@@ -1,4 +1,4 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { setNativeBackground } from "@/bridge/window";
 
 export type Theme = "dark" | "light" | "system";
 export type ResolvedTheme = "dark" | "light";
@@ -23,9 +23,5 @@ export const applyResolvedTheme = (resolved: ResolvedTheme): void => {
 };
 
 export const syncNativeBackground = (resolved: ResolvedTheme): void => {
-  try {
-    getCurrentWindow()
-      .setBackgroundColor(BACKGROUND_COLORS[resolved])
-      .catch(() => undefined);
-  } catch {}
+  setNativeBackground(BACKGROUND_COLORS[resolved]);
 };
