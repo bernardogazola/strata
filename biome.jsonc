@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": [
+    "ultracite/biome/core",
+    "ultracite/biome/react",
+    "ultracite/biome/tanstack",
+    "ultracite/biome/vitest"
+  ],
+  "files": {
+    "includes": [
+      "!**/components/ui",
+      "!src/routeTree.gen.ts",
+      "!dist",
+      "!src-tauri/gen",
+      "!src-tauri/target"
+    ]
+  }
+}

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <link href="/vite.svg" rel="icon" type="image/svg+xml">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Strata</title>
+
+    <script>
+    "use strict";
+    (() => {
+      const stored = localStorage.getItem("vite-ui-theme");
+      const dark =
+        stored === "dark" ||
+        (stored !== "light" &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches);
+      try {
+        document.documentElement.classList.toggle("dark", dark);
+        document.documentElement.style.colorScheme = dark ? "dark" : "light";
+      } catch {
+      }
+    })();
+    </script>
+
+    <style>
+    html {
+      background-color: #f6f6f6;
+    }
+    html.dark {
+      background-color: #0a0a0a;
+    }
+    </style>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script src="/src/main.tsx" type="module"></script>
+  </body>
+</html>
