@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
 import {
   assertCytoscapeColor,
@@ -6,6 +7,9 @@ import {
 } from "../palette";
 
 const MENTIONS_STRUCTURAL_EDGE_TOKEN = /--graph-edge-structural/;
+
+const readGlobalCss = (): Promise<string> =>
+  readFile(new URL("../../../global.css", import.meta.url), "utf8");
 
 describe("assertCytoscapeColor", () => {
   test("aceita os formatos que o parser do Cytoscape entende", () => {
@@ -56,9 +60,7 @@ describe("assertCytoscapeColor", () => {
 
 describe("GRAPH_TOKENS", () => {
   test("todo token declarado existe em global.css, nos dois temas", async () => {
-    const css = await import("node:fs/promises").then((fs) =>
-      fs.readFile(new URL("../../../global.css", import.meta.url), "utf8")
-    );
+    const css = await readGlobalCss();
 
     const lightBlock = css.slice(css.indexOf(":root"), css.indexOf("@theme"));
     const darkBlock = css.slice(css.indexOf(".dark {"));
@@ -70,13 +72,11 @@ describe("GRAPH_TOKENS", () => {
   });
 
   test("nenhum token do grafo está declarado em oklch", async () => {
-    const css = await import("node:fs/promises").then((fs) =>
-      fs.readFile(new URL("../../../global.css", import.meta.url), "utf8")
-    );
+    const css = await readGlobalCss();
 
     const graphLines = css
       .split("\n")
-      .filter((line) => line.trimStart().startsWith("--graph-"));
+      .filter((line: string) => line.trimStart().startsWith("--graph-"));
 
     expect(graphLines.length).toBe(GRAPH_TOKENS.length * 2);
     for (const line of graphLines) {
