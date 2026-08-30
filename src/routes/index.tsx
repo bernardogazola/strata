@@ -1,4 +1,3 @@
-import "@/global.css";
 import { createFileRoute } from "@tanstack/react-router";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";

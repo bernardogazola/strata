@@ -1,4 +1,4 @@
-import { Moon, Sun } from "lucide-react";
+import { IconMoon, IconSun } from "@tabler/icons-react";
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,8 +8,13 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { Theme } from "@/lib/theme";
 
-const THEMES = ["light", "dark", "system"] as const;
+const THEME_OPTIONS: ReadonlyArray<{ label: string; value: Theme }> = [
+  { label: "Claro", value: "light" },
+  { label: "Escuro", value: "dark" },
+  { label: "Sistema", value: "system" },
+];
 
 export function ModeToggle() {
   const { theme, resolvedTheme, setTheme } = useTheme();
@@ -17,23 +22,18 @@ export function ModeToggle() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button size="icon" variant="outline" />}>
-        {resolvedTheme === "dark" ? (
-          <Moon className="h-[1.2rem] w-[1.2rem]" />
-        ) : (
-          <Sun className="h-[1.2rem] w-[1.2rem]" />
-        )}
-        <span className="sr-only">Toggle theme</span>
+        {resolvedTheme === "dark" ? <IconMoon /> : <IconSun />}
+        <span className="sr-only">Alternar tema</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuRadioGroup onValueChange={setTheme} value={theme}>
-          {THEMES.map((t) => (
+          {THEME_OPTIONS.map((option) => (
             <DropdownMenuRadioItem
-              className="capitalize"
               closeOnClick
-              key={t}
-              value={t}
+              key={option.value}
+              value={option.value}
             >
-              {t}
+              {option.label}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

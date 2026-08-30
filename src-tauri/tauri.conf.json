@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "strata",
+  "productName": "Strata",
   "version": "0.1.0",
   "identifier": "br.pucpr.tcc.strata",
   "build": {
@@ -12,10 +12,14 @@
   "app": {
     "windows": [
       {
-        "title": "strata",
-        "width": 800,
-        "height": 600,
-        "visible": false
+        "title": "Strata",
+        "width": 1440,
+        "height": 900,
+        "visible": false,
+        "minWidth": 960,
+        "minHeight": 600,
+        "center": true,
+        "resizable": true
       }
     ],
     "security": {

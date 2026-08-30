@@ -1,9 +1,9 @@
 [package]
 name = "strata"
 version = "0.1.0"
-description = "Um app Tauri"
-authors = ["you"]
-edition = "2021"
+description = "Ferramenta local-first de arqueologia de código para onboarding em bases legadas Java"
+authors = ["Bernardo Gazola"]
+edition = "2024"
 
 [lib]
 name = "strata_lib"

@@ -1,3 +1,4 @@
+import "@/global.css";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { StrictMode } from "react";
