@@ -10,10 +10,12 @@ import {
   applyResolvedTheme,
   getSystemTheme,
   type ResolvedTheme,
+  readStoredTheme,
   resolveTheme,
   syncNativeBackground,
   THEME_STORAGE_KEY,
   type Theme,
+  writeStoredTheme,
 } from "@/lib/theme";
 
 interface ThemeProviderProps {
@@ -37,12 +39,9 @@ export function ThemeProvider({
   defaultTheme = "system",
   storageKey = THEME_STORAGE_KEY,
 }: ThemeProviderProps) {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    const stored = localStorage.getItem(storageKey);
-    return stored === "dark" || stored === "light" || stored === "system"
-      ? stored
-      : defaultTheme;
-  });
+  const [theme, setThemeState] = useState<Theme>(
+    () => readStoredTheme(storageKey) ?? defaultTheme
+  );
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
     resolveTheme(theme)
   );
@@ -68,7 +67,7 @@ export function ThemeProvider({
 
   const setTheme = useCallback(
     (next: Theme) => {
-      localStorage.setItem(storageKey, next);
+      writeStoredTheme(storageKey, next);
       setThemeState(next);
     },
     [storageKey]

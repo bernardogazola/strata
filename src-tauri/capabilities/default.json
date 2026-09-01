@@ -1,11 +1,10 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capacidades da janela principal",
+  "description": "Capacidades da janela principal. Não inclui dialog, fs nem shell: o seletor de pastas roda no Rust e a WebView só recebe um handle opaco. core:default não dá acesso a arquivos nem a processos.",
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "opener:default",
     "core:window:allow-show",
     "core:window:allow-set-focus",
     "core:window:allow-set-background-color",

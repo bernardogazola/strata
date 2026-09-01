@@ -1,24 +1,28 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR" translate="no">
   <head>
     <meta charset="UTF-8">
-    <link href="/vite.svg" rel="icon" type="image/svg+xml">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
     <title>Strata</title>
 
     <script>
     "use strict";
     (() => {
-      const stored = localStorage.getItem("vite-ui-theme");
+      let stored = null;
+      try {
+        stored = localStorage.getItem("vite-ui-theme");
+      } catch {
+        // Sem preferência salva: usa a do sistema.
+      }
+
       const dark =
         stored === "dark" ||
         (stored !== "light" &&
           window.matchMedia("(prefers-color-scheme: dark)").matches);
-      try {
-        document.documentElement.classList.toggle("dark", dark);
-        document.documentElement.style.colorScheme = dark ? "dark" : "light";
-      } catch {
-      }
+
+      const root = document.documentElement;
+      root.classList.toggle("dark", dark);
+      root.style.colorScheme = dark ? "dark" : "light";
     })();
     </script>
 

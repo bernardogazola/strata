@@ -51,6 +51,19 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  --graph-node: #d4d4d4;
+  --graph-node-border: #a3a3a3;
+  --graph-node-label: #171717;
+  --graph-node-package: #e5e5e5;
+  --graph-node-hotspot: #f59e0b;
+  --graph-node-hotspot-strong: #dc2626;
+  --graph-node-selected: #2563eb;
+  --graph-node-dimmed: #ededed;
+  --graph-edge-structural: #737373;
+  --graph-edge-evolutionary: #7c3aed;
+  --graph-edge-highlighted: #2563eb;
+  --graph-edge-dimmed: #e5e5e5;
 }
 
 @theme inline {
@@ -128,6 +141,19 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  --graph-node: #404040;
+  --graph-node-border: #737373;
+  --graph-node-label: #fafafa;
+  --graph-node-package: #262626;
+  --graph-node-hotspot: #fbbf24;
+  --graph-node-hotspot-strong: #f87171;
+  --graph-node-selected: #60a5fa;
+  --graph-node-dimmed: #2a2a2a;
+  --graph-edge-structural: #8a8a8a;
+  --graph-edge-evolutionary: #a78bfa;
+  --graph-edge-highlighted: #60a5fa;
+  --graph-edge-dimmed: #333333;
 }
 
 @layer base {

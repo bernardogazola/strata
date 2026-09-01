@@ -1,17 +1,20 @@
-import { createRouter, RouterProvider } from "@tanstack/react-router";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import "@/global.css";
+import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { z } from "zod";
+import { revealWindow } from "@/bridge/window";
+import { hasLocaleData } from "@/i18n/format";
 import AppProvider from "./provider";
-import { routeTree } from "./routeTree.gen";
+import { createAppRouter } from "./router";
 
-const router = createRouter({ routeTree });
+z.config(z.locales.pt());
 
-declare module "@tanstack/react-router" {
-  interface Register {
-    router: typeof router;
-  }
+if (import.meta.env.DEV && !hasLocaleData()) {
+  console.warn("Dados de locale pt-BR ausentes neste runtime.");
 }
+
+const { queryClient, router } = createAppRouter();
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
@@ -20,7 +23,7 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <AppProvider>
+    <AppProvider queryClient={queryClient}>
       <RouterProvider router={router} />
     </AppProvider>
   </StrictMode>
@@ -28,12 +31,6 @@ createRoot(rootElement).render(
 
 requestAnimationFrame(() => {
   requestAnimationFrame(() => {
-    try {
-      const win = getCurrentWindow();
-      win
-        .show()
-        .then(() => win.setFocus())
-        .catch(() => undefined);
-    } catch {}
+    revealWindow();
   });
 });

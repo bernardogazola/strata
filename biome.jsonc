@@ -14,5 +14,27 @@
       "!src-tauri/gen",
       "!src-tauri/target"
     ]
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/**", "!src/bridge/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@tauri-apps/**"],
+                    "message": "Acesse a API do Tauri por src/bridge/, que concentra a autoridade nativa da WebView."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
