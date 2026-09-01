@@ -4,7 +4,7 @@ import type {
   ProtocolError,
 } from "@/protocol/errors";
 import { errorParamsSchemaByCode, isKnownErrorCode } from "@/protocol/errors";
-import { formatInteger } from "./format";
+import { formatDuration, formatInteger } from "./format";
 
 export type MessageSegment =
   | { kind: "chrome"; text: string }
@@ -67,6 +67,30 @@ const errorRegistry: ErrorRegistry = {
     retryable: false,
     severity: "error",
   },
+  CACHE_CORRUPT: {
+    format: () => ({
+      body: [
+        t(
+          "O cache de análise estava corrompido e foi recriado. Nenhum resultado foi perdido, mas a próxima análise deste repositório será mais lenta."
+        ),
+      ],
+      title: "Cache recriado",
+    }),
+    retryable: true,
+    severity: "warning",
+  },
+  CACHE_MIGRATION_FAILED: {
+    format: () => ({
+      body: [
+        t(
+          "O cache de análise não pôde ser atualizado para o formato desta versão e foi recriado. Nenhum resultado foi perdido, mas a próxima análise deste repositório será mais lenta."
+        ),
+      ],
+      title: "Cache recriado",
+    }),
+    retryable: true,
+    severity: "warning",
+  },
   INTERNAL_UNEXPECTED: {
     format: () => ({
       body: [t("O Strata encontrou um erro inesperado.")],
@@ -96,6 +120,19 @@ const errorRegistry: ErrorRegistry = {
     retryable: false,
     severity: "error",
   },
+  PROC_ANALYZER_NOT_READY: {
+    format: () => ({
+      body: [
+        t(
+          "O analisador ainda está iniciando e não pode atender esta operação."
+        ),
+      ],
+      hint: "Tente de novo em instantes.",
+      title: "Analisador ainda iniciando",
+    }),
+    retryable: true,
+    severity: "error",
+  },
   PROC_ANALYZER_START_FAILED: {
     format: () => ({
       body: [t("Não foi possível iniciar o processo de análise.")],
@@ -104,6 +141,29 @@ const errorRegistry: ErrorRegistry = {
     }),
     retryable: true,
     severity: "error",
+  },
+  PROC_REQUEST_TIMEOUT: {
+    format: (p) => ({
+      body: [
+        t(
+          `O analisador não respondeu em ${formatDuration(p.timeoutMs)} e a operação foi interrompida.`
+        ),
+      ],
+      hint: "Tente de novo; se persistir, reinicie o Strata.",
+      title: "O analisador demorou demais",
+    }),
+    retryable: true,
+    severity: "error",
+  },
+  PROC_SHUTTING_DOWN: {
+    format: () => ({
+      body: [
+        t("A aplicação está sendo encerrada e não inicia novas operações."),
+      ],
+      title: "Encerrando o Strata",
+    }),
+    retryable: false,
+    severity: "warning",
   },
   PROTO_INVALID_PAYLOAD: {
     format: () => ({
@@ -181,6 +241,18 @@ const errorRegistry: ErrorRegistry = {
     retryable: false,
     severity: "error",
   },
+  REPO_NO_HISTORY: {
+    format: () => ({
+      body: [
+        t(
+          "Este repositório ainda não tem commits, então a análise estrutural roda sem as visões de histórico e de evolução."
+        ),
+      ],
+      title: "Repositório sem histórico",
+    }),
+    retryable: false,
+    severity: "warning",
+  },
   REPO_NO_JAVA_SOURCES: {
     format: () => ({
       body: [t("Nenhum arquivo .java foi encontrado no repositório.")],
@@ -199,6 +271,31 @@ const errorRegistry: ErrorRegistry = {
     retryable: false,
     severity: "error",
   },
+  REPO_PATH_CHANGED: {
+    format: () => ({
+      body: [
+        t(
+          "O caminho verificado no início da análise deixou de apontar para a mesma pasta, então a análise foi interrompida."
+        ),
+      ],
+      hint: "Abra o repositório novamente.",
+      title: "A pasta do repositório mudou",
+    }),
+    retryable: false,
+    severity: "error",
+  },
+  REPO_PATH_ESCAPES_ROOT: {
+    format: (p) => ({
+      body: [
+        t("O caminho "),
+        u(p.filePath),
+        t(" aponta para fora do repositório e foi ignorado."),
+      ],
+      title: "Caminho fora do repositório",
+    }),
+    retryable: false,
+    severity: "warning",
+  },
   REPO_TOO_MANY_FILES: {
     format: (p) => ({
       body: [
@@ -210,6 +307,18 @@ const errorRegistry: ErrorRegistry = {
     }),
     retryable: false,
     severity: "error",
+  },
+  REPO_UNREADABLE: {
+    format: (p) => ({
+      body: [
+        t("O sistema de arquivos não permitiu ler "),
+        u(p.filePath),
+        t(", que ficou de fora da análise."),
+      ],
+      title: "Arquivo inacessível",
+    }),
+    retryable: false,
+    severity: "warning",
   },
   SOURCE_FILE_TOO_LARGE: {
     format: (p) => ({
