@@ -10,6 +10,26 @@ export const BACKGROUND_COLORS: Record<ResolvedTheme, string> = {
   light: "#f6f6f6",
 };
 
+export const readStoredTheme = (storageKey: string): Theme | null => {
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(storageKey);
+  } catch {
+    return null;
+  }
+  return stored === "dark" || stored === "light" || stored === "system"
+    ? stored
+    : null;
+};
+
+export const writeStoredTheme = (storageKey: string, theme: Theme): void => {
+  try {
+    localStorage.setItem(storageKey, theme);
+  } catch {
+    // Sem armazenamento, o tema vale só para esta sessão.
+  }
+};
+
 export const getSystemTheme = (): ResolvedTheme =>
   window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 

@@ -8,16 +8,21 @@
     <script>
     "use strict";
     (() => {
-      const stored = localStorage.getItem("vite-ui-theme");
+      let stored = null;
+      try {
+        stored = localStorage.getItem("vite-ui-theme");
+      } catch {
+        // Sem preferência salva: usa a do sistema.
+      }
+
       const dark =
         stored === "dark" ||
         (stored !== "light" &&
           window.matchMedia("(prefers-color-scheme: dark)").matches);
-      try {
-        document.documentElement.classList.toggle("dark", dark);
-        document.documentElement.style.colorScheme = dark ? "dark" : "light";
-      } catch {
-      }
+
+      const root = document.documentElement;
+      root.classList.toggle("dark", dark);
+      root.style.colorScheme = dark ? "dark" : "light";
     })();
     </script>
 

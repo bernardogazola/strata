@@ -1,4 +1,6 @@
 import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import {
   assertCytoscapeColor,
@@ -8,8 +10,12 @@ import {
 
 const MENTIONS_STRUCTURAL_EDGE_TOKEN = /--graph-edge-structural/;
 
-const readGlobalCss = (): Promise<string> =>
-  readFile(new URL("../../../global.css", import.meta.url), "utf8");
+const GLOBAL_CSS = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../../global.css"
+);
+
+const readGlobalCss = (): Promise<string> => readFile(GLOBAL_CSS, "utf8");
 
 describe("assertCytoscapeColor", () => {
   test("aceita os formatos que o parser do Cytoscape entende", () => {
