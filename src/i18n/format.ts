@@ -117,3 +117,18 @@ export const plural = (
 
 export const hasLocaleData = (): boolean =>
   new Intl.DateTimeFormat(LOCALE).resolvedOptions().locale.startsWith("pt");
+
+const PLACEHOLDER = /\{(\w+)\}/g;
+
+export const interpolate = (
+  template: string,
+  params: Readonly<Record<string, number | string>>
+): string =>
+  template.replace(PLACEHOLDER, (token, name: string) => {
+    if (!Object.hasOwn(params, name)) {
+      return token;
+    }
+
+    const value = params[name];
+    return typeof value === "number" ? formatInteger(value) : value;
+  });
