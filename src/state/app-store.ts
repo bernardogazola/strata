@@ -5,7 +5,8 @@ import type { AnalysisStage, ProgressTick } from "@/protocol/analysis";
 export type BackendState =
   | { phase: "STARTING" }
   | { phase: "READY"; protocolVersion: number }
-  | { phase: "CRASHED"; exitCode: number | null };
+  | { phase: "CRASHED"; exitCode: number | null }
+  | { phase: "INCOMPATIBLE"; expected: number; received: number };
 
 interface AppState {
   readonly activeElementId: string | null;
@@ -16,6 +17,7 @@ interface AppState {
 interface AppActions {
   readonly applyProgress: (tick: ProgressTick) => void;
   readonly clearProgress: () => void;
+  readonly recoverBackend: () => void;
   readonly setActiveElementId: (elementId: string | null) => void;
   readonly setBackend: (backend: BackendState) => void;
 }
@@ -44,6 +46,16 @@ export const useAppStore = create<AppStore>()(
 
       clearProgress: () => set({ progress: {} }, false, "clearProgress"),
 
+      recoverBackend: () =>
+        set(
+          (state) =>
+            state.backend.phase === "CRASHED"
+              ? { backend: { phase: "STARTING" as const }, progress: {} }
+              : state,
+          false,
+          "recoverBackend"
+        ),
+
       setActiveElementId: (elementId) =>
         set({ activeElementId: elementId }, false, "setActiveElementId"),
 
@@ -61,3 +73,6 @@ export const selectIsAnalysing = (state: AppStore): boolean =>
 
 export const selectAnalyzerUsable = (state: AppStore): boolean =>
   state.backend.phase === "READY";
+
+export const selectBackendRecoverable = (state: AppStore): boolean =>
+  state.backend.phase === "CRASHED";
