@@ -7,7 +7,7 @@ export LC_ALL=C
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 FIXTURES_DIR="$ROOT/protocol/fixtures"
 REPOSITORIES_DIR="$ROOT/fixtures/repositories"
-EXPECT_REPOSITORIES=7
+EXPECT_REPOSITORIES=12
 EXPECT_GIT=0
 COUNT_ONLY=""
 MAX_FRAME_BYTES=16777216
@@ -18,7 +18,7 @@ uso: verify-fixtures.sh [opções]
 
   --fixtures <pasta>     fixtures de protocolo    (padrão: <repo>/protocol/fixtures)
   --repositories <pasta> fixtures de repositório  (padrão: <repo>/fixtures/repositories)
-  --expect-repositories <n>  quantas fixtures de repositório devem existir (padrão: 7)
+  --expect-repositories <n>  quantas fixtures de repositório devem existir (padrão: 12)
   --expect-git           exige também que cada fixture seja um repositório git gerado
   --count <classe>       mostra só a contagem de "protocol" ou de "repositories"
   --max-frame <n>        tamanho máximo de frame em bytes (padrão: 16777216)

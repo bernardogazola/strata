@@ -21,10 +21,15 @@ const EXPECTED_FIXTURES = [
   "broken-source",
   "cyclic",
   "inheritance",
+  "long-history",
+  "mass-change",
+  "merge-commits",
   "method-calls",
   "missing-classpath",
   "multi-module",
+  "renamed-files",
   "simple-packages",
+  "unusual-names",
 ] as const;
 
 const LINE_BUDGET: Record<string, number> = {
@@ -169,7 +174,7 @@ const packageOf = (typeId: string): string => {
 };
 
 describe("o corpus existe", () => {
-  test("as sete fixtures estruturais estão presentes, exatamente", () => {
+  test("as doze fixtures estão presentes, exatamente", () => {
     expect(corpus.map((fixture) => fixture.name)).toStrictEqual([
       ...EXPECTED_FIXTURES,
     ]);

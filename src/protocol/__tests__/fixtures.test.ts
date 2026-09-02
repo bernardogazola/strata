@@ -469,12 +469,9 @@ const EXPECTED_COVERAGE_GAP = [
   "element.describe",
   "evolution.changeMetrics",
   "evolution.cochange",
-  "graph.search",
-  "graph.slice",
   "hotspot.profile",
   "hotspots.ids",
   "hotspots.list",
-  "outline.children",
   "repository.describe",
   "tour",
 ];

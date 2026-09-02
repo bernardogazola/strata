@@ -1011,16 +1011,16 @@ self_test() {
 
   gen "$tmp/a" >/dev/null
   ids "$tmp/a" > "$tmp/id-a"
-  if [ "$(wc -l < "$tmp/id-a" | tr -d ' ')" = 7 ] &&
-     [ "$(grep -c -E '^[a-z-]+ [0-9a-f]{40}$' "$tmp/id-a")" = 7 ]; then
-    ok "sete fixtures, sete ids de commit com quarenta hex"
+  if [ "$(wc -l < "$tmp/id-a" | tr -d ' ')" = 12 ] &&
+     [ "$(grep -c -E '^[a-z-]+ [0-9a-f]{40}$' "$tmp/id-a")" = 12 ]; then
+    ok "doze fixtures, doze ids de commit com quarenta hex"
   else
-    no "sete fixtures, sete ids de commit com quarenta hex" "$(cat "$tmp/id-a")"
+    no "doze fixtures, doze ids de commit com quarenta hex" "$(cat "$tmp/id-a")"
   fi
 
   gen "$tmp/b" >/dev/null
   ids "$tmp/b" > "$tmp/id-b"
-  if [ "$(wc -l < "$tmp/id-b" | tr -d ' ')" = 7 ] && diff -q "$tmp/id-a" "$tmp/id-b" >/dev/null; then
+  if [ "$(wc -l < "$tmp/id-b" | tr -d ' ')" = 12 ] && diff -q "$tmp/id-a" "$tmp/id-b" >/dev/null; then
     ok "duas execuções em duas pastas dão ids idênticos"
   else
     no "duas execuções em duas pastas dão ids idênticos" "$(diff "$tmp/id-a" "$tmp/id-b" | head -4)"
@@ -1037,7 +1037,7 @@ self_test() {
     gen "$tmp/hostile" >/dev/null
     ids "$tmp/hostile" > "$tmp/id-hostile"
   )
-  if [ "$(wc -l < "$tmp/id-hostile" | tr -d ' ')" = 7 ] && diff -q "$tmp/id-a" "$tmp/id-hostile" >/dev/null; then
+  if [ "$(wc -l < "$tmp/id-hostile" | tr -d ' ')" = 12 ] && diff -q "$tmp/id-a" "$tmp/id-hostile" >/dev/null; then
     ok "um ambiente hostil não muda nenhum id de commit"
   else
     no "um ambiente hostil não muda nenhum id de commit" "$(diff "$tmp/id-a" "$tmp/id-hostile" | head -4)"
@@ -1081,7 +1081,7 @@ self_test() {
     no "o branch é main, não o padrão do git" "o HEAD aponta para outro lugar"
   fi
 
-  if [ -s "$tmp/a/commits.txt" ] && [ "$(wc -l < "$tmp/a/commits.txt" | tr -d ' ')" = 7 ]; then
+  if [ -s "$tmp/a/commits.txt" ] && [ "$(wc -l < "$tmp/a/commits.txt" | tr -d ' ')" = 12 ]; then
     ok "commits.txt tem uma linha por fixture"
   else
     no "commits.txt tem uma linha por fixture" "o arquivo não existe ou está incompleto"
