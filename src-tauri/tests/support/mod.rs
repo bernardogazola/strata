@@ -64,6 +64,31 @@ impl Recorder {
             .clone()
     }
 
+    pub fn wait_for(&self, predicate: impl Fn(&AnalyzerEvent) -> bool, patience: Duration) -> bool {
+        let deadline = std::time::Instant::now() + patience;
+        loop {
+            if self.snapshot().iter().any(&predicate) {
+                return true;
+            }
+            if std::time::Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+
+    pub fn settle(&self, quiet: Duration) {
+        let mut last = self.snapshot().len();
+        loop {
+            std::thread::sleep(quiet);
+            let now = self.snapshot().len();
+            if now == last {
+                return;
+            }
+            last = now;
+        }
+    }
+
     pub fn wire_names(&self) -> Vec<String> {
         self.snapshot()
             .into_iter()

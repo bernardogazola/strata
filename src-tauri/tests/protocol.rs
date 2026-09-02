@@ -1,7 +1,7 @@
 mod support;
 
 use std::time::Duration;
-use strata_lib::analyzer::{AnalyzerHandle, BackendPhase};
+use strata_lib::analyzer::{AnalyzerEvent, AnalyzerHandle, BackendPhase};
 use strata_lib::error::{ErrorCode, Response};
 use support::{Recorder, block_on, empty_payload, fast_config, stub_plan};
 
@@ -22,10 +22,14 @@ fn spawn_and_handshake() {
             }
         );
 
-        let wire = events.wire_names();
+        let arrived = events.wait_for(
+            |event| matches!(event, AnalyzerEvent::Wire { name, .. } if name == "protocol.ready"),
+            SHORT,
+        );
         assert!(
-            wire.contains(&"protocol.ready".to_owned()),
-            "o frame de ready também deve chegar ao sink, mas veio {wire:?}"
+            arrived,
+            "o frame de ready também deve chegar ao sink, mas veio {:?}",
+            events.wire_names()
         );
 
         handle.shutdown().await.expect("shutdown limpo");
@@ -130,6 +134,8 @@ fn stdin_eof_terminates_child() {
             !report.forced,
             "fechar o stdin deve bastar; terminar à força significa que o caminho do EOF falhou"
         );
+
+        events.settle(Duration::from_millis(50));
 
         assert!(
             !events.saw_crashed(),
