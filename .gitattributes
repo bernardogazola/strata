@@ -1,3 +1,11 @@
 protocol/fixtures/*.jsonl text eol=lf
 
 *.sh text eol=lf
+
+fixtures/repositories/**/*.java text eol=lf
+fixtures/repositories/**/*.json text eol=lf
+fixtures/repositories/**/*.md text eol=lf
+fixtures/repositories/**/*.xml text eol=lf
+fixtures/repositories/**/*.gradle text eol=lf
+fixtures/repositories/**/*.properties text eol=lf
+fixtures/repositories/**/*.txt text eol=lf
