@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "fixture": "merge-commits",
+  "claims": ["completeness", "files", "history", "packages", "sourceRoots", "types"],
+  "sourceRoots": [
+    {"path": "src/main/java", "kind": "MAIN", "javaFileCount": 4}
+  ],
+  "completeness": {
+    "totalFiles": 4,
+    "parseFailures": 0
+  },
+  "packages": ["pkg:br.pucpr.shipping"],
+  "types": [
+    {"id": "type:br.pucpr.shipping.Parcel", "kind": "CLASS"},
+    {"id": "type:br.pucpr.shipping.Route", "kind": "CLASS"},
+    {"id": "type:br.pucpr.shipping.Tracker", "kind": "CLASS"},
+    {"id": "type:br.pucpr.shipping.Waybill", "kind": "CLASS"}
+  ],
+  "files": [
+    "file:src/main/java/br/pucpr/shipping/Parcel.java",
+    "file:src/main/java/br/pucpr/shipping/Route.java",
+    "file:src/main/java/br/pucpr/shipping/Tracker.java",
+    "file:src/main/java/br/pucpr/shipping/Waybill.java"
+  ],
+  "history": {
+    "commits": 7,
+    "merges": 1,
+    "qualifying": 6,
+    "qualifyingCoChange": 6,
+    "authors": 1,
+    "lineages": [
+      {"first": "src/main/java/br/pucpr/shipping/Parcel.java", "head": "src/main/java/br/pucpr/shipping/Parcel.java", "renames": 0, "changes": 4},
+      {"first": "src/main/java/br/pucpr/shipping/Route.java", "head": "src/main/java/br/pucpr/shipping/Route.java", "renames": 0, "changes": 3},
+      {"first": "src/main/java/br/pucpr/shipping/Tracker.java", "head": "src/main/java/br/pucpr/shipping/Tracker.java", "renames": 0, "changes": 3},
+      {"first": "src/main/java/br/pucpr/shipping/Waybill.java", "head": "src/main/java/br/pucpr/shipping/Waybill.java", "renames": 0, "changes": 2}
+    ],
+    "cochange": [
+      {"left": "src/main/java/br/pucpr/shipping/Parcel.java", "right": "src/main/java/br/pucpr/shipping/Route.java", "support": 3, "changesLeft": 4, "changesRight": 3}
+    ]
+  }
+}

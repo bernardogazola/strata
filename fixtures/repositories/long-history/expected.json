@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "fixture": "long-history",
+  "claims": ["completeness", "files", "history", "packages", "sourceRoots", "types"],
+  "sourceRoots": [
+    {"path": "src/main/java", "kind": "MAIN", "javaFileCount": 8}
+  ],
+  "completeness": {
+    "totalFiles": 8,
+    "parseFailures": 0
+  },
+  "packages": ["pkg:br.pucpr.ledger"],
+  "types": [
+    {"id": "type:br.pucpr.ledger.Entry0", "kind": "CLASS"},
+    {"id": "type:br.pucpr.ledger.Entry1", "kind": "CLASS"},
+    {"id": "type:br.pucpr.ledger.Entry2", "kind": "CLASS"},
+    {"id": "type:br.pucpr.ledger.Entry3", "kind": "CLASS"},
+    {"id": "type:br.pucpr.ledger.Entry4", "kind": "CLASS"},
+    {"id": "type:br.pucpr.ledger.Entry5", "kind": "CLASS"},
+    {"id": "type:br.pucpr.ledger.Entry6", "kind": "CLASS"},
+    {"id": "type:br.pucpr.ledger.Entry7", "kind": "CLASS"}
+  ],
+  "files": [
+    "file:src/main/java/br/pucpr/ledger/Entry0.java",
+    "file:src/main/java/br/pucpr/ledger/Entry1.java",
+    "file:src/main/java/br/pucpr/ledger/Entry2.java",
+    "file:src/main/java/br/pucpr/ledger/Entry3.java",
+    "file:src/main/java/br/pucpr/ledger/Entry4.java",
+    "file:src/main/java/br/pucpr/ledger/Entry5.java",
+    "file:src/main/java/br/pucpr/ledger/Entry6.java",
+    "file:src/main/java/br/pucpr/ledger/Entry7.java"
+  ],
+  "history": {
+    "commits": 121,
+    "merges": 0,
+    "qualifying": 121,
+    "qualifyingCoChange": 121,
+    "authors": 2,
+    "authorsWithoutMailmap": 4,
+    "lineages": [
+      {"first": "src/main/java/br/pucpr/ledger/Entry0.java", "head": "src/main/java/br/pucpr/ledger/Entry0.java", "renames": 0, "changes": 31},
+      {"first": "src/main/java/br/pucpr/ledger/Entry1.java", "head": "src/main/java/br/pucpr/ledger/Entry1.java", "renames": 0, "changes": 31},
+      {"first": "src/main/java/br/pucpr/ledger/Entry2.java", "head": "src/main/java/br/pucpr/ledger/Entry2.java", "renames": 0, "changes": 31},
+      {"first": "src/main/java/br/pucpr/ledger/Entry3.java", "head": "src/main/java/br/pucpr/ledger/Entry3.java", "renames": 0, "changes": 31},
+      {"first": "src/main/java/br/pucpr/ledger/Entry4.java", "head": "src/main/java/br/pucpr/ledger/Entry4.java", "renames": 0, "changes": 31},
+      {"first": "src/main/java/br/pucpr/ledger/Entry5.java", "head": "src/main/java/br/pucpr/ledger/Entry5.java", "renames": 0, "changes": 31},
+      {"first": "src/main/java/br/pucpr/ledger/Entry6.java", "head": "src/main/java/br/pucpr/ledger/Entry6.java", "renames": 0, "changes": 31},
+      {"first": "src/main/java/br/pucpr/ledger/Entry7.java", "head": "src/main/java/br/pucpr/ledger/Entry7.java", "renames": 0, "changes": 31}
+    ],
+    "cochange": [
+      {"left": "src/main/java/br/pucpr/ledger/Entry0.java", "right": "src/main/java/br/pucpr/ledger/Entry3.java", "support": 16, "changesLeft": 31, "changesRight": 31},
+      {"left": "src/main/java/br/pucpr/ledger/Entry0.java", "right": "src/main/java/br/pucpr/ledger/Entry5.java", "support": 16, "changesLeft": 31, "changesRight": 31},
+      {"left": "src/main/java/br/pucpr/ledger/Entry1.java", "right": "src/main/java/br/pucpr/ledger/Entry4.java", "support": 16, "changesLeft": 31, "changesRight": 31},
+      {"left": "src/main/java/br/pucpr/ledger/Entry1.java", "right": "src/main/java/br/pucpr/ledger/Entry6.java", "support": 16, "changesLeft": 31, "changesRight": 31},
+      {"left": "src/main/java/br/pucpr/ledger/Entry2.java", "right": "src/main/java/br/pucpr/ledger/Entry5.java", "support": 16, "changesLeft": 31, "changesRight": 31},
+      {"left": "src/main/java/br/pucpr/ledger/Entry2.java", "right": "src/main/java/br/pucpr/ledger/Entry7.java", "support": 16, "changesLeft": 31, "changesRight": 31},
+      {"left": "src/main/java/br/pucpr/ledger/Entry3.java", "right": "src/main/java/br/pucpr/ledger/Entry6.java", "support": 16, "changesLeft": 31, "changesRight": 31},
+      {"left": "src/main/java/br/pucpr/ledger/Entry4.java", "right": "src/main/java/br/pucpr/ledger/Entry7.java", "support": 16, "changesLeft": 31, "changesRight": 31}
+    ]
+  }
+}

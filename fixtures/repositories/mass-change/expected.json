@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "fixture": "mass-change",
+  "claims": ["completeness", "history", "sourceRoots"],
+  "sourceRoots": [
+    {"path": "src/main/java", "kind": "MAIN", "javaFileCount": 30}
+  ],
+  "completeness": {
+    "totalFiles": 30,
+    "parseFailures": 0
+  },
+  "history": {
+    "commits": 13,
+    "merges": 0,
+    "qualifying": 13,
+    "qualifyingCoChange": 10,
+    "authors": 1,
+    "bulk": {
+      "median": 2,
+      "q1": 2,
+      "q3": 3,
+      "iqr": 1,
+      "mad": 1,
+      "bulkThreshold": 25,
+      "bulkCommitCount": 1,
+      "bulkFileTotal": 30,
+      "forcedBulkCommits": 0,
+      "excludedMergeCommits": 0
+    }
+  }
+}

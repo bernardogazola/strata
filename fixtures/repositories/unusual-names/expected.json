@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "fixture": "unusual-names",
+  "claims": ["completeness", "files", "history", "packages", "sourceRoots", "types"],
+  "sourceRoots": [
+    {"path": "src/main/java", "kind": "MAIN", "javaFileCount": 3}
+  ],
+  "completeness": {
+    "totalFiles": 3,
+    "parseFailures": 0
+  },
+  "packages": ["pkg:br.pucpr.pedidos", "pkg:br.pucpr.pedidos.avaliação"],
+  "types": [
+    {"id": "type:br.pucpr.pedidos.Pedido", "kind": "CLASS"},
+    {"id": "type:br.pucpr.pedidos.RelatorioBidi", "kind": "CLASS"},
+    {"id": "type:br.pucpr.pedidos.avaliação.Avaliação", "kind": "CLASS"}
+  ],
+  "files": [
+    "file:src/main/java/br/pucpr/pedidos/Pedido.java",
+    "file:src/main/java/br/pucpr/pedidos/Relatório‮gpj.java",
+    "file:src/main/java/br/pucpr/pedidos/avaliação/Avaliação.java"
+  ],
+  "history": {
+    "commits": 5,
+    "merges": 0,
+    "qualifying": 5,
+    "qualifyingCoChange": 5,
+    "authors": 1,
+    "lineages": [
+      {"first": "src/main/java/br/pucpr/pedidos/Pedido.java", "head": "src/main/java/br/pucpr/pedidos/Pedido.java", "renames": 0, "changes": 4},
+      {"first": "src/main/java/br/pucpr/pedidos/Relatório‮gpj.java", "head": "src/main/java/br/pucpr/pedidos/Relatório‮gpj.java", "renames": 0, "changes": 2},
+      {"first": "src/main/java/br/pucpr/pedidos/avaliação/Nota.java", "head": "src/main/java/br/pucpr/pedidos/avaliação/Avaliação.java", "renames": 1, "changes": 4}
+    ],
+    "cochange": [
+      {"left": "src/main/java/br/pucpr/pedidos/Pedido.java", "right": "src/main/java/br/pucpr/pedidos/avaliação/Nota.java", "support": 3, "changesLeft": 4, "changesRight": 4}
+    ]
+  }
+}

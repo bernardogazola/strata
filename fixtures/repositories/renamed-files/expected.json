@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "fixture": "renamed-files",
+  "claims": ["completeness", "files", "history", "packages", "sourceRoots", "types"],
+  "sourceRoots": [
+    {"path": "src/main/java", "kind": "MAIN", "javaFileCount": 5}
+  ],
+  "completeness": {
+    "totalFiles": 5,
+    "parseFailures": 0
+  },
+  "packages": ["pkg:br.pucpr.books"],
+  "types": [
+    {"id": "type:br.pucpr.books.Catalog", "kind": "CLASS"},
+    {"id": "type:br.pucpr.books.GeneralLedger", "kind": "CLASS"},
+    {"id": "type:br.pucpr.books.Loan", "kind": "CLASS"},
+    {"id": "type:br.pucpr.books.Member", "kind": "CLASS"},
+    {"id": "type:br.pucpr.books.Report", "kind": "CLASS"}
+  ],
+  "files": [
+    "file:src/main/java/br/pucpr/books/Catalog.java",
+    "file:src/main/java/br/pucpr/books/GeneralLedger.java",
+    "file:src/main/java/br/pucpr/books/Loan.java",
+    "file:src/main/java/br/pucpr/books/Member.java",
+    "file:src/main/java/br/pucpr/books/Report.java"
+  ],
+  "history": {
+    "commits": 12,
+    "merges": 0,
+    "qualifying": 12,
+    "qualifyingCoChange": 12,
+    "authors": 1,
+    "lineages": [
+      {"first": "src/main/java/br/pucpr/books/Catalog.java", "head": "src/main/java/br/pucpr/books/Catalog.java", "renames": 0, "changes": 8},
+      {"first": "src/main/java/br/pucpr/books/Ledger.java", "head": "src/main/java/br/pucpr/books/GeneralLedger.java", "renames": 2, "changes": 5},
+      {"first": "src/main/java/br/pucpr/books/Legacy.java", "head": null, "renames": 0, "changes": 3},
+      {"first": "src/main/java/br/pucpr/books/Loan.java", "head": "src/main/java/br/pucpr/books/Loan.java", "renames": 0, "changes": 5},
+      {"first": "src/main/java/br/pucpr/books/Member.java", "head": "src/main/java/br/pucpr/books/Member.java", "renames": 0, "changes": 3},
+      {"first": "src/main/java/br/pucpr/books/Report.java", "head": "src/main/java/br/pucpr/books/Report.java", "renames": 0, "changes": 3}
+    ],
+    "cochange": [
+      {"left": "src/main/java/br/pucpr/books/Catalog.java", "right": "src/main/java/br/pucpr/books/Ledger.java", "support": 4, "changesLeft": 8, "changesRight": 5},
+      {"left": "src/main/java/br/pucpr/books/Catalog.java", "right": "src/main/java/br/pucpr/books/Legacy.java", "support": 3, "changesLeft": 8, "changesRight": 3},
+      {"left": "src/main/java/br/pucpr/books/Catalog.java", "right": "src/main/java/br/pucpr/books/Loan.java", "support": 4, "changesLeft": 8, "changesRight": 5},
+      {"left": "src/main/java/br/pucpr/books/Ledger.java", "right": "src/main/java/br/pucpr/books/Loan.java", "support": 4, "changesLeft": 5, "changesRight": 5},
+      {"left": "src/main/java/br/pucpr/books/Member.java", "right": "src/main/java/br/pucpr/books/Report.java", "support": 3, "changesLeft": 3, "changesRight": 3}
+    ]
+  }
+}

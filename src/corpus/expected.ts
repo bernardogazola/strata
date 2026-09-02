@@ -74,6 +74,46 @@ const cyclesSchema = z.strictObject({
   types: z.array(z.array(elementIdSchema).min(2)),
 });
 
+const lineageRowSchema = z.strictObject({
+  changes: positiveCount,
+  first: relativePath,
+  head: relativePath.nullable(),
+  renames: count,
+});
+
+const coChangeRowSchema = z.strictObject({
+  changesLeft: positiveCount,
+  changesRight: positiveCount,
+  left: relativePath,
+  right: relativePath,
+  support: positiveCount,
+});
+
+const bulkSchema = z.strictObject({
+  bulkCommitCount: count,
+  bulkFileTotal: count,
+  bulkThreshold: positiveCount,
+  excludedMergeCommits: count,
+  forcedBulkCommits: count,
+  iqr: count,
+  mad: count,
+  median: positiveCount,
+  q1: positiveCount,
+  q3: positiveCount,
+});
+
+const historySchema = z.strictObject({
+  authors: positiveCount,
+  authorsWithoutMailmap: positiveCount.optional(),
+  bulk: bulkSchema.optional(),
+  cochange: z.array(coChangeRowSchema).min(1).optional(),
+  commits: positiveCount,
+  lineages: z.array(lineageRowSchema).min(1).optional(),
+  merges: count,
+  qualifying: positiveCount,
+  qualifyingCoChange: count,
+});
+
 export const CLAIMABLE_SECTIONS = [
   "buildSystem",
   "completeness",
@@ -104,6 +144,7 @@ export const expectedSchema = z.strictObject({
   evidence: z.array(evidenceRowSchema).min(1).optional(),
   files: z.array(elementIdSchema).min(1).optional(),
   fixture: z.string().regex(/^[a-z][a-z0-9-]*$/),
+  history: historySchema.optional(),
   methods: z.array(elementIdSchema).min(1).optional(),
   packages: z.array(elementIdSchema).min(1).optional(),
   parseFailures: z.array(elementIdSchema).min(1).optional(),
@@ -131,6 +172,7 @@ export const CANONICAL_KEY_ORDER = [
   "cycles",
   "parseFailures",
   "declaredModules",
+  "history",
 ] as const satisfies readonly (keyof Expected)[];
 
 export const DEPENDENCY_TYPE_ORDER = dependencyTypeSchema.options;
@@ -146,6 +188,21 @@ export const DEPENDENCY_TYPE_WEIGHT = {
   PARAMETER_TYPE: 1,
   RETURN_TYPE: 2,
 } as const satisfies Record<(typeof DEPENDENCY_TYPE_ORDER)[number], number>;
+
+export const COCHANGE_MIN_JACCARD = 0.15;
+export const COCHANGE_MIN_CONFIDENCE = 0.3;
+export const MIN_SUPPORT_FLOOR = 3;
+export const MIN_SUPPORT_CAP = 10;
+export const MIN_SUPPORT_FRACTION = 0.01;
+
+export const minSupport = (qualifyingCoChange: number): number =>
+  Math.min(
+    MIN_SUPPORT_CAP,
+    Math.max(
+      MIN_SUPPORT_FLOOR,
+      Math.ceil(MIN_SUPPORT_FRACTION * qualifyingCoChange)
+    )
+  );
 
 export const RESOLUTION_STRENGTH = {
   INFERRED: 1,

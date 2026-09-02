@@ -5,10 +5,13 @@ import { describe, expect, test } from "vitest";
 import {
   CANONICAL_KEY_ORDER,
   CLAIMABLE_SECTIONS,
+  COCHANGE_MIN_CONFIDENCE,
+  COCHANGE_MIN_JACCARD,
   DEPENDENCY_TYPE_ORDER,
   DEPENDENCY_TYPE_WEIGHT,
   type Expected,
   expectedSchema,
+  minSupport,
   RESOLUTION_STRENGTH,
   renderExpected,
 } from "../expected";
@@ -47,6 +50,7 @@ const ABSOLUTE_UNC = /^\\\\/;
 const HOME_DIRECTORY = /^\/(Users|home)\//;
 const METHOD_ID = /^method:(.+)#[^#]*\([^()]*\)$/;
 const JAVA_FILE = /\.java$/;
+const REVISION = /^\s*static final int REVISION = (\d+);$/m;
 
 interface Fixture {
   readonly dir: string;
@@ -522,6 +526,202 @@ describe("as dependências", () => {
       ]);
     }
     expect(checked).toBeGreaterThan(0);
+  });
+});
+
+describe("a história", () => {
+  test("qualifying exclui os merges, e Q_cc exclui além disso massa e um-arquivo", () => {
+    let checked = 0;
+    for (const fixture of corpus) {
+      const { history } = fixture.value;
+      if (!history) {
+        continue;
+      }
+      checked += 1;
+      expect([fixture.name, history.qualifying]).toStrictEqual([
+        fixture.name,
+        history.commits - history.merges,
+      ]);
+      expect([
+        fixture.name,
+        history.qualifyingCoChange <= history.qualifying,
+      ]).toStrictEqual([fixture.name, true]);
+    }
+    expect(checked).toBe(5);
+  });
+
+  test("as linhagens estão em ordem de caminho de criação e sem repetição", () => {
+    let checked = 0;
+    for (const fixture of corpus) {
+      const rows = fixture.value.history?.lineages;
+      if (!rows) {
+        continue;
+      }
+      checked += 1;
+      const first = rows.map((row) => row.first);
+      expect([fixture.name, first]).toStrictEqual([
+        fixture.name,
+        [...new Set(first)].sort(),
+      ]);
+      for (const row of rows) {
+        expect([fixture.name, row.first, row.renames > 0]).toStrictEqual([
+          fixture.name,
+          row.first,
+          row.head !== null && row.head !== row.first,
+        ]);
+      }
+    }
+    expect(checked).toBe(4);
+  });
+
+  test("o head de uma linhagem existe no disco; o de uma linhagem apagada é null", () => {
+    let checked = 0;
+    for (const fixture of corpus) {
+      for (const row of fixture.value.history?.lineages ?? []) {
+        checked += 1;
+        const onDisk =
+          row.head !== null && existsSync(path.join(fixture.dir, row.head));
+        expect([fixture.name, row.first, onDisk]).toStrictEqual([
+          fixture.name,
+          row.first,
+          row.head !== null,
+        ]);
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  test("changes casa com o REVISION que o gerador escreveu no fonte", () => {
+    let checked = 0;
+    for (const fixture of corpus) {
+      for (const row of fixture.value.history?.lineages ?? []) {
+        if (row.head === null) {
+          continue;
+        }
+        checked += 1;
+        const source = readFileSync(path.join(fixture.dir, row.head), "utf8");
+        const found = REVISION.exec(source);
+        expect([fixture.name, row.head, found?.[1] ?? null]).toStrictEqual([
+          fixture.name,
+          row.head,
+          String(row.changes),
+        ]);
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  test("os pares estão ordenados, são não ordenados e não se repetem", () => {
+    let checked = 0;
+    for (const fixture of corpus) {
+      const rows = fixture.value.history?.cochange;
+      if (!rows) {
+        continue;
+      }
+      checked += 1;
+      const keys = rows.map((row) => `${row.left} ${row.right}`);
+      expect([fixture.name, keys]).toStrictEqual([
+        fixture.name,
+        [...new Set(keys)].sort(),
+      ]);
+      for (const row of rows) {
+        expect([fixture.name, row.left < row.right]).toStrictEqual([
+          fixture.name,
+          true,
+        ]);
+      }
+    }
+    expect(checked).toBe(4);
+  });
+
+  test("cada par referencia duas linhagens declaradas, com o mesmo changes", () => {
+    let checked = 0;
+    for (const fixture of corpus) {
+      const { history } = fixture.value;
+      if (!(history?.cochange && history.lineages)) {
+        continue;
+      }
+      const changes = new Map(
+        history.lineages.map((row) => [row.first, row.changes])
+      );
+      for (const row of history.cochange) {
+        checked += 1;
+        expect([fixture.name, row.left, row.changesLeft]).toStrictEqual([
+          fixture.name,
+          row.left,
+          changes.get(row.left),
+        ]);
+        expect([fixture.name, row.right, row.changesRight]).toStrictEqual([
+          fixture.name,
+          row.right,
+          changes.get(row.right),
+        ]);
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  test("confiança e Jaccard são recalculados e todo par declarado passa nos três limiares", () => {
+    let checked = 0;
+    for (const fixture of corpus) {
+      const { history } = fixture.value;
+      if (!history?.cochange) {
+        continue;
+      }
+      const floor = minSupport(history.qualifyingCoChange);
+      for (const row of history.cochange) {
+        checked += 1;
+        const union = row.changesLeft + row.changesRight - row.support;
+        const jaccard = row.support / union;
+        const leftToRight = row.support / row.changesLeft;
+        const rightToLeft = row.support / row.changesRight;
+        expect([
+          fixture.name,
+          `${row.left} ${row.right}`,
+          [
+            row.support >= floor,
+            jaccard >= COCHANGE_MIN_JACCARD,
+            Math.max(leftToRight, rightToLeft) >= COCHANGE_MIN_CONFIDENCE,
+            leftToRight <= 1 && rightToLeft <= 1,
+            row.support <= Math.min(row.changesLeft, row.changesRight),
+          ],
+        ]).toStrictEqual([
+          fixture.name,
+          `${row.left} ${row.right}`,
+          [true, true, true, true, true],
+        ]);
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  test("o limiar de massa vem dos cortes de Tukey e MAD, com o piso de 25", () => {
+    let checked = 0;
+    for (const fixture of corpus) {
+      const bulk = fixture.value.history?.bulk;
+      if (!bulk) {
+        continue;
+      }
+      checked += 1;
+      const tukeyCut = bulk.q3 + 3 * bulk.iqr;
+      const madCut = bulk.median + 5 * 1.4826 * bulk.mad;
+      expect([fixture.name, bulk.iqr]).toStrictEqual([
+        fixture.name,
+        bulk.q3 - bulk.q1,
+      ]);
+      expect([fixture.name, bulk.bulkThreshold]).toStrictEqual([
+        fixture.name,
+        Math.min(Math.max(tukeyCut, madCut, 25), 200),
+      ]);
+      expect([
+        fixture.name,
+        fixture.value.history?.qualifying ?? 0,
+      ]).not.toStrictEqual([
+        fixture.name,
+        fixture.value.history?.qualifyingCoChange,
+      ]);
+    }
+    expect(checked).toBe(1);
   });
 });
 
