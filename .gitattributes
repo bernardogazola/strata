@@ -11,3 +11,9 @@ fixtures/repositories/**/*.properties text eol=lf
 fixtures/repositories/**/*.txt text eol=lf
 
 fixtures/repositories/**/.mailmap text eol=lf
+
+analyzer/mvnw text eol=lf
+
+analyzer/mvnw.cmd text eol=crlf
+
+analyzer/src/**/*.java text eol=lf
