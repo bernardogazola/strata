@@ -40,6 +40,9 @@ src/routeTree.gen.ts
 
 *.tsbuildinfo
 
+fixtures/repositories/**/.gradle/
+fixtures/repositories/**/bin/
+
 !fixtures/repositories/**/target/
 !fixtures/repositories/**/target/**
 

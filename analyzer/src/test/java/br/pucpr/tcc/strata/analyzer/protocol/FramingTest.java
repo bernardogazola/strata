@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.bootstrap.Lifecycle;
+import br.pucpr.tcc.strata.analyzer.protocol.method.SystemPing;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -111,20 +112,24 @@ final class FramingTest {
   void cincoLinhasMalformadasSaoToleradasEResincronizadasEASextaEncerra() throws IOException {
     final String entrada =
         String.join(
-            "\n",
-            "{isto nao e json",
-            pingRequest('0'),
-            "{\"id\":\"" + ID + "\",\"kind\":\"request\",\"method\":\"system.ping\","
-                + "\"payload\":{},\"protocol\":2}",
-            pingRequest('1'),
-            "{\"id\":\"" + ID + "\",\"kind\":\"event\",\"event\":\"protocol.ready\","
-                + "\"payload\":{},\"protocol\":1}",
-            pingRequest('2'),
-            "{\"id\":\"nao-e-um-req-id\",\"kind\":\"request\",\"method\":\"system.ping\","
-                + "\"payload\":{},\"protocol\":1}",
-            pingRequest('3'),
-            "[\"array no lugar de objeto\"]",
-            pingRequest('4'))
+                "\n",
+                "{isto nao e json",
+                pingRequest('0'),
+                "{\"id\":\""
+                    + ID
+                    + "\",\"kind\":\"request\",\"method\":\"system.ping\","
+                    + "\"payload\":{},\"protocol\":2}",
+                pingRequest('1'),
+                "{\"id\":\""
+                    + ID
+                    + "\",\"kind\":\"event\",\"event\":\"protocol.ready\","
+                    + "\"payload\":{},\"protocol\":1}",
+                pingRequest('2'),
+                "{\"id\":\"nao-e-um-req-id\",\"kind\":\"request\",\"method\":\"system.ping\","
+                    + "\"payload\":{},\"protocol\":1}",
+                pingRequest('3'),
+                "[\"array no lugar de objeto\"]",
+                pingRequest('4'))
             + "\n";
 
     final Harness h = harness(entrada);
@@ -176,8 +181,11 @@ final class FramingTest {
   @Test
   void umCarriageReturnDentroDeUmaStringContaUMAVezSoENaoDuas() throws IOException {
     final Harness h =
-        harness(pingRequest('0').replace("system.ping", "system\r.ping") + "\n" + pingRequest('1')
-            + "\n");
+        harness(
+            pingRequest('0').replace("system.ping", "system\r.ping")
+                + "\n"
+                + pingRequest('1')
+                + "\n");
     assertThat(h.run()).isEqualTo(AnalysisConstants.EXIT_OK);
     assertThat(h.malformed()).isEqualTo(1);
     assertThat(h.written().lines()).hasSize(1);

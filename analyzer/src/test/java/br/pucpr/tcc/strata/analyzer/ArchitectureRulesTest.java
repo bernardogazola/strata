@@ -6,15 +6,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.Test;
 
-@AnalyzeClasses(
-    packages = "br.pucpr.tcc.strata.analyzer",
-    importOptions = ImportOption.DoNotIncludeTests.class)
+@AnalyzeClasses(packages = "br.pucpr.tcc.strata.analyzer")
 final class ArchitectureRulesTest {
 
   @ArchTest
@@ -57,14 +54,16 @@ final class ArchitectureRulesTest {
   @Test
   void oConjuntoImportadoNaoEstaVazio() {
     final JavaClasses importadas =
-        new ClassFileImporter()
-            .withImportOption(new ImportOption.DoNotIncludeTests())
-            .importPackages("br.pucpr.tcc.strata.analyzer");
+        new ClassFileImporter().importPackages("br.pucpr.tcc.strata.analyzer");
 
     assertThat(importadas)
         .as("um pacote errado devolve conjunto vazio e deixa as três regras verdes para sempre")
         .isNotEmpty();
     assertThat(importadas.stream().map(c -> c.getFullName()))
-        .contains("br.pucpr.tcc.strata.analyzer.bootstrap.Main");
+        .as(
+            "produção e teste: as regras valem para os dois, e um grep não sabe distinguir"
+                + " a proibição do violador")
+        .contains("br.pucpr.tcc.strata.analyzer.bootstrap.Main")
+        .contains("br.pucpr.tcc.strata.analyzer.protocol.FramingTest");
   }
 }

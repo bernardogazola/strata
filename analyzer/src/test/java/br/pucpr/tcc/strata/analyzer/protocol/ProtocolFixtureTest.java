@@ -3,6 +3,8 @@ package br.pucpr.tcc.strata.analyzer.protocol;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
+import br.pucpr.tcc.strata.analyzer.protocol.method.SystemPing;
+import br.pucpr.tcc.strata.analyzer.protocol.method.SystemShutdown;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
