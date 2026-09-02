@@ -14,9 +14,17 @@ FIXTURE_NAME="Strata Fixture"
 FIXTURE_EMAIL="fixtures@strata.invalid"
 FIXTURE_DATE="2024-01-02T03:04:05+0000"
 
+FIXTURE_EPOCH=1704164645
+
+FIXTURE_COMMIT_DATE=""
+FIXTURE_COMMIT_NAME=""
+FIXTURE_COMMIT_EMAIL=""
+
 SIDECARS="expected.json README.md cloc-golden.txt"
 
-FIXTURES="simple-packages inheritance cyclic method-calls missing-classpath broken-source multi-module"
+FIXTURES="simple-packages inheritance cyclic method-calls missing-classpath broken-source multi-module renamed-files merge-commits mass-change long-history unusual-names"
+
+HISTORY_FIXTURES="renamed-files merge-commits mass-change long-history unusual-names"
 
 usage() {
   cat <<'USAGE'
@@ -79,30 +87,71 @@ fixture_reset() {
 
 fixture_git() {
   local dir="$1"; shift
+  local when="${FIXTURE_COMMIT_DATE:-$FIXTURE_DATE}"
+  local who="${FIXTURE_COMMIT_NAME:-$FIXTURE_NAME}"
+  local mail="${FIXTURE_COMMIT_EMAIL:-$FIXTURE_EMAIL}"
   env -u EMAIL \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_NOSYSTEM=1 \
-    GIT_AUTHOR_NAME="$FIXTURE_NAME"    GIT_AUTHOR_EMAIL="$FIXTURE_EMAIL" \
+    GIT_MERGE_AUTOEDIT=no \
+    GIT_AUTHOR_NAME="$who"  GIT_AUTHOR_EMAIL="$mail" \
     GIT_COMMITTER_NAME="$FIXTURE_NAME" GIT_COMMITTER_EMAIL="$FIXTURE_EMAIL" \
-    GIT_AUTHOR_DATE="$FIXTURE_DATE"    GIT_COMMITTER_DATE="$FIXTURE_DATE" \
+    GIT_AUTHOR_DATE="$when" GIT_COMMITTER_DATE="$when" \
     git -C "$dir" \
-        -c user.name="$FIXTURE_NAME" -c user.email="$FIXTURE_EMAIL" \
+        -c user.name="$who" -c user.email="$mail" \
         -c core.excludesFile=/dev/null -c core.attributesFile=/dev/null \
         -c core.autocrlf=false -c core.eol=lf -c commit.gpgsign=false \
-        -c init.defaultBranch=main \
+        -c core.quotePath=false -c init.defaultBranch=main \
         "$@"
 }
 
-fixture_history() {
-  local dir="$1" message="$2" sidecar
+fixture_history_begin() {
+  local dir="$1" sidecar
   rm -rf -- "$dir/.git"
   fixture_git "$dir" init -q
   : > "$dir/.git/info/exclude"
   for sidecar in $SIDECARS; do
     printf '/%s\n' "$sidecar" >> "$dir/.git/info/exclude"
   done
+}
+
+fixture_history() {
+  local dir="$1" message="$2"
+  fixture_history_begin "$dir"
   fixture_git "$dir" add -A
   fixture_git "$dir" commit -q --no-verify -m "$message"
 }
+
+fixture_commit() {
+  local dir="$1" day="$2" message="$3"
+  FIXTURE_COMMIT_DATE="$((FIXTURE_EPOCH + day * 86400)) +0000"
+  fixture_git "$dir" add -A
+  fixture_git "$dir" commit -q --no-verify -m "$message"
+  FIXTURE_COMMIT_DATE=""
+}
+
+fixture_commit_as() {
+  local dir="$1" day="$2" who="$3" mail="$4" message="$5"
+  FIXTURE_COMMIT_NAME="$who"
+  FIXTURE_COMMIT_EMAIL="$mail"
+  fixture_commit "$dir" "$day" "$message"
+  FIXTURE_COMMIT_NAME=""
+  FIXTURE_COMMIT_EMAIL=""
+}
+
+fixture_merge() {
+  local dir="$1" day="$2" branch="$3" message="$4"
+  FIXTURE_COMMIT_DATE="$((FIXTURE_EPOCH + day * 86400)) +0000"
+  fixture_git "$dir" merge -q --no-ff --no-edit --no-verify -m "$message" "$branch"
+  FIXTURE_COMMIT_DATE=""
+}
+
+history_begin()     { [ "$NO_GIT" = 1 ] || fixture_history_begin "$@"; }
+history_commit()    { [ "$NO_GIT" = 1 ] || fixture_commit "$@"; }
+history_commit_as() { [ "$NO_GIT" = 1 ] || fixture_commit_as "$@"; }
+history_merge()     { [ "$NO_GIT" = 1 ] || fixture_merge "$@"; }
+
+history_branch()    { [ "$NO_GIT" = 1 ] || fixture_git "$1" checkout -q -b "$2"; }
+history_switch()    { [ "$NO_GIT" = 1 ] || fixture_git "$1" checkout -q "$2"; }
 
 make_simple_packages() {
   fixture_reset "$1"
@@ -935,6 +984,391 @@ public final class Main {
 JAVA
 }
 
+make_renamed_files() {
+  local dir="$1" pkg="src/main/java/br/pucpr/books"
+  fixture_reset "$dir"
+
+  book() {
+    emit "$pkg/$1.java" <<JAVA
+package br.pucpr.books;
+
+/**
+ * Fixture de linhagem de caminho: $3
+ *
+ * <p>REVISION é a contagem de commits que tocaram este arquivo, e é o mesmo número que
+ * o golden declara em history.lineages[].changes.
+ */
+public final class $1 {
+
+    static final int REVISION = $2;
+
+    $1() {
+    }
+
+    int revision() {
+        return REVISION;
+    }
+}
+JAVA
+  }
+
+  history_begin "$dir"
+
+  book Catalog 1 "o eixo do agrupamento."
+  book Loan    1 "muda com Catalog e com Ledger."
+  book Ledger  1 "renomeada duas vezes; uma linhagem só."
+  history_commit "$dir" 0 "cria o catálogo, o empréstimo e o livro-razão"
+
+  book Catalog 2 "o eixo do agrupamento."
+  book Loan    2 "muda com Catalog e com Ledger."
+  book Ledger  2 "renomeada duas vezes; uma linhagem só."
+  history_commit "$dir" 1 "revisa os três núcleos juntos"
+
+  book Catalog 3 "o eixo do agrupamento."
+  book Loan    3 "muda com Catalog e com Ledger."
+  book Ledger  3 "renomeada duas vezes; uma linhagem só."
+  history_commit "$dir" 2 "revisa os três núcleos juntos de novo"
+
+  book Catalog 4 "o eixo do agrupamento."
+  book Loan    4 "muda com Catalog e com Ledger."
+  history_commit "$dir" 3 "ajusta catálogo e empréstimo"
+
+  book Catalog 5 "o eixo do agrupamento."
+  rm -f -- "$dir/$pkg/Ledger.java"
+  book AccountLedger 4 "renomeada duas vezes; uma linhagem só."
+  history_commit "$dir" 4 "renomeia Ledger para AccountLedger"
+
+  book Loan 5 "muda com Catalog e com Ledger."
+  rm -f -- "$dir/$pkg/AccountLedger.java"
+  book GeneralLedger 5 "renomeada duas vezes; uma linhagem só."
+  history_commit "$dir" 5 "renomeia AccountLedger para GeneralLedger"
+
+  book Member 1 "muda só com Report."
+  book Report 1 "muda só com Member."
+  history_commit "$dir" 6 "cria o sócio e o relatório"
+
+  book Member 2 "muda só com Report."
+  book Report 2 "muda só com Member."
+  history_commit "$dir" 7 "revisa sócio e relatório"
+
+  book Member 3 "muda só com Report."
+  book Report 3 "muda só com Member."
+  history_commit "$dir" 8 "revisa sócio e relatório de novo"
+
+  book Catalog 6 "o eixo do agrupamento."
+  book Legacy  1 "linhagem apagada, sem caminho no HEAD."
+  history_commit "$dir" 9 "traz o módulo legado para perto do catálogo"
+
+  book Catalog 7 "o eixo do agrupamento."
+  book Legacy  2 "linhagem apagada, sem caminho no HEAD."
+  history_commit "$dir" 10 "ajusta catálogo e legado"
+
+  book Catalog 8 "o eixo do agrupamento."
+  rm -f -- "$dir/$pkg/Legacy.java"
+  history_commit "$dir" 11 "remove o módulo legado"
+
+  unset -f book
+}
+
+make_merge_commits() {
+  local dir="$1" pkg="src/main/java/br/pucpr/shipping"
+  fixture_reset "$dir"
+
+  ship() {
+    emit "$pkg/$1.java" <<JAVA
+package br.pucpr.shipping;
+
+/**
+ * Fixture de exclusão de merge: $3
+ *
+ * <p>REVISION é a contagem de commits que tocaram este arquivo, sem contar merges.
+ */
+public final class $1 {
+
+    static final int REVISION = $2;
+
+    $1() {
+    }
+
+    int revision() {
+        return REVISION;
+    }
+}
+JAVA
+  }
+
+  history_begin "$dir"
+
+  ship Parcel 1 "muda sempre com Route."
+  ship Route  1 "muda sempre com Parcel."
+  history_commit "$dir" 0 "cria a encomenda e a rota"
+
+  ship Parcel 2 "muda sempre com Route."
+  ship Route  2 "muda sempre com Parcel."
+  history_commit "$dir" 1 "revisa encomenda e rota"
+
+  history_branch "$dir" tracking
+  ship Tracker 1 "nasce no ramo; entra na principal pelo merge."
+  ship Waybill 1 "nasce no ramo; entra na principal pelo merge."
+  history_commit "$dir" 2 "cria o rastreador e o conhecimento de embarque"
+
+  ship Tracker 2 "nasce no ramo; entra na principal pelo merge."
+  ship Waybill 2 "nasce no ramo; entra na principal pelo merge."
+  history_commit "$dir" 3 "revisa rastreador e conhecimento"
+
+  history_switch "$dir" main
+  ship Parcel 3 "muda sempre com Route."
+  ship Route  3 "muda sempre com Parcel."
+  history_commit "$dir" 4 "revisa encomenda e rota na principal"
+
+  history_merge "$dir" 5 tracking "integra o ramo de rastreamento"
+
+  ship Parcel  4 "muda sempre com Route."
+  ship Tracker 3 "nasce no ramo; entra na principal pelo merge."
+  history_commit "$dir" 6 "liga a encomenda ao rastreador"
+
+  unset -f ship
+}
+
+make_mass_change() {
+  local dir="$1" pkg="src/main/java/br/pucpr/rules"
+  fixture_reset "$dir"
+
+  rule() {
+    local id
+    id=$(printf 'Rule%02d' "$1")
+    emit "$pkg/$id.java" <<JAVA
+package br.pucpr.rules;
+
+/**
+ * Fixture: classificação de commit em massa. Uma das trinta regras que o commit de
+ * reformatação toca de uma vez.
+ *
+ * <p>REVISION é a contagem de commits que tocaram este arquivo.
+ */
+public final class $id {
+
+    static final int REVISION = $2;
+
+    $id() {
+    }
+
+    int revision() {
+        return REVISION;
+    }
+}
+JAVA
+  }
+
+  rules() {
+    local rev="$1" from="$2" to="$3" i
+    i="$from"
+    while [ "$i" -le "$to" ]; do
+      rule "$i" "$rev"
+      i=$((i + 1))
+    done
+  }
+
+  history_begin "$dir"
+
+  rules 1 1 2;   history_commit "$dir" 0  "cria as duas primeiras regras"
+  rules 1 3 4;   history_commit "$dir" 1  "cria mais duas regras"
+  rules 1 5 7;   history_commit "$dir" 2  "cria três regras de validação"
+  rules 1 8 9;   history_commit "$dir" 3  "cria duas regras de desconto"
+  rules 1 10 12; history_commit "$dir" 4  "cria três regras de frete"
+  rules 1 13 14; history_commit "$dir" 5  "cria duas regras de imposto"
+  rules 1 15 15; history_commit "$dir" 6  "cria a regra de arredondamento"
+  rules 1 16 18; history_commit "$dir" 7  "cria três regras de cancelamento"
+  rules 1 19 20; history_commit "$dir" 8  "cria duas regras de reembolso"
+  rules 1 21 21; history_commit "$dir" 9  "cria a regra de crédito"
+  rules 1 22 23; history_commit "$dir" 10 "cria duas regras de auditoria"
+
+  rules 1 24 30
+  rules 2 1 18
+  history_commit "$dir" 11 "cria as sete últimas regras e ajusta as dezoito primeiras"
+
+  rules 3 1 18
+  rules 2 19 30
+  history_commit "$dir" 12 "reformata as trinta regras de uma vez"
+
+  unset -f rule rules
+}
+
+make_long_history() {
+  local dir="$1" pkg="src/main/java/br/pucpr/ledger" i j a b who mail
+  local -a rev
+  fixture_reset "$dir"
+
+  entry() {
+    local id
+    id=$(printf 'Entry%d' "$1")
+    emit "$pkg/$id.java" <<JAVA
+package br.pucpr.ledger;
+
+/**
+ * Fixture: história longa. Um dos oito arquivos do rodízio determinístico, em que
+ * o commit i toca Entry(i mod 8) e Entry((i+3) mod 8).
+ *
+ * <p>REVISION é a contagem de commits que tocaram este arquivo.
+ */
+public final class $id {
+
+    static final int REVISION = $2;
+
+    $id() {
+    }
+
+    int revision() {
+        return REVISION;
+    }
+}
+JAVA
+  }
+
+  history_begin "$dir"
+
+  emit .mailmap <<'MAILMAP'
+Ana Souza <ana@example.invalid> <ana.souza@corp.invalid>
+Bruno Lima <bruno@example.invalid> <b.lima@corp.invalid>
+MAILMAP
+
+  i=0
+  while [ "$i" -lt 8 ]; do
+    rev[$i]=1
+    entry "$i" 1
+    i=$((i + 1))
+  done
+  history_commit_as "$dir" 0 "Ana Souza" "ana@example.invalid" \
+    "cria as oito entradas do razão"
+
+  j=0
+  while [ "$j" -lt 120 ]; do
+    a=$((j % 8))
+    b=$(((j + 3) % 8))
+    rev[$a]=$((rev[a] + 1))
+    rev[$b]=$((rev[b] + 1))
+    entry "$a" "${rev[$a]}"
+    entry "$b" "${rev[$b]}"
+    case $((j % 4)) in
+      0) who="Ana Souza";  mail="ana@example.invalid" ;;
+      1) who="Bruno Lima"; mail="bruno@example.invalid" ;;
+      2) who="A. Souza";   mail="ana.souza@corp.invalid" ;;
+      *) who="Bruno L.";   mail="b.lima@corp.invalid" ;;
+    esac
+    history_commit_as "$dir" $((j + 1)) "$who" "$mail" \
+      "$(printf 'lança o movimento %03d' $((j + 1)))"
+    j=$((j + 1))
+  done
+
+  unset -f entry
+}
+
+make_unusual_names() {
+  local dir="$1" pkg="src/main/java/br/pucpr/pedidos"
+  local seg cls rtl subject
+  fixture_reset "$dir"
+
+  seg=$(printf 'avalia\xc3\xa7\xc3\xa3o')
+  cls=$(printf 'Avalia\xc3\xa7\xc3\xa3o')
+  rtl=$(printf 'Relat\xc3\xb3rio\xe2\x80\xaegpj')
+
+  order() {
+    emit "$pkg/Pedido.java" <<JAVA
+package br.pucpr.pedidos;
+
+/**
+ * Fixture: a âncora ASCII, para que o resto da fixture tenha contra o que ser estranho.
+ *
+ * <p>REVISION é a contagem de commits que tocaram este arquivo.
+ */
+public final class Pedido {
+
+    static final int REVISION = $1;
+
+    Pedido() {
+    }
+
+    int revision() {
+        return REVISION;
+    }
+}
+JAVA
+  }
+
+  bidi() {
+    emit "$pkg/$rtl.java" <<JAVA
+package br.pucpr.pedidos;
+
+/**
+ * Fixture: o nome deste arquivo carrega U+202E RIGHT-TO-LEFT OVERRIDE, então ele aparece
+ * com a extensão trocada em qualquer superfície que não isole a direção.
+ *
+ * <p>REVISION é a contagem de commits que tocaram este arquivo.
+ */
+final class RelatorioBidi {
+
+    static final int REVISION = $1;
+
+    RelatorioBidi() {
+    }
+
+    int revision() {
+        return REVISION;
+    }
+}
+JAVA
+  }
+
+  grade() {
+    emit "$pkg/$seg/$2.java" <<JAVA
+package br.pucpr.pedidos.$seg;
+
+/**
+ * Fixture: segmento de pacote e nome de tipo fora do ASCII, ambos em NFC.
+ *
+ * <p>REVISION é a contagem de commits que tocaram esta linhagem.
+ */
+public final class $2 {
+
+    static final int REVISION = $1;
+
+    $2() {
+    }
+
+    int revision() {
+        return REVISION;
+    }
+}
+JAVA
+  }
+
+  history_begin "$dir"
+
+  order 1
+  grade 1 Nota
+  history_commit "$dir" 0 "cria o pedido e a nota"
+
+  order 2
+  bidi 1
+  history_commit "$dir" 1 "cria o relatório de nome invertido"
+
+  grade 2 Nota
+  bidi 2
+  subject=$(printf 'ajusta nota e \xe2\x80\xaegpj.oir\xc3\xb3taler')
+  history_commit "$dir" 2 "$subject"
+
+  order 3
+  rm -f -- "$dir/$pkg/$seg/Nota.java"
+  grade 3 "$cls"
+  history_commit "$dir" 3 "renomeia Nota para o nome acentuado"
+
+  order 4
+  grade 4 "$cls"
+  history_commit "$dir" 4 "fecha o pedido com a avaliação"
+
+  unset -f order bidi grade
+}
+
 build_one() {
   local name="$1" dir="$2"
   case "$name" in
@@ -945,8 +1379,21 @@ build_one() {
     missing-classpath) make_missing_classpath "$dir" ;;
     broken-source)     make_broken_source "$dir" ;;
     multi-module)      make_multi_module "$dir" ;;
+    renamed-files)     make_renamed_files "$dir" ;;
+    merge-commits)     make_merge_commits "$dir" ;;
+    mass-change)       make_mass_change "$dir" ;;
+    long-history)      make_long_history "$dir" ;;
+    unusual-names)     make_unusual_names "$dir" ;;
     *) echo "make-fixtures: não há gerador para '$name'" >&2; exit 2 ;;
   esac
+}
+
+has_own_history() {
+  local name="$1" candidate
+  for candidate in $HISTORY_FIXTURES; do
+    [ "$candidate" = "$name" ] && return 0
+  done
+  return 1
 }
 
 build_all() {
@@ -955,10 +1402,10 @@ build_all() {
   for name in $FIXTURES; do
     dir="$out/$name"
     build_one "$name" "$dir"
-    if [ "$nogit" = 0 ]; then
-      fixture_history "$dir" "adiciona a fixture $name"
-    else
+    if [ "$nogit" = 1 ]; then
       rm -rf -- "$dir/.git"
+    elif ! has_own_history "$name"; then
+      fixture_history "$dir" "adiciona a fixture $name"
     fi
   done
 }
@@ -1085,6 +1532,35 @@ self_test() {
     ok "commits.txt tem uma linha por fixture"
   else
     no "commits.txt tem uma linha por fixture" "o arquivo não existe ou está incompleto"
+  fi
+
+  if [ "$(cd "$tmp/a/renamed-files" && fixture_git . rev-list --count HEAD)" = 12 ] &&
+     [ "$(cd "$tmp/a/long-history" && fixture_git . rev-list --count HEAD)" = 121 ] &&
+     [ "$(cd "$tmp/a/merge-commits" && fixture_git . rev-list --count HEAD)" = 7 ]; then
+    ok "as fixtures de histórico têm muitos commits, não um só"
+  else
+    no "as fixtures de histórico têm muitos commits, não um só" "uma contagem de commits está errada"
+  fi
+
+  if [ "$(cd "$tmp/a/long-history" && fixture_git . log --format=%at | sort -u | wc -l | tr -d ' ')" = 121 ]; then
+    ok "cada commit de long-history tem o próprio timestamp de autor"
+  else
+    no "cada commit de long-history tem o próprio timestamp de autor" "os timestamps se repetem"
+  fi
+
+  if [ "$(cd "$tmp/a/merge-commits" && fixture_git . rev-list --count --min-parents=2 HEAD)" = 1 ] &&
+     [ "$(cd "$tmp/a/merge-commits" && fixture_git . rev-parse HEAD)" \
+     = "$(cd "$tmp/b/merge-commits" && fixture_git . rev-parse HEAD)" ]; then
+    ok "o merge tem dois pais e se reproduz byte a byte"
+  else
+    no "o merge tem dois pais e se reproduz byte a byte" "sem merge, ou ele mudou"
+  fi
+
+  if [ -f "$tmp/a/unusual-names/src/main/java/br/pucpr/pedidos/$(printf 'Relat\xc3\xb3rio\xe2\x80\xaegpj').java" ] &&
+     [ -f "$tmp/a/unusual-names/src/main/java/br/pucpr/pedidos/$(printf 'avalia\xc3\xa7\xc3\xa3o')/$(printf 'Avalia\xc3\xa7\xc3\xa3o').java" ]; then
+    ok "os caminhos não ASCII e RTL chegam ao disco com exatamente os bytes pedidos"
+  else
+    no "os caminhos não ASCII e RTL chegam ao disco com exatamente os bytes pedidos" "um byte mudou"
   fi
 
   set +e

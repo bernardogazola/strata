@@ -42,3 +42,5 @@ src/routeTree.gen.ts
 
 !fixtures/repositories/**/target/
 !fixtures/repositories/**/target/**
+
+/corpus/
