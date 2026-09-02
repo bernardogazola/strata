@@ -177,20 +177,20 @@ where
     let mut out_b = None;
     let mut out_c = None;
     std::future::poll_fn(|cx| {
-        if out_a.is_none() {
-            if let std::task::Poll::Ready(v) = a.as_mut().poll(cx) {
-                out_a = Some(v);
-            }
+        if out_a.is_none()
+            && let std::task::Poll::Ready(value) = a.as_mut().poll(cx)
+        {
+            out_a = Some(value);
         }
-        if out_b.is_none() {
-            if let std::task::Poll::Ready(v) = b.as_mut().poll(cx) {
-                out_b = Some(v);
-            }
+        if out_b.is_none()
+            && let std::task::Poll::Ready(value) = b.as_mut().poll(cx)
+        {
+            out_b = Some(value);
         }
-        if out_c.is_none() {
-            if let std::task::Poll::Ready(v) = c.as_mut().poll(cx) {
-                out_c = Some(v);
-            }
+        if out_c.is_none()
+            && let std::task::Poll::Ready(value) = c.as_mut().poll(cx)
+        {
+            out_c = Some(value);
         }
         if out_a.is_some() && out_b.is_some() && out_c.is_some() {
             std::task::Poll::Ready(())
