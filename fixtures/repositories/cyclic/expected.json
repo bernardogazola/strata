@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "fixture": "cyclic",
+  "claims": ["buildSystem", "completeness", "cycles", "dependencies", "packages", "sourceRoots", "types"],
+  "buildSystem": "GRADLE",
+  "sourceRoots": [
+    {"path": "src/main/java", "kind": "MAIN", "javaFileCount": 6}
+  ],
+  "completeness": {
+    "totalFiles": 6,
+    "parseFailures": 0
+  },
+  "packages": ["pkg:com.x.app", "pkg:com.x.billing", "pkg:com.x.orders", "pkg:com.x.orders.dto"],
+  "types": [
+    {"id": "type:com.x.app.Main", "kind": "CLASS"},
+    {"id": "type:com.x.billing.Invoice", "kind": "CLASS"},
+    {"id": "type:com.x.billing.Ledger", "kind": "CLASS"},
+    {"id": "type:com.x.billing.Posting", "kind": "CLASS"},
+    {"id": "type:com.x.orders.Order", "kind": "CLASS"},
+    {"id": "type:com.x.orders.dto.OrderDto", "kind": "CLASS"}
+  ],
+  "dependencies": [
+    {"from": "type:com.x.app.Main", "to": "type:com.x.orders.Order", "type": "IMPORTS", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.app.Main", "to": "type:com.x.orders.Order", "type": "CALLS", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.app.Main", "to": "type:com.x.orders.Order", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.app.Main", "to": "type:com.x.orders.Order", "type": "PARAMETER_TYPE", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.billing.Invoice", "to": "type:com.x.billing.Ledger", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.billing.Invoice", "to": "type:com.x.billing.Ledger", "type": "PARAMETER_TYPE", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.billing.Ledger", "to": "type:com.x.billing.Posting", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.billing.Ledger", "to": "type:com.x.billing.Posting", "type": "PARAMETER_TYPE", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.billing.Posting", "to": "type:com.x.billing.Invoice", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.billing.Posting", "to": "type:com.x.billing.Invoice", "type": "PARAMETER_TYPE", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.orders.Order", "to": "type:com.x.orders.dto.OrderDto", "type": "IMPORTS", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.orders.Order", "to": "type:com.x.orders.dto.OrderDto", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.orders.Order", "to": "type:com.x.orders.dto.OrderDto", "type": "PARAMETER_TYPE", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.orders.dto.OrderDto", "to": "type:com.x.orders.Order", "type": "IMPORTS", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.orders.dto.OrderDto", "to": "type:com.x.orders.Order", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:com.x.orders.dto.OrderDto", "to": "type:com.x.orders.Order", "type": "PARAMETER_TYPE", "occurrences": 1, "resolution": "RESOLVED"}
+  ],
+  "cycles": {
+    "types": [
+      ["type:com.x.billing.Invoice", "type:com.x.billing.Ledger", "type:com.x.billing.Posting"],
+      ["type:com.x.orders.Order", "type:com.x.orders.dto.OrderDto"]
+    ],
+    "packages": [
+      ["pkg:com.x.orders", "pkg:com.x.orders.dto"]
+    ],
+    "notInAnyCycle": ["type:com.x.app.Main"],
+    "internalCohesion": {
+      "pkg:com.x.app": 0,
+      "pkg:com.x.billing": 3,
+      "pkg:com.x.orders": 0,
+      "pkg:com.x.orders.dto": 0
+    }
+  }
+}

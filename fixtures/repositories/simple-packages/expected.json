@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "fixture": "simple-packages",
+  "claims": ["buildSystem", "completeness", "files", "methods", "packages", "sourceRoots", "types"],
+  "buildSystem": "NONE",
+  "sourceRoots": [
+    {"path": "src/main/java", "kind": "MAIN", "javaFileCount": 5}
+  ],
+  "completeness": {
+    "totalFiles": 5,
+    "parseFailures": 0
+  },
+  "packages": ["pkg:", "pkg:br.pucpr", "pkg:br.pucpr.orders"],
+  "types": [
+    {"id": "type:Bootstrap", "kind": "CLASS"},
+    {"id": "type:br.pucpr.Log", "kind": "CLASS"},
+    {"id": "type:br.pucpr.orders.Order", "kind": "CLASS"},
+    {"id": "type:br.pucpr.orders.Order$Builder", "kind": "CLASS"},
+    {"id": "type:br.pucpr.orders.OrderService", "kind": "CLASS"}
+  ],
+  "methods": [
+    "method:Bootstrap#<init>()",
+    "method:Bootstrap#main(java.lang.String[])",
+    "method:br.pucpr.Log#<init>()",
+    "method:br.pucpr.Log#info(java.lang.String,java.lang.Object[])",
+    "method:br.pucpr.orders.Order#<init>(java.util.UUID)",
+    "method:br.pucpr.orders.Order#id()",
+    "method:br.pucpr.orders.Order$Builder#<init>()",
+    "method:br.pucpr.orders.Order$Builder#build()",
+    "method:br.pucpr.orders.Order$Builder#id(java.util.UUID)",
+    "method:br.pucpr.orders.OrderService#<init>(java.util.List)",
+    "method:br.pucpr.orders.OrderService#auditor()",
+    "method:br.pucpr.orders.OrderService#build(java.util.UUID)",
+    "method:br.pucpr.orders.OrderService#first(br.pucpr.orders.Order)",
+    "method:br.pucpr.orders.OrderService#register(java.util.List)",
+    "method:br.pucpr.orders.OrderService#run()"
+  ],
+  "files": [
+    "file:src/main/java/Bootstrap.java",
+    "file:src/main/java/br/pucpr/Log.java",
+    "file:src/main/java/br/pucpr/orders/Order.java",
+    "file:src/main/java/br/pucpr/orders/OrderService.java",
+    "file:src/main/java/br/pucpr/orders/package-info.java"
+  ]
+}

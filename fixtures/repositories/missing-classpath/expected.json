@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "fixture": "missing-classpath",
+  "claims": ["completeness", "dependencies", "sourceRoots", "types"],
+  "sourceRoots": [
+    {"path": "core/src/main/java", "kind": "MAIN", "javaFileCount": 3},
+    {"path": "plugin/src/main/java", "kind": "MAIN", "javaFileCount": 5}
+  ],
+  "completeness": {
+    "totalFiles": 8,
+    "parseFailures": 0
+  },
+  "types": [
+    {"id": "type:com.acme.core.Config", "kind": "CLASS", "root": "core/src/main/java"},
+    {"id": "type:com.acme.core.Registry", "kind": "CLASS", "root": "core/src/main/java"},
+    {"id": "type:com.acme.core.Shared", "kind": "CLASS", "root": "plugin/src/main/java"},
+    {"id": "type:com.acme.core.Widget", "kind": "CLASS", "root": "core/src/main/java"},
+    {"id": "type:com.acme.plugin.Config", "kind": "CLASS", "root": "plugin/src/main/java"},
+    {"id": "type:com.acme.plugin.Finder", "kind": "CLASS", "root": "plugin/src/main/java"},
+    {"id": "type:com.acme.plugin.Loader", "kind": "CLASS", "root": "plugin/src/main/java"},
+    {"id": "type:com.acme.plugin.spi.Probe", "kind": "CLASS", "root": "plugin/src/main/java"}
+  ],
+  "dependencies": [
+    {"from": "type:com.acme.plugin.Finder", "to": "type:com.acme.core.Registry", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "INFERRED"},
+    {"from": "type:com.acme.plugin.Loader", "to": "type:com.acme.core.Widget", "type": "IMPORTS", "occurrences": 1, "resolution": "INFERRED"},
+    {"from": "type:com.acme.plugin.Loader", "to": "type:com.acme.core.Widget", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "INFERRED"},
+    {"from": "type:com.acme.plugin.spi.Probe", "to": "type:Config", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "UNRESOLVED_EXTERNAL", "external": true, "ambiguous": true},
+    {"from": "type:com.acme.plugin.spi.Probe", "to": "type:com.acme.core.Registry", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "INFERRED"},
+    {"from": "type:com.acme.plugin.spi.Probe", "to": "type:com.thirdparty.Missing", "type": "IMPORTS", "occurrences": 1, "resolution": "UNRESOLVED_EXTERNAL", "external": true},
+    {"from": "type:com.acme.plugin.spi.Probe", "to": "type:com.thirdparty.Missing", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "UNRESOLVED_EXTERNAL", "external": true},
+    {"from": "type:com.acme.plugin.spi.Probe", "to": "type:java.lang.String", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "RESOLVED", "external": true}
+  ]
+}

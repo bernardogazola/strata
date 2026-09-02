@@ -114,9 +114,24 @@ export const expectedSchema = z.strictObject({
 
 export type Expected = z.infer<typeof expectedSchema>;
 
-export const CANONICAL_KEY_ORDER = Object.keys(
-  expectedSchema.def.shape
-) as readonly string[];
+export const CANONICAL_KEY_ORDER = [
+  "version",
+  "fixture",
+  "claims",
+  "buildSystem",
+  "sourceRoots",
+  "completeness",
+  "packages",
+  "types",
+  "methods",
+  "files",
+  "dependencies",
+  "edges",
+  "evidence",
+  "cycles",
+  "parseFailures",
+  "declaredModules",
+] as const satisfies readonly (keyof Expected)[];
 
 export const DEPENDENCY_TYPE_ORDER = dependencyTypeSchema.options;
 

@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import {
+  CANONICAL_KEY_ORDER,
   CLAIMABLE_SECTIONS,
   DEPENDENCY_TYPE_ORDER,
   DEPENDENCY_TYPE_WEIGHT,
@@ -201,6 +202,12 @@ describe("forma do golden", () => {
         parsed.success ? null : `${fixture.name}: ${parsed.error.message}`
       ).toBeNull();
     }
+  });
+
+  test("a ordem canônica de chaves cobre o schema, sem sobra e sem falta", () => {
+    expect([...CANONICAL_KEY_ORDER].sort()).toStrictEqual(
+      Object.keys(expectedSchema.def.shape).sort()
+    );
   });
 
   test("o nome da fixture é o nome do diretório", () => {

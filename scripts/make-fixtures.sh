@@ -967,7 +967,7 @@ print_ids() {
   local out="$1" name
   for name in $FIXTURES; do
     printf '%s %s\n' "$name" "$(fixture_git "$out/$name" rev-parse HEAD)"
-  done
+  done | LC_ALL=C sort
 }
 
 report() {
