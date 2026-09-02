@@ -90,7 +90,7 @@ export const ERROR_CODES = Object.keys(errorParamsSchemaByCode) as ErrorCode[];
 export const isKnownErrorCode = (code: string): code is ErrorCode =>
   Object.hasOwn(errorParamsSchemaByCode, code);
 
-export const protocolErrorSchema = z.object({
+export const protocolErrorSchema = z.strictObject({
   code: z.string().max(128),
   detail: z.string().max(2048).optional(),
   origin: errorOriginSchema.optional(),

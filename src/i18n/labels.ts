@@ -4,6 +4,8 @@ import type {
   ProgressUnit,
 } from "@/protocol/analysis";
 import type {
+  BuildSystem,
+  CacheInvalidationReason,
   ChangeType,
   CommitClass,
   DependencyDirection,
@@ -11,11 +13,13 @@ import type {
   ElementKind,
   EntryPointKind,
   GraphLevel,
+  HistoryScope,
   HotspotDimension,
   HotspotEvidenceCode,
   HotspotMetric,
   RelationshipConfidence,
   ResolutionQuality,
+  SourceRootKind,
   StageStatus,
   TourReasonTag,
   TourTier,
@@ -341,3 +345,30 @@ export const englishTermAccessibleNames = {
   LOC: "linhas de código",
   PageRank: "centralidade PageRank",
 } as const satisfies Record<EnglishTerm, string>;
+
+export const buildSystemLabels = {
+  ANT: "Ant",
+  GRADLE: "Gradle",
+  MAVEN: "Maven",
+  NONE: "Nenhum sistema de build",
+  UNKNOWN: "Sistema de build não identificado",
+} as const satisfies Record<BuildSystem, string>;
+
+export const sourceRootKindLabels = {
+  GENERATED: "Código gerado",
+  MAIN: "Código principal",
+  TEST: "Código de teste",
+} as const satisfies Record<SourceRootKind, string>;
+
+export const historyScopeLabels = {
+  ALL: "Todo o histórico",
+  LAST_N_COMMITS: "Apenas os commits mais recentes",
+} as const satisfies Record<HistoryScope, string>;
+
+export const cacheInvalidationReasonLabels = {
+  CONFIG_CHANGED: "A configuração da análise mudou",
+  CORRUPT: "O cache estava corrompido",
+  HEAD_CHANGED: "O HEAD do repositório mudou",
+  SCHEMA_VERSION: "O formato do cache mudou nesta versão",
+  WORKTREE_DIRTY: "Há alterações não registradas na árvore de trabalho",
+} as const satisfies Record<CacheInvalidationReason, string>;

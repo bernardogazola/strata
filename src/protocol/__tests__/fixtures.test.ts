@@ -23,6 +23,8 @@ const RESERVED_TOPIC = "protocol";
 
 const PAYLOAD_MUST_FAIL = new Set(["protocol.invalid-payload.jsonl"]);
 
+const ENVELOPE_MUST_FAIL = new Set(["protocol.discarded-frame.jsonl"]);
+
 const LIFECYCLE_TOPICS = new Set([
   "analysis.cancelled",
   "analysis.completed",
@@ -62,6 +64,23 @@ const methods = findProtocolExport("METHODS") as
   | undefined;
 const events = findProtocolExport("EVENTS") as
   | Record<string, z.ZodType>
+  | undefined;
+
+interface ExtendableSchema {
+  readonly extend: (shape: Record<string, z.ZodType>) => z.ZodType;
+}
+
+const protocolMessageSchema = findProtocolExport("protocolMessageSchema") as
+  | z.ZodType
+  | undefined;
+const requestEnvelopeSchema = findProtocolExport("requestEnvelopeSchema") as
+  | ExtendableSchema
+  | undefined;
+const okResponseEnvelopeSchema = findProtocolExport(
+  "okResponseEnvelopeSchema"
+) as ExtendableSchema | undefined;
+const eventEnvelopeSchema = findProtocolExport("eventEnvelopeSchema") as
+  | ExtendableSchema
   | undefined;
 
 const methodNames = methods === undefined ? [] : Object.keys(methods).sort();
@@ -209,7 +228,11 @@ const isAbsolutePathLike = (value: string): boolean =>
   ABSOLUTE_UNC.test(value) ||
   HOME_DIRECTORY.test(value);
 
-const OPEN_MAP_PATHS = new Set(["payload.counters", "payload.error.params"]);
+const OPEN_MAP_PATHS = new Set([
+  "error.params",
+  "payload.counters",
+  "payload.error.params",
+]);
 
 const objectPaths = (
   value: unknown,
@@ -388,6 +411,46 @@ const reachableSchemas = (): SchemaNode[] => {
   return into;
 };
 
+const composedFrameSchema = (
+  fixture: Fixture,
+  frame: Frame
+): z.ZodType | null => {
+  const { topic } = fixture;
+  if (topic === undefined || topic === RESERVED_TOPIC) {
+    return null;
+  }
+  const { kind } = frame.value;
+  if (
+    kind === "event" &&
+    events !== undefined &&
+    eventEnvelopeSchema !== undefined
+  ) {
+    const payload = events[topic];
+    return payload === undefined
+      ? null
+      : eventEnvelopeSchema.extend({ payload });
+  }
+  if (methods === undefined) {
+    return null;
+  }
+  const contract = methods[topic];
+  if (contract === undefined) {
+    return null;
+  }
+  if (kind === "request" && requestEnvelopeSchema !== undefined) {
+    return requestEnvelopeSchema.extend({ payload: contract.params });
+  }
+  if (
+    kind === "response" &&
+    frame.value.ok === true &&
+    contract.result !== null &&
+    okResponseEnvelopeSchema !== undefined
+  ) {
+    return okResponseEnvelopeSchema.extend({ payload: contract.result });
+  }
+  return null;
+};
+
 const coveredTopics = new Set(
   fixtures
     .map((fixture) => fixture.topic)
@@ -475,44 +538,55 @@ describe("o registro do protocolo", () => {
 
 describe("validação", () => {
   test("todo quadro satisfaz o schema de envelope", () => {
-    const envelope = findProtocolExport("protocolMessageSchema") as
-      | z.ZodType
-      | undefined;
-    expect(envelope, "protocolMessageSchema não foi exportado").toBeDefined();
+    expect(
+      protocolMessageSchema,
+      "protocolMessageSchema não foi exportado"
+    ).toBeDefined();
     for (const { fixture, frame } of allFrames) {
-      const result = (envelope as z.ZodType).safeParse(frame.value);
+      if (ENVELOPE_MUST_FAIL.has(fixture.name)) {
+        continue;
+      }
+      const result = (protocolMessageSchema as z.ZodType).safeParse(
+        frame.value
+      );
       expect(result.success, `${fixture.name}:${frame.index + 1}`).toBe(true);
     }
   });
 
-  test("todo payload satisfaz o schema que o nome do arquivo nomeia", () => {
+  test("a fixture de quadro descartado reprova no envelope", () => {
+    expect(protocolMessageSchema).toBeDefined();
+    let checked = 0;
     for (const { fixture, frame } of allFrames) {
-      const { topic } = fixture;
-      if (topic === undefined || topic === RESERVED_TOPIC) {
+      if (!ENVELOPE_MUST_FAIL.has(fixture.name)) {
         continue;
       }
-      if (PAYLOAD_MUST_FAIL.has(fixture.name)) {
-        continue;
-      }
-      const { kind, payload } = frame.value;
-      let schema: z.ZodType | null = null;
-      if (kind === "event" && events !== undefined) {
-        schema = events[topic] ?? null;
-      } else if (kind === "request" && methods !== undefined) {
-        schema = methods[topic]?.params ?? null;
-      } else if (
-        kind === "response" &&
-        frame.value.ok === true &&
-        methods !== undefined
+      checked += 1;
+      expect(
+        (protocolMessageSchema as z.ZodType).safeParse(frame.value).success,
+        fixture.name
+      ).toBe(false);
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  test("todo quadro satisfaz o schema composto do seu tópico", () => {
+    let checked = 0;
+    for (const { fixture, frame } of allFrames) {
+      if (
+        ENVELOPE_MUST_FAIL.has(fixture.name) ||
+        PAYLOAD_MUST_FAIL.has(fixture.name)
       ) {
-        schema = methods[topic]?.result ?? null;
-      }
-      if (schema === null) {
         continue;
       }
-      const result = schema.safeParse(payload);
+      const composed = composedFrameSchema(fixture, frame);
+      if (composed === null) {
+        continue;
+      }
+      checked += 1;
+      const result = composed.safeParse(frame.value);
       expect(result.success, `${fixture.name}:${frame.index + 1}`).toBe(true);
     }
+    expect(checked).toBeGreaterThan(0);
   });
 
   test("a fixture de payload inválido reprova no schema do seu método", () => {
@@ -560,21 +634,26 @@ describe("validação", () => {
 
 describe("chave desconhecida", () => {
   test("uma chave a mais em qualquer objeto de qualquer quadro reprova", () => {
-    const envelope = findProtocolExport("protocolMessageSchema") as
-      | z.ZodType
-      | undefined;
-    expect(envelope).toBeDefined();
+    expect(protocolMessageSchema).toBeDefined();
     let mutants = 0;
     for (const { fixture, frame } of allFrames) {
-      for (const at of objectPaths(frame.value, [], [])) {
+      if (ENVELOPE_MUST_FAIL.has(fixture.name)) {
+        continue;
+      }
+      const composed = composedFrameSchema(fixture, frame);
+      const schema = composed ?? (protocolMessageSchema as z.ZodType);
+      const sites =
+        composed === null
+          ? [[] as (number | string)[]]
+          : objectPaths(frame.value, [], []);
+      for (const at of sites) {
         if (OPEN_MAP_PATHS.has(at.join("."))) {
           continue;
         }
         mutants += 1;
         const mutated = injectAt(frame.value, at);
-        const result = (envelope as z.ZodType).safeParse(mutated);
         expect(
-          result.success,
+          schema.safeParse(mutated).success,
           `${fixture.name}:${frame.index + 1} aceitou ${UNKNOWN_KEY} em "${at.join(".")}"`
         ).toBe(false);
       }
@@ -583,12 +662,12 @@ describe("chave desconhecida", () => {
   });
 
   test("uma chave a mais em um mapa aberto continua passando", () => {
-    const envelope = findProtocolExport("protocolMessageSchema") as
-      | z.ZodType
-      | undefined;
-    expect(envelope).toBeDefined();
     let checked = 0;
     for (const { fixture, frame } of allFrames) {
+      const composed = composedFrameSchema(fixture, frame);
+      if (composed === null) {
+        continue;
+      }
       for (const at of objectPaths(frame.value, [], [])) {
         if (!OPEN_MAP_PATHS.has(at.join("."))) {
           continue;
@@ -596,7 +675,7 @@ describe("chave desconhecida", () => {
         checked += 1;
         const mutated = injectAt(frame.value, at);
         expect(
-          (envelope as z.ZodType).safeParse(mutated).success,
+          composed.safeParse(mutated).success,
           `${fixture.name}: mapa aberto "${at.join(".")}" recusou uma chave nova`
         ).toBe(true);
       }

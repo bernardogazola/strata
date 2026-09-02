@@ -6,7 +6,11 @@ import {
 } from "@/protocol/enums";
 import { hotspotEvidenceCodeLabels, tourReasonTagLabels } from "../labels";
 
-const UNRENDERED_SCHEMAS = new Set(["errorOriginSchema"]);
+const UNRENDERED_SCHEMAS = new Set([
+  "errorOriginSchema",
+  "protocolEventSchema",
+  "protocolMethodSchema",
+]);
 
 const SCHEMA_SUFFIX = /Schema$/;
 

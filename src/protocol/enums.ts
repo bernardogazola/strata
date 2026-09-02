@@ -155,3 +155,29 @@ export const hotspotEvidenceCodeSchema = z.enum([
   "COCHANGES_ACROSS_PACKAGES",
 ]);
 export type HotspotEvidenceCode = z.infer<typeof hotspotEvidenceCodeSchema>;
+
+export const buildSystemSchema = z.enum([
+  "MAVEN",
+  "GRADLE",
+  "ANT",
+  "NONE",
+  "UNKNOWN",
+]);
+export type BuildSystem = z.infer<typeof buildSystemSchema>;
+
+export const sourceRootKindSchema = z.enum(["MAIN", "TEST", "GENERATED"]);
+export type SourceRootKind = z.infer<typeof sourceRootKindSchema>;
+
+export const historyScopeSchema = z.enum(["ALL", "LAST_N_COMMITS"]);
+export type HistoryScope = z.infer<typeof historyScopeSchema>;
+
+export const cacheInvalidationReasonSchema = z.enum([
+  "CORRUPT",
+  "SCHEMA_VERSION",
+  "WORKTREE_DIRTY",
+  "CONFIG_CHANGED",
+  "HEAD_CHANGED",
+]);
+export type CacheInvalidationReason = z.infer<
+  typeof cacheInvalidationReasonSchema
+>;
