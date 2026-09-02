@@ -4,16 +4,43 @@ version = "0.1.0"
 description = "Ferramenta local-first de arqueologia de código para onboarding em bases legadas Java"
 authors = ["Bernardo Gazola"]
 edition = "2024"
+# Descoberta automática desligada: um tests/*.rs novo só roda depois de ganhar
+# uma entrada [[test]] abaixo.
+autobins = false
+autotests = false
 
 [lib]
 name = "strata_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "strata"
+path = "src/main.rs"
+test = false
+
+[[bin]]
+name = "stub_child"
+path = "tests/stub_child.rs"
+test = false
+bench = false
+doc = false
+
+[[test]]
+name = "protocol"
+path = "tests/protocol.rs"
+
+[[test]]
+name = "lifecycle"
+path = "tests/lifecycle.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-
+serde_json = { version = "1", features = ["raw_value"] }
+tokio = { version = "1.53.1", features = ["rt", "sync", "time"] }
+thiserror = "2.0.20"
+getrandom = "0.4.3"

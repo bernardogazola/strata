@@ -1,5 +1,8 @@
 use tauri::{Manager, Theme, window::Color};
 
+pub mod analyzer;
+pub mod error;
+
 // Tem de bater com BACKGROUND_COLORS em theme.ts, o global.css e o estilo inline do index.html.
 const BG_LIGHT: Color = Color(246, 246, 246, 255);
 const BG_DARK: Color = Color(10, 10, 10, 255);
