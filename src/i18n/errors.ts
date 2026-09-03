@@ -199,7 +199,7 @@ const errorRegistry: ErrorRegistry = {
   },
   PROTO_UNKNOWN_METHOD: {
     format: () => ({
-      body: [t("O analisador não reconhece esta operação.")],
+      body: [t("Esta operação não é reconhecida.")],
       hint: "Provavelmente o analisador e a interface estão em versões diferentes.",
       title: "Operação desconhecida",
     }),
