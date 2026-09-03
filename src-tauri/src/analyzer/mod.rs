@@ -136,6 +136,17 @@ impl AnalyzerHandle {
         self.dispatch(method, payload, None, timeout, false).await
     }
 
+    pub async fn request_in_repository(
+        &self,
+        method: &str,
+        payload: &RawValue,
+        repository: &crate::repository::RepositoryPath,
+        timeout: Duration,
+    ) -> Result<Response, ProtocolError> {
+        self.dispatch(method, payload, Some(repository.as_str()), timeout, false)
+            .await
+    }
+
     async fn dispatch(
         &self,
         method: &str,
@@ -164,6 +175,13 @@ impl AnalyzerHandle {
         let id = RequestId::generate()
             .map_err(|error| ProtocolError::internal(format!("sem CSPRNG: {error}")))?;
         let line = protocol::encode_request(id.as_str(), method, payload, repository_path)?;
+        let framed = line.len().saturating_sub(1);
+        if framed > self.shared.config.max_frame_bytes {
+            return Err(ProtocolError::MessageTooLarge {
+                limit_bytes: self.shared.config.max_frame_bytes as u64,
+                received_bytes: framed as u64,
+            });
+        }
 
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
         let writer = self.shared.register(id, reply_tx, during_shutdown)?;
@@ -193,6 +211,11 @@ impl AnalyzerHandle {
     #[must_use]
     pub fn backend_phase(&self) -> BackendPhase {
         self.shared.phase()
+    }
+
+    #[must_use]
+    pub fn is_stopping(&self) -> bool {
+        self.shared.is_stopping()
     }
 
     #[must_use]

@@ -4,6 +4,7 @@ use serde_json::value::RawValue;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ErrorCode {
+    HandleUnknown,
     AnalyzerNotFound,
     AnalyzerStartFailed,
     AnalyzerCrashed,
@@ -20,6 +21,7 @@ pub enum ErrorCode {
 impl ErrorCode {
     pub const fn as_wire(self) -> &'static str {
         match self {
+            Self::HandleUnknown => "REPO_HANDLE_UNKNOWN",
             Self::AnalyzerNotFound => "PROC_ANALYZER_NOT_FOUND",
             Self::AnalyzerStartFailed => "PROC_ANALYZER_START_FAILED",
             Self::AnalyzerCrashed => "PROC_ANALYZER_CRASHED",
@@ -37,6 +39,8 @@ impl ErrorCode {
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum ProtocolError {
+    #[error("handle de repositório desconhecido")]
+    HandleUnknown,
     #[error("runtime do analisador não encontrado")]
     AnalyzerNotFound { detail: String },
     #[error("o analisador não conseguiu iniciar")]
@@ -67,6 +71,7 @@ pub enum ProtocolError {
 impl ProtocolError {
     pub fn code(&self) -> ErrorCode {
         match self {
+            Self::HandleUnknown => ErrorCode::HandleUnknown,
             Self::AnalyzerNotFound { .. } => ErrorCode::AnalyzerNotFound,
             Self::AnalyzerStartFailed { .. } => ErrorCode::AnalyzerStartFailed,
             Self::AnalyzerCrashed { .. } => ErrorCode::AnalyzerCrashed,
@@ -109,7 +114,8 @@ impl ProtocolError {
         match self {
             Self::AnalyzerNotFound { .. } | Self::AnalyzerStartFailed { .. } => None,
             Self::MalformedMessage { detail } | Self::Internal { detail } => Some(detail),
-            Self::AnalyzerCrashed { .. }
+            Self::HandleUnknown
+            | Self::AnalyzerCrashed { .. }
             | Self::AnalyzerNotReady
             | Self::ShuttingDown
             | Self::RequestTimeout { .. }
@@ -170,7 +176,8 @@ impl Serialize for ProtocolError {
             Self::UnknownMethod { method } => {
                 map.serialize_entry("params", &MethodParams { method })?;
             }
-            Self::AnalyzerNotFound { .. }
+            Self::HandleUnknown
+            | Self::AnalyzerNotFound { .. }
             | Self::AnalyzerStartFailed { .. }
             | Self::AnalyzerNotReady
             | Self::ShuttingDown

@@ -2,6 +2,9 @@ use tauri::{Manager, Theme, window::Color};
 
 pub mod analyzer;
 pub mod error;
+pub mod log;
+pub mod repository;
+mod ring;
 
 // Tem de bater com BACKGROUND_COLORS em theme.ts, o global.css e o estilo inline do index.html.
 const BG_LIGHT: Color = Color(246, 246, 246, 255);

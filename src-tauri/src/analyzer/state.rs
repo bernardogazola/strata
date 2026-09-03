@@ -1,14 +1,20 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 use tokio::sync::{Notify, Semaphore, mpsc, oneshot};
 
 use crate::error::{ProtocolError, Response};
+use crate::ring::Ring;
 
 use super::request_id::RequestId;
 use super::{AnalyzerConfig, AnalyzerEvent};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(
+    tag = "phase",
+    rename_all = "SCREAMING_SNAKE_CASE",
+    rename_all_fields = "camelCase"
+)]
 pub enum BackendPhase {
     Starting,
     Ready { protocol_version: u32 },
@@ -23,19 +29,22 @@ pub enum Terminal {
     Incompatible { expected: u32, received: u32 },
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Diagnostics {
     pub malformed_count: u32,
     pub last_fault: Option<ProtocolError>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StderrTail {
     pub lines: Vec<String>,
     pub truncated: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExitReport {
     pub exit_code: Option<i32>,
     pub forced: bool,
@@ -279,6 +288,11 @@ impl Shared {
         self.lock().shutdown_requested
     }
 
+    pub(crate) fn is_stopping(&self) -> bool {
+        let inner = self.lock();
+        inner.shutdown_requested || matches!(inner.terminal, Some(Terminal::Exited { .. }))
+    }
+
     pub(crate) fn note_fault(&self, fault: ProtocolError) -> bool {
         let exhausted = {
             let mut inner = self.lock();
@@ -298,104 +312,14 @@ impl Shared {
     }
 
     pub(crate) fn stderr_tail(&self) -> StderrTail {
-        self.stderr
+        let snapshot = self
+            .stderr
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .snapshot()
-    }
-}
-
-struct Ring {
-    lines: VecDeque<String>,
-    bytes: usize,
-    max_bytes: usize,
-    max_lines: usize,
-    max_line_bytes: usize,
-    truncated: bool,
-}
-
-impl Ring {
-    const fn new(max_bytes: usize, max_lines: usize, max_line_bytes: usize) -> Self {
-        Self {
-            lines: VecDeque::new(),
-            bytes: 0,
-            max_bytes,
-            max_lines,
-            max_line_bytes,
-            truncated: false,
-        }
-    }
-
-    fn push(&mut self, mut line: String) {
-        if line.len() > self.max_line_bytes {
-            let mut cut = self.max_line_bytes;
-            while cut > 0 && !line.is_char_boundary(cut) {
-                cut -= 1;
-            }
-            line.truncate(cut);
-            line.push_str("…truncada");
-            self.truncated = true;
-        }
-        self.bytes += line.len();
-        self.lines.push_back(line);
-        while self.lines.len() > self.max_lines || self.bytes > self.max_bytes {
-            match self.lines.pop_front() {
-                Some(dropped) => {
-                    self.bytes -= dropped.len();
-                    self.truncated = true;
-                }
-                None => break,
-            }
-        }
-    }
-
-    fn snapshot(&self) -> StderrTail {
+            .snapshot();
         StderrTail {
-            lines: self.lines.iter().cloned().collect(),
-            truncated: self.truncated,
+            lines: snapshot.0,
+            truncated: snapshot.1,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::Ring;
-
-    #[test]
-    fn the_ring_keeps_the_newest_lines_and_says_it_dropped_some() {
-        let mut ring = Ring::new(64 * 1024, 3, 8_192);
-        for n in 0..10 {
-            ring.push(format!("line {n}"));
-        }
-        let tail = ring.snapshot();
-        assert_eq!(tail.lines, vec!["line 7", "line 8", "line 9"]);
-        assert!(tail.truncated);
-    }
-
-    #[test]
-    fn a_byte_budget_binds_before_the_line_count() {
-        let mut ring = Ring::new(20, 1_000, 8_192);
-        ring.push("a".repeat(15));
-        ring.push("b".repeat(15));
-        let tail = ring.snapshot();
-        assert_eq!(tail.lines.len(), 1);
-        assert!(tail.lines[0].starts_with('b'));
-    }
-
-    #[test]
-    fn an_over_long_line_is_truncated_rather_than_dropped() {
-        let mut ring = Ring::new(64 * 1024, 10, 16);
-        ring.push("x".repeat(500));
-        let tail = ring.snapshot();
-        assert_eq!(tail.lines.len(), 1, "a linha sobrevive, encurtada");
-        assert!(tail.lines[0].ends_with("…truncada"));
-    }
-
-    #[test]
-    fn truncation_lands_on_a_character_boundary() {
-        let mut ring = Ring::new(64 * 1024, 10, 5);
-        ring.push("ãããã".to_owned());
-        let tail = ring.snapshot();
-        assert!(tail.lines[0].ends_with("…truncada"));
     }
 }
