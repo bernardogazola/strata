@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "fixture": "inheritance",
+  "claims": ["completeness", "dependencies", "sourceRoots", "types"],
+  "sourceRoots": [
+    {"path": "src/main/java", "kind": "MAIN", "javaFileCount": 7}
+  ],
+  "completeness": {
+    "totalFiles": 7,
+    "parseFailures": 0
+  },
+  "types": [
+    {"id": "type:br.pucpr.payments.Auditable", "kind": "INTERFACE"},
+    {"id": "type:br.pucpr.payments.BaseGateway", "kind": "CLASS"},
+    {"id": "type:br.pucpr.payments.Card", "kind": "CLASS"},
+    {"id": "type:br.pucpr.payments.CardGateway", "kind": "CLASS"},
+    {"id": "type:br.pucpr.payments.Instrument", "kind": "INTERFACE"},
+    {"id": "type:br.pucpr.payments.Named", "kind": "INTERFACE"},
+    {"id": "type:br.pucpr.payments.Traceable", "kind": "INTERFACE"}
+  ],
+  "dependencies": [
+    {"from": "type:br.pucpr.payments.Auditable", "to": "type:br.pucpr.payments.Named", "type": "EXTENDS", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:br.pucpr.payments.Auditable", "to": "type:br.pucpr.payments.Traceable", "type": "EXTENDS", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:br.pucpr.payments.Card", "to": "type:br.pucpr.payments.Instrument", "type": "IMPLEMENTS", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:br.pucpr.payments.CardGateway", "to": "type:br.pucpr.payments.Auditable", "type": "IMPLEMENTS", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:br.pucpr.payments.CardGateway", "to": "type:br.pucpr.payments.BaseGateway", "type": "EXTENDS", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:br.pucpr.payments.CardGateway", "to": "type:br.pucpr.payments.Instrument", "type": "IMPLEMENTS", "occurrences": 1, "resolution": "RESOLVED"}
+  ]
+}

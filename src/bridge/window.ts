@@ -1,6 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-
-const isTauri = (): boolean => "__TAURI_INTERNALS__" in window;
+import { isTauri } from "./environment";
 
 export const revealWindow = (): void => {
   if (!isTauri()) {

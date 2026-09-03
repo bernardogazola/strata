@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "fixture": "broken-source",
+  "claims": ["completeness", "dependencies", "files", "parseFailures", "sourceRoots", "types"],
+  "sourceRoots": [
+    {"path": "src/main/java", "kind": "MAIN", "javaFileCount": 4}
+  ],
+  "completeness": {
+    "totalFiles": 4,
+    "parseFailures": 1
+  },
+  "types": [
+    {"id": "type:br.pucpr.broken.Healthy", "kind": "CLASS"},
+    {"id": "type:br.pucpr.broken.Neighbour", "kind": "CLASS"}
+  ],
+  "files": [
+    "file:src/main/java/br/pucpr/broken/Healthy.java",
+    "file:src/main/java/br/pucpr/broken/Neighbour.java",
+    "file:src/main/java/br/pucpr/broken/ReportPath.java",
+    "file:src/main/java/br/pucpr/broken/package-info.java"
+  ],
+  "dependencies": [
+    {"from": "type:br.pucpr.broken.Healthy", "to": "type:br.pucpr.broken.Neighbour", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "RESOLVED"}
+  ],
+  "parseFailures": ["file:src/main/java/br/pucpr/broken/ReportPath.java"]
+}

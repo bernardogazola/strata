@@ -10,6 +10,7 @@
     "includes": [
       "!**/components/ui",
       "!src/routeTree.gen.ts",
+      "!fixtures",
       "!dist",
       "!src-tauri/gen",
       "!src-tauri/target"

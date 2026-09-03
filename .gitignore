@@ -39,3 +39,8 @@ playwright-report
 src/routeTree.gen.ts
 
 *.tsbuildinfo
+
+!fixtures/repositories/**/target/
+!fixtures/repositories/**/target/**
+
+/corpus/

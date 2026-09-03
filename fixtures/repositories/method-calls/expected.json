@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "fixture": "method-calls",
+  "claims": ["completeness", "dependencies", "edges", "evidence", "sourceRoots", "types"],
+  "sourceRoots": [
+    {"path": "src/main/java", "kind": "MAIN", "javaFileCount": 4}
+  ],
+  "completeness": {
+    "totalFiles": 4,
+    "parseFailures": 0
+  },
+  "types": [
+    {"id": "type:a.b.Order", "kind": "CLASS"},
+    {"id": "type:a.c.OrderRepository", "kind": "CLASS"},
+    {"id": "type:a.c.OrderService", "kind": "CLASS"},
+    {"id": "type:a.c.Task", "kind": "INTERFACE"}
+  ],
+  "dependencies": [
+    {"from": "type:a.c.OrderService", "to": "type:a.b.Order", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:a.c.OrderService", "to": "type:a.b.Order", "type": "PARAMETER_TYPE", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:a.c.OrderService", "to": "type:a.c.OrderRepository", "type": "CALLS", "occurrences": 5, "resolution": "RESOLVED"},
+    {"from": "type:a.c.OrderService", "to": "type:a.c.OrderRepository", "type": "FIELD_TYPE", "occurrences": 2, "resolution": "RESOLVED"},
+    {"from": "type:a.c.OrderService", "to": "type:a.c.Task", "type": "CALLS", "occurrences": 1, "resolution": "RESOLVED"},
+    {"from": "type:a.c.OrderService", "to": "type:a.c.Task", "type": "RETURN_TYPE", "occurrences": 2, "resolution": "RESOLVED"},
+    {"from": "type:a.c.OrderService", "to": "type:java.util.List", "type": "IMPORTS", "occurrences": 1, "resolution": "RESOLVED", "external": true},
+    {"from": "type:a.c.OrderService", "to": "type:java.util.List", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "RESOLVED", "external": true},
+    {"from": "type:a.c.OrderService", "to": "type:java.util.List", "type": "PARAMETER_TYPE", "occurrences": 1, "resolution": "RESOLVED", "external": true}
+  ],
+  "edges": [
+    {"from": "type:a.c.OrderService", "to": "type:a.b.Order", "types": {"FIELD_TYPE": 1, "PARAMETER_TYPE": 1}, "distinctTypeCount": 2, "occurrenceTotal": 2, "weight": 4, "quality": "RESOLVED"},
+    {"from": "type:a.c.OrderService", "to": "type:a.c.OrderRepository", "types": {"CALLS": 5, "FIELD_TYPE": 2}, "distinctTypeCount": 2, "occurrenceTotal": 7, "weight": 16, "quality": "RESOLVED"},
+    {"from": "type:a.c.OrderService", "to": "type:a.c.Task", "types": {"CALLS": 1, "RETURN_TYPE": 2}, "distinctTypeCount": 2, "occurrenceTotal": 3, "weight": 6, "quality": "RESOLVED"},
+    {"from": "type:a.c.OrderService", "to": "type:java.util.List", "types": {"IMPORTS": 1, "FIELD_TYPE": 1, "PARAMETER_TYPE": 1}, "distinctTypeCount": 3, "occurrenceTotal": 3, "weight": 5, "quality": "RESOLVED"}
+  ],
+  "evidence": [
+    {"from": "type:a.c.OrderService", "to": "type:a.c.OrderRepository", "type": "CALLS", "file": "src/main/java/a/c/OrderService.java", "line": 27, "anchor": "primary.reload();", "fromMethod": "method:a.c.OrderService#refresh()"},
+    {"from": "type:a.c.OrderService", "to": "type:a.c.OrderRepository", "type": "CALLS", "file": "src/main/java/a/c/OrderService.java", "line": 28, "anchor": "fallback.reload();", "fromMethod": "method:a.c.OrderService#refresh()"},
+    {"from": "type:a.c.OrderService", "to": "type:a.c.OrderRepository", "type": "CALLS", "file": "src/main/java/a/c/OrderService.java", "line": 32, "anchor": "() -> primary.audit();", "fromMethod": "method:a.c.OrderService#auditor()"},
+    {"from": "type:a.c.OrderService", "to": "type:a.c.OrderRepository", "type": "CALLS", "file": "src/main/java/a/c/OrderService.java", "line": 39, "anchor": "fallback.audit();", "fromMethod": "method:a.c.OrderService#run()"},
+    {"from": "type:a.c.OrderService", "to": "type:a.c.OrderRepository", "type": "CALLS", "file": "src/main/java/a/c/OrderService.java", "line": 45, "anchor": "primary.first();", "fromMethod": "method:a.c.OrderService#seed()"}
+  ]
+}

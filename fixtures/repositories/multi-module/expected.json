@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "fixture": "multi-module",
+  "claims": ["buildSystem", "declaredModules", "packages", "sourceRoots", "types"],
+  "buildSystem": "MAVEN",
+  "sourceRoots": [
+    {"path": "api/src/main/java", "kind": "MAIN", "javaFileCount": 2},
+    {"path": "core/src/main/java", "kind": "MAIN", "javaFileCount": 6},
+    {"path": "core/src/test/java", "kind": "TEST", "javaFileCount": 1},
+    {"path": "core/target/generated-sources/annotations", "kind": "GENERATED", "javaFileCount": 1}
+  ],
+  "packages": [
+    "pkg:br.pucpr.legacy.api",
+    "pkg:br.pucpr.legacy.core",
+    "pkg:br.pucpr.legacy.core.gen",
+    "pkg:br.pucpr.legacy.core.spi"
+  ],
+  "types": [
+    {"id": "type:br.pucpr.legacy.api.CatalogEndpoint", "kind": "CLASS", "root": "api/src/main/java"},
+    {"id": "type:br.pucpr.legacy.api.Main", "kind": "CLASS", "root": "api/src/main/java"},
+    {"id": "type:br.pucpr.legacy.core.Audited", "kind": "ANNOTATION", "root": "core/src/main/java"},
+    {"id": "type:br.pucpr.legacy.core.Catalog", "kind": "CLASS", "root": "core/src/main/java"},
+    {"id": "type:br.pucpr.legacy.core.CatalogEntry", "kind": "RECORD", "root": "core/src/main/java"},
+    {"id": "type:br.pucpr.legacy.core.CatalogTest", "kind": "CLASS", "root": "core/src/test/java", "test": true},
+    {"id": "type:br.pucpr.legacy.core.Kind", "kind": "ENUM", "root": "core/src/main/java"},
+    {"id": "type:br.pucpr.legacy.core.gen.CatalogMetadata", "kind": "CLASS", "root": "core/target/generated-sources/annotations", "generated": true},
+    {"id": "type:br.pucpr.legacy.core.spi.MemoryStore", "kind": "CLASS", "root": "core/src/main/java"},
+    {"id": "type:br.pucpr.legacy.core.spi.Store", "kind": "INTERFACE", "root": "core/src/main/java"}
+  ],
+  "declaredModules": ["core", "api"]
+}
