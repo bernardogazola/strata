@@ -33,6 +33,10 @@ path = "tests/protocol.rs"
 name = "lifecycle"
 path = "tests/lifecycle.rs"
 
+[[test]]
+name = "commands"
+path = "tests/commands.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

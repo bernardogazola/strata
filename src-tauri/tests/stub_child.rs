@@ -75,6 +75,23 @@ fn main() {
                     emit(&ok_empty(&id));
                 }
             }
+            "echo-methods" => {
+                eprintln!("stub-method: {}", extract_method(&text));
+                if is_shutdown {
+                    emit(&ok_empty(&id));
+                    std::io::stdout().flush().ok();
+                    return;
+                }
+                emit(&ok_empty(&id));
+            }
+            "refuse" => {
+                if is_shutdown {
+                    emit(&ok_empty(&id));
+                    std::io::stdout().flush().ok();
+                    return;
+                }
+                emit(&error_response(&id));
+            }
             "stderr-flood" => {
                 let noise = "x".repeat(1024);
                 for n in 0..1024 {
@@ -92,6 +109,23 @@ fn main() {
             }
         }
     }
+}
+
+fn error_response(id: &str) -> String {
+    format!(
+        r#"{{"protocol":1,"kind":"response","id":"{id}","ok":false,"error":{{"code":"REPO_NO_JAVA_SOURCES","origin":"analyzer","params":{{}}}}}}"#
+    )
+}
+
+fn extract_method(line: &str) -> String {
+    let Some(start) = line.find(r#""method":""#) else {
+        return String::from("<none>");
+    };
+    let rest = &line[start + r#""method":""#.len()..];
+    rest.find('"').map_or_else(
+        || String::from("<unterminated>"),
+        |end| rest[..end].to_owned(),
+    )
 }
 
 fn emit(frame: &str) {
