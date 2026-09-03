@@ -1,6 +1,8 @@
+import { z } from "zod";
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import type { AnalysisStage, ProgressTick } from "@/protocol/analysis";
+import type { ProtocolError } from "@/protocol/errors";
 
 export type BackendState =
   | { phase: "STARTING" }
@@ -8,15 +10,42 @@ export type BackendState =
   | { phase: "CRASHED"; exitCode: number | null }
   | { phase: "INCOMPATIBLE"; expected: number; received: number };
 
+export const backendStateSchema = z.discriminatedUnion("phase", [
+  z.strictObject({ phase: z.literal("STARTING") }),
+  z.strictObject({
+    phase: z.literal("READY"),
+    protocolVersion: z.number().int(),
+  }),
+  z.strictObject({
+    exitCode: z.number().int().nullable(),
+    phase: z.literal("CRASHED"),
+  }),
+  z.strictObject({
+    expected: z.number().int(),
+    phase: z.literal("INCOMPATIBLE"),
+    received: z.number().int(),
+  }),
+]) satisfies z.ZodType<BackendState>;
+
+export interface AnalysisWarning {
+  readonly analysisId: string;
+  readonly error: ProtocolError;
+}
+
+export const MAX_RETAINED_WARNINGS = 200;
+
 interface AppState {
   readonly activeElementId: string | null;
   readonly backend: BackendState;
   readonly progress: Readonly<Partial<Record<AnalysisStage, ProgressTick>>>;
+  readonly warnings: readonly AnalysisWarning[];
 }
 
 interface AppActions {
+  readonly appendWarning: (warning: AnalysisWarning) => void;
   readonly applyProgress: (tick: ProgressTick) => void;
   readonly clearProgress: () => void;
+  readonly clearWarnings: () => void;
   readonly recoverBackend: () => void;
   readonly setActiveElementId: (elementId: string | null) => void;
   readonly setBackend: (backend: BackendState) => void;
@@ -28,12 +57,23 @@ const initialState: AppState = {
   activeElementId: null,
   backend: { phase: "STARTING" },
   progress: {},
+  warnings: [],
 };
 
 export const useAppStore = create<AppStore>()(
   devtools(
     (set) => ({
       ...initialState,
+
+      appendWarning: (warning) =>
+        set(
+          (state) =>
+            state.warnings.length >= MAX_RETAINED_WARNINGS
+              ? state
+              : { warnings: [...state.warnings, warning] },
+          false,
+          "appendWarning"
+        ),
 
       applyProgress: (tick) =>
         set(
@@ -45,6 +85,8 @@ export const useAppStore = create<AppStore>()(
         ),
 
       clearProgress: () => set({ progress: {} }, false, "clearProgress"),
+
+      clearWarnings: () => set({ warnings: [] }, false, "clearWarnings"),
 
       recoverBackend: () =>
         set(
@@ -76,3 +118,6 @@ export const selectAnalyzerUsable = (state: AppStore): boolean =>
 
 export const selectBackendRecoverable = (state: AppStore): boolean =>
   state.backend.phase === "CRASHED";
+
+export const selectWarningCount = (state: AppStore): number =>
+  state.warnings.length;

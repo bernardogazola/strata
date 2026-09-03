@@ -2,6 +2,33 @@
   "format_on_save": "on",
   "formatter": "language_server",
   "lsp": {
+    "jdtls": {
+      "settings": {
+        "initialization_options": {
+          "settings": {
+            "java": {
+              "format": {
+                "enabled": false
+              },
+              "import": {
+                "exclusions": [
+                  "**/node_modules/**",
+                  "**/.metadata/**",
+                  "**/fixtures/**",
+                  "**/corpus/**"
+                ],
+                "gradle": {
+                  "enabled": false
+                },
+                "maven": {
+                  "enabled": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "typescript-language-server": {
       "settings": {
         "typescript": {
@@ -13,6 +40,9 @@
     }
   },
   "languages": {
+    "Java": {
+      "format_on_save": "off"
+    },
     "JavaScript": {
       "code_actions_on_format": {
         "source.fixAll.biome": true,

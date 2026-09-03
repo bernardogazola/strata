@@ -1,0 +1,202 @@
+import { QueryClient } from "@tanstack/react-query";
+import { beforeEach, describe, expect, test } from "vitest";
+import { handleFrame, resetEventState } from "@/bridge/events";
+import type { RawFrame } from "@/bridge/transport";
+import { analysisStageSchema } from "@/protocol/analysis";
+import { useAppStore } from "@/state/app-store";
+
+const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
+const OTHER = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1X";
+
+const initialStore = useAppStore.getState();
+let queryClient: QueryClient;
+
+beforeEach(() => {
+  useAppStore.setState(initialStore, true);
+  resetEventState();
+  queryClient = new QueryClient();
+});
+
+const forwarded = (event: string, payload: unknown): RawFrame => ({
+  kind: "forwarded",
+  value: { event, payload },
+});
+
+const state = (value: unknown): RawFrame => ({ kind: "state", value });
+
+const tick = (analysisId: string) => ({
+  analysisId,
+  completed: 1,
+  stage: "SOURCE_ANALYSIS",
+  total: 10,
+  unit: "JAVA_FILES",
+});
+
+describe("validação na fronteira", () => {
+  test("um tick válido é aplicado e o id não entra na store", () => {
+    expect(
+      handleFrame(forwarded("analysis.progress", tick(AN)), queryClient)
+    ).toBe(true);
+    const stored = useAppStore.getState().progress.SOURCE_ANALYSIS;
+    expect(stored?.completed).toBe(1);
+    expect(stored).not.toHaveProperty("analysisId");
+  });
+
+  test("um payload que não passa no schema é recusado e não armazenado", () => {
+    const hostile = { ...tick(AN), completed: -1 };
+    expect(
+      handleFrame(forwarded("analysis.progress", hostile), queryClient)
+    ).toBe(false);
+    expect(useAppStore.getState().progress).toStrictEqual({});
+  });
+
+  test("um nome de evento fora do registro é recusado", () => {
+    expect(handleFrame(forwarded("analysis.invented", {}), queryClient)).toBe(
+      false
+    );
+  });
+
+  test("uma chave a mais no envelope é recusada", () => {
+    const frame: RawFrame = {
+      kind: "forwarded",
+      value: { event: "analysis.progress", extra: 1, payload: tick(AN) },
+    };
+    expect(handleFrame(frame, queryClient)).toBe(false);
+  });
+
+  test("um BackendState inválido não sobrescreve a fase corrente", () => {
+    expect(handleFrame(state({ phase: "LIGADO" }), queryClient)).toBe(false);
+    expect(useAppStore.getState().backend.phase).toBe("STARTING");
+  });
+
+  test("um BackendState válido é aplicado", () => {
+    expect(
+      handleFrame(state({ phase: "READY", protocolVersion: 1 }), queryClient)
+    ).toBe(true);
+    expect(useAppStore.getState().backend).toStrictEqual({
+      phase: "READY",
+      protocolVersion: 1,
+    });
+  });
+});
+
+describe("clearProgress no fim da análise", () => {
+  const completeness = {
+    historyTruncatedAtCommits: null,
+    parseFailures: 0,
+    shallowClone: false,
+    skippedFiles: 0,
+    totalFiles: 1,
+  };
+
+  const terminal = {
+    "analysis.cancelled": { analysisId: AN, completeness },
+    "analysis.completed": { analysisId: AN, completeness },
+    "analysis.failed": {
+      analysisId: AN,
+      error: { code: "REPO_NO_JAVA_SOURCES", origin: "analyzer", params: {} },
+    },
+  } as const;
+
+  for (const [event, payload] of Object.entries(terminal)) {
+    test(`${event} zera o progresso`, () => {
+      handleFrame(forwarded("analysis.progress", tick(AN)), queryClient);
+      expect(Object.keys(useAppStore.getState().progress)).toHaveLength(1);
+
+      expect(handleFrame(forwarded(event, payload), queryClient)).toBe(true);
+      expect(useAppStore.getState().progress).toStrictEqual({});
+    });
+  }
+});
+
+describe("ticks atrasados", () => {
+  test("um tick de uma análise que terminou é descartado", () => {
+    handleFrame(
+      forwarded("analysis.failed", {
+        analysisId: AN,
+        error: { code: "ANALYSIS_CANCELLED", origin: "analyzer", params: {} },
+      }),
+      queryClient
+    );
+    expect(
+      handleFrame(forwarded("analysis.progress", tick(AN)), queryClient)
+    ).toBe(true);
+    expect(useAppStore.getState().progress).toStrictEqual({});
+  });
+
+  test("um tick de outra análise não é descartado", () => {
+    handleFrame(
+      forwarded("analysis.failed", {
+        analysisId: AN,
+        error: { code: "ANALYSIS_CANCELLED", origin: "analyzer", params: {} },
+      }),
+      queryClient
+    );
+    handleFrame(forwarded("analysis.progress", tick(OTHER)), queryClient);
+    expect(Object.keys(useAppStore.getState().progress)).toHaveLength(1);
+  });
+});
+
+describe("avisos", () => {
+  test("um aviso é acrescentado e analysis.started limpa a lista", () => {
+    const warning = {
+      analysisId: AN,
+      error: {
+        code: "SOURCE_PARSE_FAILED",
+        origin: "analyzer",
+        params: { filePath: "src/Main.java" },
+      },
+    };
+    expect(
+      handleFrame(forwarded("analysis.warning", warning), queryClient)
+    ).toBe(true);
+    expect(useAppStore.getState().warnings).toHaveLength(1);
+
+    handleFrame(
+      forwarded("analysis.started", { analysisId: OTHER }),
+      queryClient
+    );
+    expect(useAppStore.getState().warnings).toStrictEqual([]);
+  });
+});
+
+describe("invalidação", () => {
+  test("cache.invalidated limpa o cache inteiro", () => {
+    queryClient.setQueryData(["analysis", AN, "structure"], { any: true });
+    expect(
+      handleFrame(
+        forwarded("cache.invalidated", { reason: "HEAD_CHANGED" }),
+        queryClient
+      )
+    ).toBe(true);
+    expect(
+      queryClient.getQueryData(["analysis", AN, "structure"])
+    ).toBeUndefined();
+  });
+
+  test("todo estágio tem regra, e SOURCE_ANALYSIS não invalida nada de propósito", () => {
+    queryClient.setQueryData(["analysis", AN, "structure"], { any: true });
+    const stageEvent = (stage: string) => ({
+      analysisId: AN,
+      counters: {},
+      durationMs: 1,
+      stage,
+      status: "COMPLETED",
+    });
+
+    for (const stage of analysisStageSchema.options) {
+      expect(
+        handleFrame(
+          forwarded("analysis.stage.completed", stageEvent(stage)),
+          queryClient
+        ),
+        `${stage} deve ter uma regra`
+      ).toBe(true);
+    }
+
+    const entry = queryClient
+      .getQueryCache()
+      .find({ queryKey: ["analysis", AN, "structure"] });
+    expect(entry?.state.isInvalidated).toBe(true);
+  });
+});

@@ -1,12 +1,42 @@
-use tauri::{Manager, Theme, window::Color};
+use std::sync::Arc;
+
+use tauri::{Manager, RunEvent, Theme, window::Color};
+
+pub mod analyzer;
+pub mod commands;
+pub mod diagnostics;
+pub mod dialog;
+pub mod error;
+pub mod events;
+pub mod log;
+pub mod repository;
+mod ring;
+pub mod runtime;
+
+use crate::log::ShellLog;
+use crate::runtime::{AnalyzerRuntime, HandshakeCell, PlanSource};
 
 // Tem de bater com BACKGROUND_COLORS em theme.ts, o global.css e o estilo inline do index.html.
 const BG_LIGHT: Color = Color(246, 246, 246, 255);
 const BG_DARK: Color = Color(10, 10, 10, 255);
 
+const HOME_VAR: &str = "STRATA_ANALYZER_HOME";
+const MAX_HEAP_VAR: &str = "STRATA_ANALYZER_MAX_HEAP";
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            commands::open_repository,
+            commands::close_repository,
+            commands::analyzer_state,
+            commands::analyzer_restart,
+            commands::analyzer_stderr_tail,
+            commands::analyzer_request,
+            commands::analyzer_cancel,
+            commands::export_diagnostics,
+        ])
         .setup(|app| {
             let window = app
                 .get_webview_window("main")
@@ -26,8 +56,43 @@ pub fn run() {
                 }
             });
 
+            let shell_log = Arc::new(ShellLog::default());
+            let handshake = Arc::new(HandshakeCell::default());
+            let sink = Arc::new(events::TauriSink::new(
+                app.handle().clone(),
+                Arc::clone(&shell_log),
+                Arc::clone(&handshake),
+            ));
+            let runtime = Arc::new(AnalyzerRuntime::new(
+                PlanSource::Discovered {
+                    home: std::env::var_os(HOME_VAR).map(Into::into),
+                    resource_dir: app.path().resource_dir().ok(),
+                    data_dir: app.path().app_data_dir().map_err(|error| {
+                        format!("sem diretório de dados do aplicativo: {error}")
+                    })?,
+                    max_heap: std::env::var(MAX_HEAP_VAR).ok(),
+                },
+                analyzer::AnalyzerConfig::default(),
+                sink,
+                shell_log,
+                handshake,
+            ));
+            app.manage(Arc::clone(&runtime));
+
+            tauri::async_runtime::spawn(async move { runtime.boot().await });
+
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("erro ao executar o aplicativo Tauri");
+        .build(tauri::generate_context!())
+        .expect("erro ao montar o aplicativo Tauri");
+
+    // build() + run(callback): só o callback recebe RunEvent::Exit, e sem ele o Cmd+Q no
+    // macOS deixa a JVM rodando.
+    app.run(|handle, event| {
+        if matches!(event, RunEvent::Exit)
+            && let Some(runtime) = handle.try_state::<Arc<AnalyzerRuntime>>()
+        {
+            runtime.shutdown_blocking();
+        }
+    });
 }

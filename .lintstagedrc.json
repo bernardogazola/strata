@@ -1,3 +1,4 @@
 {
-  "*.{js,jsx,ts,tsx,json,jsonc,css,scss,md,mdx}": ["pnpm exec ultracite fix"]
+  "*.{js,jsx,ts,tsx,json,jsonc,css,scss,md,mdx}": ["pnpm exec ultracite fix"],
+  "analyzer/src/**/*.java": ["bash scripts/format-java.sh"]
 }
