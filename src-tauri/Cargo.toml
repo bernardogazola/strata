@@ -8,6 +8,7 @@ edition = "2024"
 # uma entrada [[test]] abaixo.
 autobins = false
 autotests = false
+default-run = "strata"
 
 [lib]
 name = "strata_lib"
