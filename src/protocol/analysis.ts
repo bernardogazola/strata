@@ -31,7 +31,7 @@ export const analysisStatusSchema = z.enum([
 ]);
 export type AnalysisStatus = z.infer<typeof analysisStatusSchema>;
 
-export const progressTickSchema = z.object({
+export const progressTickSchema = z.strictObject({
   completed: z.number().int().nonnegative(),
   stage: analysisStageSchema,
   total: z.number().int().nonnegative().nullable(),
@@ -39,7 +39,7 @@ export const progressTickSchema = z.object({
 });
 export type ProgressTick = z.infer<typeof progressTickSchema>;
 
-export const analysisCompletenessSchema = z.object({
+export const analysisCompletenessSchema = z.strictObject({
   historyTruncatedAtCommits: z.number().int().nonnegative().nullable(),
   parseFailures: z.number().int().nonnegative(),
   shallowClone: z.boolean(),

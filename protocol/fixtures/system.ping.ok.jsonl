@@ -1,0 +1,2 @@
+{"id":"req_01JQ8ZA1B2C3D4E5F6G7H8J9K0","kind":"request","method":"system.ping","payload":{},"protocol":1}
+{"id":"req_01JQ8ZA1B2C3D4E5F6G7H8J9K0","kind":"response","ok":true,"payload":{"uptimeMillis":0},"protocol":1}

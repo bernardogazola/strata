@@ -1,0 +1,1 @@
+{"event":"analysis.failed","kind":"event","payload":{"analysisId":"an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W","error":{"code":"REPO_NO_JAVA_SOURCES","detail":"nenhuma raiz de código foi encontrada sob a raiz do repositório","origin":"analyzer","params":{}}},"protocol":1}

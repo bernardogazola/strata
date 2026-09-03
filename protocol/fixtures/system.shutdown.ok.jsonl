@@ -1,0 +1,2 @@
+{"id":"req_01JQ8ZA1B2C3D4E5F6G7H8J9K1","kind":"request","method":"system.shutdown","payload":{},"protocol":1}
+{"id":"req_01JQ8ZA1B2C3D4E5F6G7H8J9K1","kind":"response","ok":true,"payload":{},"protocol":1}

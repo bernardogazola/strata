@@ -1,0 +1,1 @@
+{"event":"analysis.warning","kind":"event","payload":{"analysisId":"an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W","error":{"code":"SOURCE_PARSE_FAILED","origin":"analyzer","params":{"filePath":"src/main/java/br/pucpr/orders/PaymentService.java"}}},"protocol":1}

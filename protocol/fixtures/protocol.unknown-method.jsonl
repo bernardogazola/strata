@@ -1,0 +1,1 @@
+{"error":{"code":"PROTO_UNKNOWN_METHOD","detail":"nenhum handler está registrado para o método pedido","origin":"analyzer","params":{"method":"graph.nonexistent"}},"id":"req_01JQ8ZA1B2C3D4E5F6G7H8J9K2","kind":"response","ok":false,"protocol":1}
