@@ -7,7 +7,7 @@ MAIN_CLASS="br.pucpr.tcc.strata.analyzer.bootstrap.Main"
 APP_IDENTIFIER="br.pucpr.tcc.strata"
 READY_BUDGET_MS=1500
 CRASH_BUDGET_MS=2000
-HANDSHAKE_WAIT_MS=12000
+STARTUP_WAIT_MS=60000
 QUIT_WAIT_MS=5000
 WARM_RUNS=5
 POLL_SECONDS=0.025
@@ -267,6 +267,14 @@ self_test() {
   expect "uma fase ausente é erro" "$(report_field "$report" event INCOMPATIBLE unixMs || echo ausente)" "ausente"
   expect "esperar uma linha ausente estoura o tempo" "$(wait_for_line "$report" query CRASHED 60 || echo timeout)" "timeout"
   expect "READY é o mais tardio entre evento e consulta" "$(later_of 1410 1520)" "1520"
+  grep -v '"CRASHED"' "$report" > "$dir/ready.jsonl"
+  expect "ready_of lê a mais tardia das duas linhas" "$(ready_of "$dir/ready.jsonl")" "1520"
+  printf '%s\n' '{"phase":"STARTING","source":"event","elapsedMs":3,"unixMs":1000}' \
+    '{"phase":"CRASHED","exitCode":null,"source":"event","elapsedMs":10003,"unixMs":11000}' > "$dir/crashed.jsonl"
+  local started_ms
+  started_ms="$(now_ms)"
+  expect "um CRASHED antes de READY encerra a espera" "$(ready_of "$dir/crashed.jsonl" || echo recusado)" "recusado"
+  expect "...na hora, não depois da espera de inicialização" "$([ $(( $(now_ms) - started_ms )) -lt 5000 ] && echo rápido || echo lento)" "rápido"
   expect "uma sonda que falhou é gravada como null" "$(json_number 'n/a')" "null"
 
   PROBLEMS=0; check_budget "acima do limite" 1500 1500 >/dev/null
@@ -655,10 +663,18 @@ inspect_windows() {
 }
 
 ready_of() {
-  local report="$1" event query
-  event="$(wait_for_line "$report" event READY "$HANDSHAKE_WAIT_MS")" || return 1
-  query="$(wait_for_line "$report" query '*' "$HANDSHAKE_WAIT_MS")" || return 1
-  later_of "$event" "$query"
+  local report="$1" deadline event query
+  deadline=$(( $(now_ms) + STARTUP_WAIT_MS ))
+  while :; do
+    if report_line "$report" event CRASHED >/dev/null; then return 1; fi
+    if event="$(report_field "$report" event READY unixMs)" && [ -n "$event" ] \
+      && query="$(report_field "$report" query '*' unixMs)" && [ -n "$query" ]; then
+      later_of "$event" "$query"
+      return 0
+    fi
+    [ "$(now_ms)" -lt "$deadline" ] || return 1
+    sleep "$POLL_SECONDS"
+  done
 }
 
 crash_analyzer() {
@@ -688,7 +704,7 @@ run_smoke() {
     report="$WORK/report-$run.jsonl"
     launch "$report" "$WORK/app-$run.log"
     if ! ready_unix="$(ready_of "$report")"; then
-      bad "execução $run: sem evento READY e primeira leitura de analyzer_state em até ${HANDSHAKE_WAIT_MS} ms (relatório: $(tr '\n' ' ' < "$report" 2>/dev/null || echo nenhum))"
+      bad "execução $run: sem evento READY e primeira leitura de analyzer_state em até ${STARTUP_WAIT_MS} ms, ou o shell informou CRASHED (relatório: $(tr '\n' ' ' < "$report" 2>/dev/null || echo nenhum))"
       quit_app ""
       return 0
     fi
