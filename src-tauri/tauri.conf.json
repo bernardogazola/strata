@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "node -e \"console.error('tauri build: package with pnpm package, which stages the analyzer runtime and merges src-tauri/tauri.bundle.conf.json');process.exit(1)\"",
     "frontendDist": "../dist"
   },
   "app": {
