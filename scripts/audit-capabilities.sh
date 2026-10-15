@@ -270,6 +270,25 @@ function untok(t) {
   while (t != "" && index("'\"`)],;", substr(t, length(t), 1)) > 0) t = substr(t, 1, length(t) - 1)
   return t
 }
+function argv(seg, t, whole,   nw, w, i, u, np, pc, j, p, n, first) {
+  split("", t); split("", whole)
+  nw = split(seg, w, /[ \t]+/)
+  for (i = 1; i <= nw; i++) {
+    u = untok(w[i])
+    np = split(u, pc, /[][(),]/)
+    if (np < 2) { t[++n] = u; continue }
+    first = n + 1
+    for (j = 1; j <= np; j++) if ((p = untok(pc[j])) != "") t[++n] = p
+    if (n >= first) whole[first] = u
+  }
+  return n + 0
+}
+function cfgat(u,   p) {
+  if (u == "--config") return 1
+  if (index(u, "--config=") == 1) return 10
+  if (u !~ /^-[A-Za-z]/ || (p = index(u, "c")) == 0) return 0
+  return (p < length(u) ? p + 1 : 1)
+}
 function cmdname(t,   b) {
   b = tolower(t)
   sub(/^.*[\/\\]/, "", b)
@@ -279,38 +298,37 @@ function cmdname(t,   b) {
 }
 function findcall(t, nt,   k, u, c, pm) {
   for (k = 1; k <= nt; k++) {
-    u = untok(t[k]); c = cmdname(u)
+    u = t[k]; c = cmdname(u)
     if (c == "tauri" || c == "cargo-tauri" || index(tolower(u), "@tauri-apps/cli") == 1) return k
     if (pm && (u in tscript)) return k
     if (c ~ /^(pnpm|npm|yarn|bun)$/) pm = 1
   }
   return 0
 }
-function reaches(cmd,   ns, seg, si, nt, t) {
+function reaches(cmd,   ns, seg, si, nt, t, wh) {
   ns = split(cmd, seg, SHSEP)
   for (si = 1; si <= ns; si++) {
-    nt = split(seg[si], t, /[ \t]+/)
+    nt = argv(seg[si], t, wh)
     if (findcall(t, nt) > 0) return 1
   }
   return 0
 }
-function checkcall(where, line, seps,   ns, seg, si, nt, t, ci, k, u, v, p, xp) {
+function checkcall(where, line, seps,   ns, seg, si, nt, t, wh, ci, k, u, v, at, xp) {
   ns = split(line, seg, seps)
   for (si = 1; si <= ns; si++) {
-    nt = split(seg[si], t, /[ \t]+/)
+    nt = argv(seg[si], t, wh)
     ci = findcall(t, nt)
     if (ci == 0) continue
     xp = 0
     for (k = ci + 1; k <= nt; k++) {
-      u = untok(t[k])
+      u = t[k]
       if (!xp && (index(u, "$") > 0 || u ~ /%[A-Za-z_][A-Za-z0-9_]*%/)) {
         xp = 1
         bad("workflow", where ": a CLI do Tauri recebe \"" u "\". O --config pode viajar dentro de uma expansão, e esta auditoria lê texto, não valores: escreva os argumentos literalmente, um passo por sistema operacional")
       }
-      if (u == "--config") v = untok(t[k + 1])
-      else if (index(u, "--config=") == 1) v = substr(u, 10)
-      else if (u ~ /^-[A-Za-z]/ && (p = index(u, "c")) > 0) v = (p < length(u) ? substr(u, p + 1) : untok(t[k + 1]))
-      else continue
+      if ((at = cfgat(u)) == 0) continue
+      if (at == 1) v = (((k + 1) in wh) ? wh[k + 1] : t[k + 1])
+      else v = substr(((k in wh) ? wh[k] : u), at)
       if (v != OVERLAY_REL)
         bad("workflow", where " mescla \"" v "\" na configuração do Tauri. Só o " OVERLAY_REL " é auditado; qualquer outra coisa entra no pacote sem auditoria")
     }
@@ -324,10 +342,12 @@ function checkuses(where, line,   v) {
   bad("workflow", where " roda a action local \"" v "\". Esta auditoria só lê .github/actions/ e .github/workflows/; uma action em outro lugar pode rodar tauri build com qualquer configuração")
 }
 
-function contjoin(src, out, outn,   n, L, i, s, cur, curn, nout, open) {
+function iscomment(s, cm) { sub(/^[ \t]+/, "", s); return (index(s, cm) == 1) }
+function contjoin(src, out, outn, cm,   n, L, i, s, cur, curn, nout, open) {
   n = split(src, L, "\n")
   for (i = 1; i <= n; i++) {
     s = L[i]; sub(/\r$/, "", s)
+    if (!open && cm != "" && iscomment(s, cm)) continue
     if (open) cur = cur " " s
     else { cur = s; curn = i }
     open = (cur ~ /[\\`^][ \t]*$/)
@@ -374,6 +394,15 @@ function yamljoin(src, out, outn,   n, L, i, s, c, c0, ind, col, v, cur, curn, o
   return nout + 0
 }
 
+function jsline(src,   n, L, i, r, sep) {
+  n = split(src, L, "\n")
+  for (i = 1; i <= n; i++) {
+    if (iscomment(L[i], "//")) continue
+    r = r sep L[i]; sep = " "
+  }
+  return r
+}
+
 function checkpipe(f, kind,   n, L, i, ll, lln, nl, gh, lf, where) {
   gh = (kind == "workflow" || kind == "action")
   n = split(jsrc[f], L, "\n")
@@ -388,12 +417,11 @@ function checkpipe(f, kind,   n, L, i, ll, lln, nl, gh, lf, where) {
   split("", ll); split("", lln)
   lf = tolower(f)
   if (lf ~ /\.[cm]?[jt]s$/) {
-    ll[1] = jsrc[f]; gsub(/\n/, " ", ll[1])
-    checkcall(rel(f), ll[1], ";")
+    checkcall(rel(f), jsline(jsrc[f]), ";")
     return
   }
   if (lf ~ /\.ya?ml$/) nl = yamljoin(jsrc[f], ll, lln)
-  else nl = contjoin(jsrc[f], ll, lln)
+  else nl = contjoin(jsrc[f], ll, lln, (lf ~ /\.(sh|ps1)$/ ? "#" : ""))
   for (i = 1; i <= nl; i++) {
     where = rel(f) ":" lln[i]
     checkcall(where, ll[i], SHSEP)
@@ -1076,6 +1104,56 @@ R
 
   seed; write_at scripts/release.sh 'set -euo pipefail\npnpm tauri build --config src-tauri/other.json'
   expect "um script que um workflow roda"                              fail "scripts/release.sh:2 mescla"
+
+  seed; write_at scripts/release.ps1 "Start-Process pnpm -ArgumentList 'tauri','build','--config','src-tauri/other.json'"
+  expect "uma lista de argumentos do PowerShell unida por vírgulas"    fail "scripts/release.ps1:1 mescla \"src-tauri/other.json\""
+
+  seed; write_at scripts/release.mjs 'spawnSync("pnpm",["tauri","build","--config","src-tauri/other.json"]);'
+  expect "...ou um array JS sem espaços"                               fail "scripts/release.mjs mescla \"src-tauri/other.json\""
+
+  seed; write_at scripts/release.ps1 "Start-Process pnpm -ArgumentList 'tauri','build','--config','src-tauri/tauri.bundle.conf.json'"
+  expect "uma lista unida por vírgulas que cita o próprio overlay"     ok "nenhuma autoridade fora do conjunto declarado"
+
+  seed; write_at scripts/release.sh 'pnpm package --bundles app,dmg'
+  expect "uma vírgula dentro de um valor de --bundles não é configuração" ok "nenhuma autoridade fora do conjunto declarado"
+
+  seed; step '      - run: pnpm tauri build --config src-tauri/tauri.bundle.conf.json,src-tauri/other.json'
+  expect "...mas dentro de um valor de --config é um caminho só, e não o overlay" fail "mescla \"src-tauri/tauri.bundle.conf.json,src-tauri/other.json\""
+
+  seed; write_at scripts/release.mjs 'spawnSync("pnpm",["package","--config","src-tauri/other.json"]);'
+  expect "uma chamada JS que envolve o gerenciador de pacotes"         fail "scripts/release.mjs mescla \"src-tauri/other.json\""
+
+  seed; write_at scripts/release.mjs "execFileSync('npx', ['tauri','build','-c','src-tauri/other.json']);"
+  expect "...ou o npx e a CLI"                                         fail "scripts/release.mjs mescla \"src-tauri/other.json\""
+
+  seed; write_at scripts/release.ps1 "Start-Process -FilePath pnpm -ArgumentList @('package','--config','src-tauri/other.json')"
+  expect "...ou Start-Process -FilePath com um array de argumentos @()" fail "scripts/release.ps1:1 mescla \"src-tauri/other.json\""
+
+  seed; write_at scripts/release.mjs 'spawnSync("node",["scripts/build-analyzer.mjs"]);'
+  expect "uma chamada JS a outro programa não é chamada ao Tauri"      ok "nenhuma autoridade fora do conjunto declarado"
+
+  seed
+  if mkdir -p "$tmp/scripts" && cp "$ROOT/scripts/build-analyzer.mjs" "$tmp/scripts/"; then
+    expect "o próprio build-analyzer.mjs deste repositório"            ok "0 workflows, 1 outro arquivo"
+  else
+    failed=$((failed + 1)); printf '  falha  o próprio build-analyzer.mjs deste repositório: não foi possível copiá-lo de %s\n' "$ROOT"
+  fi
+
+  local prose='O build é feito pelo `pnpm package` que mapeia o staging para `$RESOURCE/analyzer/`.'
+  seed; write_at scripts/build-analyzer.sh "set -euo pipefail\n# $prose"
+  expect "texto em um comentário de linha inteira em .sh"              ok "nenhuma autoridade fora do conjunto declarado"
+
+  seed; write_at scripts/build-analyzer.mjs "// $prose\nexport const stage = 1;"
+  expect "...ou em um comentário // de linha inteira em .mjs"          ok "nenhuma autoridade fora do conjunto declarado"
+
+  seed; write_at scripts/build-analyzer.sh "set -euo pipefail\n$prose"
+  expect "...e o mesmo texto como código ainda falha"                  fail "scripts/build-analyzer.sh:2: a CLI do Tauri recebe"
+
+  seed; write_at scripts/release.sh 'echo pronto # pnpm tauri build --config src-tauri/other.json'
+  expect "um comentário depois de código na mesma linha ainda é lido"  fail "scripts/release.sh:1 mescla \"src-tauri/other.json\""
+
+  seed; step '      - run: |\n          # pnpm tauri build --config src-tauri/other.json\n          pnpm package --bundles deb'
+  expect "...assim como um comentário dentro de um bloco run do YAML, que é shell" fail "package.yml:7 mescla \"src-tauri/other.json\""
 
   seed; step '      - uses: ./tools/build'
   expect "uma action local fora de .github/actions, que nada lê" fail "roda a action local \"./tools/build\""
