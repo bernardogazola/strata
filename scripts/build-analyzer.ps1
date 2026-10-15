@@ -119,6 +119,8 @@ New-Item -ItemType Directory -Path (Join-Path $Stage 'lib') | Out-Null
 Write-Step "jlink --add-modules $modules"
 & (Join-Path $jdk 'bin\jlink.exe') --add-modules $modules --strip-debug --no-header-files `
   --no-man-pages --compress=zip-6 --output (Join-Path $Stage 'runtime')
+Get-ChildItem -Recurse -File (Join-Path $Stage 'runtime') |
+  Where-Object IsReadOnly | ForEach-Object { $_.IsReadOnly = $false }
 Copy-Item $jar (Join-Path $Stage 'analyzer.jar')
 Copy-Item (Join-Path $AnalyzerDir 'target\lib\*.jar') (Join-Path $Stage 'lib')
 

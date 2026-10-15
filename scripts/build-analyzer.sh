@@ -143,6 +143,7 @@ main() {
   step "jlink --add-modules $modules"
   "$jdk/bin/jlink" --add-modules "$modules" --strip-debug --no-header-files \
     --no-man-pages --compress=zip-6 --output "$STAGE/runtime"
+  chmod -R u+w "$STAGE/runtime"
   cp "$jar" "$STAGE/analyzer.jar"
   cp "$ANALYZER_DIR"/target/lib/*.jar "$STAGE/lib/"
 
