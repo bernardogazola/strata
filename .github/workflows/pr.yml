@@ -50,6 +50,9 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Generate the fixture repositories
+        run: bash scripts/make-fixtures.sh
+
       - name: Test, with the coverage floor
         run: pnpm test:coverage
 
@@ -106,6 +109,17 @@ jobs:
         run: |
           rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component rustfmt,clippy
           rustup default "$RUST_TOOLCHAIN"
+
+      - name: JDK 25
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: The analyzer jar the development fallback resolves
+        working-directory: analyzer
+        run: ./mvnw --batch-mode --no-transfer-progress --quiet package -DskipTests
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
