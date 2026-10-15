@@ -66,13 +66,22 @@ analyzer_jar() {
 
 baseline_modules() {
   [ -f "$MODULES_FILE" ] || return 0
-  grep -v '^#' "$MODULES_FILE" | grep -v '^[[:space:]]*$' | head -1
+  grep -v '^#' "$MODULES_FILE" | grep -v '^[[:space:]]*$' | grep -v '^+' | head -1
+}
+
+extra_modules() {
+  [ -f "$MODULES_FILE" ] || return 0
+  sed -n 's/^+\([A-Za-z0-9.]*\).*/\1/p' "$MODULES_FILE" | paste -sd, -
 }
 
 accept_modules() {
-  local modules="$1" header
-  header="$(grep '^#' "$MODULES_FILE" 2>/dev/null || true)"
-  { [ -n "$header" ] && printf '%s\n' "$header"; printf '%s\n' "$modules"; } > "$MODULES_FILE.tmp"
+  local modules="$1"
+  if [ -n "$(baseline_modules)" ]; then
+    awk -v new="$modules" 'done || /^#/ || /^[[:space:]]*$/ || /^\+/ { print; next } { print new; done = 1 }' \
+      "$MODULES_FILE" > "$MODULES_FILE.tmp"
+  else
+    { cat "$MODULES_FILE" 2>/dev/null || true; printf '%s\n' "$modules"; } > "$MODULES_FILE.tmp"
+  fi
   mv "$MODULES_FILE.tmp" "$MODULES_FILE"
 }
 
@@ -100,14 +109,21 @@ MSG
 }
 
 self_check() {
-  local stdout_file="$SCRATCH/stdout.jsonl" status=0
+  local modules="$1" stdout_file="$SCRATCH/stdout.jsonl" status=0 listed module
+  listed="$("$STAGE/runtime/bin/java" --list-modules | sed 's/@.*//')"
+  for module in ${modules//,/ }; do
+    printf '%s\n' "$listed" | grep -qx "$module" || fail "falta o módulo $module no runtime preparado"
+  done
   "$STAGE/runtime/bin/java" -Xss2m -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 \
     -cp "$STAGE/analyzer.jar:$STAGE/lib/*" "$MAIN_CLASS" "--data-dir=$SCRATCH/data" \
     < /dev/null > "$stdout_file" 2> "$SCRATCH/stderr.log" || status=$?
-  [ "$status" -eq 0 ] || fail "o runtime preparado saiu com $status no EOF do stdin (o stderr está na saída acima)"
+  if [ "$status" -ne 0 ]; then
+    cat "$SCRATCH/stderr.log" >&2
+    fail "o runtime preparado saiu com $status no EOF do stdin (o stderr dele está acima)"
+  fi
   grep -q '"event":"protocol.ready"' "$stdout_file" \
-    || fail "o runtime preparado não imprimiu protocol.ready"
-  step "o runtime preparado responde ao handshake"
+    || { cat "$SCRATCH/stderr.log" >&2; fail "o runtime preparado não imprimiu protocol.ready"; }
+  step "o runtime preparado tem os $(printf '%s' "$modules" | awk -F, '{ print NF }') módulos e responde ao handshake"
 }
 
 main() {
@@ -133,6 +149,12 @@ main() {
   modules="$("$jdk/bin/jdeps" --print-module-deps --ignore-missing-deps \
     --multi-release "$JAVA_RELEASE" --class-path "$ANALYZER_DIR/target/lib/*" "$jar")"
   check_modules "$modules" "$accept"
+  local extras
+  extras="$(extra_modules)"
+  if [ -n "$extras" ]; then
+    step "módulos que o jdeps não enxerga, tirados de analyzer/runtime-modules.txt: $extras"
+    modules="$modules,$extras"
+  fi
 
   case "$STAGE" in
     */src-tauri/resources/analyzer) rm -rf "$STAGE" ;;
@@ -149,7 +171,7 @@ main() {
 
   SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/build-analyzer.XXXXXX")"
   trap cleanup EXIT
-  self_check
+  self_check "$modules"
 
   step "preparado: $(du -sh "$STAGE" | cut -f1) em src-tauri/resources/analyzer ($(find "$STAGE/lib" -name '*.jar' | wc -l | tr -d ' ') jars)"
 }
