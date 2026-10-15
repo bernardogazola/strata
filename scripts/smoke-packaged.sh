@@ -294,6 +294,12 @@ self_test() {
   expect "um .exe sobrando ao lado do app e do desinstalador falha" "$PROBLEMS" "1"
   PROBLEMS=0; check_executables $'uninstall.exe\nstrata.exe' "strata.exe,uninstall.exe" >/dev/null
   expect "o app e o desinstalador NSIS passam" "$PROBLEMS" "0"
+  expect "uma listagem de deb sem ./ dá os nomes de usr/bin" \
+    "$(printf '%s\n' '-rwxr-xr-x root/root 1 2026-10-15 16:51 usr/bin/strata' \
+      '-rwxr-xr-x root/root 1 2026-10-15 16:51 usr/lib/Strata/analyzer/runtime/bin/java' | deb_bin_entries)" "strata"
+  expect "...e com ./, as duas entradas de um deb sujo" \
+    "$(printf '%s\n' '-rwxr-xr-x root/root 1 2026-10-15 16:51 ./usr/bin/strata' \
+      '-rwxr-xr-x root/root 1 2026-10-15 16:51 ./usr/bin/stub_child' | deb_bin_entries | paste -sd, -)" "strata,stub_child"
 
   PROBLEMS=0; check_bundled_jvm $'/usr/lib/dyld\n/Library/Java/x/lib/server/libjvm.dylib' "/apps/Strata.app/lib/server/libjvm.dylib" libjvm.dylib >/dev/null
   expect "uma JVM de fora do bundle falha" "$PROBLEMS" "1"
@@ -454,6 +460,10 @@ cleanup() {
   fi
 }
 
+deb_bin_entries() {
+  awk '$NF ~ /^(\.\/)?usr\/bin\/[^\/]+$/ { sub(/^(\.\/)?usr\/bin\//, "", $NF); print $NF }'
+}
+
 names_in() {
   local file
   for file in "$1"/$2; do
@@ -485,7 +495,7 @@ install_linux() {
   ARTIFACT="$deb"
   echo "smoke-packaged: extraindo $(basename "$deb")"
   listing="$(dpkg-deb -c "$deb")"
-  check_executables "$(printf '%s\n' "$listing" | awk '$NF ~ /^\.\/usr\/bin\/[^\/]+$/ { sub(/^\.\/usr\/bin\//, "", $NF); print $NF }')" "strata"
+  check_executables "$(printf '%s\n' "$listing" | deb_bin_entries)" "strata"
   mode="$(printf '%s\n' "$listing" | awk '!seen && $NF ~ /\/analyzer\/runtime\/bin\/java$/ { print $1; seen = 1 }')"
   if [ "$mode" = "-rwxr-xr-x" ]; then
     good "o deb entrega runtime/bin/java como -rwxr-xr-x"
