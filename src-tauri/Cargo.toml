@@ -39,6 +39,10 @@ path = "tests/lifecycle.rs"
 name = "commands"
 path = "tests/commands.rs"
 
+[[test]]
+name = "packaged_runtime"
+path = "tests/packaged_runtime.rs"
+
 [features]
 default = ["test-support"]
 test-support = []

@@ -2,8 +2,10 @@ mod support;
 
 use std::time::Duration;
 use strata_lib::analyzer::process::{self, RealProbe};
-use strata_lib::analyzer::{AnalyzerConfig, AnalyzerHandle};
+use strata_lib::analyzer::{AnalyzerConfig, AnalyzerHandle, BackendPhase};
 use strata_lib::error::ErrorCode;
+#[cfg(windows)]
+use support::stderr_until;
 use support::{Recorder, block_on, empty_payload, fast_config, stub_plan};
 
 #[test]
@@ -99,8 +101,77 @@ fn shutdown_timeout_force_terminates() {
             report.forced,
             "um filho que ignora os dois prazos precisa ser terminado"
         );
-        assert!(handle.backend_phase() != strata_lib::analyzer::BackendPhase::Starting);
+        #[cfg(unix)]
+        assert_eq!(
+            report.exit_code, None,
+            "a morte por sinal não tem código de saída"
+        );
+        #[cfg(windows)]
+        assert_eq!(
+            report.exit_code,
+            Some(1),
+            "Child::kill é TerminateProcess(h, 1)"
+        );
+        assert_eq!(
+            handle.backend_phase(),
+            BackendPhase::Crashed {
+                exit_code: report.exit_code
+            }
+        );
     });
+}
+
+#[cfg(windows)]
+#[test]
+fn the_child_gets_its_own_console_and_no_window() {
+    let production = block_on(async {
+        let events = Recorder::new();
+        let handle = AnalyzerHandle::spawn(stub_plan("console"), fast_config(), events.sink())
+            .await
+            .expect("stub pronto");
+        let lines = stderr_until(
+            &handle,
+            |line| line.starts_with("console-processes: "),
+            Duration::from_secs(5),
+        );
+        handle.shutdown().await.expect("shutdown limpo");
+        console_probe(&lines)
+    });
+
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_stub_child"))
+        .arg("--mode=console")
+        .output()
+        .expect("o stub roda sem o spawn de produção");
+    let lines: Vec<String> = String::from_utf8_lossy(&output.stderr)
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    let control = console_probe(&lines);
+    eprintln!("sonda de console: produção {production:?} · controle sem a flag {control:?}");
+
+    let own_windowless = (String::from("absent"), 1);
+    assert_eq!(
+        production, own_windowless,
+        "o spawn de produção deve dar ao filho um console próprio, sem janela"
+    );
+    assert_ne!(
+        control, own_windowless,
+        "o controle deve ser diferente do filho de produção"
+    );
+}
+
+#[cfg(windows)]
+fn console_probe(lines: &[String]) -> (String, u32) {
+    let window = lines
+        .iter()
+        .find_map(|line| line.strip_prefix("console: "))
+        .expect("o stub informa a janela do console");
+    let processes = lines
+        .iter()
+        .find_map(|line| line.strip_prefix("console-processes: "))
+        .and_then(|count| count.parse().ok())
+        .expect("o stub informa quantos processos dividem o console");
+    (window.to_owned(), processes)
 }
 
 #[test]
