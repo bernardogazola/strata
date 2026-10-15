@@ -16,7 +16,8 @@ pub fn child_env(data_dir: &Path) -> Vec<(OsString, OsString)> {
 
     #[cfg(unix)]
     {
-        env.push((OsString::from("LANG"), OsString::from("C.UTF-8")));
+        let locale = utf8_locale(|name| std::env::var_os(name));
+        env.push((OsString::from("LANG"), locale));
         env.push((OsString::from("TMPDIR"), data_dir.as_os_str().to_owned()));
         inherit(&mut env, "HOME");
     }
@@ -49,6 +50,28 @@ fn inherit(env: &mut Vec<(OsString, OsString)>, name: &str) {
     if let Some(value) = std::env::var_os(name) {
         env.push((OsString::from(name), value));
     }
+}
+
+#[cfg(unix)]
+fn utf8_locale(lookup: impl Fn(&str) -> Option<OsString>) -> OsString {
+    let inherited = ["LC_ALL", "LC_CTYPE", "LANG"]
+        .into_iter()
+        .find_map(|name| lookup(name).filter(|value| !value.is_empty()));
+    match inherited {
+        Some(locale) if names_utf8(&locale) => locale,
+        _ => OsString::from("C.UTF-8"),
+    }
+}
+
+#[cfg(unix)]
+fn names_utf8(locale: &std::ffi::OsStr) -> bool {
+    let Some(text) = locale.to_str() else {
+        return false;
+    };
+    let name = text.split_once('@').map_or(text, |(name, _)| name);
+    name.split_once('.').is_some_and(|(_, codeset)| {
+        codeset.eq_ignore_ascii_case("UTF-8") || codeset.eq_ignore_ascii_case("utf8")
+    })
 }
 
 pub const MAIN_CLASS: &str = "br.pucpr.tcc.strata.analyzer.bootstrap.Main";
@@ -412,6 +435,38 @@ mod tests {
             );
         }
         #[cfg(unix)]
-        assert!(names.iter().any(|name| name == "LANG"));
+        {
+            let lang = env.iter().find(|(name, _)| name == "LANG");
+            assert!(
+                lang.is_some_and(|(_, value)| super::names_utf8(value)),
+                "seja qual for o locale do pai, o LANG do filho indica UTF-8: {lang:?}"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_parent_locale_is_kept_only_when_it_names_utf8() {
+        use std::ffi::OsString;
+
+        let cases: &[(&[(&str, &str)], &str)] = &[
+            (&[("LC_ALL", "pt_BR.UTF-8")], "pt_BR.UTF-8"),
+            (&[("LC_ALL", ""), ("LANG", "en_US.utf8")], "en_US.utf8"),
+            (&[("LANG", "pt_BR.ISO-8859-1")], "C.UTF-8"),
+            (&[("LC_ALL", "C"), ("LANG", "en_US.UTF-8")], "C.UTF-8"),
+            (&[("LC_CTYPE", "pt_BR.UTF-8"), ("LANG", "C")], "pt_BR.UTF-8"),
+            (&[], "C.UTF-8"),
+            (&[("LANG", "sr_RS.UTF-8@latin")], "sr_RS.UTF-8@latin"),
+            (&[("LC_CTYPE", "UTF-8")], "C.UTF-8"),
+        ];
+        for (parent, expected) in cases {
+            let lookup = |name: &str| {
+                parent
+                    .iter()
+                    .find(|(key, _)| *key == name)
+                    .map(|(_, value)| OsString::from(value))
+            };
+            assert_eq!(super::utf8_locale(lookup), *expected, "pai {parent:?}");
+        }
     }
 }

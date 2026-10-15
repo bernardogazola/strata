@@ -28,6 +28,8 @@ public final class AnalysisConstants {
 
   public static final int EXIT_PROTOCOL_DESYNCHRONIZED = 70;
 
+  public static final int EXIT_PLATFORM_ENCODING = 78;
+
   private AnalysisConstants() {}
 
   public static Map<String, Object> asMetadata() {

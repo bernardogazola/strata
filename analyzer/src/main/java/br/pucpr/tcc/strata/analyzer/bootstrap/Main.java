@@ -19,6 +19,15 @@ public final class Main {
 
   public static void main(String[] args) {
     final StdoutCapture capture = StdoutCapture.install();
+    final String pathEncoding = System.getProperty("sun.jnu.encoding");
+    if (PathEncodingGuard.refuses(System.getProperty("os.name"), pathEncoding)) {
+      Log.error(
+          "sun.jnu.encoding vale "
+              + pathEncoding
+              + "; decodificar caminhos de arquivo exige um locale UTF-8");
+      System.exit(AnalysisConstants.EXIT_PLATFORM_ENCODING);
+      return;
+    }
     int exitCode = AnalysisConstants.EXIT_OK;
     try {
       final RuntimeArguments arguments = RuntimeArguments.parse(args);
