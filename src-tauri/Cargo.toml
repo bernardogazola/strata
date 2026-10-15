@@ -22,6 +22,7 @@ test = false
 [[bin]]
 name = "stub_child"
 path = "tests/stub_child.rs"
+required-features = ["test-support"]
 test = false
 bench = false
 doc = false
@@ -37,6 +38,10 @@ path = "tests/lifecycle.rs"
 [[test]]
 name = "commands"
 path = "tests/commands.rs"
+
+[features]
+default = ["test-support"]
+test-support = []
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
