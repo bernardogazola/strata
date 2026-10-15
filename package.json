@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "build": "tsc -b && vite build",
+    "build:analyzer": "node scripts/build-analyzer.mjs",
     "check": "ultracite check",
     "dev": "vite",
     "fix": "ultracite fix",
+    "package": "pnpm build:analyzer && tauri build --config src-tauri/tauri.bundle.conf.json",
     "prepare": "husky",
     "preview": "vite preview",
     "tauri": "tauri",

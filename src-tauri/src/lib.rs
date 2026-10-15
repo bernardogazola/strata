@@ -12,6 +12,7 @@ pub mod log;
 pub mod repository;
 mod ring;
 pub mod runtime;
+pub mod smoke;
 
 use crate::log::ShellLog;
 use crate::runtime::{AnalyzerRuntime, HandshakeCell, PlanSource};
@@ -25,6 +26,7 @@ const MAX_HEAP_VAR: &str = "STRATA_ANALYZER_MAX_HEAP";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let started = std::time::Instant::now();
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
@@ -37,7 +39,7 @@ pub fn run() {
             commands::analyzer_cancel,
             commands::export_diagnostics,
         ])
-        .setup(|app| {
+        .setup(move |app| {
             let window = app
                 .get_webview_window("main")
                 .expect("a janela principal deveria existir");
@@ -58,11 +60,17 @@ pub fn run() {
 
             let shell_log = Arc::new(ShellLog::default());
             let handshake = Arc::new(HandshakeCell::default());
-            let sink = Arc::new(events::TauriSink::new(
-                app.handle().clone(),
-                Arc::clone(&shell_log),
-                Arc::clone(&handshake),
-            ));
+            let (sink, probe) = smoke::install(
+                Arc::new(events::TauriSink::new(
+                    app.handle().clone(),
+                    Arc::clone(&shell_log),
+                    Arc::clone(&handshake),
+                )),
+                std::env::var_os(smoke::SMOKE_REPORT_VAR),
+                started,
+                &shell_log,
+            );
+            app.manage(probe);
             let runtime = Arc::new(AnalyzerRuntime::new(
                 PlanSource::Discovered {
                     home: std::env::var_os(HOME_VAR).map(Into::into),
