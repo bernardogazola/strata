@@ -183,10 +183,7 @@ build_dmg() {
   /usr/bin/ditto "$app" "$stage/$(basename "$app")"
   ln -s /Applications "$stage/Applications"
 
-  case "$out_dir" in
-    */dmg) find "$out_dir" -maxdepth 1 -name '*.dmg' -type f -delete ;;
-    *) die "recusando apagar arquivos .dmg de $out_dir, que não é uma pasta de dmg" ;;
-  esac
+  find "$out_dir" -maxdepth 1 -type f -name "${VOLUME_NAME}_*.dmg" -delete
 
   for attempt in 1 2; do
     if /usr/bin/hdiutil create -quiet -volname "$VOLUME_NAME" -srcfolder "$stage" -ov -format UDZO "$out"; then
@@ -203,15 +200,26 @@ verify_dmg() {
   local dmg="$1" copy
   MOUNT="$SCRATCH/mnt"
   mkdir -p "$MOUNT"
-  /usr/bin/hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$MOUNT" "$dmg" >/dev/null 2>&1
+  if ! /usr/bin/hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$MOUNT" "$dmg" >/dev/null 2>"$SCRATCH/attach.err"; then
+    bad "o hdiutil não conseguiu montar $(basename "$dmg"): $(tail -1 "$SCRATCH/attach.err")"
+    MOUNT=""
+    return 0
+  fi
   copy="$MOUNT/$VOLUME_NAME.app"
   if /usr/bin/codesign --verify --deep --strict "$copy" >/dev/null 2>&1; then
     good "o app dentro de $(basename "$dmg") continua passando na verificação"
   else
     bad "o app dentro de $(basename "$dmg") não passa mais na verificação: $(/usr/bin/codesign --verify --deep --strict "$copy" 2>&1 | tail -1)"
   fi
-  /usr/bin/hdiutil detach "$MOUNT" -quiet
+  detach_volume "$MOUNT"
   MOUNT=""
+}
+
+detach_volume() {
+  /usr/bin/hdiutil detach "$1" -quiet 2>/dev/null && return 0
+  sleep 2
+  /usr/bin/hdiutil detach "$1" -quiet 2>/dev/null && return 0
+  /usr/bin/hdiutil detach "$1" -quiet -force
 }
 
 synthetic_app() {

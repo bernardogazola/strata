@@ -487,9 +487,12 @@ install_macos() {
   echo "smoke-packaged: instalando $(basename "$dmg")"
   MOUNT="$WORK/mnt"
   mkdir -p "$MOUNT" "$WORK/Applications"
-  /usr/bin/hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$MOUNT" "$dmg" >/dev/null
+  /usr/bin/hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$MOUNT" "$dmg" >/dev/null \
+    || die "o hdiutil não conseguiu montar $(basename "$dmg")"
   /usr/bin/ditto "$MOUNT/Strata.app" "$WORK/Applications/Strata.app"
-  /usr/bin/hdiutil detach "$MOUNT" -quiet
+  /usr/bin/hdiutil detach "$MOUNT" -quiet 2>/dev/null \
+    || { sleep 2; /usr/bin/hdiutil detach "$MOUNT" -quiet 2>/dev/null; } \
+    || /usr/bin/hdiutil detach "$MOUNT" -quiet -force
   MOUNT=""
   app="$WORK/Applications/Strata.app"
   APP_EXE="$app/Contents/MacOS/strata"
@@ -723,6 +726,8 @@ run_smoke() {
       fi
     else
       WARM_MS="${WARM_MS:+$WARM_MS }$ready_ms"
+      [ -n "$ANALYZER_PID" ] \
+        || bad "execução $run: READY foi informado, mas nenhum analisador filho foi encontrado, então a verificação de órfão não pode rodar"
     fi
 
     if [ "$run" -lt "$WARM_RUNS" ]; then
@@ -841,8 +846,8 @@ configure_os() {
     MINGW* | MSYS* | CYGWIN*)
       OS_KIND="windows"; OS_LABEL="Windows"; JAVA_NAME="java.exe"
       KILL_LABEL="taskkill /F"; QUIT_SIGNAL="WM_CLOSE (taskkill sem /F)"; CRASH_EXIT_CODE="1"
-      [ "$CI_MODE" = "yes" ] \
-        || die "uma execução no Windows não é isolada: ela apaga os dados do Strata em %APPDATA% e %LOCALAPPDATA% e instala por usuário; rode só com --ci em um runner descartável"
+      [ "$CI_MODE" = "yes" ] && [ "${GITHUB_ACTIONS:-}" = "true" ] \
+        || die "uma execução no Windows não é isolada: ela apaga os dados do Strata em %APPDATA% e %LOCALAPPDATA% e instala por usuário; só roda com --ci em um runner descartável do GitHub Actions (GITHUB_ACTIONS=true)"
       local tool
       for tool in pwsh cygpath taskkill tasklist iconv base64; do
         command -v "$tool" >/dev/null || die "o $tool é necessário no Windows"
