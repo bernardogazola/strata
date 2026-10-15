@@ -29,6 +29,8 @@ CSP_CONNECT_DEV="'self' ipc: http://ipc.localhost ws://localhost:1420 ws://local
 
 CSP_REQUIRED_DIRECTIVES="default-src 'self'|object-src 'none'|frame-src 'none'|frame-ancestors 'none'|base-uri 'none'|form-action 'none'"
 
+DENIED_ENV="TAURI_CONFIG TAURI_APP_PATH TAURI_FRONTEND_PATH"
+
 AUDIT_ROOT="$ROOT"
 SELF_TEST=0
 
@@ -48,6 +50,10 @@ Verificações, em ordem:
   superfícies de plugin   capability · Cargo.toml · registro em .rs · package.json
   csp                     connect-src exato nas duas políticas; seis diretivas fixadas
   superfície da webview   withGlobalTauri · assetProtocol · freezePrototype · capabilities inline
+  workflows               .github/workflows, .github/actions, scripts/, .cargo/config:
+                          tauri --config só com o overlay, nenhuma expansão depois de uma
+                          chamada ao tauri, sem TAURI_CONFIG, sem tauri-action, sem um
+                          segundo projeto Tauri
 
 saída: 0 ok · 1 alguma verificação falhou · 2 erro de uso
 USAGE
@@ -248,6 +254,153 @@ function npmhit(x,   m) {
 }
 function joinsetpfx(a,   b, k) { for (k in a) b[k ":"] = 1; return joinset(b) }
 
+function envline(key, where, s, tag,   u, i) {
+  u = toupper(s)
+  for (i = 1; i <= nenv; i++) {
+    if (((key, denyenv[i]) in envhit) || index(u, denyenv[i]) == 0) continue
+    envhit[key, denyenv[i]] = 1
+    bad(tag, where " cita " denyenv[i] ", que " (denyenv[i] == "TAURI_CONFIG" ? "mescla configuração que esta auditoria nunca lê" : "aponta a CLI do Tauri para um projeto que esta auditoria nunca lê"))
+  }
+}
+
+function rel(f) { return (index(f, ROOTDIR "/") == 1 ? substr(f, length(ROOTDIR) + 2) : f) }
+
+function untok(t) {
+  while (t != "" && index("'\"`([,", substr(t, 1, 1)) > 0) t = substr(t, 2)
+  while (t != "" && index("'\"`)],;", substr(t, length(t), 1)) > 0) t = substr(t, 1, length(t) - 1)
+  return t
+}
+function cmdname(t,   b) {
+  b = tolower(t)
+  sub(/^.*[\/\\]/, "", b)
+  sub(/@.*$/, "", b)
+  sub(/\.(exe|cmd|bat|ps1|js|cjs|mjs)$/, "", b)
+  return b
+}
+function findcall(t, nt,   k, u, c, pm) {
+  for (k = 1; k <= nt; k++) {
+    u = untok(t[k]); c = cmdname(u)
+    if (c == "tauri" || c == "cargo-tauri" || index(tolower(u), "@tauri-apps/cli") == 1) return k
+    if (pm && (u in tscript)) return k
+    if (c ~ /^(pnpm|npm|yarn|bun)$/) pm = 1
+  }
+  return 0
+}
+function reaches(cmd,   ns, seg, si, nt, t) {
+  ns = split(cmd, seg, SHSEP)
+  for (si = 1; si <= ns; si++) {
+    nt = split(seg[si], t, /[ \t]+/)
+    if (findcall(t, nt) > 0) return 1
+  }
+  return 0
+}
+function checkcall(where, line, seps,   ns, seg, si, nt, t, ci, k, u, v, p, xp) {
+  ns = split(line, seg, seps)
+  for (si = 1; si <= ns; si++) {
+    nt = split(seg[si], t, /[ \t]+/)
+    ci = findcall(t, nt)
+    if (ci == 0) continue
+    xp = 0
+    for (k = ci + 1; k <= nt; k++) {
+      u = untok(t[k])
+      if (!xp && (index(u, "$") > 0 || u ~ /%[A-Za-z_][A-Za-z0-9_]*%/)) {
+        xp = 1
+        bad("workflow", where ": a CLI do Tauri recebe \"" u "\". O --config pode viajar dentro de uma expansão, e esta auditoria lê texto, não valores: escreva os argumentos literalmente, um passo por sistema operacional")
+      }
+      if (u == "--config") v = untok(t[k + 1])
+      else if (index(u, "--config=") == 1) v = substr(u, 10)
+      else if (u ~ /^-[A-Za-z]/ && (p = index(u, "c")) > 0) v = (p < length(u) ? substr(u, p + 1) : untok(t[k + 1]))
+      else continue
+      if (v != OVERLAY_REL)
+        bad("workflow", where " mescla \"" v "\" na configuração do Tauri. Só o " OVERLAY_REL " é auditado; qualquer outra coisa entra no pacote sem auditoria")
+    }
+  }
+}
+function checkuses(where, line,   v) {
+  if (!match(line, /(^|[ \t{,])uses[ \t]*:/)) return
+  v = trim(substr(line, RSTART + RLENGTH)); sub(/[ \t].*$/, "", v); v = untok(v)
+  if (substr(v, 1, 1) != ".") return
+  if (index(v, "..") == 0 && (index(v, "./.github/actions/") == 1 || index(v, "./.github/workflows/") == 1)) return
+  bad("workflow", where " roda a action local \"" v "\". Esta auditoria só lê .github/actions/ e .github/workflows/; uma action em outro lugar pode rodar tauri build com qualquer configuração")
+}
+
+function contjoin(src, out, outn,   n, L, i, s, cur, curn, nout, open) {
+  n = split(src, L, "\n")
+  for (i = 1; i <= n; i++) {
+    s = L[i]; sub(/\r$/, "", s)
+    if (open) cur = cur " " s
+    else { cur = s; curn = i }
+    open = (cur ~ /[\\`^][ \t]*$/)
+    if (open) sub(/[\\`^][ \t]*$/, "", cur)
+    else { out[++nout] = cur; outn[nout] = curn }
+  }
+  if (open) { out[++nout] = cur; outn[nout] = curn }
+  return nout + 0
+}
+function yamlkey(c) {
+  return (c ~ /^[A-Za-z0-9_.$\/-]+[ \t]*:([ \t]|$)/ || c ~ /^"[^"]*"[ \t]*:([ \t]|$)/ || c ~ /^'[^']*'[ \t]*:([ \t]|$)/)
+}
+function yamlnode(c) { return (c ~ /^-([ \t]|$)/ || yamlkey(c)) }
+function litjoin(cur, c) {
+  if (cur !~ /[\\`^][ \t]*$/) return cur " ; " c
+  sub(/[\\`^][ \t]*$/, "", cur)
+  return cur " " c
+}
+function yamljoin(src, out, outn,   n, L, i, s, c, c0, ind, col, v, cur, curn, own, mode, nout) {
+  n = split(src, L, "\n"); own = -1
+  for (i = 1; i <= n; i++) {
+    s = L[i]; sub(/\r$/, "", s)
+    c = s; sub(/^[ \t]+/, "", c); ind = length(s) - length(c)
+    if (c == "") continue
+    if (own >= 0 && ind > own && (mode != "open" || !yamlnode(c))) {
+      cur = (mode == "lit" ? litjoin(cur, c) : cur " " c)
+      if (mode == "open") mode = "plain"
+      continue
+    }
+    if (substr(c, 1, 1) == "#") continue
+    if (cur != "") { out[++nout] = cur; outn[nout] = curn }
+    cur = c; curn = i; col = ind; own = ind; mode = "open"
+    while (c ~ /^-([ \t]|$)/) { c0 = c; sub(/^-[ \t]*/, "", c); col += length(c0) - length(c) }
+    if (yamlkey(c)) {
+      own = col
+      v = c; sub(/^("[^"]*"|'[^']*'|[^:]*)[ \t]*:[ \t]*/, "", v)
+    } else if (col > ind) v = c
+    else continue
+    if (substr(v, 1, 1) == "|") mode = "lit"
+    else if (substr(v, 1, 1) == ">") mode = "fold"
+    else if (v != "" && v !~ /^#/ && v !~ /^[&!][^ \t]*([ \t]+#.*)?$/) mode = "plain"
+  }
+  if (cur != "") { out[++nout] = cur; outn[nout] = curn }
+  return nout + 0
+}
+
+function checkpipe(f, kind,   n, L, i, ll, lln, nl, gh, lf, where) {
+  gh = (kind == "workflow" || kind == "action")
+  n = split(jsrc[f], L, "\n")
+  for (i = 1; i <= n; i++) {
+    envline(f, rel(f) ":" i, L[i], "workflow")
+    if (gh && !(f in tahit) && index(tolower(L[i]), "/tauri-action") > 0) {
+      tahit[f] = 1
+      bad("workflow", rel(f) ":" i " usa tauri-action. Os inputs args e projectPath dela mesclam configuração sem que nenhuma linha diga tauri, seja o que for que digam hoje: empacote com pnpm package")
+    }
+  }
+  if (kind == "cargo") return
+  split("", ll); split("", lln)
+  lf = tolower(f)
+  if (lf ~ /\.[cm]?[jt]s$/) {
+    ll[1] = jsrc[f]; gsub(/\n/, " ", ll[1])
+    checkcall(rel(f), ll[1], ";")
+    return
+  }
+  if (lf ~ /\.ya?ml$/) nl = yamljoin(jsrc[f], ll, lln)
+  else nl = contjoin(jsrc[f], ll, lln)
+  for (i = 1; i <= nl; i++) {
+    where = rel(f) ":" lln[i]
+    checkcall(where, ll[i], SHSEP)
+    if (gh) checkuses(where, ll[i])
+  }
+}
+
 BEGIN {
   split(" $schema build build.beforeBuildCommand bundle bundle.resources", ovk, " ")
   for (oi in ovk) overlay_ok[ovk[oi]] = 1
@@ -257,6 +410,8 @@ BEGIN {
   toset(DENY_NS, deny_ns)
   toset(CONNECT_PROD, want_conn_prod)
   toset(CONNECT_DEV,  want_conn_dev)
+  nenv  = split(DENY_ENV, denyenv, " ")
+  SHSEP = "&&|[|][|]|;|[|]|&"
 
   nrows = split(PLUGINS, prow, ";")
   for (i = 1; i <= nrows; i++) {
@@ -276,8 +431,12 @@ END {
   if (!(CARGO in seen)) bad("files", "ausente ou vazio: " CARGO)
   if (!(PKG   in seen)) bad("files", "ausente ou vazio: " PKG)
   for (f in seen) {
-    if (index(f, CAPDIR "/") == 1) capf[f] = 1
-    else if (f ~ /\.rs$/)          rsf[f]  = 1
+    if (index(f, CAPDIR "/") == 1)      capf[f] = 1
+    else if (index(f, WFDIR "/") == 1)  pipe[f] = "workflow"
+    else if (index(f, ACTDIR "/") == 1) pipe[f] = "action"
+    else if (index(f, SCRDIR "/") == 1) pipe[f] = "script"
+    else if (f ~ /\/\.cargo\/config(\.toml)?$/) pipe[f] = "cargo"
+    else if (f ~ /\.rs$/)               rsf[f]  = 1
   }
   ncapread = sortlist(capf, capl)
   nrsread  = sortlist(rsf,  rsl)
@@ -390,8 +549,7 @@ END {
       for (i = 1; i <= jn[kk]; i++) npmhit(jval[PKG, ka[2], i])
     }
   } else bad("plugin", "não foi possível interpretar o package.json")
-  if (index(jsrc[PKG], "TAURI_CONFIG") > 0)
-    bad("surface", "package.json cita TAURI_CONFIG, que mescla configuração que esta auditoria nunca lê")
+  envline(PKG, "package.json", jsrc[PKG], "surface")
   for (kk in jn) {
     split(kk, ka, SUBSEP)
     if (ka[1] != PKG || index(ka[2], "scripts.") != 1) continue
@@ -442,6 +600,37 @@ END {
       }
     } else bad("surface", "não foi possível interpretar o src-tauri/tauri.bundle.conf.json")
   }
+  for (ri = 1; ri <= nrsread; ri++) {
+    nl = split(jsrc[rsl[ri]], cl, "\n")
+    for (i = 1; i <= nl; i++) envline(rsl[ri], rel(rsl[ri]) ":" i, cl[i], "surface")
+  }
+
+  for (f in pipe) npread[pipe[f]]++
+  split("workflow action script cargo", kinds, " ")
+  split(N_WF " " N_ACT " " N_SCR " " N_CARGO, kfound, " ")
+  for (i = 1; i <= 4; i++)
+    if (npread[kinds[i]] + 0 != kfound[i] + 0)
+      bad("workflow", "foram lidos " (npread[kinds[i]] + 0) " dos " (kfound[i] + 0) " arquivo(s) de " kinds[i] " encontrados; o resto passaria em toda verificação por vacuidade")
+  if (WF_EXISTS == 1 && npread["workflow"] + 0 == 0)
+    bad("workflow", ".github/workflows existe e nenhum workflow foi lido dela, então toda verificação de workflow passaria por vacuidade")
+
+  do {
+    grew = 0
+    for (kk in jn) {
+      split(kk, ka, SUBSEP)
+      if (ka[1] != PKG || index(ka[2], "scripts.") != 1 || (substr(ka[2], 9) in tscript)) continue
+      for (i = 1; i <= jn[kk]; i++)
+        if (reaches(jval[PKG, ka[2], i])) { tscript[substr(ka[2], 9)] = 1; grew = 1 }
+    }
+  } while (grew)
+
+  npipe = sortlist(pipe, pipel)
+  for (i = 1; i <= npipe; i++) checkpipe(pipel[i], pipe[pipel[i]])
+
+  nsa = split(SECOND_APP, saa, "|")
+  for (i = 1; i <= nsa; i++)
+    if (saa[i] != "")
+      bad("workflow", saa[i] " é uma configuração do Tauri fora do par auditado. Um passo que faça cd para lá, ou que a cite em TAURI_APP_PATH, compila ou mescla essa configuração no lugar de src-tauri/tauri.conf.json")
 
   nuniq = length_of(perm_set)
 
@@ -456,6 +645,9 @@ END {
          st("plugin"), length_of(cap_plug), length_of(cargo_plug), length_of(rs_plug), length_of(npm_plug)
   printf "  %s  csp ...................... connect-src exato nas duas políticas, 6 diretivas fixadas\n", st("csp")
   printf "  %s  superfície da webview .... globalTauri, assetProtocol, freezePrototype, capabilities inline, configurações mescladas\n", st("surface")
+  nwfr = npread["workflow"] + 0; noth = npread["action"] + npread["script"] + npread["cargo"]
+  printf "  %s  workflows ................ %d workflow%s, %d outro%s arquivo%s: --config só com o overlay, sem TAURI_CONFIG, sem tauri-action\n",
+         st("workflow"), nwfr, (nwfr == 1 ? "" : "s"), noth, (noth == 1 ? "" : "s"), (noth == 1 ? "" : "s")
 
   if (nerr > 0) {
     print ""
@@ -512,6 +704,36 @@ run_audit() {
   while IFS= read -r f; do files+=("$f"); done \
     < <(find "$srcdir" \( -name target -o -name gen \) -prune -o -type f -name '*.rs' -print | LC_ALL=C sort)
 
+  local wfdir="$root/.github/workflows" actdir="$root/.github/actions" scrdir="$root/scripts"
+  local wfexists=0 nwf=0 nact=0 nscr=0 ncargo=0 second=""
+  if [ -d "$wfdir" ]; then
+    wfexists=1
+    while IFS= read -r f; do files+=("$f"); nwf=$((nwf + 1)); done \
+      < <(find -L "$wfdir" -type f \( -iname '*.yml' -o -iname '*.yaml' \) | LC_ALL=C sort)
+  fi
+  if [ -d "$actdir" ]; then
+    while IFS= read -r f; do
+      if [ -s "$f" ]; then files+=("$f"); nact=$((nact + 1)); fi
+    done < <(find -L "$actdir" -type f | LC_ALL=C sort)
+  fi
+  if [ -d "$scrdir" ]; then
+    while IFS= read -r f; do
+      if [ "$f" != "$scrdir/audit-capabilities.sh" ] && [ -s "$f" ]; then files+=("$f"); nscr=$((nscr + 1)); fi
+    done < <(find -L "$scrdir" -type f | LC_ALL=C sort)
+  fi
+  for f in "$root/.cargo/config" "$root/.cargo/config.toml" "$srcdir/.cargo/config" "$srcdir/.cargo/config.toml"; do
+    if [ -s "$f" ]; then files+=("$f"); ncargo=$((ncargo + 1)); fi
+  done
+  while IFS= read -r f; do
+    case "$f" in
+      "$srcdir"/*/*) second="$second|${f#"$root"/}" ;;
+      "$srcdir"/*)   ;;
+      *)             second="$second|${f#"$root"/}" ;;
+    esac
+  done < <(find "$root" \( -name node_modules -o -name .git -o -name target \) -prune -o \
+             \( -type f -o -type l \) \( -iname 'tauri*.conf.json' -o -iname 'tauri*.conf.json5' -o -iname 'tauri*.toml' \) \
+             -print | LC_ALL=C sort)
+
   local base_perms base_capfiles deny_ns plugins
   base_perms=$(printf '%s' "$BASELINE_PERMISSIONS" | tr '\n' ' ')
   base_capfiles=$(printf '%s' "$BASELINE_CAPABILITY_FILES" | tr '\n' ' ')
@@ -521,6 +743,9 @@ run_audit() {
   awk -v ROOTDIR="$root" -v CAPDIR="$capdir" -v CONF="$conf" -v CARGO="$cargo" -v PKG="$pkg" \
       -v CAPFOUND="$capfound" \
       -v OVERLAY="$overlay" -v STRAY_CONF="$stray" -v OVERLAY_REL="src-tauri/tauri.bundle.conf.json" \
+      -v WFDIR="$wfdir" -v ACTDIR="$actdir" -v SCRDIR="$scrdir" -v WF_EXISTS="$wfexists" \
+      -v N_WF="$nwf" -v N_ACT="$nact" -v N_SCR="$nscr" -v N_CARGO="$ncargo" \
+      -v SECOND_APP="$second" -v DENY_ENV="$DENIED_ENV" \
       -v BASE_PERMS="$base_perms" \
       -v BASE_CAPFILES="$base_capfiles" \
       -v DENY_NS="$deny_ns" \
@@ -569,8 +794,15 @@ self_test() {
            "$1" > "$tmp/src-tauri/tauri.bundle.conf.json"
   }
 
+  write_at() {
+    mkdir -p "$(dirname "$tmp/$1")"
+    printf '%b\n' "$2" > "$tmp/$1"
+  }
+  local wf_head='name: package\non: push\njobs:\n  package:\n    runs-on: ubuntu-24.04\n    steps:'
+  step() { write_at ".github/workflows/${2:-package.yml}" "$wf_head\n$1"; }
+
   seed() {
-    rm -rf "$tmp/src-tauri" "$tmp/package.json"
+    find "$tmp" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
     mkdir -p "$tmp/src-tauri/capabilities" "$tmp/src-tauri/src"
     cap_with "$(baseline_body)"
     write_conf "$(prod_csp)" "$(dev_csp)" ""
@@ -779,6 +1011,86 @@ R
 
   seed; sed 's|"pnpm build:analyzer|"TAURI_CONFIG={} pnpm build:analyzer|' "$tmp/package.json" > "$tmp/pkg.tmp" && mv "$tmp/pkg.tmp" "$tmp/package.json"
   expect "TAURI_CONFIG em um script npm"                               fail "TAURI_CONFIG"
+
+  seed
+  if mkdir -p "$tmp/.github/workflows" && cp "$ROOT/.github/workflows/security.yml" "$tmp/.github/workflows/"; then
+    expect "o próprio security.yml deste repositório"                  ok "1 workflow, 0 outros arquivos"
+  else
+    failed=$((failed + 1)); printf '  falha  o próprio security.yml deste repositório: não foi possível copiá-lo de %s\n' "$ROOT"
+  fi
+
+  seed; step '      - if: runner.os == "Linux"\n        run: pnpm package --bundles deb\n      - if: runner.os == "macOS"\n        run: pnpm package --bundles app\n      - if: runner.os == "macOS"\n        run: pnpm package --bundles app,dmg\n      - if: runner.os == "Windows"\n        run: pnpm package --bundles nsis'
+  expect "um workflow que empacota com pnpm package, uma linha literal por sistema operacional" ok "nenhuma autoridade fora do conjunto declarado"
+
+  seed; step '      - run: pnpm tauri build --config src-tauri/tauri.bundle.conf.json'
+  expect "...ou que cita o próprio overlay"                            ok "nenhuma autoridade fora do conjunto declarado"
+
+  seed; step '      - run: |\n          pnpm package --bundles deb\n          git -c core.autocrlf=false checkout -- .\n          git config --global core.autocrlf false\n          bash -c true\n          xvfb-run -a bash scripts/smoke-packaged.sh --ci\n          cargo test --manifest-path src-tauri/Cargo.toml -- --ignored\n          cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings'
+  expect "o -c do git e do bash, uma linha depois do pnpm package, não é do tauri" ok "nenhuma autoridade fora do conjunto declarado"
+
+  seed; step '      - run: pnpm tauri build --config src-tauri/other.json'
+  expect "um workflow que mescla uma segunda configuração pelo script tauri" fail "package.yml:7 mescla \"src-tauri/other.json\""
+
+  seed; step '      - run: pnpm package -- --config src-tauri/other.json'
+  expect "...ou que acrescenta uma ao pnpm package"                    fail "mescla \"src-tauri/other.json\""
+
+  seed; step '      - run: npx tauri build -c src-tauri/other.json'
+  expect "...ou pelo npx, com -c"                                      fail "mescla \"src-tauri/other.json\""
+
+  seed; step '      - run: cargo tauri build --config=src-tauri/other.json'
+  expect "...ou pelo cargo tauri, com --config="                       fail "mescla \"src-tauri/other.json\""
+
+  seed; step '      - run: pnpm tauri build -vc src-tauri/other.json'
+  expect "...ou com -c agrupado atrás de outra flag, como o clap permite" fail "mescla \"src-tauri/other.json\""
+
+  seed; sed 's|"scripts": { |"scripts": { "release": "pnpm package", |' "$tmp/package.json" > "$tmp/pkg.tmp" && mv "$tmp/pkg.tmp" "$tmp/package.json"
+  step '      - run: pnpm release --config src-tauri/other.json'
+  expect "...ou por um script que só chega ao tauri por meio de outro" fail "mescla \"src-tauri/other.json\""
+
+  seed; step '      - run: |\n          pnpm tauri build \\\n            --config src-tauri/other.json'
+  expect "...mesmo quebrado em uma linha de continuação"               fail "package.yml:7 mescla \"src-tauri/other.json\""
+
+  seed; step '      - run: pnpm tauri build\n          --config src-tauri/other.json'
+  expect "...ou dobrado pelo próprio YAML, sem nenhuma barra invertida" fail "package.yml:7 mescla \"src-tauri/other.json\""
+
+  seed; step "      - run: pnpm tauri build --config '{\"app\":{}}'"
+  expect "...ou JSON inline, que nenhuma verificação de arquivo enxerga" fail "mescla \"{"
+
+  seed; step '      - run: pnpm package --bundles ${{ matrix.bundles }}'
+  expect "...ou uma expansão, cujo valor esta auditoria não consegue ler" fail "viajar dentro de uma expansão"
+
+  seed; write_at .github/workflows/package.yml 'on: push\nenv:\n  TAURI_CONFIG: "{}"\njobs: {}'
+  expect "TAURI_CONFIG em um bloco env de workflow"                    fail "package.yml:3 cita TAURI_CONFIG"
+
+  seed; step '      - run: pnpm package --bundles deb\n        env:\n          TAURI_APP_PATH: ci'
+  expect "TAURI_APP_PATH, que aponta a CLI para outro projeto"         fail "cita TAURI_APP_PATH"
+
+  seed; step '      - uses: tauri-apps/tauri-action@0123456789abcdef0123456789abcdef01234567'
+  expect "tauri-action, digam o que disserem os inputs"                fail "usa tauri-action"
+
+  seed; step '      - run: pnpm tauri build -c src-tauri/other.json' package.yaml
+  expect "...e .yaml não serve de esconderijo"                         fail "package.yaml:7 mescla"
+
+  seed; write_at .github/actions/build/action.yml 'runs:\n  using: composite\n  steps:\n    - run: pnpm tauri build -c src-tauri/other.json\n      shell: bash'
+  expect "uma action composite"                                        fail "action.yml:4 mescla"
+
+  seed; write_at scripts/release.sh 'set -euo pipefail\npnpm tauri build --config src-tauri/other.json'
+  expect "um script que um workflow roda"                              fail "scripts/release.sh:2 mescla"
+
+  seed; step '      - uses: ./tools/build'
+  expect "uma action local fora de .github/actions, que nada lê" fail "roda a action local \"./tools/build\""
+
+  seed; write_at ci/src-tauri/tauri.conf.json '{}'
+  expect "um segundo projeto Tauri em que um passo poderia entrar com cd" fail "ci/src-tauri/tauri.conf.json é uma configuração do Tauri fora"
+
+  seed; write_at .cargo/config.toml '[env]\nTAURI_CONFIG = { value = "{}", force = true }'
+  expect "TAURI_CONFIG em .cargo/config.toml, que chega ao tauri-build" fail ".cargo/config.toml:2 cita TAURI_CONFIG"
+
+  seed; write_at src-tauri/build.rs 'fn main() {\n    println!("cargo:rustc-env=TAURI_CONFIG={{}}");\n    tauri_build::build()\n}'
+  expect "...ou um build script que o repassa ao generate_context!"    fail "build.rs:2 cita TAURI_CONFIG"
+
+  seed; write_at .github/workflows/README.md 'nada aqui roda'
+  expect "uma pasta de workflows da qual o awk não leu nada não é aprovação" fail "por vacuidade"
 
   printf '\n%d ok, %d com falha\n' "$pass" "$failed"
   [ "$failed" -eq 0 ]
