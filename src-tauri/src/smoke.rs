@@ -12,18 +12,32 @@ use crate::log::ShellLog;
 
 pub const SMOKE_REPORT_VAR: &str = "STRATA_SMOKE_REPORT";
 
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum Source {
+    Event,
+    Query,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ReportLine<'a> {
     #[serde(flatten)]
     phase: &'a BackendPhase,
+    source: Source,
     elapsed_ms: u64,
     unix_ms: u64,
 }
 
-fn report_line(phase: &BackendPhase, elapsed_ms: u64, unix_ms: u64) -> serde_json::Result<String> {
+fn report_line(
+    phase: &BackendPhase,
+    source: Source,
+    elapsed_ms: u64,
+    unix_ms: u64,
+) -> serde_json::Result<String> {
     let mut line = serde_json::to_string(&ReportLine {
         phase,
+        source,
         elapsed_ms,
         unix_ms,
     })?;
@@ -38,10 +52,11 @@ fn millis(duration: std::time::Duration) -> u64 {
 struct SmokeReport {
     file: Mutex<File>,
     started: Instant,
+    log: Arc<ShellLog>,
 }
 
 impl SmokeReport {
-    fn create(path: &Path, started: Instant) -> io::Result<Self> {
+    fn create(path: &Path, started: Instant, log: Arc<ShellLog>) -> io::Result<Self> {
         let file = OpenOptions::new()
             .append(true)
             .create_new(true)
@@ -49,27 +64,34 @@ impl SmokeReport {
         Ok(Self {
             file: Mutex::new(file),
             started,
+            log,
         })
     }
 
-    fn record(&self, phase: &BackendPhase) -> io::Result<()> {
+    fn write(&self, phase: &BackendPhase, source: Source) -> io::Result<()> {
         let unix_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(millis)
             .unwrap_or_default();
-        let line = report_line(phase, millis(self.started.elapsed()), unix_ms)?;
+        let line = report_line(phase, source, millis(self.started.elapsed()), unix_ms)?;
         let mut file = self
             .file
             .lock()
             .map_err(|_| io::Error::other("lock do relatório de smoke envenenado"))?;
         file.write_all(line.as_bytes())
     }
+
+    fn record(&self, phase: &BackendPhase, source: Source) {
+        if let Err(error) = self.write(phase, source) {
+            self.log
+                .warn(format!("relatório de smoke: falha ao gravar: {error}"));
+        }
+    }
 }
 
 struct SmokeSink {
     inner: Arc<dyn EventSink>,
-    report: SmokeReport,
-    log: Arc<ShellLog>,
+    report: Arc<SmokeReport>,
 }
 
 impl EventSink for SmokeSink {
@@ -79,39 +101,55 @@ impl EventSink for SmokeSink {
             AnalyzerEvent::Wire { .. } | AnalyzerEvent::Fault(_) => None,
         };
         self.inner.emit(event);
-        if let Some(phase) = phase
-            && let Err(error) = self.report.record(&phase)
-        {
-            self.log
-                .warn(format!("relatório de smoke: falha ao gravar: {error}"));
+        if let Some(phase) = phase {
+            self.report.record(&phase, Source::Event);
         }
     }
 }
 
-pub fn wrap(
+pub struct SmokeProbe {
+    report: Option<Arc<SmokeReport>>,
+}
+
+impl SmokeProbe {
+    pub fn query_served(&self, phase: &BackendPhase) {
+        if let Some(report) = &self.report {
+            report.record(phase, Source::Query);
+        }
+    }
+}
+
+pub fn install(
     inner: Arc<dyn EventSink>,
     requested: Option<OsString>,
     started: Instant,
     log: &Arc<ShellLog>,
-) -> Arc<dyn EventSink> {
+) -> (Arc<dyn EventSink>, SmokeProbe) {
+    let inert = |inner| (inner, SmokeProbe { report: None });
     let Some(path) = requested else {
-        return inner;
+        return inert(inner);
     };
-    match SmokeReport::create(Path::new(&path), started) {
+    match SmokeReport::create(Path::new(&path), started, Arc::clone(log)) {
         Ok(report) => {
             log.info("relatório de smoke: gravando as fases do ciclo de vida");
-            Arc::new(SmokeSink {
+            let report = Arc::new(report);
+            let sink: Arc<dyn EventSink> = Arc::new(SmokeSink {
                 inner,
-                report,
-                log: Arc::clone(log),
-            })
+                report: Arc::clone(&report),
+            });
+            (
+                sink,
+                SmokeProbe {
+                    report: Some(report),
+                },
+            )
         }
         Err(error) => {
             log.warn(format!(
                 "relatório de smoke: não foi possível criar {}: {error}",
                 Path::new(&path).display()
             ));
-            inner
+            inert(inner)
         }
     }
 }
@@ -124,7 +162,7 @@ mod tests {
     use serde_json::Value;
     use serde_json::value::RawValue;
 
-    use super::{BackendPhase, report_line, wrap};
+    use super::{BackendPhase, Source, install, report_line};
     use crate::analyzer::{AnalyzerEvent, EventSink};
     use crate::error::ProtocolError;
     use crate::log::ShellLog;
@@ -177,20 +215,26 @@ mod tests {
             &BackendPhase::Ready {
                 protocol_version: 1,
             },
+            Source::Event,
             410,
             1_700,
         )
         .expect("serializa");
         assert_eq!(
             ready,
-            "{\"phase\":\"READY\",\"protocolVersion\":1,\"elapsedMs\":410,\"unixMs\":1700}\n"
+            "{\"phase\":\"READY\",\"protocolVersion\":1,\"source\":\"event\",\"elapsedMs\":410,\"unixMs\":1700}\n"
         );
 
-        let crashed =
-            report_line(&BackendPhase::Crashed { exit_code: None }, 9, 2).expect("serializa");
+        let crashed = report_line(
+            &BackendPhase::Crashed { exit_code: None },
+            Source::Query,
+            9,
+            2,
+        )
+        .expect("serializa");
         assert_eq!(
             crashed,
-            "{\"phase\":\"CRASHED\",\"exitCode\":null,\"elapsedMs\":9,\"unixMs\":2}\n"
+            "{\"phase\":\"CRASHED\",\"exitCode\":null,\"source\":\"query\",\"elapsedMs\":9,\"unixMs\":2}\n"
         );
     }
 
@@ -199,7 +243,7 @@ mod tests {
         let path = scratch("order");
         let recorder = Arc::new(Recorder::default());
         let log = Arc::new(ShellLog::default());
-        let sink = wrap(
+        let (sink, probe) = install(
             Arc::clone(&recorder) as Arc<dyn EventSink>,
             Some(path.clone().into_os_string()),
             Instant::now(),
@@ -207,6 +251,7 @@ mod tests {
         );
 
         sink.emit(AnalyzerEvent::State(BackendPhase::Starting));
+        probe.query_served(&BackendPhase::Starting);
         sink.emit(wire());
         sink.emit(AnalyzerEvent::State(BackendPhase::Ready {
             protocol_version: 1,
@@ -224,9 +269,20 @@ mod tests {
             "o decorador deve repassar tudo, intacto e em ordem"
         );
         let report = lines(&path);
-        let phases: Vec<_> = report.iter().map(|line| line["phase"].clone()).collect();
-        assert_eq!(phases, ["STARTING", "READY", "CRASHED"]);
-        assert_eq!(report[2]["exitCode"], 70);
+        let lines: Vec<_> = report
+            .iter()
+            .map(|line| (line["phase"].clone(), line["source"].clone()))
+            .collect();
+        assert_eq!(
+            lines,
+            [
+                ("STARTING".into(), "event".into()),
+                ("STARTING".into(), "query".into()),
+                ("READY".into(), "event".into()),
+                ("CRASHED".into(), "event".into()),
+            ]
+        );
+        assert_eq!(report[3]["exitCode"], 70);
         assert!(report.iter().all(|line| line["unixMs"].as_u64().is_some()));
         std::fs::remove_file(&path).expect("limpeza");
     }
@@ -237,7 +293,7 @@ mod tests {
         std::fs::write(&path, "somebody else's file\n").expect("arquivo prévio gravado");
         let recorder = Arc::new(Recorder::default());
         let log = Arc::new(ShellLog::default());
-        let sink = wrap(
+        let (sink, probe) = install(
             Arc::clone(&recorder) as Arc<dyn EventSink>,
             Some(path.clone().into_os_string()),
             Instant::now(),
@@ -245,6 +301,7 @@ mod tests {
         );
 
         sink.emit(AnalyzerEvent::State(BackendPhase::Starting));
+        probe.query_served(&BackendPhase::Starting);
 
         assert_eq!(
             std::fs::read_to_string(&path).expect("ainda está lá"),
@@ -255,10 +312,12 @@ mod tests {
     }
 
     #[test]
-    fn without_the_variable_the_inner_sink_is_returned_as_is() {
+    fn without_the_variable_the_inner_sink_is_returned_as_is_and_the_probe_is_inert() {
         let inner: Arc<dyn EventSink> = Arc::new(Recorder::default());
         let log = Arc::new(ShellLog::default());
-        let sink = wrap(Arc::clone(&inner), None, Instant::now(), &log);
+        let (sink, probe) = install(Arc::clone(&inner), None, Instant::now(), &log);
         assert!(Arc::ptr_eq(&inner, &sink));
+        assert!(probe.report.is_none());
+        probe.query_served(&BackendPhase::Starting);
     }
 }

@@ -9,6 +9,7 @@ use crate::analyzer::BackendPhase;
 use crate::error::{ProtocolError, Response};
 use crate::repository::{OpenedRepository, RepositoryHandle};
 use crate::runtime::AnalyzerRuntime;
+use crate::smoke::SmokeProbe;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RequiresRepository {
@@ -205,8 +206,13 @@ pub fn close_repository(handle: RepositoryHandle, runtime: Runtime<'_>) {
 }
 
 #[tauri::command]
-pub async fn analyzer_state(runtime: Runtime<'_>) -> Result<BackendPhase, CommandError> {
-    Ok(runtime.phase().await)
+pub async fn analyzer_state(
+    runtime: Runtime<'_>,
+    smoke: State<'_, SmokeProbe>,
+) -> Result<BackendPhase, CommandError> {
+    let phase = runtime.phase().await;
+    smoke.query_served(&phase);
+    Ok(phase)
 }
 
 #[tauri::command]

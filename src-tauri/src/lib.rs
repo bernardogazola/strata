@@ -12,7 +12,7 @@ pub mod log;
 pub mod repository;
 mod ring;
 pub mod runtime;
-mod smoke;
+pub mod smoke;
 
 use crate::log::ShellLog;
 use crate::runtime::{AnalyzerRuntime, HandshakeCell, PlanSource};
@@ -60,7 +60,7 @@ pub fn run() {
 
             let shell_log = Arc::new(ShellLog::default());
             let handshake = Arc::new(HandshakeCell::default());
-            let sink = smoke::wrap(
+            let (sink, probe) = smoke::install(
                 Arc::new(events::TauriSink::new(
                     app.handle().clone(),
                     Arc::clone(&shell_log),
@@ -70,6 +70,7 @@ pub fn run() {
                 started,
                 &shell_log,
             );
+            app.manage(probe);
             let runtime = Arc::new(AnalyzerRuntime::new(
                 PlanSource::Discovered {
                     home: std::env::var_os(HOME_VAR).map(Into::into),
