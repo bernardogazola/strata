@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/package.yml
+      - .gitattributes
       - package.json
       - pnpm-lock.yaml
       - scripts/build-analyzer.*
@@ -110,11 +111,32 @@ jobs:
 
       - name: Sign ad hoc and build the dmg
         if: runner.os == 'macOS'
-        run: bash scripts/sign-macos.sh
+        run: |
+          bash scripts/sign-macos.sh --self-test
+          bash scripts/sign-macos.sh
 
-      - name: The deb's dependencies resolve
+      - name: The deb installs and links on a clean Ubuntu 24.04
         if: runner.os == 'Linux'
-        run: sudo apt-get install --simulate ./src-tauri/target/release/bundle/deb/*.deb
+        run: |
+          cat > "$RUNNER_TEMP/check-deb.sh" <<'CHECK'
+          set -eu
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends /deb/*.deb >/dev/null
+          missing=""
+          for binary in /usr/bin/strata /usr/lib/Strata/analyzer/runtime/bin/java \
+            /usr/lib/Strata/analyzer/runtime/lib/server/libjvm.so; do
+            [ -e "$binary" ] || { echo "missing from the installed deb: $binary"; exit 1; }
+            unresolved="$(ldd "$binary" | grep 'not found' || true)"
+            [ -z "$unresolved" ] || missing="$missing $binary: $unresolved"
+          done
+          [ -z "$missing" ] || { echo "unresolved on a clean Ubuntu 24.04:$missing"; exit 1; }
+          echo "the deb installs on a clean Ubuntu 24.04 and every binary links"
+          CHECK
+          docker run --rm \
+            -v "$PWD/src-tauri/target/release/bundle/deb:/deb:ro" \
+            -v "$RUNNER_TEMP/check-deb.sh:/check-deb.sh:ro" \
+            ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55 \
+            sh /check-deb.sh
 
       - name: Packaged smoke
         run: |

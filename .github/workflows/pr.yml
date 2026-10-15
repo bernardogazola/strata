@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: pr-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 defaults:
   run:
@@ -85,9 +85,8 @@ jobs:
           java-version: "25"
           cache: maven
 
-      - name: mvnw verify
-        working-directory: analyzer
-        run: ./mvnw --batch-mode --no-transfer-progress verify
+      - name: mvnw verify, jdeps against the module baseline, jlink, handshake
+        run: bash scripts/build-analyzer.sh
 
   rust:
     name: rust
@@ -158,6 +157,7 @@ jobs:
           bash scripts/verify-fixtures.sh --self-test
           bash scripts/make-fixtures.sh --self-test
           bash scripts/corpus.sh --self-test
+          bash scripts/smoke-packaged.sh --self-test
 
       - name: Regenerate the fixture repositories and compare commit ids
         run: |
