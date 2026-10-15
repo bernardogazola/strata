@@ -111,6 +111,24 @@ function jpath(d,   p) {
   p = jpth[d]
   return (p == "" ? "" : p ".") pendkey[d]
 }
+function tauriconfig(name, cmd,   ns, seg, si, nt, t, ti, v) {
+  ns = split(cmd, seg, /&&|\|\||;|\|/)
+  for (si = 1; si <= ns; si++) {
+    nt = split(seg[si], t, /[ \t]+/)
+    v = 0
+    for (ti = 1; ti <= nt; ti++) if (t[ti] == "tauri") v = 1
+    if (!v) continue
+    for (ti = 1; ti <= nt; ti++) {
+      v = ""
+      if (t[ti] == "--config" || t[ti] == "-c") v = t[ti + 1]
+      else if (index(t[ti], "--config=") == 1) v = substr(t[ti], 10)
+      else if (t[ti] ~ /^-c./) v = substr(t[ti], 3)
+      else continue
+      if (v != OVERLAY_REL)
+        bad("surface", "o script npm \"" name "\" mescla \"" v "\" na configuração do Tauri. Só o " OVERLAY_REL " é auditado; qualquer outra coisa entra no pacote sem auditoria")
+    }
+  }
+}
 function jflat(f, s,   n, i, j, c, str, hadesc, d, tok, kind, p) {
   n = length(s); i = 1; d = 0
   ctype[0] = "a"; jpth[0] = ""; haskey[0] = 0
@@ -372,6 +390,13 @@ END {
       for (i = 1; i <= jn[kk]; i++) npmhit(jval[PKG, ka[2], i])
     }
   } else bad("plugin", "não foi possível interpretar o package.json")
+  if (index(jsrc[PKG], "TAURI_CONFIG") > 0)
+    bad("surface", "package.json cita TAURI_CONFIG, que mescla configuração que esta auditoria nunca lê")
+  for (kk in jn) {
+    split(kk, ka, SUBSEP)
+    if (ka[1] != PKG || index(ka[2], "scripts.") != 1) continue
+    for (i = 1; i <= jn[kk]; i++) tauriconfig(substr(ka[2], 9), jval[PKG, ka[2], i])
+  }
   for (k in npm_plug)
     if (ptab[k, "npm"] != "allow")
       bad("plugin", "package.json declara @tauri-apps/plugin-" k ". O binding JS de um plugin que a WebView não pode chamar parece uma capability concedida.")
@@ -471,17 +496,17 @@ run_audit() {
   if [ -f "$srcdir/tauri.bundle.conf.json" ]; then overlay=$(abspath_file "$srcdir/tauri.bundle.conf.json"); fi
   while IFS= read -r name; do
     case "$name" in tauri.conf.json | tauri.bundle.conf.json) ;; *) stray="$stray $name" ;; esac
-  done < <(find "$srcdir" -maxdepth 1 -type f \( -iname 'tauri*.conf.json' -o -iname 'tauri*.conf.json5' -o -iname 'tauri*.toml' \) -exec basename {} \; | LC_ALL=C sort)
+  done < <(find "$srcdir" -maxdepth 1 \( -type f -o -type l \) \( -iname 'tauri*.conf.json' -o -iname 'tauri*.conf.json5' -o -iname 'tauri*.toml' \) -exec basename {} \; | LC_ALL=C sort)
 
   capfound=""
   while IFS= read -r f; do
     rel=${f#"$capdir"/}
     capfound="$capfound $rel"
-  done < <(find "$capdir" -type f | LC_ALL=C sort)
+  done < <(find "$capdir" \( -type f -o -type l \) | LC_ALL=C sort)
 
   local files=()
   while IFS= read -r f; do files+=("$f"); done \
-    < <(find "$capdir" -type f -name '*.json' | LC_ALL=C sort)
+    < <(find "$capdir" \( -type f -o -type l \) -name '*.json' | LC_ALL=C sort)
   files+=("$conf" "$cargo" "$pkg")
   if [ -n "$overlay" ]; then files+=("$overlay"); fi
   while IFS= read -r f; do files+=("$f"); done \
@@ -495,7 +520,7 @@ run_audit() {
 
   awk -v ROOTDIR="$root" -v CAPDIR="$capdir" -v CONF="$conf" -v CARGO="$cargo" -v PKG="$pkg" \
       -v CAPFOUND="$capfound" \
-      -v OVERLAY="$overlay" -v STRAY_CONF="$stray" \
+      -v OVERLAY="$overlay" -v STRAY_CONF="$stray" -v OVERLAY_REL="src-tauri/tauri.bundle.conf.json" \
       -v BASE_PERMS="$base_perms" \
       -v BASE_CAPFILES="$base_capfiles" \
       -v DENY_NS="$deny_ns" \
@@ -575,6 +600,7 @@ R
     cat > "$tmp/package.json" <<'P'
 {
   "name": "strata",
+  "scripts": { "package": "pnpm build:analyzer && tauri build --config src-tauri/tauri.bundle.conf.json" },
   "dependencies": { "@tauri-apps/api": "^2.11.1", "react": "^19.2.8" },
   "devDependencies": { "@tauri-apps/cli": "^2.11.4", "@tanstack/router-plugin": "^1.168.35" }
 }
@@ -741,6 +767,18 @@ R
 
   seed; printf '{}\n' > "$tmp/src-tauri/tauri.macos.conf.json"
   expect "uma configuração de plataforma que o Tauri mescla sozinho"   fail "tauri.macos.conf.json é mesclado"
+
+  seed; printf '{}\n' > "$tmp/elsewhere.json"; ln -s ../elsewhere.json "$tmp/src-tauri/tauri.macos.conf.json"
+  expect "...mesmo quando é um symlink, que o Tauri segue"             fail "tauri.macos.conf.json é mesclado"
+
+  seed; sed 's|tauri.bundle.conf.json"|tauri.bundle.conf.json --config src-tauri/release.json"|' "$tmp/package.json" > "$tmp/pkg.tmp" && mv "$tmp/pkg.tmp" "$tmp/package.json"
+  expect "um segundo --config em um script npm"                        fail "mescla \"src-tauri/release.json\""
+
+  seed; sed 's|--config src-tauri/tauri.bundle.conf.json|-c src-tauri/other.json|' "$tmp/package.json" > "$tmp/pkg.tmp" && mv "$tmp/pkg.tmp" "$tmp/package.json"
+  expect "...ou um -c apontando para outro lugar"                      fail "mescla \"src-tauri/other.json\""
+
+  seed; sed 's|"pnpm build:analyzer|"TAURI_CONFIG={} pnpm build:analyzer|' "$tmp/package.json" > "$tmp/pkg.tmp" && mv "$tmp/pkg.tmp" "$tmp/package.json"
+  expect "TAURI_CONFIG em um script npm"                               fail "TAURI_CONFIG"
 
   printf '\n%d ok, %d com falha\n' "$pass" "$failed"
   [ "$failed" -eq 0 ]
