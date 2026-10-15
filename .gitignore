@@ -36,8 +36,6 @@ coverage
 test-results
 playwright-report
 
-src/routeTree.gen.ts
-
 *.tsbuildinfo
 
 fixtures/repositories/**/.gradle/
