@@ -231,6 +231,9 @@ function npmhit(x,   m) {
 function joinsetpfx(a,   b, k) { for (k in a) b[k ":"] = 1; return joinset(b) }
 
 BEGIN {
+  split(" $schema build build.beforeBuildCommand bundle bundle.resources", ovk, " ")
+  for (oi in ovk) overlay_ok[ovk[oi]] = 1
+  overlay_ok[""] = 1
   nbase  = toset(BASE_PERMS, want_perm)
   ncapb  = toset(BASE_CAPFILES, want_capfile)
   toset(DENY_NS, deny_ns)
@@ -401,6 +404,20 @@ END {
     }
   } else bad("csp", "não foi possível interpretar o tauri.conf.json")
 
+  nst = split(STRAY_CONF, sca, " ")
+  for (i = 1; i <= nst; i++)
+    bad("surface", "src-tauri/" sca[i] " é mesclado ao tauri.conf.json pelo Tauri e esta auditoria não o lê: uma CSP ou uma capability inline ali entraria no pacote sem auditoria")
+  if (OVERLAY != "") {
+    if (jflat(OVERLAY, jsrc[OVERLAY])) {
+      for (kk in jn) {
+        split(kk, ka, SUBSEP)
+        if (ka[1] != OVERLAY) continue
+        if (ka[2] in overlay_ok || index(ka[2], "bundle.resources.") == 1) continue
+        bad("surface", "src-tauri/tauri.bundle.conf.json define " ka[2] ". O overlay de empacotamento só pode definir build.beforeBuildCommand e bundle.resources: qualquer outra coisa que ele mescle entra no pacote sem passar por esta auditoria")
+      }
+    } else bad("surface", "não foi possível interpretar o src-tauri/tauri.bundle.conf.json")
+  }
+
   nuniq = length_of(perm_set)
 
   printf "audit-capabilities · %d arquivo%s de capability · %d permiss%s · baseline %d\n",
@@ -413,7 +430,7 @@ END {
   printf "  %s  superfícies de plugin .... cap %d · Cargo %d · rs %d · npm %d\n",
          st("plugin"), length_of(cap_plug), length_of(cargo_plug), length_of(rs_plug), length_of(npm_plug)
   printf "  %s  csp ...................... connect-src exato nas duas políticas, 6 diretivas fixadas\n", st("csp")
-  printf "  %s  superfície da webview .... globalTauri, assetProtocol, freezePrototype, capabilities inline\n", st("surface")
+  printf "  %s  superfície da webview .... globalTauri, assetProtocol, freezePrototype, capabilities inline, configurações mescladas\n", st("surface")
 
   if (nerr > 0) {
     print ""
@@ -450,6 +467,12 @@ run_audit() {
   capdir=$(abspath_dir "$capdir")
   conf=$(abspath_file "$conf"); cargo=$(abspath_file "$cargo"); pkg=$(abspath_file "$pkg")
 
+  local overlay="" stray="" name
+  if [ -f "$srcdir/tauri.bundle.conf.json" ]; then overlay=$(abspath_file "$srcdir/tauri.bundle.conf.json"); fi
+  while IFS= read -r name; do
+    case "$name" in tauri.conf.json | tauri.bundle.conf.json) ;; *) stray="$stray $name" ;; esac
+  done < <(find "$srcdir" -maxdepth 1 -type f \( -iname 'tauri*.conf.json' -o -iname 'tauri*.conf.json5' -o -iname 'tauri*.toml' \) -exec basename {} \; | LC_ALL=C sort)
+
   capfound=""
   while IFS= read -r f; do
     rel=${f#"$capdir"/}
@@ -460,6 +483,7 @@ run_audit() {
   while IFS= read -r f; do files+=("$f"); done \
     < <(find "$capdir" -type f -name '*.json' | LC_ALL=C sort)
   files+=("$conf" "$cargo" "$pkg")
+  if [ -n "$overlay" ]; then files+=("$overlay"); fi
   while IFS= read -r f; do files+=("$f"); done \
     < <(find "$srcdir" \( -name target -o -name gen \) -prune -o -type f -name '*.rs' -print | LC_ALL=C sort)
 
@@ -471,6 +495,7 @@ run_audit() {
 
   awk -v ROOTDIR="$root" -v CAPDIR="$capdir" -v CONF="$conf" -v CARGO="$cargo" -v PKG="$pkg" \
       -v CAPFOUND="$capfound" \
+      -v OVERLAY="$overlay" -v STRAY_CONF="$stray" \
       -v BASE_PERMS="$base_perms" \
       -v BASE_CAPFILES="$base_capfiles" \
       -v DENY_NS="$deny_ns" \
@@ -514,6 +539,11 @@ self_test() {
            "$CSP_CONNECT_DEV" "${1-frame-ancestors 'none'; }"
   }
 
+  write_overlay() {
+    printf '{\n  "$schema": "https://schema.tauri.app/config/2",\n  "build": { "beforeBuildCommand": "pnpm build" },\n  "bundle": { %s }\n}\n' \
+           "$1" > "$tmp/src-tauri/tauri.bundle.conf.json"
+  }
+
   seed() {
     rm -rf "$tmp/src-tauri" "$tmp/package.json"
     mkdir -p "$tmp/src-tauri/capabilities" "$tmp/src-tauri/src"
@@ -539,6 +569,8 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 R
+
+    write_overlay '"resources": { "resources/analyzer/": "analyzer/" }'
 
     cat > "$tmp/package.json" <<'P'
 {
@@ -698,6 +730,17 @@ R
   printf '{\n  "app": {\n    "security": {\n      "csp": "%s",\n      "devCsp": "%s",\n      "freezePrototype": false\n    }\n  }\n}\n' \
     "$(prod_csp)" "$(dev_csp)" > "$tmp/src-tauri/tauri.conf.json"
   expect "freezePrototype desligado"                                   fail "freezePrototype"
+
+  seed; expect "o overlay de empacotamento pode incluir os recursos do analisador" ok "configurações mescladas"
+
+  seed; write_overlay '"resources": {} }, "app": { "security": { "csp": "default-src *" }'
+  expect "um overlay que define a CSP a leva para o pacote sem auditoria" fail "tauri.bundle.conf.json define app"
+
+  seed; write_overlay '"resources": {}, "macOS": { "entitlements": "x.plist" }'
+  expect "um overlay que acrescenta entitlements do macOS"             fail "tauri.bundle.conf.json define bundle.macOS"
+
+  seed; printf '{}\n' > "$tmp/src-tauri/tauri.macos.conf.json"
+  expect "uma configuração de plataforma que o Tauri mescla sozinho"   fail "tauri.macos.conf.json é mesclado"
 
   printf '\n%d ok, %d com falha\n' "$pass" "$failed"
   [ "$failed" -eq 0 ]
