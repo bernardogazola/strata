@@ -8,6 +8,7 @@ import br.pucpr.tcc.strata.analyzer.repository.ValidatedRepository;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -15,8 +16,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
+import java.util.stream.Stream;
 
 public final class SpoonModelBuilder {
+
+  private static final String EMPTY_CLASSPATH_DIRECTORY = "strata-spoon-empty-classpath";
 
   public static final int COMPLIANCE_LEVEL = 25;
 
@@ -32,19 +36,15 @@ public final class SpoonModelBuilder {
     Objects.requireNonNull(visitor, "visitor");
     Objects.requireNonNull(cancelled, "cancelled");
     final Map<SourceRoot, List<JavaSource>> assigned = assign(repository, roots);
-    final Path emptyClasspath = createEmptyClasspath();
-    try {
-      Log.info(
-          "análise de código: "
-              + assigned.size()
-              + " raiz(es) de código, "
-              + assigned.values().stream().mapToInt(List::size).sum()
-              + " arquivo(s) .java");
-      return new SourceAnalysisRun(repository.snapshot().root(), emptyClasspath, visitor, cancelled)
-          .run(assigned);
-    } finally {
-      deleteEmptyClasspath(emptyClasspath);
-    }
+    final Path emptyClasspath = emptyClasspath();
+    Log.info(
+        "análise de código: "
+            + assigned.size()
+            + " raiz(es) de código, "
+            + assigned.values().stream().mapToInt(List::size).sum()
+            + " arquivo(s) .java");
+    return new SourceAnalysisRun(repository.snapshot().root(), emptyClasspath, visitor, cancelled)
+        .run(assigned);
   }
 
   private static Map<SourceRoot, List<JavaSource>> assign(
@@ -84,20 +84,24 @@ public final class SpoonModelBuilder {
     return assigned;
   }
 
-  private static Path createEmptyClasspath() {
+  private static Path emptyClasspath() {
+    final Path directory =
+        Path.of(System.getProperty("java.io.tmpdir")).resolve(EMPTY_CLASSPATH_DIRECTORY);
     try {
-      return Files.createTempDirectory("strata-spoon-classpath-");
+      Files.createDirectories(directory);
+      if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
+        throw new IllegalStateException(directory + " não é um diretório de verdade");
+      }
+      try (Stream<Path> entries = Files.list(directory)) {
+        if (entries.findAny().isPresent()) {
+          throw new IllegalStateException(
+              directory + " deve ficar vazio: é o classpath contra o qual o Spoon resolve");
+        }
+      }
+      return directory;
     } catch (IOException failure) {
       throw new UncheckedIOException(
-          "não foi possível criar o diretório vazio do classpath do Spoon", failure);
-    }
-  }
-
-  private static void deleteEmptyClasspath(Path emptyClasspath) {
-    try {
-      Files.deleteIfExists(emptyClasspath);
-    } catch (IOException failure) {
-      Log.warn("não foi possível apagar " + emptyClasspath + ": " + failure);
+          "não foi possível preparar o diretório vazio do classpath do Spoon", failure);
     }
   }
 }

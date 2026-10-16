@@ -127,6 +127,22 @@ final class ParseFailureIsolatorTest {
   }
 
   @Test
+  void duasMetadesQueFalhamSemCulpadoSeguemSozinhasEContamSoAsQuarentenasDeVerdade() {
+    final List<String> files = files(64);
+    final List<String> leftPair = List.of(files.get(3), files.get(20));
+    final List<String> rightPair = List.of(files.get(35), files.get(60));
+    final FakeBuilder builder = new FakeBuilder(files, Set.of(), List.of(leftPair, rightPair));
+
+    final Isolation<String> isolation = builder.isolate();
+
+    assertThat(isolation.failed()).isEmpty();
+    assertThat(isolation.batches()).hasSize(4);
+    assertThat(isolation.quarantines()).isEqualTo(2);
+    assertThat(isolation.batches())
+        .noneMatch(batch -> batch.containsAll(leftPair) || batch.containsAll(rightPair));
+  }
+
+  @Test
   void todaListaDadaAoConstrutorPreservaAOrdemOriginal() {
     final List<String> files = files(300);
     final FakeBuilder builder =

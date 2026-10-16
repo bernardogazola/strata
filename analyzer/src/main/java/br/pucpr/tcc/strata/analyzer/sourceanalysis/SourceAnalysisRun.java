@@ -182,7 +182,7 @@ final class SourceAnalysisRun {
     }
     builds += isolation.builds();
     batches += isolation.batches().size();
-    quarantinedBatches += Math.max(0, isolation.batches().size() - 1);
+    quarantinedBatches += isolation.quarantines();
   }
 
   private Attempt<Factory> build(SourceRoot root, List<String> files) {

@@ -54,7 +54,7 @@ final class ParseFailureIsolator<F, M> {
     }
   }
 
-  record Isolation<F>(List<List<F>> batches, List<F> failed, int builds) {
+  record Isolation<F>(List<List<F>> batches, List<F> failed, int builds, int quarantines) {
 
     public Isolation {
       batches = batches.stream().map(List::copyOf).toList();
@@ -69,6 +69,7 @@ final class ParseFailureIsolator<F, M> {
     private final List<List<F>> batches = new ArrayList<>();
     private final BitSet failed = new BitSet();
     private int builds;
+    private int quarantines;
 
     private Run(List<F> files, BatchConsumer<F, M> consumer) {
       this.files = files;
@@ -93,6 +94,7 @@ final class ParseFailureIsolator<F, M> {
             union(leftBuilds ? NONE : culprits(left), rightBuilds ? NONE : culprits(right));
         if (culprits.length == 0 && (leftBuilds || rightBuilds)) {
           final int[] quarantined = leftBuilds ? quarantine(left, right) : quarantine(right, left);
+          quarantines++;
           analyze(without(remaining, quarantined));
           analyze(quarantined);
           return;
@@ -164,7 +166,8 @@ final class ParseFailureIsolator<F, M> {
     }
 
     Isolation<F> result() {
-      return new Isolation<>(batches, failed.stream().mapToObj(files::get).toList(), builds);
+      return new Isolation<>(
+          batches, failed.stream().mapToObj(files::get).toList(), builds, quarantines);
     }
   }
 
