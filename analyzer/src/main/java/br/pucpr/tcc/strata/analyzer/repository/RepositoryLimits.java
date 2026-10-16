@@ -8,7 +8,8 @@ record RepositoryLimits(
     int maxPathBytes,
     int maxBuildFileBytes,
     int maxGitConfigBytes,
-    int maxWarnings) {
+    int maxWarnings,
+    int maxPackedRefsBytes) {
 
   static final RepositoryLimits PRODUCTION =
       new RepositoryLimits(
@@ -17,7 +18,8 @@ record RepositoryLimits(
           AnalysisConstants.MAX_PATH_BYTES,
           AnalysisConstants.MAX_BUILD_FILE_BYTES,
           AnalysisConstants.MAX_GIT_CONFIG_BYTES,
-          AnalysisConstants.MAX_REPOSITORY_WARNINGS);
+          AnalysisConstants.MAX_REPOSITORY_WARNINGS,
+          AnalysisConstants.MAX_PACKED_REFS_BYTES);
 
   RepositoryLimits {
     if (maxEnumeratedFiles < 1
@@ -25,7 +27,8 @@ record RepositoryLimits(
         || maxPathBytes < 1
         || maxBuildFileBytes < 1
         || maxGitConfigBytes < 1
-        || maxWarnings < 1) {
+        || maxWarnings < 1
+        || maxPackedRefsBytes < 1) {
       throw new IllegalArgumentException("todo limite é positivo");
     }
   }

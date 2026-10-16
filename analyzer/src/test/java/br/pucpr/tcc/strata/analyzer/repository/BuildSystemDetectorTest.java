@@ -41,7 +41,8 @@ final class BuildSystemDetectorTest {
         PRODUCTION.maxPathBytes(),
         maxBuildFileBytes,
         PRODUCTION.maxGitConfigBytes(),
-        PRODUCTION.maxWarnings());
+        PRODUCTION.maxWarnings(),
+        PRODUCTION.maxPackedRefsBytes());
   }
 
   private static String pomDeTamanho(int size) {

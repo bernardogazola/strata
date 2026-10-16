@@ -266,7 +266,8 @@ final class RepositoryWalkerTest {
         maxPathBytes,
         RepositoryLimits.PRODUCTION.maxBuildFileBytes(),
         RepositoryLimits.PRODUCTION.maxGitConfigBytes(),
-        maxWarnings);
+        maxWarnings,
+        RepositoryLimits.PRODUCTION.maxPackedRefsBytes());
   }
 
   private static void abortarSeAPermissaoNaoMorde(Path trancada) {

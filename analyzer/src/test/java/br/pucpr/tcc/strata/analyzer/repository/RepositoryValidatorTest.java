@@ -112,7 +112,8 @@ final class RepositoryValidatorTest {
             RepositoryLimits.PRODUCTION.maxPathBytes(),
             RepositoryLimits.PRODUCTION.maxBuildFileBytes(),
             RepositoryLimits.PRODUCTION.maxGitConfigBytes(),
-            RepositoryLimits.PRODUCTION.maxWarnings());
+            RepositoryLimits.PRODUCTION.maxWarnings(),
+            RepositoryLimits.PRODUCTION.maxPackedRefsBytes());
 
     assertThat(new RepositoryValidator(tres).validate(repo))
         .as("a varredura para na quarta entrada: found é o piso, nunca a contagem total")
@@ -307,7 +308,8 @@ final class RepositoryValidatorTest {
             RepositoryLimits.PRODUCTION.maxPathBytes(),
             RepositoryLimits.PRODUCTION.maxBuildFileBytes(),
             RepositoryLimits.PRODUCTION.maxGitConfigBytes(),
-            1);
+            1,
+            RepositoryLimits.PRODUCTION.maxPackedRefsBytes());
 
     assertThat(inspecionado(new RepositoryValidator().inspect(repo)).warnings())
         .containsExactly(RepositoryIssue.noHistory(), RepositoryIssue.pathEscapesRoot("vazamento"));

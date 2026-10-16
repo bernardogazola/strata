@@ -48,6 +48,10 @@ public final class AnalysisConstants {
 
   public static final int MAX_GIT_CONFIG_BYTES = 1_048_576;
 
+  public static final int MAX_PACKED_REFS_BYTES = 67_108_864;
+
+  public static final int PACKAGE_DECLARATION_SCAN_BYTES = 65_536;
+
   public static final int MAX_REPOSITORY_WARNINGS = 100;
 
   private AnalysisConstants() {}

@@ -230,6 +230,7 @@ final class GitMetadataGuardTest {
         producao.maxPathBytes(),
         producao.maxBuildFileBytes(),
         bytes,
-        producao.maxWarnings());
+        producao.maxWarnings(),
+        producao.maxPackedRefsBytes());
   }
 }
