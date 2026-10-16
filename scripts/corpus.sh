@@ -161,6 +161,8 @@ commit_derived_tree() {
   local dir="$1"
   local -a git_hermetic=(
     env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_CONFIG_PARAMETERS -u GIT_CONFIG_COUNT
+    -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_COMMON_DIR
+    -u GIT_QUARANTINE_PATH -u GIT_DEFAULT_HASH -u GIT_DEFAULT_REF_FORMAT -u GIT_REFERENCE_BACKEND
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
     GIT_AUTHOR_NAME="$DERIVED_AUTHOR" GIT_AUTHOR_EMAIL="$DERIVED_EMAIL"
     GIT_COMMITTER_NAME="$DERIVED_AUTHOR" GIT_COMMITTER_EMAIL="$DERIVED_EMAIL"
@@ -169,7 +171,8 @@ commit_derived_tree() {
     -c core.excludesFile=/dev/null -c core.attributesFile=/dev/null
     -c core.autocrlf=false -c commit.gpgsign=false -c core.hooksPath=/dev/null
   )
-  "${git_hermetic[@]}" init -q --template= --initial-branch=main
+  find "$dir" -type f -perm -u+x -exec chmod a-x {} +
+  "${git_hermetic[@]}" init -q --template= --initial-branch=main --object-format=sha1
   "${git_hermetic[@]}" add --all --force .
   "${git_hermetic[@]}" commit -q -m "$DERIVED_MESSAGE"
 }
@@ -269,31 +272,53 @@ self_test() {
     no "um HEAD que diverge do pino é recusado" "divergente=$rc_pin igual=$rc_good"
   fi
 
-  local n derived="$tmp/derived" again="$tmp/derived-again" first second mutations why=""
-  mkdir -p "$tmp/synthetic/src/pkg" "$tmp/hostile/.config/git"
+  local n derived="$tmp/derived" again="$tmp/derived-again" first second mutations extensions
+  local why="" real_git
+  real_git=$(command -v git)
+  mkdir -p "$tmp/synthetic/src/pkg" "$tmp/synthetic/src/site" "$tmp/hostile/.config/git" \
+    "$tmp/hostile/bin" "$tmp/hostile/objects" "$tmp/hostile/common.git" "$tmp/hostile/quarantine"
   for n in $(seq -w 1 120); do
     printf 'package pkg;\n\npublic class F%s {\n  int value() {\n    return 1;\n  }\n}\n' "$n" \
       > "$tmp/synthetic/src/pkg/F$n.java"
   done
-  printf '[user]\n\tname = intruder\n\temail = intruder@example.invalid\n[commit]\n\tgpgsign = true\n[i18n]\n\tcommitEncoding = ISO-8859-1\n' \
+  printf '#!/bin/sh\necho download\n' > "$tmp/synthetic/src/site/download.cgi"
+  chmod +x "$tmp/synthetic/src/site/download.cgi"
+  printf '[user]\n\tname = intruder\n\temail = intruder@example.invalid\n[commit]\n\tgpgsign = true\n[i18n]\n\tcommitEncoding = ISO-8859-1\n[core]\n\tfileMode = false\n' \
     > "$tmp/hostile/.gitconfig"
   printf '*.java\nMUTATIONS.txt\n' > "$tmp/hostile/.config/git/ignore"
   printf '*.java working-tree-encoding=UTF-16\n' > "$tmp/hostile/.config/git/attributes"
+  sed "s|@GIT@|$real_git|g" > "$tmp/hostile/bin/git" <<'SHIM'
+#!/usr/bin/env bash
+"@GIT@" "$@" || exit
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+  [ "${args[i]}" = init ] && exec "@GIT@" "${args[@]:0:i}" config core.fileMode false
+done
+exit 0
+SHIM
+  chmod +x "$tmp/hostile/bin/git"
   set +e
   ( set -e; derive_broken_tree "$tmp/synthetic" "$derived" ) >"$tmp/derive.log" 2>&1
   local rc_first=$?
   ( set -e
     export HOME="$tmp/hostile" XDG_CONFIG_HOME="$tmp/hostile/.config" GIT_DIR="$tmp/hostile/stolen.git"
     export GIT_CONFIG_SYSTEM="$tmp/hostile/.gitconfig"
-    export GIT_CONFIG_PARAMETERS="'i18n.commitencoding'='ISO-8859-1'"
-    export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=i18n.commitEncoding GIT_CONFIG_VALUE_0=ISO-8859-1
+    export GIT_CONFIG_PARAMETERS="'i18n.commitencoding'='ISO-8859-1' 'core.filemode'='false'"
+    export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=i18n.commitEncoding GIT_CONFIG_VALUE_0=ISO-8859-1
+    export GIT_CONFIG_KEY_1=core.fileMode GIT_CONFIG_VALUE_1=false
     export GIT_AUTHOR_NAME=intruder GIT_COMMITTER_NAME=intruder
     export GIT_AUTHOR_DATE="1 +0000" GIT_COMMITTER_DATE="1 +0000"
+    export GIT_OBJECT_DIRECTORY="$tmp/hostile/objects" GIT_COMMON_DIR="$tmp/hostile/common.git"
+    export GIT_ALTERNATE_OBJECT_DIRECTORIES="$derived/.git/objects"
+    export GIT_QUARANTINE_PATH="$tmp/hostile/quarantine"
+    export GIT_DEFAULT_HASH=sha256 GIT_DEFAULT_REF_FORMAT=reftable GIT_REFERENCE_BACKEND=reftable
+    export PATH="$tmp/hostile/bin:$PATH"
     derive_broken_tree "$tmp/synthetic" "$again" ) >>"$tmp/derive.log" 2>&1
   local rc_again=$?
   set -e
   first=$(git --git-dir="$derived/.git" rev-parse -q --verify 'HEAD^{commit}' 2>/dev/null) || first=""
   second=$(git --git-dir="$again/.git" rev-parse -q --verify 'HEAD^{commit}' 2>/dev/null) || second=""
+  extensions=$(git --git-dir="$again/.git" config --get-regexp '^extensions\.' 2>/dev/null) || true
   mutations=$(grep -c -v -e '^#' -e '^[[:space:]]*$' "$derived/MUTATIONS.txt" 2>/dev/null) || true
   [ "$rc_first" = 0 ] && [ "$rc_again" = 0 ] || why="$why a derivação saiu com $rc_first/$rc_again ($(tr '\n' ' ' < "$tmp/derive.log"));"
   [ -d "$derived/.git" ] || why="$why sem .git;"
@@ -305,6 +330,7 @@ self_test() {
     "$(cd "$derived" && find . -path ./.git -prune -o -type f -print | wc -l | tr -d ' ')" ] ||
     why="$why o commit não contém todos os arquivos da árvore;"
   [ "$mutations" = 3 ] || why="$why MUTATIONS.txt tem ${mutations:-0} linha(s) de mutação;"
+  [ -z "$extensions" ] || why="$why o repositório hostil exige extensions: $extensions;"
   [ -n "$first" ] && [ "$first" = "$second" ] || why="$why os ids diferem: '$first' e depois '$second';"
   if [ -z "$why" ]; then
     ok "broken-tree é derivado offline em um commit na main, com o mesmo id em uma máquina hostil"
