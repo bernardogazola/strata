@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.eclipse.jgit.api.Git;
 import org.junit.jupiter.api.Test;
@@ -181,6 +182,42 @@ final class SpoonModelBuilderTest {
   }
 
   @Test
+  void umaRaizAcimaDoTetoDeFontePorModeloViraPedacosConsecutivosSemPerderArquivo()
+      throws Exception {
+    final Path directory = temp.resolve("budget");
+    final String padding = "// " + "x".repeat(1_990_000) + "\n";
+    final List<String> files = new ArrayList<>();
+    for (int index = 0; index < 9; index++) {
+      final String file = "src/main/java/p/Big" + index + ".java";
+      TestRepositories.write(
+          directory, file, padding + "package p;\n\nclass Big" + index + " {}\n");
+      files.add(file);
+    }
+    final ValidatedRepository repository =
+        SourceTrees.repository(
+            directory, Map.of("src/main/java/p/Small.java", "package p;\n\nclass Small {}\n"));
+    final List<List<String>> batches = new ArrayList<>();
+
+    final SourceAnalysis analysis = analyzeAll(repository, batch -> batches.add(batch.files()));
+
+    assertThat(analysis.parseFailures()).isZero();
+    assertThat(analysis.diagnostics().splitBatches()).isEqualTo(1);
+    assertThat(batches).hasSize(2);
+    final List<String> concatenated = new ArrayList<>();
+    batches.forEach(concatenated::addAll);
+    files.add("src/main/java/p/Small.java");
+    assertThat(concatenated).as("pedaços consecutivos na ordem de caminho").isSorted();
+    assertThat(concatenated).containsExactlyInAnyOrderElementsOf(files);
+    for (final List<String> batch : batches) {
+      long bytes = 0;
+      for (final String file : batch) {
+        bytes += Files.size(directory.resolve(file));
+      }
+      assertThat(bytes).isLessThanOrEqualTo(AnalysisConstants.MAX_MODEL_SOURCE_BYTES);
+    }
+  }
+
+  @Test
   void arquivosSemNadaAModelarSaoAnalisadosENaoContamComoFalha() throws Exception {
     final ValidatedRepository repository =
         SourceTrees.repository(
@@ -257,6 +294,35 @@ final class SpoonModelBuilderTest {
         .isInstanceOf(CancellationException.class);
     assertThat(visits).hasValue(0);
     assertThat(calls).hasValue(insideTheBuild);
+  }
+
+  @Test
+  void oCancelamentoAlcancaAExtracaoAntesDeCadaUnidade() throws Exception {
+    final Map<String, String> files = new LinkedHashMap<>();
+    for (int index = 0; index < 5; index++) {
+      files.put("src/main/java/p/U" + index + ".java", "package p;\n\nclass U" + index + " {}\n");
+    }
+    final ValidatedRepository repository =
+        SourceTrees.repository(temp.resolve("extraction-cancel"), files);
+    final AtomicBoolean cancel = new AtomicBoolean();
+    final List<String> extracted = new ArrayList<>();
+
+    assertThatThrownBy(
+            () ->
+                new SpoonModelBuilder()
+                    .analyze(
+                        repository,
+                        repository.layout().sourceRoots(),
+                        batch ->
+                            batch.perCompilationUnit(
+                                (file, unit) -> {
+                                  extracted.add(file);
+                                  cancel.set(true);
+                                  return file;
+                                }),
+                        cancel::get))
+        .isInstanceOf(CancellationException.class);
+    assertThat(extracted).containsExactly("src/main/java/p/U0.java");
   }
 
   @Test

@@ -163,9 +163,13 @@ final class SpoonCorpusSpikeIT {
             diagnostics.visitMillis(),
             diagnostics.longestBuildMillis(),
             diagnostics.longestBuildRoot(),
-            gap.longestMillis()),
+            gap.longestMillis(),
+            gap.longestBetween()),
         new SpikeReport.Models(
-            diagnostics.batches(), diagnostics.quarantinedBatches(), diagnostics.builds()),
+            diagnostics.batches(),
+            diagnostics.splitBatches(),
+            diagnostics.quarantinedBatches(),
+            diagnostics.builds()),
         probe.extraction());
   }
 
@@ -188,7 +192,7 @@ final class SpoonCorpusSpikeIT {
         List.of(),
         List.of(),
         new SpikeReport.Heap(meter.peakLiveBytes(), meter.peakUsedBytes()),
-        new SpikeReport.Timing(wallMillis, 0, 0, 0, 0, "", 0),
+        new SpikeReport.Timing(wallMillis, 0, 0, 0, 0, "", 0, ""),
         null,
         null);
   }
@@ -367,19 +371,47 @@ final class SpoonCorpusSpikeIT {
 
   private static final class CancellationGap implements BooleanSupplier {
 
+    private static final StackWalker WALKER = StackWalker.getInstance();
+
     private long last = System.nanoTime();
+    private String lastWhere = "start";
     private long longest;
+    private String longestFrom = "";
+    private String longestTo = "";
 
     @Override
     public boolean getAsBoolean() {
       final long now = System.nanoTime();
-      longest = Math.max(longest, now - last);
+      final String where =
+          WALKER.walk(
+              frames ->
+                  frames
+                      .skip(1)
+                      .findFirst()
+                      .map(
+                          frame ->
+                              frame
+                                      .getClassName()
+                                      .substring(frame.getClassName().lastIndexOf('.') + 1)
+                                  + "."
+                                  + frame.getMethodName())
+                      .orElse("unknown"));
+      if (now - last > longest) {
+        longest = now - last;
+        longestFrom = lastWhere;
+        longestTo = where;
+      }
       last = now;
+      lastWhere = where;
       return false;
     }
 
     private long longestMillis() {
       return longest / 1_000_000;
+    }
+
+    private String longestBetween() {
+      return longestFrom + " -> " + longestTo;
     }
   }
 

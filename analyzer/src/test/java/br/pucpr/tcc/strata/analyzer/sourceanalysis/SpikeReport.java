@@ -91,9 +91,10 @@ record SpikeReport(
       long visitMillis,
       long longestBuildMillis,
       String longestBuildRoot,
-      long longestCancellationGapMillis) {}
+      long longestCancellationGapMillis,
+      String longestCancellationGapBetween) {}
 
-  record Models(int batches, int quarantinedBatches, int builds) {}
+  record Models(int batches, int splitBatches, int quarantinedBatches, int builds) {}
 
   record Extraction(
       long types,

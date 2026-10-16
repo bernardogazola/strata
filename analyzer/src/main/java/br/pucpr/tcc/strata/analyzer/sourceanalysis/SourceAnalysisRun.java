@@ -26,6 +26,7 @@ import spoon.reflect.factory.Factory;
 final class SourceAnalysisRun {
 
   private static final int MAX_SOURCE_FILE_BYTES = AnalysisConstants.MAX_SOURCE_FILE_BYTES;
+  private static final long MAX_MODEL_SOURCE_BYTES = AnalysisConstants.MAX_MODEL_SOURCE_BYTES;
 
   private final Path repositoryRoot;
   private final Path emptyClasspath;
@@ -38,8 +39,11 @@ final class SourceAnalysisRun {
 
   private final Map<SourceRootId, List<String>> descriptors = new LinkedHashMap<>();
 
+  private final Map<String, Integer> sizes = new LinkedHashMap<>();
+
   private List<SourceFile> preParsed = List.of();
   private int batches;
+  private int splitBatches;
   private int quarantinedBatches;
   private int builds;
   private long preParseNanos;
@@ -108,6 +112,7 @@ final class SourceAnalysisRun {
       descriptors.get(root.id()).add(file);
     } else if (!parsed.empty()) {
       typeFiles.get(root.id()).add(file);
+      sizes.put(file, content.get().length);
     }
   }
 
@@ -125,9 +130,10 @@ final class SourceAnalysisRun {
     final long started = System.nanoTime();
     final int buildsBefore = builds;
     final int batchesBefore = batches;
-    final List<String> types = typeFiles.get(root.id());
-    if (!types.isEmpty()) {
-      isolateAndVisit(root, types);
+    final List<List<String>> chunks = chunks(typeFiles.get(root.id()));
+    splitBatches += Math.max(0, chunks.size() - 1);
+    for (final List<String> chunk : chunks) {
+      isolateAndVisit(root, chunk);
     }
     // O module-info.java vai em um lote só dele: junto dos tipos, o Spoon lança
     // "Ambiguous package name".
@@ -144,6 +150,26 @@ final class SourceAnalysisRun {
             + " build(s), "
             + (System.nanoTime() - started) / 1_000_000
             + " ms");
+  }
+
+  private List<List<String>> chunks(List<String> files) {
+    final List<List<String>> chunks = new ArrayList<>();
+    List<String> current = new ArrayList<>();
+    long bytes = 0;
+    for (final String file : files) {
+      final int size = sizes.get(file);
+      if (!current.isEmpty() && bytes + size > MAX_MODEL_SOURCE_BYTES) {
+        chunks.add(List.copyOf(current));
+        current = new ArrayList<>();
+        bytes = 0;
+      }
+      current.add(file);
+      bytes += size;
+    }
+    if (!current.isEmpty()) {
+      chunks.add(List.copyOf(current));
+    }
+    return chunks;
   }
 
   private void isolateAndVisit(SourceRoot root, List<String> files) {
@@ -194,7 +220,8 @@ final class SourceAnalysisRun {
   }
 
   private void visit(SourceRoot root, List<String> files, Factory factory) {
-    final ModeledBatch batch = new ModeledBatch(root, files, factory, repositoryRoot, preParsed);
+    final ModeledBatch batch =
+        new ModeledBatch(root, files, factory, repositoryRoot, preParsed, cancelled);
     final Set<String> modeled = batch.modeledFiles();
     for (final String file : files) {
       if (!modeled.contains(file)) {
@@ -248,6 +275,7 @@ final class SourceAnalysisRun {
         issues,
         new SourceAnalysis.Diagnostics(
             batches,
+            splitBatches,
             quarantinedBatches,
             builds,
             preParseNanos / 1_000_000,

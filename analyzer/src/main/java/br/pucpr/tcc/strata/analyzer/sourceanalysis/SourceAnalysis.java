@@ -27,6 +27,7 @@ public record SourceAnalysis(
 
   public record Diagnostics(
       int batches,
+      int splitBatches,
       int quarantinedBatches,
       int builds,
       long preParseMillis,

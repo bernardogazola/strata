@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
 import spoon.reflect.CtModel;
 import spoon.reflect.declaration.CtCompilationUnit;
 import spoon.reflect.factory.Factory;
@@ -24,6 +25,7 @@ public final class ModeledBatch {
   private final List<SourceFile> analysisFiles;
   private final Map<String, CtCompilationUnit> unitsByFile = new TreeMap<>();
   private final Set<String> extractionFailures = new TreeSet<>();
+  private final BooleanSupplier cancelled;
   private CtModel model;
   private boolean open = true;
 
@@ -32,10 +34,12 @@ public final class ModeledBatch {
       List<String> files,
       Factory factory,
       Path repositoryRoot,
-      List<SourceFile> analysisFiles) {
+      List<SourceFile> analysisFiles,
+      BooleanSupplier cancelled) {
     this.root = Objects.requireNonNull(root, "root");
     this.files = List.copyOf(Objects.requireNonNull(files, "files"));
     this.analysisFiles = List.copyOf(Objects.requireNonNull(analysisFiles, "analysisFiles"));
+    this.cancelled = Objects.requireNonNull(cancelled, "cancelled");
     this.model = Objects.requireNonNull(factory, "factory").getModel();
     final Map<Path, String> byAbsolutePath = new HashMap<>();
     for (final String file : this.files) {
@@ -72,6 +76,9 @@ public final class ModeledBatch {
     ensureOpen();
     final List<T> results = new ArrayList<>();
     for (final Map.Entry<String, CtCompilationUnit> entry : unitsByFile.entrySet()) {
+      if (cancelled.getAsBoolean()) {
+        throw new CancellationException("análise de código cancelada durante a extração");
+      }
       final String file = entry.getKey();
       if (extractionFailures.contains(file)) {
         continue;
@@ -81,8 +88,8 @@ public final class ModeledBatch {
         if (result != null) {
           results.add(result);
         }
-      } catch (CancellationException cancelled) {
-        throw cancelled;
+      } catch (CancellationException cancellation) {
+        throw cancellation;
       } catch (RuntimeException | StackOverflowError failure) {
         Log.warn(
             "a extração falhou em "
