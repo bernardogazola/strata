@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.StreamWriteFeature;
+import com.fasterxml.jackson.core.json.JsonWriteFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -23,9 +24,12 @@ public final class CanonicalJson {
 
   public CanonicalJson() {
     this.mapper = JsonMapper.builder().build();
+    // Sem desligar o AUTO_CLOSE_TARGET, fechar o generator fecharia o stdout do processo.
+    // O COMBINE_UNICODE_SURROGATES_IN_UTF8 escreve emoji cru, como o JSON.stringify faz.
     this.factory =
         JsonFactory.builder()
             .disable(StreamWriteFeature.AUTO_CLOSE_TARGET)
+            .enable(JsonWriteFeature.COMBINE_UNICODE_SURROGATES_IN_UTF8)
             .build()
             .setCodec(mapper);
   }
