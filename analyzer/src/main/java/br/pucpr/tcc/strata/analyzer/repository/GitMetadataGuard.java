@@ -7,6 +7,7 @@ import java.io.Serial;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
+import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -18,6 +19,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.RefDatabase;
@@ -39,6 +41,7 @@ final class GitMetadataGuard {
   private static final String REFS = "refs";
   private static final String COMMONDIR = "commondir";
   private static final String CONFIG_WORKTREE = "config.worktree";
+  private static final String INDEX = "index";
   private static final String REFTABLE = "reftable";
   private static final String TABLES_LIST = "tables.list";
   private static final String INCLUDE_SECTION = "include";
@@ -46,16 +49,18 @@ final class GitMetadataGuard {
   private static final byte[] UTF8_BOM = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
 
   private final int maxGitConfigBytes;
+  private final int maxPackedRefsBytes;
 
   GitMetadataGuard(RepositoryLimits limits) {
     this.maxGitConfigBytes = limits.maxGitConfigBytes();
+    this.maxPackedRefsBytes = limits.maxPackedRefsBytes();
   }
 
   boolean admits(Path root) {
     try {
       final Optional<Path> gitDir = locateGitDir(root);
       if (gitDir.isPresent()) {
-        checkGitDir(gitDir.get());
+        checkGitDir(gitDir.get(), root);
       }
       return true;
     } catch (Refusal refusal) {
@@ -69,12 +74,20 @@ final class GitMetadataGuard {
     }
   }
 
+  static boolean namesNetworkLocation(String path) {
+    return path.length() >= 2 && isSlash(path.charAt(0)) && isSlash(path.charAt(1));
+  }
+
+  private static boolean isSlash(char character) {
+    return character == '/' || character == '\\';
+  }
+
   private Optional<Path> locateGitDir(Path root) throws IOException, Refusal {
-    final Path dotGit = root.resolve(Constants.DOT_GIT);
-    final Optional<BasicFileAttributes> dotGitAttributes = attributes(dotGit);
+    final Path dotGit = dotGitOf(root);
+    final Optional<BasicFileAttributes> dotGitAttributes = attributes(dotGit, root);
     final boolean dotGitIsDirectory =
         dotGitAttributes.map(BasicFileAttributes::isDirectory).orElse(false);
-    if (dotGitIsDirectory && looksLikeGitDir(dotGit)) {
+    if (dotGitIsDirectory && looksLikeGitDir(dotGit, root)) {
       return Optional.of(dotGit);
     }
     final boolean dotGitIsFile =
@@ -85,19 +98,28 @@ final class GitMetadataGuard {
         return target;
       }
     }
-    return looksLikeGitDir(root) ? Optional.of(root) : Optional.empty();
+    return looksLikeGitDir(root, root) ? Optional.of(root) : Optional.empty();
   }
 
-  private boolean looksLikeGitDir(Path directory) throws IOException, Refusal {
-    final Path commonDir = commonDirOf(directory);
-    if (!Files.exists(commonDir.resolve(Constants.OBJECTS))
-        || !Files.exists(commonDir.resolve(REFS))) {
+  private static Path dotGitOf(Path root) throws IOException, Refusal {
+    final Path dotGit = root.resolve(Constants.DOT_GIT);
+    final Optional<BasicFileAttributes> found = ownAttributes(dotGit);
+    if (found.isEmpty() || !found.get().isSymbolicLink()) {
+      return dotGit;
+    }
+    return resolveAgainst(root, Files.readSymbolicLink(dotGit).toString());
+  }
+
+  private boolean looksLikeGitDir(Path directory, Path root) throws IOException, Refusal {
+    final Path commonDir = commonDirOf(directory, root);
+    if (attributes(commonDir.resolve(Constants.OBJECTS), root).isEmpty()
+        || attributes(commonDir.resolve(REFS), root).isEmpty()) {
       return false;
     }
-    if (Files.exists(commonDir.resolve(REFTABLE))) {
+    if (attributes(commonDir.resolve(REFTABLE), root).isPresent()) {
       return true;
     }
-    return readSmallPlainFile(commonDir.resolve(Constants.HEAD))
+    return readPlainFileWithin(commonDir.resolve(Constants.HEAD), maxGitConfigBytes, root)
         .map(GitMetadataGuard::isValidHead)
         .orElse(false);
   }
@@ -116,7 +138,7 @@ final class GitMetadataGuard {
 
   private Optional<Path> gitdirTarget(Path root, Path dotGitFile) throws IOException, Refusal {
     final byte[] content =
-        readSmallPlainFile(dotGitFile)
+        readPlainFileWithin(dotGitFile, maxGitConfigBytes, root)
             .orElseThrow(() -> new Refusal(dotGitFile + " sumiu durante a inspeção"));
     if (content.length <= GITDIR_PREFIX.length() || !startsWith(content, GITDIR_PREFIX)) {
       return Optional.empty();
@@ -131,63 +153,96 @@ final class GitMetadataGuard {
       return Optional.empty();
     }
     final Path target = resolveAgainst(root, RawParseUtils.decode(content, pathStart, lineEnd));
-    if (!Files.isDirectory(target)) {
+    if (!attributes(target, root).map(BasicFileAttributes::isDirectory).orElse(false)) {
       throw new Refusal(dotGitFile + " aponta para " + target + ", que não é um diretório");
     }
     return Optional.of(target);
   }
 
-  private void checkGitDir(Path gitDir) throws IOException, Refusal {
-    requireSmallPlainFile(gitDir.resolve(Constants.HEAD));
-    requireSmallPlainFile(gitDir.resolve(CONFIG_WORKTREE));
-    final Path commonDir = commonDirOf(gitDir);
-    requireSmallPlainFile(commonDir.resolve(Constants.HEAD));
+  private void checkGitDir(Path gitDir, Path root) throws IOException, Refusal {
+    requireSmallPlainFile(gitDir.resolve(Constants.HEAD), root);
+    requireSmallPlainFile(gitDir.resolve(CONFIG_WORKTREE), root);
+    requireNoSymbolicLink(gitDir.resolve(INDEX), root);
+    final Optional<byte[]> workTreePointer =
+        readPlainFileWithin(gitDir.resolve(Constants.GITDIR_FILE), maxGitConfigBytes, root);
+    if (workTreePointer.isPresent()) {
+      checkWorkTreePath(
+          gitDir, new String(workTreePointer.get(), StandardCharsets.UTF_8).trim(), "gitdir", root);
+    }
+    final Path commonDir = commonDirOf(gitDir, root);
+    requireSmallPlainFile(commonDir.resolve(Constants.HEAD), root);
     final Path config = commonDir.resolve(Constants.CONFIG);
-    if (requireSmallPlainFile(config)) {
+    if (requireSmallPlainFile(config, root)) {
       final Set<Path> visited = new HashSet<>();
       visited.add(config.toRealPath());
-      checkIncludes(config, commonDir, 0, visited);
+      checkConfig(config, new ConfigScope(gitDir, commonDir, root), 0, visited);
     }
-    requirePlainFile(commonDir.resolve(Constants.PACKED_REFS));
-    requirePlainFile(commonDir.resolve(Constants.SHALLOW));
-    checkLooseRefChain(gitDir, commonDir);
-    checkReftable(commonDir);
+    requirePlainFileWithin(commonDir.resolve(Constants.PACKED_REFS), maxPackedRefsBytes, root);
+    requireSmallPlainFile(commonDir.resolve(Constants.SHALLOW), root);
+    checkLooseRefChain(gitDir, commonDir, root);
+    checkReftable(commonDir, root);
   }
 
-  private Path commonDirOf(Path gitDir) throws IOException, Refusal {
-    final Optional<byte[]> commondir = readSmallPlainFile(gitDir.resolve(COMMONDIR));
+  private Path commonDirOf(Path gitDir, Path root) throws IOException, Refusal {
+    final Optional<byte[]> commondir =
+        readPlainFileWithin(gitDir.resolve(COMMONDIR), maxGitConfigBytes, root);
     if (commondir.isEmpty()) {
       return gitDir;
     }
-    return resolveAgainst(gitDir, new String(commondir.get(), StandardCharsets.UTF_8).trim());
+    final Path commonDir =
+        resolveAgainst(gitDir, new String(commondir.get(), StandardCharsets.UTF_8).trim());
+    requireNoSymbolicLink(commonDir, root);
+    return commonDir;
   }
 
-  private void checkIncludes(Path configFile, Path baseDirectory, int depth, Set<Path> visited)
+  private static void checkWorkTreePath(Path gitDir, String value, String source, Path root)
       throws IOException, Refusal {
-    for (final String value : includePaths(configFile)) {
-      final Path included = resolveInclude(value, baseDirectory);
-      if (!Files.exists(included)) {
+    if (value.isEmpty()) {
+      return;
+    }
+    if (namesNetworkLocation(value)) {
+      throw new Refusal(source + " nomeia o local de rede " + value);
+    }
+    requireNoSymbolicLink(resolveAgainst(gitDir, value), root);
+  }
+
+  private void checkConfig(Path configFile, ConfigScope scope, int depth, Set<Path> visited)
+      throws IOException, Refusal {
+    final Config parsed = parse(configFile);
+    for (final String workTree :
+        parsed.getStringList(
+            ConfigConstants.CONFIG_CORE_SECTION, null, ConfigConstants.CONFIG_KEY_WORKTREE)) {
+      checkWorkTreePath(scope.gitDir(), workTree, configFile + " core.worktree", scope.root());
+    }
+    for (final String value : includePaths(parsed)) {
+      final Path included = resolveInclude(value, scope.commonDir());
+      final Optional<BasicFileAttributes> found = attributes(included, scope.root());
+      if (found.isEmpty()) {
         continue;
       }
       if (depth >= MAX_INCLUDE_DEPTH) {
         throw new Refusal(
             configFile + " aninha includes com profundidade maior que " + MAX_INCLUDE_DEPTH);
       }
-      requireSmallPlainFile(included);
+      requireWithin(included, found.get(), maxGitConfigBytes);
       if (!visited.add(included.toRealPath())) {
         throw new Refusal(configFile + " inclui " + included + " mais de uma vez");
       }
-      checkIncludes(included, baseDirectory, depth + 1, visited);
+      checkConfig(included, scope, depth + 1, visited);
     }
   }
 
-  private static List<String> includePaths(Path configFile) throws IOException, Refusal {
+  private static Config parse(Path configFile) throws IOException, Refusal {
     final Config parsed = new Config();
     try {
       parsed.fromText(decodeConfig(Files.readAllBytes(configFile)));
     } catch (ConfigInvalidException invalid) {
       throw new Refusal(configFile + " não é uma config Git válida: " + invalid.getMessage());
     }
+    return parsed;
+  }
+
+  private static List<String> includePaths(Config parsed) {
     final List<String> paths =
         new ArrayList<>(Arrays.asList(parsed.getStringList(INCLUDE_SECTION, null, INCLUDE_KEY)));
     for (final String subsection : parsed.getSubsections(INCLUDE_SECTION)) {
@@ -214,11 +269,12 @@ final class GitMetadataGuard {
     return resolveAgainst(home.toPath(), value.substring(HOME_PREFIX.length()));
   }
 
-  private void checkLooseRefChain(Path gitDir, Path commonDir) throws IOException, Refusal {
+  private void checkLooseRefChain(Path gitDir, Path commonDir, Path root)
+      throws IOException, Refusal {
     String name = Constants.HEAD;
     for (int depth = 0; depth <= RefDatabase.MAX_SYMBOLIC_REF_DEPTH; depth++) {
       final Optional<String> target =
-          readSmallPlainFile(looseRefFile(name, gitDir, commonDir))
+          readPlainFileWithin(looseRefFile(name, gitDir, commonDir), maxGitConfigBytes, root)
               .flatMap(GitMetadataGuard::symbolicTarget);
       if (target.isEmpty()) {
         return;
@@ -254,13 +310,13 @@ final class GitMetadataGuard {
     return Optional.of(RawParseUtils.decode(content, SYMREF_PREFIX.length(), length));
   }
 
-  private void checkReftable(Path commonDir) throws IOException, Refusal {
+  private void checkReftable(Path commonDir, Path root) throws IOException, Refusal {
     final Path reftable = commonDir.resolve(REFTABLE);
-    if (!Files.isDirectory(reftable)) {
+    if (!attributes(reftable, root).map(BasicFileAttributes::isDirectory).orElse(false)) {
       return;
     }
     final Path tablesList = reftable.resolve(TABLES_LIST);
-    final Optional<byte[]> listed = readSmallPlainFile(tablesList);
+    final Optional<byte[]> listed = readPlainFileWithin(tablesList, maxGitConfigBytes, root);
     if (listed.isEmpty()) {
       return;
     }
@@ -271,29 +327,42 @@ final class GitMetadataGuard {
       if (table.contains("/") || table.contains("\\") || ".".equals(table) || "..".equals(table)) {
         throw new Refusal(tablesList + " nomeia uma tabela fora do diretório reftable: " + table);
       }
-      requirePlainFile(reftable.resolve(table));
+      requirePlainFile(reftable.resolve(table), root);
     }
   }
 
-  private Optional<byte[]> readSmallPlainFile(Path file) throws IOException, Refusal {
-    return requireSmallPlainFile(file) ? Optional.of(Files.readAllBytes(file)) : Optional.empty();
+  private static Optional<byte[]> readPlainFileWithin(Path file, int maxBytes, Path root)
+      throws IOException, Refusal {
+    return requirePlainFileWithin(file, maxBytes, root)
+        ? Optional.of(Files.readAllBytes(file))
+        : Optional.empty();
   }
 
-  private boolean requireSmallPlainFile(Path file) throws IOException, Refusal {
-    final Optional<BasicFileAttributes> found = attributes(file);
+  private boolean requireSmallPlainFile(Path file, Path root) throws IOException, Refusal {
+    return requirePlainFileWithin(file, maxGitConfigBytes, root);
+  }
+
+  private static boolean requirePlainFileWithin(Path file, int maxBytes, Path root)
+      throws IOException, Refusal {
+    final Optional<BasicFileAttributes> found = attributes(file, root);
     if (found.isEmpty()) {
       return false;
     }
-    requireRegular(file, found.get());
-    if (found.get().size() > maxGitConfigBytes) {
-      throw new Refusal(
-          file + " tem " + found.get().size() + " bytes, acima de " + maxGitConfigBytes + " bytes");
-    }
+    requireWithin(file, found.get(), maxBytes);
     return true;
   }
 
-  private static void requirePlainFile(Path file) throws IOException, Refusal {
-    final Optional<BasicFileAttributes> found = attributes(file);
+  private static void requireWithin(Path file, BasicFileAttributes attributes, int maxBytes)
+      throws Refusal {
+    requireRegular(file, attributes);
+    if (attributes.size() > maxBytes) {
+      throw new Refusal(
+          file + " tem " + attributes.size() + " bytes, acima de " + maxBytes + " bytes");
+    }
+  }
+
+  private static void requirePlainFile(Path file, Path root) throws IOException, Refusal {
+    final Optional<BasicFileAttributes> found = attributes(file, root);
     if (found.isPresent()) {
       requireRegular(file, found.get());
     }
@@ -305,15 +374,41 @@ final class GitMetadataGuard {
     }
   }
 
-  private static Optional<BasicFileAttributes> attributes(Path file) throws IOException {
+  private static Optional<BasicFileAttributes> attributes(Path path, Path root)
+      throws IOException, Refusal {
+    Path walked = path.getRoot();
+    Optional<BasicFileAttributes> found = walked == null ? Optional.empty() : ownAttributes(walked);
+    for (final Path name : path) {
+      walked = walked == null ? name : walked.resolve(name);
+      found = ownAttributes(walked);
+      if (found.isEmpty()) {
+        return found;
+      }
+      if (found.get().isSymbolicLink() && walked.startsWith(root)) {
+        throw new Refusal(
+            walked + " é um link simbólico dentro do repositório, que o JGit seguiria");
+      }
+    }
+    return found;
+  }
+
+  private static void requireNoSymbolicLink(Path path, Path root) throws IOException, Refusal {
+    attributes(path, root);
+  }
+
+  private static Optional<BasicFileAttributes> ownAttributes(Path path) throws IOException {
     try {
-      return Optional.of(Files.readAttributes(file, BasicFileAttributes.class));
+      return Optional.of(
+          Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS));
     } catch (NoSuchFileException absent) {
       return Optional.empty();
     }
   }
 
   private static Path resolveAgainst(Path base, String value) throws Refusal {
+    if (namesNetworkLocation(value)) {
+      throw new Refusal("o repositório nomeia o local de rede " + value + " sob " + base);
+    }
     try {
       final Path path = Path.of(value);
       return path.isAbsolute() ? path : base.resolve(path);
@@ -330,6 +425,8 @@ final class GitMetadataGuard {
     return content.length >= prefix.length
         && Arrays.equals(content, 0, prefix.length, prefix, 0, prefix.length);
   }
+
+  private record ConfigScope(Path gitDir, Path commonDir, Path root) {}
 
   private static final class Refusal extends Exception {
 

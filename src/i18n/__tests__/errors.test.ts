@@ -128,7 +128,7 @@ describe("formatProtocolError", () => {
       )
       .join("");
 
-    expect(text).toContain("mais de 200.000 arquivos");
+    expect(text).toContain("mais de 200.000 arquivos e pastas");
     expect(text).not.toContain("200.001");
   });
 });

@@ -7,6 +7,7 @@ import java.nio.file.FileVisitOption;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
 import java.nio.file.Files;
+import java.nio.file.NotLinkException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
@@ -44,7 +45,11 @@ final class RepositoryWalker {
     private final List<JavaSource> javaSources = new ArrayList<>();
     private final List<BuildFileEntry> buildFiles = new ArrayList<>();
     private final List<RepositoryIssue> warnings = new ArrayList<>();
+
+    private int enumeratedEntries;
+
     private int totalFileCount;
+
     private int droppedWarnings;
     private int loggedEntries;
     private int silencedEntries;
@@ -63,18 +68,20 @@ final class RepositoryWalker {
       if (isGitMetadata(directory)) {
         return FileVisitResult.SKIP_SUBTREE;
       }
+      if (!enumerate()) {
+        return FileVisitResult.TERMINATE;
+      }
       final String relative = relative(directory);
       if (tooLong(relative)) {
         warn(RepositoryIssue.unreadable(relative));
         return FileVisitResult.SKIP_SUBTREE;
       }
+      recordBuildFile(directory, relative, false, 0);
       if (attributes.isOther() || attributes.isSymbolicLink()) {
         // O NIO desce em junções do Windows mesmo sem FOLLOW_LINKS, sem detectar laço.
         // Aqui elas contam como link e não são percorridas.
-        if (!count()) {
-          return FileVisitResult.TERMINATE;
-        }
-        checkEscape(directory, relative);
+        totalFileCount++;
+        checkEscape(directory, relative, attributes);
         return FileVisitResult.SKIP_SUBTREE;
       }
       return FileVisitResult.CONTINUE;
@@ -85,29 +92,29 @@ final class RepositoryWalker {
       if (isGitMetadata(file)) {
         return FileVisitResult.CONTINUE;
       }
+      if (!enumerate()) {
+        return FileVisitResult.TERMINATE;
+      }
       final String relative = relative(file);
       if (attributes.isDirectory()) {
         warn(RepositoryIssue.unreadable(relative));
+        recordBuildFile(file, relative, false, 0);
         return FileVisitResult.CONTINUE;
       }
-      if (!count()) {
-        return FileVisitResult.TERMINATE;
-      }
+      totalFileCount++;
       if (tooLong(relative)) {
         warn(RepositoryIssue.unreadable(relative));
         return FileVisitResult.CONTINUE;
       }
       if (attributes.isSymbolicLink()) {
-        checkEscape(file, relative);
+        checkEscape(file, relative, attributes);
       }
       final String name = file.getFileName().toString();
       if (attributes.isRegularFile() && name.endsWith(JAVA_SUFFIX)) {
         javaSources.add(
             new JavaSource(relative, attributes.size(), attributes.lastModifiedTime().toMillis()));
       }
-      if (BuildSystemDetector.BUILD_FILE_NAMES.contains(name)) {
-        buildFiles.add(new BuildFileEntry(relative, attributes.isRegularFile(), attributes.size()));
-      }
+      recordBuildFile(file, relative, attributes.isRegularFile(), attributes.size());
       return FileVisitResult.CONTINUE;
     }
 
@@ -118,10 +125,15 @@ final class RepositoryWalker {
         refusal = RepositoryIssue.rootUnreadable();
         return FileVisitResult.TERMINATE;
       }
-      logEntry("ignorando a entrada ilegível " + file + ": " + failure);
-      if (!isGitMetadata(file)) {
-        warn(RepositoryIssue.unreadable(relative(file)));
+      if (isGitMetadata(file)) {
+        logEntry("ignorando a entrada ilegível " + file + ": " + failure);
+        return FileVisitResult.CONTINUE;
       }
+      if (!enumerate()) {
+        return FileVisitResult.TERMINATE;
+      }
+      logEntry("ignorando a entrada ilegível " + file + ": " + failure);
+      warn(RepositoryIssue.unreadable(relative(file)));
       return FileVisitResult.CONTINUE;
     }
 
@@ -140,25 +152,62 @@ final class RepositoryWalker {
       return FileVisitResult.CONTINUE;
     }
 
-    private boolean count() {
-      totalFileCount++;
-      if (totalFileCount <= limits.maxEnumeratedFiles()) {
+    private boolean enumerate() {
+      enumeratedEntries++;
+      if (enumeratedEntries <= limits.maxEnumeratedFiles()) {
         return true;
       }
-      refusal = RepositoryIssue.tooManyFiles(limits.maxEnumeratedFiles(), totalFileCount);
+      refusal = RepositoryIssue.tooManyFiles(limits.maxEnumeratedFiles(), enumeratedEntries);
       return false;
     }
 
-    private void checkEscape(Path link, String relative) {
+    private void recordBuildFile(Path entry, String relative, boolean regularFile, long size) {
+      if (BuildSystemDetector.BUILD_FILE_NAMES.contains(entry.getFileName().toString())) {
+        buildFiles.add(new BuildFileEntry(relative, regularFile, size));
+      }
+    }
+
+    private void checkEscape(Path link, String relative, BasicFileAttributes attributes) {
+      final Path text;
+      try {
+        text = Files.readSymbolicLink(link);
+      } catch (NotLinkException notALink) {
+        if (attributes.isOther()) {
+          checkJunction(link, relative);
+        } else {
+          logEntry("a entrada " + link + " deixou de ser um link simbólico durante a varredura");
+        }
+        return;
+      } catch (IOException unreadable) {
+        logEntry("não foi possível ler o link simbólico " + link + ": " + unreadable);
+        warn(RepositoryIssue.unreadable(relative));
+        return;
+      }
+      if (escapes(link, text)) {
+        logEntry(
+            "o link simbólico " + link + " aponta para fora da raiz do repositório, para " + text);
+        warn(RepositoryIssue.pathEscapesRoot(relative));
+      }
+    }
+
+    private boolean escapes(Path link, Path text) {
+      if (GitMetadataGuard.namesNetworkLocation(text.toString())) {
+        return true;
+      }
+      final Path target = text.isAbsolute() ? text : link.getParent().resolve(text);
+      return !target.normalize().startsWith(root);
+    }
+
+    private void checkJunction(Path junction, String relative) {
       final Path target;
       try {
-        target = link.toRealPath();
-      } catch (IOException danglingOrLoop) {
-        logEntry("o link simbólico " + link + " não resolve: " + danglingOrLoop);
+        target = junction.toRealPath();
+      } catch (IOException dangling) {
+        logEntry("a junction " + junction + " não resolve: " + dangling);
         return;
       }
       if (!target.startsWith(root)) {
-        logEntry("o link simbólico " + link + " escapa da raiz do repositório para " + target);
+        logEntry("a junction " + junction + " escapa da raiz do repositório para " + target);
         warn(RepositoryIssue.pathEscapesRoot(relative));
       }
     }

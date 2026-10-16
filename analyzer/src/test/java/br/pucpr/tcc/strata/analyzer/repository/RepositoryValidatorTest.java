@@ -192,6 +192,25 @@ final class RepositoryValidatorTest {
         .isEqualTo(new RepositoryOutcome.Rejected<>(RepositoryIssue.notAGitRepository()));
   }
 
+  @Test
+  void pomXmlQueEDiretorioNaRaizDaSistemaUnknownDePontaAPonta() throws Exception {
+    final Path repo = real.resolve("pom-diretorio");
+    try (Git git = TestRepositories.init(repo)) {
+      TestRepositories.write(repo, "src/main/java/A.java", "class A {}");
+      TestRepositories.write(repo, "pom.xml/LEIA.txt", "um diretório, não um POM");
+      TestRepositories.commitAll(git, "primeiro");
+    }
+
+    final var accepted = aceito(new RepositoryValidator().validate(repo));
+
+    assertThat(accepted.value().layout().buildSystem())
+        .as(
+            "o build existe mas não pode ser lido: NONE diria à pessoa que o projeto não tem"
+                + " build")
+        .isEqualTo(BuildSystem.UNKNOWN);
+    assertThat(raizes(accepted)).containsExactly("src/main/java");
+  }
+
   private static RepositoryOutcome.Accepted<RepositorySnapshot> inspecionado(
       RepositoryOutcome<RepositorySnapshot> outcome) {
     assertThat(outcome).isInstanceOf(RepositoryOutcome.Accepted.class);

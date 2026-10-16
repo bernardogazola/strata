@@ -313,7 +313,7 @@ const errorRegistry: ErrorRegistry = {
     format: (p) => ({
       body: [
         t(
-          `O repositório tem mais de ${formatInteger(p.limit)} arquivos, o limite que o Strata percorre com segurança.`
+          `O repositório tem mais de ${formatInteger(p.limit)} arquivos e pastas, o limite que o Strata percorre com segurança.`
         ),
       ],
       title: "Repositório grande demais",

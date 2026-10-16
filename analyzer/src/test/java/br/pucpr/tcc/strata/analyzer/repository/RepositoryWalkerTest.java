@@ -236,6 +236,139 @@ final class RepositoryWalkerTest {
         .containsExactly("src/a\\b.java");
   }
 
+  @Test
+  void cemDiretoriosVaziosPassamDoTetoDeEntradas() throws Exception {
+    for (int indice = 0; indice < 100; indice++) {
+      Files.createDirectories(real.resolve("vazio-" + indice));
+    }
+
+    assertThat(walker(limites(10, 64, 1_024, 100)).walk(real))
+        .as("sem contar diretório, uma árvore de diretórios vazios varreria sem teto nenhum")
+        .isEqualTo(new RepositoryOutcome.Rejected<>(RepositoryIssue.tooManyFiles(10, 11)));
+  }
+
+  @Test
+  @DisabledOnOs(value = OS.WINDOWS, disabledReason = "permissão POSIX não existe no Windows")
+  void pastaLegivelMasNaoPesquisavelContaCadaEntradaQueFalha() throws Exception {
+    final Path trancada = Files.createDirectories(real.resolve("trancada"));
+    for (int indice = 0; indice < 50; indice++) {
+      TestRepositories.write(trancada, "f" + indice + ".txt", "x");
+    }
+    Files.setPosixFilePermissions(
+        trancada,
+        Set.of(
+            PosixFilePermission.OWNER_READ,
+            PosixFilePermission.GROUP_READ,
+            PosixFilePermission.OTHERS_READ));
+    try {
+      Assumptions.assumeFalse(
+          Files.exists(trancada.resolve("f0.txt")),
+          "este usuário consulta as entradas de um diretório que não pode percorrer (rodando como root?):"
+              + " o caso da entrada que falha não pode ser produzido aqui");
+
+      assertThat(walker(limites(10, 64, 1_024, 100)).walk(real))
+          .as("a pasta lista os 50 nomes e cada um falha no stat: cada falha é uma entrada")
+          .isEqualTo(new RepositoryOutcome.Rejected<>(RepositoryIssue.tooManyFiles(10, 11)));
+    } finally {
+      Files.setPosixFilePermissions(trancada, Set.of(PosixFilePermission.values()));
+    }
+  }
+
+  @Test
+  void diretorioContaNoTetoDeEntradasMasNaoNoTotalDeArquivos() throws Exception {
+    TestRepositories.write(real, "a/um.txt", "1");
+    TestRepositories.write(real, "b/dois.txt", "2");
+    Files.createDirectories(real.resolve("c/d/e"));
+
+    assertThat(aceito(walker(limites(7, 64, 1_024, 100)).walk(real)).value().totalFileCount())
+        .as("sete entradas (a, b, c, c/d, c/d/e e os dois arquivos), das quais duas são arquivo")
+        .isEqualTo(2);
+    assertThat(walker(limites(6, 64, 1_024, 100)).walk(real))
+        .isEqualTo(new RepositoryOutcome.Rejected<>(RepositoryIssue.tooManyFiles(6, 7)));
+  }
+
+  @Test
+  void diretorioComNomeDeArquivoDeBuildEntraNoInventarioEEDescido() throws Exception {
+    TestRepositories.write(real, "pom.xml/Dentro.java", "class Dentro {}");
+
+    final var accepted = aceito(walker(RepositoryLimits.PRODUCTION).walk(real));
+
+    assertThat(accepted.value().buildFiles())
+        .as("existe, então o sistema não é NONE; não é regular, então nunca é aberto")
+        .containsExactly(new BuildFileEntry("pom.xml", false, 0));
+    assertThat(accepted.value().javaSources())
+        .extracting(JavaSource::relativePath)
+        .containsExactly("pom.xml/Dentro.java");
+  }
+
+  @Test
+  @DisabledOnOs(
+      value = OS.WINDOWS,
+      disabledReason =
+          "criar no Windows um link para um alvo UNC faz o JDK consultar o alvo, a própria"
+              + " requisição SMB que este teste proíbe")
+  void linkParaCaminhoDeRedeEAvisadoSemSerResolvido() throws Exception {
+    TestRepositories.symlink(real.resolve("rede"), Path.of("\\\\strata.invalid\\share\\x"));
+    TestRepositories.symlink(real.resolve("unc"), Path.of("\\\\?\\UNC\\strata.invalid\\share\\x"));
+
+    final var accepted = aceito(walker(RepositoryLimits.PRODUCTION).walk(real));
+
+    assertThat(accepted.warnings())
+        .as(
+            "em um Unix o alvo é um nome relativo pendente; resolvê-lo daria em nada, e não avisaria")
+        .containsExactlyInAnyOrder(
+            RepositoryIssue.pathEscapesRoot("rede"), RepositoryIssue.pathEscapesRoot("unc"));
+  }
+
+  @Test
+  @DisabledOnOs(
+      value = OS.WINDOWS,
+      disabledReason =
+          "criar no Windows um link para um alvo UNC faz o JDK consultar o alvo, a própria"
+              + " requisição SMB que este teste proíbe")
+  void cadeiaDeLinksERelatadaNoEloQueNomeiaARede() throws Exception {
+    TestRepositories.symlink(real.resolve("b"), Path.of("\\\\strata.invalid\\share"));
+    TestRepositories.symlink(real.resolve("a"), Path.of("b"));
+
+    final var accepted = aceito(walker(RepositoryLimits.PRODUCTION).walk(real));
+
+    assertThat(accepted.warnings())
+        .as("a aponta para b, que está dentro; b é visitado e julgado pelo próprio texto")
+        .containsExactly(RepositoryIssue.pathEscapesRoot("b"));
+    assertThat(accepted.value().totalFileCount()).isEqualTo(2);
+  }
+
+  @Test
+  void linkQueAtravessaUmDiretorioLinkEJulgadoPeloTextoSemSeguir() throws Exception {
+    final Path repo = Files.createDirectories(real.resolve("repo"));
+    TestRepositories.write(real, "fora/Segredo.java", "class Segredo {}");
+    TestRepositories.symlink(repo.resolve("d"), real.resolve("fora"));
+    TestRepositories.symlink(repo.resolve("a"), Path.of("d/Segredo.java"));
+
+    final var accepted = aceito(walker(RepositoryLimits.PRODUCTION).walk(repo));
+
+    assertThat(accepted.warnings())
+        .as(
+            "seguir a acharia fora/Segredo.java; o texto d/Segredo.java está dentro, e a fuga é"
+                + " relatada em d: a prova de que o alvo de a nunca foi resolvido")
+        .containsExactly(RepositoryIssue.pathEscapesRoot("d"));
+  }
+
+  @Test
+  void linkRelativoQueSobeParaForaEAvisadoEOQueFicaDentroNao() throws Exception {
+    final Path repo = Files.createDirectories(real.resolve("repo"));
+    Files.createDirectories(real.resolve("fora"));
+    TestRepositories.write(repo, "outra/B.java", "class B {}");
+    TestRepositories.symlink(repo.resolve("sobe"), Path.of("../fora"));
+    TestRepositories.symlink(repo.resolve("src/irmao"), Path.of("../outra/B.java"));
+
+    final var accepted = aceito(walker(RepositoryLimits.PRODUCTION).walk(repo));
+
+    assertThat(accepted.warnings())
+        .as("o relativo é resolvido contra a pasta do link e normalizado, sem tocar o disco")
+        .containsExactly(RepositoryIssue.pathEscapesRoot("sobe"));
+  }
+
   private JavaSource fonte(String relativo) throws Exception {
     final Path arquivo = real.resolve(relativo);
     return new JavaSource(
