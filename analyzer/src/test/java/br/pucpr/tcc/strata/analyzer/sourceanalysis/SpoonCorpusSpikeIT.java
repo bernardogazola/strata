@@ -12,6 +12,7 @@ import br.pucpr.tcc.strata.analyzer.repository.ValidatedRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.sun.management.OperatingSystemMXBean;
+import java.io.File;
 import java.io.IOException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
@@ -22,13 +23,17 @@ import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
+import java.util.stream.Collectors;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.junit.jupiter.api.Test;
@@ -57,15 +62,16 @@ final class SpoonCorpusSpikeIT {
   @Test
   void oSpoonSemClasspathSobreviveAoCorpusDentroDeDoisGibDeHeap() throws Exception {
     HermeticSystemReader.install();
+    final String baseCommit = baseCommit(Path.of(System.getProperty("strata.root")));
     final Path corpus = corpusDirectory();
     final Path report = Path.of(System.getProperty("strata.spike.report")).toAbsolutePath();
     final List<SpikeReport.RepositoryResult> results = new ArrayList<>();
 
     for (final String name : REPOSITORIES) {
       results.add(measure(name, corpus.resolve(name)));
-      write(report, reportOf(corpus, results, false));
+      write(report, reportOf(baseCommit, results, false));
     }
-    final SpikeReport finalReport = reportOf(corpus, results, true);
+    final SpikeReport finalReport = reportOf(baseCommit, results, true);
     write(report, finalReport);
 
     final SpikeReport.RepositoryResult derived = results.getLast();
@@ -78,7 +84,7 @@ final class SpoonCorpusSpikeIT {
   }
 
   private static SpikeReport.RepositoryResult measure(String name, Path directory)
-      throws IOException {
+      throws IOException, InterruptedException {
     System.gc();
     final RepositoryOutcome<ValidatedRepository> outcome =
         new RepositoryValidator().validate(directory.toRealPath());
@@ -97,10 +103,13 @@ final class SpoonCorpusSpikeIT {
             new SpoonModelBuilder()
                 .analyze(repository, repository.layout().sourceRoots(), probe, gap);
       } catch (OutOfMemoryError exhausted) {
-        return outOfMemory(name, repository, meter, millisSince(started));
+        final long wallMillis = millisSince(started);
+        meter.drain();
+        return outOfMemory(name, repository, meter, wallMillis);
       }
-      return completed(
-          name, directory, repository, analysis, meter, probe, gap, millisSince(started));
+      final long wallMillis = millisSince(started);
+      meter.drain();
+      return completed(name, directory, repository, analysis, meter, probe, gap, wallMillis);
     }
   }
 
@@ -164,7 +173,8 @@ final class SpoonCorpusSpikeIT {
             diagnostics.longestBuildMillis(),
             diagnostics.longestBuildRoot(),
             gap.longestMillis(),
-            gap.longestBetween()),
+            gap.longestBetween(),
+            gap.longestMillisByCallSites()),
         new SpikeReport.Models(
             diagnostics.batches(),
             diagnostics.splitBatches(),
@@ -192,7 +202,7 @@ final class SpoonCorpusSpikeIT {
         List.of(),
         List.of(),
         new SpikeReport.Heap(meter.peakLiveBytes(), meter.peakUsedBytes()),
-        new SpikeReport.Timing(wallMillis, 0, 0, 0, 0, "", 0, ""),
+        new SpikeReport.Timing(wallMillis, 0, 0, 0, 0, "", 0, "", Map.of()),
         null,
         null);
   }
@@ -221,14 +231,13 @@ final class SpoonCorpusSpikeIT {
   }
 
   private static SpikeReport reportOf(
-      Path corpus, List<SpikeReport.RepositoryResult> results, boolean complete)
-      throws IOException {
+      String baseCommit, List<SpikeReport.RepositoryResult> results, boolean complete) {
     final int passing = (int) results.stream().filter(SpikeReport.RepositoryResult::pass).count();
     final String outcome = !complete ? "INCOMPLETE" : passing >= MIN_PASSING ? "PASS" : "FAIL";
     return new SpikeReport(
         SCHEMA,
         Instant.now().truncatedTo(ChronoUnit.SECONDS).toString(),
-        baseCommit(corpus.getParent()),
+        baseCommit,
         "Spoon in no-classpath mode over every detected source root of each corpus repository,"
             + " one model alive at a time, with a visitor that walks types, type references"
             + " (getTypeDeclaration) and executable references (getExecutableDeclaration) while"
@@ -346,11 +355,13 @@ final class SpoonCorpusSpikeIT {
   }
 
   private static String baseCommit(Path strataRoot) throws IOException {
-    try (Repository strata =
-        new FileRepositoryBuilder()
-            .setGitDir(strataRoot.resolve(".git").toFile())
-            .setMustExist(true)
-            .build()) {
+    final File root = strataRoot.toAbsolutePath().normalize().toFile();
+    final FileRepositoryBuilder builder =
+        new FileRepositoryBuilder().addCeilingDirectory(root.getParentFile()).findGitDir(root);
+    assertThat(builder.getGitDir())
+        .as("strata.root não é um checkout Git do Strata: " + root)
+        .isNotNull();
+    try (Repository strata = builder.setMustExist(true).build()) {
       return Optional.ofNullable(strata.resolve("HEAD"))
           .map(head -> head.abbreviate(7).name())
           .orElse("unborn");
@@ -372,7 +383,9 @@ final class SpoonCorpusSpikeIT {
   private static final class CancellationGap implements BooleanSupplier {
 
     private static final StackWalker WALKER = StackWalker.getInstance();
+    private static final long NANOS_PER_MILLI = 1_000_000;
 
+    private final Map<String, Long> longestByCallSites = new HashMap<>();
     private long last = System.nanoTime();
     private String lastWhere = "start";
     private long longest;
@@ -382,36 +395,57 @@ final class SpoonCorpusSpikeIT {
     @Override
     public boolean getAsBoolean() {
       final long now = System.nanoTime();
-      final String where =
-          WALKER.walk(
-              frames ->
-                  frames
-                      .skip(1)
-                      .findFirst()
-                      .map(
-                          frame ->
-                              frame
-                                      .getClassName()
-                                      .substring(frame.getClassName().lastIndexOf('.') + 1)
-                                  + "."
-                                  + frame.getMethodName())
-                      .orElse("unknown"));
-      if (now - last > longest) {
-        longest = now - last;
+      final String where = callSite();
+      final long gap = now - last;
+      if (gap > longest) {
+        longest = gap;
         longestFrom = lastWhere;
         longestTo = where;
       }
+      longestByCallSites.merge(between(lastWhere, where), gap, Math::max);
       last = now;
       lastWhere = where;
       return false;
     }
 
     private long longestMillis() {
-      return longest / 1_000_000;
+      return longest / NANOS_PER_MILLI;
     }
 
     private String longestBetween() {
-      return longestFrom + " -> " + longestTo;
+      return between(longestFrom, longestTo);
+    }
+
+    private Map<String, Long> longestMillisByCallSites() {
+      return Collections.unmodifiableMap(
+          longestByCallSites.entrySet().stream()
+              .sorted(
+                  Map.Entry.<String, Long>comparingByValue(Comparator.reverseOrder())
+                      .thenComparing(Map.Entry.comparingByKey()))
+              .collect(
+                  Collectors.toMap(
+                      Map.Entry::getKey,
+                      entry -> entry.getValue() / NANOS_PER_MILLI,
+                      (first, second) -> first,
+                      LinkedHashMap::new)));
+    }
+
+    private static String callSite() {
+      return WALKER.walk(
+          frames ->
+              frames
+                  .skip(2)
+                  .findFirst()
+                  .map(
+                      frame ->
+                          frame.getClassName().substring(frame.getClassName().lastIndexOf('.') + 1)
+                              + "."
+                              + frame.getMethodName())
+                  .orElse("unknown"));
+    }
+
+    private static String between(String from, String to) {
+      return from + " -> " + to;
     }
   }
 
