@@ -1,6 +1,5 @@
 package br.pucpr.tcc.strata.analyzer.repository;
 
-import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.bootstrap.Log;
 import br.pucpr.tcc.strata.analyzer.repository.BuildDescription.DeclaredSourceDirectory;
 import java.io.IOException;
@@ -63,6 +62,13 @@ final class BuildSystemDetector {
   BuildDescription detect(Path root, RepositoryInventory inventory) {
     Objects.requireNonNull(root, "root");
     Objects.requireNonNull(inventory, "inventory");
+    final EntryLog log = new EntryLog(limits.maxWarnings());
+    final BuildDescription description = classify(root, inventory, log);
+    log.summarize("build-file");
+    return description;
+  }
+
+  private BuildDescription classify(Path root, RepositoryInventory inventory, EntryLog log) {
     final Map<String, BuildFileEntry> atRoot = new HashMap<>();
     for (final BuildFileEntry entry : inventory.buildFiles()) {
       if (entry.relativePath().indexOf('/') < 0) {
@@ -70,10 +76,10 @@ final class BuildSystemDetector {
       }
     }
     if (atRoot.containsKey(POM)) {
-      return maven(root, inventory, atRoot.get(POM));
+      return maven(root, inventory, atRoot.get(POM), log);
     }
     if (GRADLE_FILES.stream().anyMatch(atRoot::containsKey)) {
-      return gradle(root, atRoot);
+      return gradle(root, atRoot, log);
     }
     if (atRoot.containsKey(ANT_BUILD)) {
       return withoutModules(BuildSystem.ANT);
@@ -84,23 +90,27 @@ final class BuildSystemDetector {
     return withoutModules(BuildSystem.NONE);
   }
 
-  static Optional<byte[]> readBounded(Path file, int maxBytes) {
+  static Optional<byte[]> readBounded(Path file, int maxBytes, EntryLog log) {
+    final Optional<byte[]> content = readPrefix(file, Math.addExact(maxBytes, 1), log);
+    if (content.isPresent() && content.get().length > maxBytes) {
+      log.warn("sem ler " + file + ": passa de " + maxBytes + " bytes");
+      return Optional.empty();
+    }
+    return content;
+  }
+
+  static Optional<byte[]> readPrefix(Path file, int prefixBytes, EntryLog log) {
     try {
       if (!Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS)
           .isRegularFile()) {
-        Log.warn("sem ler " + file + ": deixou de ser um arquivo comum");
+        log.warn("sem ler " + file + ": deixou de ser um arquivo comum");
         return Optional.empty();
       }
       try (InputStream input = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {
-        final byte[] content = input.readNBytes(Math.addExact(maxBytes, 1));
-        if (content.length > maxBytes) {
-          Log.warn("sem ler " + file + ": passa de " + maxBytes + " bytes");
-          return Optional.empty();
-        }
-        return Optional.of(content);
+        return Optional.of(input.readNBytes(prefixBytes));
       }
     } catch (IOException failure) {
-      Log.warn("não foi possível ler " + file + ": " + failure);
+      log.warn("não foi possível ler " + file + ": " + failure);
       return Optional.empty();
     }
   }
@@ -109,8 +119,9 @@ final class BuildSystemDetector {
     return new BuildDescription(buildSystem, List.of(), List.of(REPOSITORY_ROOT), List.of());
   }
 
-  private BuildDescription maven(Path root, RepositoryInventory inventory, BuildFileEntry rootPom) {
-    final Optional<PomReader.Pom> parsedRoot = readPom(root, rootPom);
+  private BuildDescription maven(
+      Path root, RepositoryInventory inventory, BuildFileEntry rootPom, EntryLog log) {
+    final Optional<PomReader.Pom> parsedRoot = readPom(root, rootPom, log);
     if (parsedRoot.isEmpty()) {
       return withoutModules(BuildSystem.UNKNOWN);
     }
@@ -124,13 +135,12 @@ final class BuildSystemDetector {
     while (!pending.isEmpty()) {
       final ModulePom current = pending.removeFirst();
       sourceDirectories.addAll(declaredSourceDirectories(current));
-      for (final ModuleReference module : modulesOf(current)) {
+      for (final ModuleReference module : modulesOf(current, log)) {
         moduleDirectories.add(module.directory());
         final boolean descend =
-            current.depth() < AnalysisConstants.MAX_DIRECTORY_DEPTH
-                && visited.add(module.pomPath());
+            current.depth() < limits.maxDirectoryDepth() && visited.add(module.pomPath());
         if (descend) {
-          readModulePom(root, buildFiles.get(module.pomPath()), module, current.depth() + 1)
+          readModulePom(root, buildFiles.get(module.pomPath()), module, current.depth() + 1, log)
               .ifPresent(pending::addLast);
         }
       }
@@ -148,14 +158,14 @@ final class BuildSystemDetector {
         .toList();
   }
 
-  private List<ModuleReference> modulesOf(ModulePom modulePom) {
+  private List<ModuleReference> modulesOf(ModulePom modulePom, EntryLog log) {
     final List<ModuleReference> modules = new ArrayList<>();
     for (final String value : modulePom.pom().allModules()) {
       resolveModule(modulePom.directory(), value).ifPresent(modules::add);
     }
     final int rejected = modulePom.pom().allModules().size() - modules.size();
     if (rejected > 0) {
-      Log.warn(
+      log.warn(
           "ignorado(s) "
               + rejected
               + " módulo(s) Maven de "
@@ -166,22 +176,22 @@ final class BuildSystemDetector {
   }
 
   private Optional<ModulePom> readModulePom(
-      Path root, BuildFileEntry entry, ModuleReference module, int depth) {
+      Path root, BuildFileEntry entry, ModuleReference module, int depth, EntryLog log) {
     if (entry == null) {
-      Log.info(
+      log.info(
           "o módulo Maven "
               + module.directory()
               + " não tem o arquivo listado "
               + module.pomPath());
       return Optional.empty();
     }
-    return readPom(root, entry)
+    return readPom(root, entry, log)
         .map(pom -> new ModulePom(module.directory(), entry.relativePath(), pom, depth));
   }
 
-  private Optional<PomReader.Pom> readPom(Path root, BuildFileEntry entry) {
+  private Optional<PomReader.Pom> readPom(Path root, BuildFileEntry entry, EntryLog log) {
     if (!entry.regularFile() || entry.sizeBytes() > limits.maxBuildFileBytes()) {
-      Log.warn(
+      log.warn(
           "sem ler "
               + entry.relativePath()
               + ": não é um arquivo comum, ou passa de "
@@ -190,14 +200,14 @@ final class BuildSystemDetector {
       return Optional.empty();
     }
     final Optional<byte[]> content =
-        readBounded(root.resolve(entry.relativePath()), limits.maxBuildFileBytes());
+        readBounded(root.resolve(entry.relativePath()), limits.maxBuildFileBytes(), log);
     if (content.isEmpty()) {
       return Optional.empty();
     }
     try {
       return Optional.of(PomReader.read(content.get()));
     } catch (XMLStreamException malformed) {
-      Log.warn(
+      log.warn(
           "POM ilegível "
               + entry.relativePath()
               + ": "
@@ -276,7 +286,7 @@ final class BuildSystemDetector {
     return slashed.startsWith("/") || driveLetter;
   }
 
-  private BuildDescription gradle(Path root, Map<String, BuildFileEntry> atRoot) {
+  private BuildDescription gradle(Path root, Map<String, BuildFileEntry> atRoot, EntryLog log) {
     final Set<String> included = new LinkedHashSet<>();
     for (final String name : GRADLE_SETTINGS) {
       final BuildFileEntry entry = atRoot.get(name);
@@ -284,10 +294,10 @@ final class BuildSystemDetector {
         continue;
       }
       if (!entry.regularFile() || entry.sizeBytes() > limits.maxBuildFileBytes()) {
-        Log.warn("sem ler " + name + ": não é um arquivo comum, ou é grande demais");
+        log.warn("sem ler " + name + ": não é um arquivo comum, ou é grande demais");
         continue;
       }
-      readBounded(root.resolve(name), limits.maxBuildFileBytes())
+      readBounded(root.resolve(name), limits.maxBuildFileBytes(), log)
           .map(content -> new String(content, StandardCharsets.UTF_8))
           .map(GradleSettingsReader::includedDirectories)
           .ifPresent(included::addAll);
@@ -310,6 +320,45 @@ final class BuildSystemDetector {
 
   private static int utf8Length(String value) {
     return value.getBytes(StandardCharsets.UTF_8).length;
+  }
+
+  static final class EntryLog {
+
+    private final int limit;
+    private int logged;
+    private int silenced;
+
+    EntryLog(int limit) {
+      this.limit = limit;
+    }
+
+    void info(String message) {
+      if (admit()) {
+        Log.info(message);
+      }
+    }
+
+    void warn(String message) {
+      if (admit()) {
+        Log.warn(message);
+      }
+    }
+
+    void summarize(String stage) {
+      if (silenced > 0) {
+        Log.warn(
+            "outras " + silenced + " linhas de log por entrada de " + stage + " foram silenciadas");
+      }
+    }
+
+    private boolean admit() {
+      if (logged < limit) {
+        logged++;
+        return true;
+      }
+      silenced++;
+      return false;
+    }
   }
 
   private record ModulePom(String directory, String pomPath, PomReader.Pom pom, int depth) {}

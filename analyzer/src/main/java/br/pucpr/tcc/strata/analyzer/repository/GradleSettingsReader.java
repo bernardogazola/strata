@@ -18,11 +18,14 @@ final class GradleSettingsReader {
     Objects.requireNonNull(settings, "settings");
     final List<Token> tokens = tokenize(settings);
     final Set<String> directories = new LinkedHashSet<>();
-    for (int index = 0; index < tokens.size(); index++) {
+    int index = 0;
+    while (index < tokens.size()) {
       if (tokens.get(index).isIdentifier(INCLUDE)) {
-        for (final String projectPath : includeArguments(tokens, index + 1)) {
-          directoryOf(projectPath).ifPresent(directories::add);
-        }
+        final IncludeCall call = includeCall(tokens, index + 1);
+        call.arguments().forEach(path -> directoryOf(path).ifPresent(directories::add));
+        index = call.end();
+      } else {
+        index++;
       }
     }
     return List.copyOf(directories);
@@ -46,9 +49,16 @@ final class GradleSettingsReader {
     return Optional.of(String.join("/", segments));
   }
 
-  private static List<String> includeArguments(List<Token> tokens, int start) {
+  private record IncludeCall(List<String> arguments, int end) {
+
+    IncludeCall {
+      arguments = List.copyOf(arguments);
+    }
+  }
+
+  private static IncludeCall includeCall(List<Token> tokens, int start) {
     if (start < tokens.size() && tokens.get(start).isPunctuation('(')) {
-      return parenthesizedArguments(tokens, start + 1);
+      return parenthesizedCall(tokens, start + 1);
     }
     final List<String> arguments = new ArrayList<>();
     int index = start;
@@ -57,25 +67,28 @@ final class GradleSettingsReader {
       final boolean continues =
           index + 1 < tokens.size() && tokens.get(index + 1).isPunctuation(',');
       if (!continues) {
-        break;
+        return new IncludeCall(arguments, index + 1);
       }
       index += 2;
     }
-    return arguments;
+    return new IncludeCall(arguments, index);
   }
 
-  private static List<String> parenthesizedArguments(List<Token> tokens, int start) {
+  private static IncludeCall parenthesizedCall(List<Token> tokens, int start) {
     final List<String> arguments = new ArrayList<>();
     final List<Token> argument = new ArrayList<>();
     int depth = 0;
     for (int index = start; index < tokens.size(); index++) {
       final Token token = tokens.get(index);
+      if (token.isIdentifier(INCLUDE)) {
+        return new IncludeCall(arguments, index);
+      }
       final boolean closesCall = depth == 0 && token.isPunctuation(')');
       if (closesCall || (depth == 0 && token.isPunctuation(','))) {
         literalArgument(argument).ifPresent(arguments::add);
         argument.clear();
         if (closesCall) {
-          break;
+          return new IncludeCall(arguments, index + 1);
         }
         continue;
       }
@@ -86,7 +99,7 @@ final class GradleSettingsReader {
       }
       argument.add(token);
     }
-    return arguments;
+    return new IncludeCall(arguments, tokens.size());
   }
 
   private static Optional<String> literalArgument(List<Token> argument) {

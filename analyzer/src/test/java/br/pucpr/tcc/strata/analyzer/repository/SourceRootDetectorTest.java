@@ -6,7 +6,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -19,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 final class SourceRootDetectorTest {
@@ -309,5 +313,92 @@ final class SourceRootDetectorTest {
     assertThatThrownBy(this::detectarAqui)
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("sr_egq2td0h");
+  }
+
+  @Test
+  void pacoteDepoisDeMaisDe64KiBDeComentarioCaiNaPastaDoArquivo() throws IOException {
+    final String licenca =
+        "/*" + "x".repeat(AnalysisConstants.PACKAGE_DECLARATION_SCAN_BYTES) + "*/\n";
+    escrever("src/com/x/Longo.java", licenca + "package com.x;\nclass Longo {}");
+    escrever("lib/com/y/Curto.java", "/* Licença. */\npackage com.y;\nclass Curto {}");
+
+    assertThat(raizes(detectarAqui()))
+        .as(
+            "o troco aceito de ler só o prefixo: a declaração que vem depois dele não é vista, e o"
+                + " arquivo fica na própria pasta, como um ilegível")
+        .containsExactly(
+            new Raiz("lib", SourceRootKind.MAIN, 1), new Raiz("src/com/x", SourceRootKind.MAIN, 1));
+  }
+
+  @Test
+  void fonteMaiorQueOPrefixoComPacoteNoTopoAindaEInferido() throws IOException {
+    final String corpo =
+        "  int campo;\n".repeat(AnalysisConstants.PACKAGE_DECLARATION_SCAN_BYTES / 10);
+    escrever("big/com/z/Grande.java", "package com.z;\nclass Grande {\n" + corpo + "}\n");
+
+    assertThat(corpo.length())
+        .as("pré-condição: o arquivo passa do prefixo")
+        .isGreaterThan(AnalysisConstants.PACKAGE_DECLARATION_SCAN_BYTES);
+    assertThat(raizes(detectarAqui()))
+        .as("ler só o começo não é recusar o arquivo por ser maior que o começo")
+        .containsExactly(new Raiz("big", SourceRootKind.MAIN, 1));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "test, TEST",
+    "tests, TEST",
+    "it, TEST",
+    "testFixtures, TEST",
+    "test2, TEST",
+    "integrationTest, TEST",
+    "integrationTests, TEST",
+    "functionalTest, TEST",
+    "intTest, TEST",
+    "latestTest, TEST",
+    "main, MAIN",
+    "jmh, MAIN",
+    "latest, MAIN",
+    "contest, MAIN",
+    "attestation, MAIN"
+  })
+  void conjuntoDeFonteDoGradleETesteSoPelaPalavraTest(String conjunto, SourceRootKind natureza)
+      throws IOException {
+    escrever("settings.gradle", "include 'app'");
+    escrever("app/src/" + conjunto + "/java/p/X.java", "package p; class X {}");
+
+    assertThat(raizes(detectarAqui()))
+        .as("'test' como palavra, não como pedaço de 'latest', 'contest' ou 'attestation'")
+        .containsExactly(new Raiz("app/src/" + conjunto + "/java", natureza, 1));
+  }
+
+  @Test
+  void logPorFonteIlegivelParaNoTetoDeAvisosEResumeOResto() throws IOException {
+    final int ilegiveis = AnalysisConstants.MAX_REPOSITORY_WARNINGS + 50;
+    final List<JavaSource> fontes = new ArrayList<>();
+    for (int indice = 0; indice < ilegiveis; indice++) {
+      fontes.add(new JavaSource("flat/A" + indice + ".java", 10, 0));
+    }
+    final RepositoryInventory inventario = new RepositoryInventory(ilegiveis, fontes, List.of());
+
+    final PrintStream original = System.err;
+    final ByteArrayOutputStream capturado = new ByteArrayOutputStream();
+    final ProjectLayout layout;
+    System.setErr(new PrintStream(capturado, true, StandardCharsets.UTF_8));
+    try {
+      layout = new ProjectLayoutDetector().detect(real, inventario);
+    } finally {
+      System.setErr(original);
+    }
+    final List<String> linhas = capturado.toString(StandardCharsets.UTF_8).lines().toList();
+
+    assertThat(raizes(layout))
+        .as("arquivo que não pôde ser lido fica na própria pasta")
+        .containsExactly(new Raiz("flat", SourceRootKind.MAIN, ilegiveis));
+    assertThat(linhas)
+        .as("o anel de stderr do Rust guarda 2 000 linhas; um layout plano não pode varrê-lo")
+        .filteredOn(linha -> linha.contains("não foi possível ler"))
+        .hasSize(AnalysisConstants.MAX_REPOSITORY_WARNINGS);
+    assertThat(linhas).filteredOn(linha -> linha.contains("outras 50 linhas")).hasSize(1);
   }
 }

@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.repository.BuildDescription.DeclaredSourceDirectory;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -43,6 +46,45 @@ final class BuildSystemDetectorTest {
         PRODUCTION.maxGitConfigBytes(),
         PRODUCTION.maxWarnings(),
         PRODUCTION.maxPackedRefsBytes());
+  }
+
+  private static RepositoryLimits comProfundidade(int maxDirectoryDepth) {
+    return new RepositoryLimits(
+        PRODUCTION.maxEnumeratedFiles(),
+        maxDirectoryDepth,
+        PRODUCTION.maxPathBytes(),
+        PRODUCTION.maxBuildFileBytes(),
+        PRODUCTION.maxGitConfigBytes(),
+        PRODUCTION.maxWarnings(),
+        PRODUCTION.maxPackedRefsBytes());
+  }
+
+  private static RepositoryLimits comTetoDeAvisos(int maxWarnings) {
+    return new RepositoryLimits(
+        PRODUCTION.maxEnumeratedFiles(),
+        PRODUCTION.maxDirectoryDepth(),
+        PRODUCTION.maxPathBytes(),
+        PRODUCTION.maxBuildFileBytes(),
+        PRODUCTION.maxGitConfigBytes(),
+        maxWarnings,
+        PRODUCTION.maxPackedRefsBytes());
+  }
+
+  @FunctionalInterface
+  private interface Acao {
+    void executar() throws IOException;
+  }
+
+  private static List<String> stderrDe(Acao acao) throws IOException {
+    final PrintStream original = System.err;
+    final ByteArrayOutputStream capturado = new ByteArrayOutputStream();
+    System.setErr(new PrintStream(capturado, true, StandardCharsets.UTF_8));
+    try {
+      acao.executar();
+    } finally {
+      System.setErr(original);
+    }
+    return capturado.toString(StandardCharsets.UTF_8).lines().toList();
   }
 
   private static String pomDeTamanho(int size) {
@@ -172,6 +214,31 @@ final class BuildSystemDetectorTest {
   }
 
   @Test
+  void prefixoDeArquivoMaiorQueElePegaSoOComecoSemRecusar() throws IOException {
+    final Path arquivo = TestRepositories.write(real, "A.java", "package a;\nclass A {}");
+    final BuildSystemDetector.EntryLog log =
+        new BuildSystemDetector.EntryLog(PRODUCTION.maxWarnings());
+
+    assertThat(BuildSystemDetector.readPrefix(arquivo, 10, log))
+        .hasValueSatisfying(
+            bytes -> assertThat(new String(bytes, StandardCharsets.UTF_8)).isEqualTo("package a;"));
+    assertThat(BuildSystemDetector.readBounded(arquivo, 10, log))
+        .as("controle: com o mesmo teto, a leitura inteira recusa o arquivo maior")
+        .isEmpty();
+  }
+
+  @Test
+  void prefixoDeSymlinkNuncaEAberto() throws IOException {
+    final Path alvo = TestRepositories.write(temp.resolve("fora"), "A.java", "package fora;");
+    final Path link = TestRepositories.symlink(real.resolve("repo/A.java"), alvo);
+
+    assertThat(
+            BuildSystemDetector.readPrefix(
+                link, 64, new BuildSystemDetector.EntryLog(PRODUCTION.maxWarnings())))
+        .isEmpty();
+  }
+
+  @Test
   void reatorFechaOsModulosTransitivamenteSemSairDaRaiz() throws IOException {
     TestRepositories.write(
         real,
@@ -279,6 +346,50 @@ final class BuildSystemDetectorTest {
         .hasSize(AnalysisConstants.MAX_DIRECTORY_DEPTH + 2)
         .contains("m/".repeat(AnalysisConstants.MAX_DIRECTORY_DEPTH) + "m")
         .doesNotContain("m/".repeat(AnalysisConstants.MAX_DIRECTORY_DEPTH + 1) + "m");
+  }
+
+  @Test
+  void recursaoDoReatorObedeceAProfundidadeInjetada() throws IOException {
+    final int teto = 3;
+    final String filho = "<project><modules><module>m</module></modules></project>";
+    TestRepositories.write(real, "pom.xml", filho);
+    for (int nivel = 1; nivel <= teto + 4; nivel++) {
+      TestRepositories.write(real, "m/".repeat(nivel) + "pom.xml", filho);
+    }
+
+    final BuildDescription build =
+        new BuildSystemDetector(comProfundidade(teto))
+            .detect(real, TestRepositories.inventoryOf(real));
+
+    assertThat(build.moduleDirectories())
+        .as("a costura de teste alcança o reator: POMs lidos do nível 0 ao teto injetado")
+        .hasSize(teto + 2)
+        .contains("m/".repeat(teto) + "m")
+        .doesNotContain("m/".repeat(teto + 1) + "m");
+  }
+
+  @Test
+  void logPorModuloAusenteParaNoTetoDeAvisosEResumeOResto() throws IOException {
+    final int teto = 3;
+    final int ausentes = 10;
+    final StringBuilder modulos = new StringBuilder();
+    for (int indice = 0; indice < ausentes; indice++) {
+      modulos.append("<module>falta").append(indice).append("</module>");
+    }
+    TestRepositories.write(
+        real, "pom.xml", "<project><modules>" + modulos + "</modules></project>");
+    final RepositoryInventory inventario = TestRepositories.inventoryOf(real);
+    final BuildSystemDetector detector = new BuildSystemDetector(comTetoDeAvisos(teto));
+
+    final List<String> linhas = stderrDe(() -> detector.detect(real, inventario));
+
+    assertThat(linhas)
+        .as("o anel de stderr do Rust guarda 2 000 linhas; um POM hostil não pode varrê-lo")
+        .filteredOn(linha -> linha.contains("o módulo Maven falta"))
+        .hasSize(teto);
+    assertThat(linhas)
+        .filteredOn(linha -> linha.contains("outras " + (ausentes - teto) + " linhas"))
+        .hasSize(1);
   }
 
   @Test

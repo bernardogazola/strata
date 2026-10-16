@@ -2,6 +2,7 @@ package br.pucpr.tcc.strata.analyzer.repository;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.bootstrap.Log;
+import br.pucpr.tcc.strata.analyzer.repository.BuildSystemDetector.EntryLog;
 import java.nio.file.Path;
 import java.text.Normalizer;
 import java.util.ArrayList;
@@ -22,6 +23,12 @@ final class SourceRootDetector {
   private static final String REPOSITORY_ROOT = "";
   private static final String SEPARATOR = "/";
 
+  private static final Set<String> TEST_SOURCE_SETS = Set.of("test", "tests", "it");
+
+  private static final String TEST_PREFIX = "test";
+  private static final String TEST_WORD = "Test";
+  private static final char PLURAL = 's';
+
   List<SourceRoot> detect(Path root, RepositoryInventory inventory, BuildDescription build) {
     Objects.requireNonNull(root, "root");
     Objects.requireNonNull(inventory, "inventory");
@@ -31,8 +38,13 @@ final class SourceRootDetector {
         build.buildSystem() == BuildSystem.MAVEN
             ? refineByReactor(scanned, inventory, build)
             : scanned;
-    return assign(
-        inventory, candidates.isEmpty() ? inferFromPackages(root, inventory) : candidates);
+    if (!candidates.isEmpty()) {
+      return assign(inventory, candidates);
+    }
+    final EntryLog log = new EntryLog(AnalysisConstants.MAX_REPOSITORY_WARNINGS);
+    final List<Candidate> inferred = inferFromPackages(root, inventory, log);
+    log.summarize("source-root");
+    return assign(inventory, inferred);
   }
 
   private record Candidate(String relativePath, SourceRootKind kind, String moduleDirectory) {}
@@ -77,9 +89,12 @@ final class SourceRootDetector {
               && !gradleModules.isEmpty()
               && gradleModules.contains(join(segments, 0, index));
       if (conventional || gradleSet) {
-        final boolean test = "test".equals(set) || (gradleSet && containsIgnoringCase(set, "test"));
         return Optional.of(
-            candidate(segments, index, 3, test ? SourceRootKind.TEST : SourceRootKind.MAIN));
+            candidate(
+                segments,
+                index,
+                3,
+                isTestSourceSet(set) ? SourceRootKind.TEST : SourceRootKind.MAIN));
       }
     }
     final boolean mavenGenerated =
@@ -100,6 +115,33 @@ final class SourceRootDetector {
       return Optional.of(candidate(segments, index, 6, SourceRootKind.GENERATED));
     }
     return Optional.empty();
+  }
+
+  private static boolean isTestSourceSet(String set) {
+    if (TEST_SOURCE_SETS.contains(set)) {
+      return true;
+    }
+    final boolean testPrefix =
+        set.startsWith(TEST_PREFIX)
+            && set.length() > TEST_PREFIX.length()
+            && startsWord(set.charAt(TEST_PREFIX.length()));
+    if (testPrefix) {
+      return true;
+    }
+    for (int at = set.indexOf(TEST_WORD); at >= 0; at = set.indexOf(TEST_WORD, at + 1)) {
+      int end = at + TEST_WORD.length();
+      if (end < set.length() && set.charAt(end) == PLURAL) {
+        end++;
+      }
+      if (end == set.length() || startsWord(set.charAt(end))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean startsWord(char character) {
+    return Character.isUpperCase(character) || Character.isDigit(character);
   }
 
   private static Candidate candidate(
@@ -148,12 +190,13 @@ final class SourceRootDetector {
     return directories;
   }
 
-  private static List<Candidate> inferFromPackages(Path root, RepositoryInventory inventory) {
+  private static List<Candidate> inferFromPackages(
+      Path root, RepositoryInventory inventory, EntryLog log) {
     final Map<String, Candidate> inferred = new LinkedHashMap<>();
     for (final JavaSource source : inventory.javaSources()) {
       final String directory = parentOf(source.relativePath());
       final String rootPath =
-          declaredPackageOf(root, source)
+          declaredPackageOf(root, source, log)
               .map(declared -> withoutPackage(directory, declared))
               .orElse(directory);
       inferred.putIfAbsent(rootPath, new Candidate(rootPath, kindByName(rootPath), rootPath));
@@ -167,12 +210,14 @@ final class SourceRootDetector {
     return List.copyOf(inferred.values());
   }
 
-  private static Optional<String> declaredPackageOf(Path root, JavaSource source) {
+  private static Optional<String> declaredPackageOf(Path root, JavaSource source, EntryLog log) {
     if (source.sizeBytes() > AnalysisConstants.MAX_SOURCE_FILE_BYTES) {
       return Optional.empty();
     }
-    return BuildSystemDetector.readBounded(
-            root.resolve(source.relativePath()), AnalysisConstants.MAX_SOURCE_FILE_BYTES)
+    return BuildSystemDetector.readPrefix(
+            root.resolve(source.relativePath()),
+            AnalysisConstants.PACKAGE_DECLARATION_SCAN_BYTES,
+            log)
         .flatMap(PackageDeclarations::declaredPackage);
   }
 

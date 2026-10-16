@@ -3,6 +3,7 @@ package br.pucpr.tcc.strata.analyzer.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -107,5 +108,27 @@ final class PackageDeclarationsTest {
       })
   void qualquerOutraCoisaPrimeiroEPacotePadrao(String source) {
     assertThat(PackageDeclarations.declaredPackage(source)).isEmpty();
+  }
+
+  @Test
+  void prefixoSoDaOPacoteQuandoADeclaracaoCabeInteira() {
+    final byte[] fonte =
+        "/* licença */\n@Generated(value = \"x\")\npackage br.pucpr.avaliação;\nclass A {}"
+            .getBytes(StandardCharsets.UTF_8);
+    int fimDaDeclaracao = 0;
+    while (fonte[fimDaDeclaracao] != ';') {
+      fimDaDeclaracao++;
+    }
+
+    for (int corte = 0; corte <= fimDaDeclaracao; corte++) {
+      assertThat(PackageDeclarations.declaredPackage(Arrays.copyOf(fonte, corte)))
+          .as("cortado em %d bytes", corte)
+          .isEmpty();
+    }
+    for (int corte = fimDaDeclaracao + 1; corte <= fonte.length; corte++) {
+      assertThat(PackageDeclarations.declaredPackage(Arrays.copyOf(fonte, corte)))
+          .as("cortado em %d bytes", corte)
+          .contains("br.pucpr.avaliação");
+    }
   }
 }

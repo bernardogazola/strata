@@ -2,12 +2,20 @@ package br.pucpr.tcc.strata.analyzer.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 final class GradleSettingsReaderTest {
+
+  private static final long PRAZO_EM_SEGUNDOS = 5;
+
+  private static String noTetoDeBuild(String fragmento) {
+    return fragmento.repeat(AnalysisConstants.MAX_BUILD_FILE_BYTES / fragmento.length());
+  }
 
   @Test
   void groovyComAspasSimplesEVirgulasNaOrdemDoDocumento() {
@@ -136,5 +144,40 @@ final class GradleSettingsReaderTest {
   @ValueSource(strings = {"", ":", "::a", "a::b", "a:", ":..", "..", ".", "a:.", "a/b", "a\\b"})
   void caminhoQueNaoNomeiaSubprojetoEDescartado(String projectPath) {
     assertThat(GradleSettingsReader.directoryOf(projectPath)).isEmpty();
+  }
+
+  @Test
+  void includeDentroDeListaSemFechoEncerraALista() {
+    final String settings =
+        """
+        include('a', 'b'
+        include 'c'
+        include('d',
+        include('e')
+        """;
+
+    assertThat(GradleSettingsReader.includedDirectories(settings))
+        .as(
+            "'b' e o argumento depois de 'd,' não têm fim conhecido e ficam de fora; os include"
+                + " seguintes ainda são lidos")
+        .containsExactly("a", "c", "d", "e");
+  }
+
+  @Test
+  @Timeout(value = PRAZO_EM_SEGUNDOS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+  void umMegaDeIncludeSemFechoELinearENaoDaModulo() {
+    final String settings = noTetoDeBuild("include(");
+
+    assertThat(GradleSettingsReader.includedDirectories(settings)).isEmpty();
+  }
+
+  @Test
+  @Timeout(value = PRAZO_EM_SEGUNDOS, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
+  void umMegaDeIncludeComLiteralSemFechoELinearEDaUmModuloSo() {
+    final String settings = noTetoDeBuild("include(\"a\",");
+
+    assertThat(GradleSettingsReader.includedDirectories(settings))
+        .as("cada lista termina no include seguinte com o 'a' já fechado por vírgula")
+        .containsExactly("a");
   }
 }
