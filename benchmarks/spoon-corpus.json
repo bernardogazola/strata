@@ -1,0 +1,461 @@
+{
+  "schema": 1,
+  "measuredAt": "2026-10-16T17:50:08Z",
+  "baseCommit": "fe082fc",
+  "measure": "Spoon in no-classpath mode over every detected source root of each corpus repository, one model alive at a time, with a visitor that walks types, type references (getTypeDeclaration) and executable references (getExecutableDeclaration) while the model is alive",
+  "rule": {
+    "source": "SpoonCorpusSpikeIT",
+    "maxParseFailureRatio": 0.02,
+    "ratioPopulation": "parseFailures/totalFiles over the default analysis selection: every MAIN and GENERATED root, no TEST root (includeTests=false); allRoots reports every root and does not decide",
+    "maxHeapBytes": 2147483648,
+    "heapCriterion": "every source root modelled under -Xmx2g without OutOfMemoryError; peakLiveBytes (largest heap occupancy after a collection) is the margin, and peakUsedBytes cannot exceed the ceiling by construction",
+    "minPassingRepositories": 4,
+    "ofRepositories": 5,
+    "timeBoxHours": 8,
+    "onPass": "keep Spoon as the source analysis engine",
+    "onFail": "fall back to JavaParser: RESOLVED only where a single-type import or the same-package rule fixes the name, everything else UNRESOLVED_EXTERNAL"
+  },
+  "verdict": {
+    "outcome": "PASS",
+    "passingRepositories": 5,
+    "measuredRepositories": 5,
+    "allPass": true
+  },
+  "environment": {
+    "os": "Mac OS X 27.0.1",
+    "arch": "aarch64",
+    "cpu": "Apple M4 Pro",
+    "logicalCores": 14,
+    "ramBytes": 25769803776,
+    "storage": "APPLE SSD AP1024Z internal NVMe SSD",
+    "runtime": "full JDK under Maven Surefire, not the jlink image the application ships",
+    "jvm": "Eclipse Adoptium 25.0.4.1+1-LTS",
+    "jvmFlags": ["-Xmx2g", "-Xss2m", "-XX:-HeapDumpOnOutOfMemoryError"],
+    "maxHeapBytes": 2147483648,
+    "garbageCollectors": [
+      "G1 Young Generation",
+      "G1 Concurrent GC",
+      "G1 Old Generation"
+    ]
+  },
+  "spoon": {
+    "version": "11.5.0",
+    "complianceLevel": 25,
+    "noClasspath": true,
+    "ignoreSyntaxErrors": true,
+    "commentEnabled": false,
+    "resolution": "JDK platform modules of the running runtime plus the batch's own sources; never the analyzer's classpath, never the repository's jars",
+    "syntaxErrors": "a fresh ECJ parser per file decides; Spoon's own filter stays on as a backstop",
+    "moduleDescriptors": "module-info.java is modelled in a batch of its own"
+  },
+  "repositories": [
+    {
+      "name": "commons-lang",
+      "origin": "clone",
+      "commitId": "598dfc163b8b410fb3bb8794521206ec8dcec82a",
+      "outcome": "COMPLETED",
+      "sourceRoots": {
+        "MAIN": 1,
+        "TEST": 1,
+        "GENERATED": 0
+      },
+      "files": {
+        "MAIN": {
+          "total": 259,
+          "analyzed": 259,
+          "tooLarge": 0,
+          "parseFailures": 0
+        },
+        "TEST": {
+          "total": 268,
+          "analyzed": 268,
+          "tooLarge": 0,
+          "parseFailures": 0
+        },
+        "GENERATED": {
+          "total": 0,
+          "analyzed": 0,
+          "tooLarge": 0,
+          "parseFailures": 0
+        }
+      },
+      "decision": {
+        "totalFiles": 259,
+        "parseFailures": 0,
+        "ratio": 0.0
+      },
+      "allRoots": {
+        "totalFiles": 527,
+        "parseFailures": 0,
+        "ratio": 0.0
+      },
+      "pass": true,
+      "parseFailureCount": 0,
+      "parseFailures": [],
+      "tooLarge": [],
+      "heap": {
+        "peakLiveBytes": 575607336,
+        "peakUsedBytes": 597198624
+      },
+      "timing": {
+        "wallMillis": 15241,
+        "preParseMillis": 381,
+        "buildMillis": 11956,
+        "visitMillis": 2891,
+        "longestBuildMillis": 10768,
+        "longestBuildRoot": "src/test/java",
+        "longestCancellationGapMillis": 3804,
+        "longestCancellationGapBetween": "SpoonLaunchers$CancellationCheckpoint.check -> SpoonLaunchers$CancellationCheckpoint.check"
+      },
+      "models": {
+        "batches": 2,
+        "splitBatches": 0,
+        "quarantinedBatches": 0,
+        "builds": 2
+      },
+      "extraction": {
+        "types": 2015,
+        "typeReferences": 628486,
+        "resolvedTypeReferences": 474618,
+        "executableReferences": 80673,
+        "resolvedExecutableReferences": 23648
+      }
+    },
+    {
+      "name": "junit5",
+      "origin": "clone",
+      "commitId": "f59f60d2cebdf2224235d81f781b1f310cbc8138",
+      "outcome": "COMPLETED",
+      "sourceRoots": {
+        "MAIN": 25,
+        "TEST": 20,
+        "GENERATED": 0
+      },
+      "files": {
+        "MAIN": {
+          "total": 914,
+          "analyzed": 914,
+          "tooLarge": 0,
+          "parseFailures": 0
+        },
+        "TEST": {
+          "total": 798,
+          "analyzed": 798,
+          "tooLarge": 0,
+          "parseFailures": 0
+        },
+        "GENERATED": {
+          "total": 0,
+          "analyzed": 0,
+          "tooLarge": 0,
+          "parseFailures": 0
+        }
+      },
+      "decision": {
+        "totalFiles": 914,
+        "parseFailures": 0,
+        "ratio": 0.0
+      },
+      "allRoots": {
+        "totalFiles": 1712,
+        "parseFailures": 0,
+        "ratio": 0.0
+      },
+      "pass": true,
+      "parseFailureCount": 0,
+      "parseFailures": [],
+      "tooLarge": [],
+      "heap": {
+        "peakLiveBytes": 247109888,
+        "peakUsedBytes": 506247056
+      },
+      "timing": {
+        "wallMillis": 11659,
+        "preParseMillis": 462,
+        "buildMillis": 3786,
+        "visitMillis": 7399,
+        "longestBuildMillis": 963,
+        "longestBuildRoot": "jupiter-tests/src/test/java",
+        "longestCancellationGapMillis": 838,
+        "longestCancellationGapBetween": "ModeledBatch.perCompilationUnit -> ModeledBatch.perCompilationUnit"
+      },
+      "models": {
+        "batches": 59,
+        "splitBatches": 0,
+        "quarantinedBatches": 0,
+        "builds": 59
+      },
+      "extraction": {
+        "types": 4469,
+        "typeReferences": 537681,
+        "resolvedTypeReferences": 401689,
+        "executableReferences": 79251,
+        "resolvedExecutableReferences": 30359
+      }
+    },
+    {
+      "name": "spring-framework",
+      "origin": "clone",
+      "commitId": "82a6b40b9366ec181ededdad282b307ee5381a52",
+      "outcome": "COMPLETED",
+      "sourceRoots": {
+        "MAIN": 30,
+        "TEST": 30,
+        "GENERATED": 0
+      },
+      "files": {
+        "MAIN": {
+          "total": 5459,
+          "analyzed": 5459,
+          "tooLarge": 0,
+          "parseFailures": 0
+        },
+        "TEST": {
+          "total": 3743,
+          "analyzed": 3743,
+          "tooLarge": 0,
+          "parseFailures": 0
+        },
+        "GENERATED": {
+          "total": 0,
+          "analyzed": 0,
+          "tooLarge": 0,
+          "parseFailures": 0
+        }
+      },
+      "decision": {
+        "totalFiles": 5459,
+        "parseFailures": 0,
+        "ratio": 0.0
+      },
+      "allRoots": {
+        "totalFiles": 9202,
+        "parseFailures": 0,
+        "ratio": 0.0
+      },
+      "pass": true,
+      "parseFailureCount": 0,
+      "parseFailures": [],
+      "tooLarge": [],
+      "heap": {
+        "peakLiveBytes": 485108984,
+        "peakUsedBytes": 692393608
+      },
+      "timing": {
+        "wallMillis": 89077,
+        "preParseMillis": 1565,
+        "buildMillis": 13694,
+        "visitMillis": 73791,
+        "longestBuildMillis": 1497,
+        "longestBuildRoot": "spring-core/src/test/java",
+        "longestCancellationGapMillis": 19800,
+        "longestCancellationGapBetween": "ModeledBatch.perCompilationUnit -> ModeledBatch.perCompilationUnit"
+      },
+      "models": {
+        "batches": 60,
+        "splitBatches": 0,
+        "quarantinedBatches": 0,
+        "builds": 60
+      },
+      "extraction": {
+        "types": 22833,
+        "typeReferences": 3574821,
+        "resolvedTypeReferences": 2647127,
+        "executableReferences": 523737,
+        "resolvedExecutableReferences": 179657
+      }
+    },
+    {
+      "name": "elasticsearch",
+      "origin": "clone",
+      "commitId": "b42549c72e6e040825b13e5d8ebf7ff63886b24d",
+      "outcome": "COMPLETED",
+      "sourceRoots": {
+        "MAIN": 292,
+        "TEST": 235,
+        "GENERATED": 0
+      },
+      "files": {
+        "MAIN": {
+          "total": 16848,
+          "analyzed": 16845,
+          "tooLarge": 0,
+          "parseFailures": 3
+        },
+        "TEST": {
+          "total": 9934,
+          "analyzed": 9932,
+          "tooLarge": 0,
+          "parseFailures": 2
+        },
+        "GENERATED": {
+          "total": 0,
+          "analyzed": 0,
+          "tooLarge": 0,
+          "parseFailures": 0
+        }
+      },
+      "decision": {
+        "totalFiles": 16848,
+        "parseFailures": 3,
+        "ratio": 1.7806267806267807e-4
+      },
+      "allRoots": {
+        "totalFiles": 26782,
+        "parseFailures": 5,
+        "ratio": 1.8669255470091852e-4
+      },
+      "pass": true,
+      "parseFailureCount": 5,
+      "parseFailures": [
+        {
+          "path": "libs/core/src/test/java/org/elasticsearch/core/internal/provider/EmbeddedImplClassLoaderTests.java",
+          "rootKind": "TEST",
+          "cause": "MODEL_BUILD_CRASH"
+        },
+        {
+          "path": "modules/legacy-geo/src/main/java/org/elasticsearch/legacygeo/builders/GeometryCollectionBuilder.java",
+          "rootKind": "MAIN",
+          "cause": "EXTRACTION_CRASH"
+        },
+        {
+          "path": "server/src/test/java/org/elasticsearch/index/analysis/CustomNormalizerTests.java",
+          "rootKind": "TEST",
+          "cause": "MODEL_BUILD_CRASH"
+        },
+        {
+          "path": "test/framework/src/main/java/org/elasticsearch/test/MapMatcher.java",
+          "rootKind": "MAIN",
+          "cause": "EXTRACTION_CRASH"
+        },
+        {
+          "path": "x-pack/plugin/snapshot-repo-test-kit/src/main/java/org/elasticsearch/repositories/blobstore/testkit/analyze/ContendedRegisterAnalyzeAction.java",
+          "rootKind": "MAIN",
+          "cause": "MODEL_BUILD_CRASH"
+        }
+      ],
+      "tooLarge": [],
+      "heap": {
+        "peakLiveBytes": 1622553472,
+        "peakUsedBytes": 1759392640
+      },
+      "timing": {
+        "wallMillis": 353613,
+        "preParseMillis": 5533,
+        "buildMillis": 129515,
+        "visitMillis": 218468,
+        "longestBuildMillis": 11636,
+        "longestBuildRoot": "server/src/test/java",
+        "longestCancellationGapMillis": 13698,
+        "longestCancellationGapBetween": "ModeledBatch.perCompilationUnit -> ModeledBatch.perCompilationUnit"
+      },
+      "models": {
+        "batches": 647,
+        "splitBatches": 4,
+        "quarantinedBatches": 1,
+        "builds": 713
+      },
+      "extraction": {
+        "types": 53966,
+        "typeReferences": 17361202,
+        "resolvedTypeReferences": 12746719,
+        "executableReferences": 2595454,
+        "resolvedExecutableReferences": 820740
+      }
+    },
+    {
+      "name": "broken-tree",
+      "origin": "derived",
+      "commitId": "9c871d6d29b55db2a0d98819855885ed6c2b41d5",
+      "derivedFrom": "commons-lang",
+      "mutations": [
+        "truncate-half  ./src/main/java/org/apache/commons/lang3/AnnotationUtils.java",
+        "unbalanced     ./src/main/java/org/apache/commons/lang3/builder/CompareToBuilder.java",
+        "unresolvable   ./src/main/java/org/apache/commons/lang3/concurrent/StrataUnresolvable.java"
+      ],
+      "outcome": "COMPLETED",
+      "sourceRoots": {
+        "MAIN": 1,
+        "TEST": 1,
+        "GENERATED": 0
+      },
+      "files": {
+        "MAIN": {
+          "total": 260,
+          "analyzed": 257,
+          "tooLarge": 0,
+          "parseFailures": 3
+        },
+        "TEST": {
+          "total": 268,
+          "analyzed": 268,
+          "tooLarge": 0,
+          "parseFailures": 0
+        },
+        "GENERATED": {
+          "total": 0,
+          "analyzed": 0,
+          "tooLarge": 0,
+          "parseFailures": 0
+        }
+      },
+      "decision": {
+        "totalFiles": 260,
+        "parseFailures": 3,
+        "ratio": 0.011538461538461539
+      },
+      "allRoots": {
+        "totalFiles": 528,
+        "parseFailures": 3,
+        "ratio": 0.005681818181818182
+      },
+      "pass": true,
+      "parseFailureCount": 3,
+      "parseFailures": [
+        {
+          "path": "src/main/java/org/apache/commons/lang3/AnnotationUtils.java",
+          "rootKind": "MAIN",
+          "cause": "SYNTAX_ERROR"
+        },
+        {
+          "path": "src/main/java/org/apache/commons/lang3/builder/CompareToBuilder.java",
+          "rootKind": "MAIN",
+          "cause": "SYNTAX_ERROR"
+        },
+        {
+          "path": "src/main/java/org/apache/commons/lang3/concurrent/StrataUnresolvable.java",
+          "rootKind": "MAIN",
+          "cause": "SYNTAX_ERROR"
+        }
+      ],
+      "tooLarge": [],
+      "heap": {
+        "peakLiveBytes": 433033320,
+        "peakUsedBytes": 837307600
+      },
+      "timing": {
+        "wallMillis": 14444,
+        "preParseMillis": 197,
+        "buildMillis": 11243,
+        "visitMillis": 3001,
+        "longestBuildMillis": 10861,
+        "longestBuildRoot": "src/test/java",
+        "longestCancellationGapMillis": 3998,
+        "longestCancellationGapBetween": "SpoonLaunchers$CancellationCheckpoint.check -> SpoonLaunchers$CancellationCheckpoint.check"
+      },
+      "models": {
+        "batches": 2,
+        "splitBatches": 0,
+        "quarantinedBatches": 0,
+        "builds": 2
+      },
+      "extraction": {
+        "types": 2012,
+        "typeReferences": 625521,
+        "resolvedTypeReferences": 471683,
+        "executableReferences": 80500,
+        "resolvedExecutableReferences": 23466
+      }
+    }
+  ]
+}
