@@ -43,8 +43,7 @@ public final class TestRepositories {
         final Path relative = source.relativize(file);
         final boolean sidecar =
             relative.getNameCount() == 1 && SIDECARS.contains(relative.toString());
-        final boolean underGit = relative.getName(0).toString().equals(".git");
-        if (sidecar || underGit || ".DS_Store".equals(file.getFileName().toString())) {
+        if (sidecar || isLocalJunk(relative)) {
           continue;
         }
         final Path copy = target.resolve(posix(relative));
@@ -55,6 +54,16 @@ public final class TestRepositories {
     try (Git git = init(target)) {
       return commitAll(git, "adiciona a fixture " + fixture + "\n");
     }
+  }
+
+  private static boolean isLocalJunk(Path relative) {
+    for (final Path name : relative) {
+      final String segment = name.toString();
+      if (".git".equals(segment) || ".gradle".equals(segment) || "bin".equals(segment)) {
+        return true;
+      }
+    }
+    return ".DS_Store".equals(relative.getFileName().toString());
   }
 
   public static String corpusCommitId(String fixture) throws IOException {
