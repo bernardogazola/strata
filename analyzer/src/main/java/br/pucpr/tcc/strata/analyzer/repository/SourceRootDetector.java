@@ -20,7 +20,6 @@ import java.util.Set;
 
 final class SourceRootDetector {
 
-  private static final String REPOSITORY_ROOT = "";
   private static final String SEPARATOR = "/";
 
   private static final Set<String> TEST_SOURCE_SETS = Set.of("test", "tests", "it");
@@ -182,9 +181,9 @@ final class SourceRootDetector {
   private static Set<String> directoriesHoldingJava(RepositoryInventory inventory) {
     final Set<String> directories = new HashSet<>();
     for (final JavaSource source : inventory.javaSources()) {
-      String directory = parentOf(source.relativePath());
+      String directory = SourceRoots.parentOf(source.relativePath());
       while (directories.add(directory) && !directory.isEmpty()) {
-        directory = parentOf(directory);
+        directory = SourceRoots.parentOf(directory);
       }
     }
     return directories;
@@ -194,7 +193,7 @@ final class SourceRootDetector {
       Path root, RepositoryInventory inventory, EntryLog log) {
     final Map<String, Candidate> inferred = new LinkedHashMap<>();
     for (final JavaSource source : inventory.javaSources()) {
-      final String directory = parentOf(source.relativePath());
+      final String directory = SourceRoots.parentOf(source.relativePath());
       final String rootPath =
           declaredPackageOf(root, source, log)
               .map(declared -> withoutPackage(directory, declared))
@@ -260,7 +259,7 @@ final class SourceRootDetector {
     final Map<String, Integer> counts = new HashMap<>();
     int outside = 0;
     for (final JavaSource source : inventory.javaSources()) {
-      final Optional<String> owner = deepestRoot(source.relativePath(), byPath.keySet());
+      final Optional<String> owner = SourceRoots.deepest(source.relativePath(), byPath.keySet());
       if (owner.isPresent()) {
         counts.merge(owner.get(), 1, Integer::sum);
       } else {
@@ -292,22 +291,6 @@ final class SourceRootDetector {
     }
     roots.sort(Comparator.comparing(SourceRoot::relativePath));
     return List.copyOf(roots);
-  }
-
-  private static Optional<String> deepestRoot(String filePath, Set<String> roots) {
-    String directory = parentOf(filePath);
-    while (!roots.contains(directory)) {
-      if (directory.isEmpty()) {
-        return Optional.empty();
-      }
-      directory = parentOf(directory);
-    }
-    return Optional.of(directory);
-  }
-
-  private static String parentOf(String relativePath) {
-    final int slash = relativePath.lastIndexOf('/');
-    return slash < 0 ? REPOSITORY_ROOT : relativePath.substring(0, slash);
   }
 
   private static String join(String[] segments, int from, int to) {
