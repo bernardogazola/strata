@@ -19,6 +19,12 @@ fn main() {
     }
     eprintln!("stub-env-end");
 
+    if mode == "console" {
+        for line in console_report() {
+            eprintln!("{line}");
+        }
+    }
+
     if mode == "wedged" {
         emit(READY);
         std::thread::sleep(std::time::Duration::from_secs(600));
@@ -109,6 +115,37 @@ fn main() {
             }
         }
     }
+}
+
+#[cfg(windows)]
+fn console_report() -> Vec<String> {
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetConsoleWindow() -> *mut core::ffi::c_void;
+        fn GetConsoleProcessList(process_list: *mut u32, process_count: u32) -> u32;
+    }
+    const CAPACITY: u32 = 64;
+
+    // SAFETY: não recebe argumentos e só lê o console deste processo; null indica que não há janela.
+    let window = unsafe { GetConsoleWindow() };
+    let mut ids = [0_u32; CAPACITY as usize];
+    // SAFETY: `ids` tem espaço para exatamente CAPACITY u32, a quantidade passada.
+    let attached = unsafe { GetConsoleProcessList(ids.as_mut_ptr(), CAPACITY) };
+
+    let window = if window.is_null() {
+        "absent"
+    } else {
+        "present"
+    };
+    vec![
+        format!("console: {window}"),
+        format!("console-processes: {attached}"),
+    ]
+}
+
+#[cfg(not(windows))]
+fn console_report() -> Vec<String> {
+    vec![String::from("console: n/a")]
 }
 
 fn error_response(id: &str) -> String {

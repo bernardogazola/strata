@@ -170,7 +170,7 @@ impl AnalyzerHandle {
             tokio::time::timeout(admission, Arc::clone(&self.shared.permits).acquire_owned())
                 .await
                 .map_err(|_| expired())?
-                .map_err(|_| ProtocolError::ShuttingDown)?;
+                .map_err(|_| self.shared.closed_error())?;
 
         let id = RequestId::generate()
             .map_err(|error| ProtocolError::internal(format!("sem CSPRNG: {error}")))?;
@@ -197,7 +197,7 @@ impl AnalyzerHandle {
         )
         .await
         .map_err(|_| expired())?
-        .map_err(|_| ProtocolError::ShuttingDown)?;
+        .map_err(|_| self.shared.closed_error())?;
 
         let outcome = tokio::time::timeout(remaining(deadline), reply_rx).await;
         drop(pending);

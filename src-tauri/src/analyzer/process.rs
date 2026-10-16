@@ -16,7 +16,7 @@ pub fn child_env(data_dir: &Path) -> Vec<(OsString, OsString)> {
 
     #[cfg(unix)]
     {
-        env.push((OsString::from("LANG"), OsString::from("C.UTF-8")));
+        env.push((OsString::from("LANG"), OsString::from(CHILD_LOCALE)));
         env.push((OsString::from("TMPDIR"), data_dir.as_os_str().to_owned()));
         inherit(&mut env, "HOME");
     }
@@ -50,6 +50,9 @@ fn inherit(env: &mut Vec<(OsString, OsString)>, name: &str) {
         env.push((OsString::from(name), value));
     }
 }
+
+#[cfg(unix)]
+const CHILD_LOCALE: &str = "C.UTF-8";
 
 pub const MAIN_CLASS: &str = "br.pucpr.tcc.strata.analyzer.bootstrap.Main";
 
@@ -412,6 +415,12 @@ mod tests {
             );
         }
         #[cfg(unix)]
-        assert!(names.iter().any(|name| name == "LANG"));
+        {
+            let lang = env.iter().find(|(name, _)| name == "LANG");
+            assert!(
+                lang.is_some_and(|(_, value)| value == "C.UTF-8"),
+                "seja qual for o locale do pai, o LANG do filho é C.UTF-8: {lang:?}"
+            );
+        }
     }
 }

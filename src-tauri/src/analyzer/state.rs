@@ -161,6 +161,16 @@ impl Shared {
         None
     }
 
+    pub(crate) fn closed_error(&self) -> ProtocolError {
+        let inner = self.lock();
+        match self.request_error(&inner) {
+            Some(ProtocolError::AnalyzerNotReady) | None => {
+                ProtocolError::AnalyzerCrashed { exit_code: None }
+            }
+            Some(error) => error,
+        }
+    }
+
     pub(crate) fn register(
         &self,
         id: RequestId,
@@ -321,5 +331,53 @@ impl Shared {
             lines: snapshot.0,
             truncated: snapshot.1,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Shared, Terminal};
+    use crate::analyzer::AnalyzerConfig;
+    use crate::error::ProtocolError;
+    use tokio::sync::{mpsc, oneshot};
+
+    fn ready_shared() -> Shared {
+        let (writer, _writer_rx) = mpsc::channel(1);
+        let (handshake, _handshake_rx) = oneshot::channel();
+        let (events, _events_rx) = std::sync::mpsc::channel();
+        let shared = Shared::new(AnalyzerConfig::default(), writer, handshake, events);
+        shared.set_ready(1);
+        shared
+    }
+
+    #[test]
+    fn a_closed_pipe_before_the_reaper_reports_a_crash_not_a_shutdown() {
+        let shared = ready_shared();
+        shared.close_writer();
+        assert!(matches!(
+            shared.closed_error(),
+            ProtocolError::AnalyzerCrashed { exit_code: None }
+        ));
+    }
+
+    #[test]
+    fn a_closed_pipe_during_a_requested_shutdown_is_a_shutdown() {
+        let shared = ready_shared();
+        assert!(shared.request_shutdown());
+        assert!(matches!(shared.closed_error(), ProtocolError::ShuttingDown));
+    }
+
+    #[test]
+    fn a_closed_pipe_after_the_reaper_keeps_the_recorded_exit_code() {
+        let shared = ready_shared();
+        assert!(shared.set_terminal(Terminal::Crashed {
+            exit_code: Some(70)
+        }));
+        assert!(matches!(
+            shared.closed_error(),
+            ProtocolError::AnalyzerCrashed {
+                exit_code: Some(70)
+            }
+        ));
     }
 }

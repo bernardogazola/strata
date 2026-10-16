@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use serde_json::value::RawValue;
 use strata_lib::analyzer::{
-    AnalyzerConfig, AnalyzerEvent, BackendPhase, EventSink, LaunchPlan, process,
+    AnalyzerConfig, AnalyzerEvent, AnalyzerHandle, BackendPhase, EventSink, LaunchPlan, process,
 };
 
 pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
@@ -35,6 +35,26 @@ pub fn stub_plan(mode: &str) -> LaunchPlan {
         args: vec![OsString::from(format!("--mode={mode}"))],
         env: process::child_env(&working_dir),
         working_dir,
+    }
+}
+
+pub fn stderr_until(
+    handle: &AnalyzerHandle,
+    done: impl Fn(&str) -> bool,
+    patience: Duration,
+) -> Vec<String> {
+    let deadline = std::time::Instant::now() + patience;
+    loop {
+        let lines: Vec<String> = handle
+            .stderr_tail()
+            .lines
+            .iter()
+            .map(|line| line.trim_end_matches('\r').to_owned())
+            .collect();
+        if lines.iter().any(|line| done(line)) || std::time::Instant::now() >= deadline {
+            return lines;
+        }
+        std::thread::sleep(Duration::from_millis(5));
     }
 }
 

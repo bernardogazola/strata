@@ -11,7 +11,9 @@ use strata_lib::diagnostics::{BundleInputs, build_bundle};
 use strata_lib::error::ErrorCode;
 use strata_lib::repository::{RepositoryHandle, RepositoryRegistry};
 use strata_lib::runtime::{AnalyzerRuntime, HandshakeCell, PlanSource};
-use support::{Recorder, block_on, empty_payload, fast_config, stub_plan};
+use support::{Recorder, block_on, empty_payload, fast_config, stderr_until, stub_plan};
+
+const STDERR_PATIENCE: Duration = Duration::from_secs(5);
 
 const SHORT: Duration = Duration::from_secs(5);
 
@@ -213,7 +215,12 @@ fn an_unknown_method_is_refused_before_the_child_sees_it() {
             .expect("system.ping está na tabela");
 
         let analyzer = runtime.analyzer().await.expect("ativo");
-        let seen = analyzer.stderr_tail().lines.join("\n");
+        let seen = stderr_until(
+            &analyzer,
+            |line| line == "stub-method: system.ping",
+            STDERR_PATIENCE,
+        )
+        .join("\n");
         assert!(
             seen.contains("stub-method: system.ping"),
             "o stub deveria ter informado o método que recebeu: {seen}"
@@ -263,7 +270,12 @@ fn analysis_cancel_reaches_the_child_although_the_table_omits_it() {
             .expect("o cancel contorna METHODS de propósito");
 
         let analyzer = runtime.analyzer().await.expect("ativo");
-        let seen = analyzer.stderr_tail().lines.join("\n");
+        let seen = stderr_until(
+            &analyzer,
+            |line| line == "stub-method: analysis.cancel",
+            STDERR_PATIENCE,
+        )
+        .join("\n");
         assert!(
             seen.contains("stub-method: analysis.cancel"),
             "o cancel deve chegar ao processo filho: {seen}"

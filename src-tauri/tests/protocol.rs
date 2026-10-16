@@ -3,7 +3,7 @@ mod support;
 use std::time::Duration;
 use strata_lib::analyzer::{AnalyzerEvent, AnalyzerHandle, BackendPhase};
 use strata_lib::error::{ErrorCode, Response};
-use support::{Recorder, block_on, empty_payload, fast_config, stub_plan};
+use support::{Recorder, block_on, empty_payload, fast_config, stderr_until, stub_plan};
 
 const SHORT: Duration = Duration::from_secs(5);
 
@@ -158,6 +158,7 @@ fn stderr_drained_no_deadlock() {
             .expect("as respostas fluem enquanto o stderr transborda");
         assert!(matches!(response, Response::Ok(_)));
 
+        stderr_until(&handle, |line| line.contains("flood 1023"), SHORT);
         let tail = handle.stderr_tail();
         assert!(tail.truncated, "um megabyte não pode ser retido inteiro");
         assert!(tail.lines.len() <= 2000);
