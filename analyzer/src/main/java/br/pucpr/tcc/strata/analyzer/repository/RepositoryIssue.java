@@ -62,7 +62,7 @@ public record RepositoryIssue(Code code, Map<String, Object> params) {
     return new RepositoryIssue(Code.REPO_NO_HISTORY, Map.of());
   }
 
-  static String reportable(String relativePath) {
+  public static String reportable(String relativePath) {
     String candidate = Objects.requireNonNull(relativePath, "relativePath");
     while (candidate.getBytes(StandardCharsets.UTF_8).length > AnalysisConstants.MAX_PATH_BYTES) {
       final int lastSeparator = candidate.lastIndexOf('/');
