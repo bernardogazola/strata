@@ -34,6 +34,8 @@ public final class AnalysisConstants {
 
   public static final int MAX_MODEL_SOURCE_BYTES = 16_777_216;
 
+  public static final int MAX_SOURCE_NESTING_DEPTH = 1_000;
+
   public static final int MAX_ENUMERATED_FILES = 200_000;
 
   public static final int MAX_JAVA_SOURCES = 60_000;

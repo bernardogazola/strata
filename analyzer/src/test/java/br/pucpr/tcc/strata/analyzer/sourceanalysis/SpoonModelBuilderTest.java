@@ -2,6 +2,7 @@ package br.pucpr.tcc.strata.analyzer.sourceanalysis;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRoot;
@@ -9,9 +10,12 @@ import br.pucpr.tcc.strata.analyzer.repository.SourceRootId;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootKind;
 import br.pucpr.tcc.strata.analyzer.repository.TestRepositories;
 import br.pucpr.tcc.strata.analyzer.repository.ValidatedRepository;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -523,6 +527,353 @@ final class SpoonModelBuilderTest {
             SourceIssue.parseFailed("src/main/java/p/D.java"));
     assertThat(analysis.parseFailures()).isEqualTo(2);
     assertThat(analysis.skippedFiles()).isEqualTo(3);
+  }
+
+  @Test
+  void oitentaMilChavesAbertasNaoChegamAoEcjEAAnaliseTerminaLogo() throws Exception {
+    final String deep = "src/main/java/p/Deep.java";
+    final ValidatedRepository repository =
+        SourceTrees.repository(
+            temp.resolve("braces"),
+            Map.of(
+                deep,
+                "package p;\n\nclass Deep { void f() { " + "{".repeat(80_000) + " int x = 1 "));
+
+    final SourceAnalysis analysis =
+        assertTimeoutPreemptively(Duration.ofSeconds(1), () -> analyzeAll(repository, batch -> {}));
+
+    assertThat(status(analysis, deep)).isEqualTo(SourceFileStatus.PARSE_FAILED);
+    assertThat(cause(analysis, deep)).isEqualTo(ParseFailureCause.NESTING_TOO_DEEP);
+    assertThat(analysis.issues()).containsExactly(SourceIssue.parseFailed(deep));
+  }
+
+  @Test
+  void trintaMilLambdasAninhadasNaoChegamAoEcjEAAnaliseTerminaLogo() throws Exception {
+    final String lambdas = "src/main/java/p/Lambdas.java";
+    final ValidatedRepository repository =
+        SourceTrees.repository(
+            temp.resolve("lambdas"),
+            Map.of(
+                lambdas,
+                "package p;\n\nclass Lambdas { Object f() { return "
+                    + "x -> ".repeat(30_000)
+                    + "1; } }\n"));
+
+    final SourceAnalysis analysis =
+        assertTimeoutPreemptively(Duration.ofSeconds(1), () -> analyzeAll(repository, batch -> {}));
+
+    assertThat(status(analysis, lambdas)).isEqualTo(SourceFileStatus.PARSE_FAILED);
+    assertThat(cause(analysis, lambdas)).isEqualTo(ParseFailureCause.NESTING_TOO_DEEP);
+    assertThat(analysis.issues()).containsExactly(SourceIssue.parseFailed(lambdas));
+  }
+
+  @Test
+  void novecentosNiveisLegitimosSaoModelados() throws Exception {
+    final String nested = "src/main/java/p/Nested.java";
+    final ValidatedRepository repository =
+        SourceTrees.repository(
+            temp.resolve("nested"),
+            Map.of(
+                nested,
+                "package p;\n\nclass Nested { void f() { "
+                    + "{".repeat(900)
+                    + " int x = 1; "
+                    + "}".repeat(900)
+                    + " } }\n"));
+    final List<String> types = new ArrayList<>();
+
+    final SourceAnalysis analysis =
+        analyzeAll(
+            repository,
+            batch -> batch.model().getAllTypes().forEach(type -> types.add(type.getSimpleName())));
+
+    assertThat(status(analysis, nested)).isEqualTo(SourceFileStatus.ANALYZED);
+    assertThat(types).containsExactly("Nested");
+  }
+
+  @Test
+  void sessentaMilLambdasLadoALadoChegamAoEcj() throws Exception {
+    final String flat = "src/main/java/p/Flat.java";
+    final StringBuilder source = new StringBuilder("package p;\n\nclass Flat { void f() { ");
+    for (int index = 0; index < 60_000; index++) {
+      source.append("Runnable r").append(index).append(" = () -> {};\n");
+    }
+    final ValidatedRepository repository =
+        SourceTrees.repository(
+            temp.resolve("flat"), Map.of(flat, source.append("} int x }\n").toString()));
+
+    final SourceAnalysis analysis = analyzeAll(repository, batch -> {});
+
+    assertThat(status(analysis, flat)).isEqualTo(SourceFileStatus.PARSE_FAILED);
+    assertThat(cause(analysis, flat)).isEqualTo(ParseFailureCause.SYNTAX_ERROR);
+  }
+
+  @Test
+  void umArquivoQueFazOParserDoEcjLancarFalhaSozinhoEORestoEAnalisado() throws Exception {
+    final String broken = "src/main/java/p/Broken.java";
+    final String source = "package p;\n\nclass Broken {\n  void call(new Thing(_)) {}\n}\n";
+    assertThatThrownBy(() -> SyntaxPreParser.parse("Broken.java", source.toCharArray()))
+        .as("o controle: sem isto, o teste passaria com uma entrada que o ECJ já não derruba")
+        .isInstanceOf(NullPointerException.class);
+    final ValidatedRepository repository =
+        SourceTrees.repository(
+            temp.resolve("pre-parse-crash"),
+            Map.of(broken, source, "src/main/java/p/Fine.java", "package p;\n\nclass Fine {}\n"));
+    final List<String> batchFiles = new ArrayList<>();
+
+    final SourceAnalysis analysis =
+        analyzeAll(repository, batch -> batchFiles.addAll(batch.files()));
+
+    assertThat(status(analysis, broken)).isEqualTo(SourceFileStatus.PARSE_FAILED);
+    assertThat(cause(analysis, broken)).isEqualTo(ParseFailureCause.PRE_PARSE_CRASH);
+    assertThat(analysis.issues()).containsExactly(SourceIssue.parseFailed(broken));
+    assertThat(batchFiles).containsExactly("src/main/java/p/Fine.java");
+  }
+
+  @Test
+  void umArquivoQueViraPastaDepoisDaValidacaoTerminaIlegivelComUmAviso() throws Exception {
+    final Path directory = temp.resolve("became-directory");
+    final String vanished = "src/main/java/p/B.java";
+    final ValidatedRepository repository =
+        SourceTrees.repository(
+            directory,
+            Map.of(
+                "src/main/java/p/A.java",
+                "package p;\n\nclass A {}\n",
+                vanished,
+                "package p;\n\nclass B {}\n"));
+    Files.delete(directory.resolve(vanished));
+    Files.createDirectory(directory.resolve(vanished));
+
+    final SourceAnalysis analysis = analyzeAll(repository, batch -> {});
+
+    assertThat(analysis.totalFiles()).isEqualTo(2);
+    assertThat(status(analysis, vanished)).isEqualTo(SourceFileStatus.PARSE_FAILED);
+    assertThat(cause(analysis, vanished)).isEqualTo(ParseFailureCause.UNREADABLE);
+    assertThat(analysis.issues()).containsExactly(SourceIssue.parseFailed(vanished));
+  }
+
+  @Test
+  void umArquivoQueCresceAlemDoTetoDepoisDaValidacaoFicaDeForaComUmAviso() throws Exception {
+    final Path directory = temp.resolve("grew-before");
+    final String grown = "src/main/java/p/B.java";
+    final ValidatedRepository repository =
+        SourceTrees.repository(
+            directory,
+            Map.of(
+                "src/main/java/p/A.java",
+                "package p;\n\nclass A {}\n",
+                grown,
+                "package p;\n\nclass B {}\n"));
+    TestRepositories.write(directory, grown, tooLarge("B"));
+
+    final SourceAnalysis analysis = analyzeAll(repository, batch -> {});
+
+    assertThat(analysis.totalFiles()).isEqualTo(2);
+    assertThat(status(analysis, grown)).isEqualTo(SourceFileStatus.SKIPPED_TOO_LARGE);
+    assertThat(analysis.issues())
+        .containsExactly(SourceIssue.fileTooLarge(grown, AnalysisConstants.MAX_SOURCE_FILE_BYTES));
+  }
+
+  @Test
+  void umArquivoQuebradoDepoisDoPreParseEDescartadoPeloSpoonEContadoComoFalha() throws Exception {
+    final Path directory = temp.resolve("dropped");
+    final String swapped = "src/test/java/b/Swapped.java";
+    final ValidatedRepository repository = twoRoots(directory, swapped);
+    final List<String> types = new ArrayList<>();
+
+    final SourceAnalysis analysis =
+        analyzeAll(
+            repository,
+            onFirstRoot(
+                () ->
+                    TestRepositories.write(
+                        directory, swapped, "package b;\n\nclass Swapped { int x }\n"),
+                types));
+
+    assertThat(status(analysis, swapped)).isEqualTo(SourceFileStatus.PARSE_FAILED);
+    assertThat(cause(analysis, swapped)).isEqualTo(ParseFailureCause.DROPPED_BY_SPOON);
+    assertThat(analysis.issues()).containsExactly(SourceIssue.parseFailed(swapped));
+    assertThat(types).containsExactlyInAnyOrder("a.A", "b.Other");
+  }
+
+  @Test
+  void umArquivoTrocadoPorLinkParaForaDepoisDoPreParseNuncaEModelado() throws Exception {
+    final Path directory = temp.resolve("symlink");
+    final String swapped = "src/test/java/b/Swapped.java";
+    final ValidatedRepository repository = twoRoots(directory, swapped);
+    final Path secret =
+        TestRepositories.write(
+            temp.resolve("outside"), "Secret.java", "package b;\n\nclass Secret {}\n");
+    final List<String> types = new ArrayList<>();
+
+    final SourceAnalysis analysis =
+        analyzeAll(
+            repository,
+            onFirstRoot(
+                () -> {
+                  Files.delete(directory.resolve(swapped));
+                  Files.createSymbolicLink(directory.resolve(swapped), secret);
+                },
+                types));
+
+    assertThat(types).containsExactlyInAnyOrder("a.A", "b.Other");
+    assertThat(status(analysis, swapped)).isEqualTo(SourceFileStatus.PARSE_FAILED);
+    assertThat(cause(analysis, swapped)).isEqualTo(ParseFailureCause.UNREADABLE);
+    assertThat(analysis.issues()).containsExactly(SourceIssue.parseFailed(swapped));
+  }
+
+  @Test
+  void umArquivoQueCresceAlemDoTetoDepoisDoPreParseFicaDeFora() throws Exception {
+    final Path directory = temp.resolve("grew-after");
+    final String grown = "src/test/java/b/Swapped.java";
+    final ValidatedRepository repository = twoRoots(directory, grown);
+    final List<String> types = new ArrayList<>();
+
+    final SourceAnalysis analysis =
+        analyzeAll(
+            repository,
+            onFirstRoot(
+                () -> TestRepositories.write(directory, grown, tooLarge("Swapped")), types));
+
+    assertThat(status(analysis, grown)).isEqualTo(SourceFileStatus.SKIPPED_TOO_LARGE);
+    assertThat(analysis.issues())
+        .containsExactly(SourceIssue.fileTooLarge(grown, AnalysisConstants.MAX_SOURCE_FILE_BYTES));
+    assertThat(types).containsExactlyInAnyOrder("a.A", "b.Other");
+  }
+
+  @Test
+  void umArquivoQuePassaDoTetoDeAninhamentoDepoisDoPreParseNaoChegaAoEcjDoSpoon() throws Exception {
+    final Path directory = temp.resolve("deep-after");
+    final String deep = "src/test/java/b/Swapped.java";
+    final ValidatedRepository repository = twoRoots(directory, deep);
+    final List<String> types = new ArrayList<>();
+    final BatchVisitor visitor =
+        onFirstRoot(
+            () ->
+                TestRepositories.write(
+                    directory,
+                    deep,
+                    "package b;\n\nclass Swapped { void f() { " + "{".repeat(80_000)),
+            types);
+
+    final SourceAnalysis analysis =
+        assertTimeoutPreemptively(Duration.ofSeconds(30), () -> analyzeAll(repository, visitor));
+
+    assertThat(status(analysis, deep)).isEqualTo(SourceFileStatus.PARSE_FAILED);
+    assertThat(cause(analysis, deep)).isEqualTo(ParseFailureCause.NESTING_TOO_DEEP);
+    assertThat(types).containsExactlyInAnyOrder("a.A", "b.Other");
+  }
+
+  @Test
+  void umArquivoUtf8ComBomEAnalisadoEOIdentificadorAcentuadoEModelado() throws Exception {
+    final Path directory = temp.resolve("bom");
+    final Path file = directory.resolve("src/main/java/p/ComBom.java");
+    Files.createDirectories(file.getParent());
+    final byte[] text =
+        "package p;\n\nclass ComBom {\n  int função;\n}\n".getBytes(StandardCharsets.UTF_8);
+    final byte[] content = new byte[text.length + 3];
+    content[0] = (byte) 0xEF;
+    content[1] = (byte) 0xBB;
+    content[2] = (byte) 0xBF;
+    System.arraycopy(text, 0, content, 3, text.length);
+    Files.write(file, content);
+    try (Git git = TestRepositories.init(directory)) {
+      TestRepositories.commitAll(git, "bom\n");
+    }
+    final ValidatedRepository repository = SourceTrees.validated(directory);
+    final List<String> fields = new ArrayList<>();
+
+    final SourceAnalysis analysis =
+        analyzeAll(
+            repository,
+            batch ->
+                onlyType(batch, "ComBom").getFields().stream()
+                    .map(CtField::getSimpleName)
+                    .forEach(fields::add));
+
+    assertThat(status(analysis, "src/main/java/p/ComBom.java"))
+        .isEqualTo(SourceFileStatus.ANALYZED);
+    assertThat(fields).containsExactly("função");
+  }
+
+  @Test
+  void umaRaizNaFronteiraDoTetoMantemCadaPastaNumPedacoSo() throws Exception {
+    final Path directory = temp.resolve("directories");
+    final String padding = "// " + "x".repeat(1_900_000) + "\n";
+    for (int index = 0; index < 5; index++) {
+      TestRepositories.write(
+          directory,
+          "src/main/java/p/P" + index + ".java",
+          padding + "package p;\n\nclass P" + index + " {}\n");
+      TestRepositories.write(
+          directory,
+          "src/main/java/p/q/Q" + index + ".java",
+          padding + "package p.q;\n\nclass Q" + index + " {}\n");
+    }
+    final ValidatedRepository repository =
+        SourceTrees.repository(
+            directory, Map.of("src/main/java/p/z.java", "package p;\n\nclass z {}\n"));
+    final List<List<String>> batches = new ArrayList<>();
+
+    final SourceAnalysis analysis = analyzeAll(repository, batch -> batches.add(batch.files()));
+
+    assertThat(analysis.parseFailures()).isZero();
+    assertThat(analysis.diagnostics().splitBatches()).isEqualTo(1);
+    assertThat(batches)
+        .containsExactly(
+            List.of(
+                "src/main/java/p/P0.java",
+                "src/main/java/p/P1.java",
+                "src/main/java/p/P2.java",
+                "src/main/java/p/P3.java",
+                "src/main/java/p/P4.java",
+                "src/main/java/p/z.java"),
+            List.of(
+                "src/main/java/p/q/Q0.java",
+                "src/main/java/p/q/Q1.java",
+                "src/main/java/p/q/Q2.java",
+                "src/main/java/p/q/Q3.java",
+                "src/main/java/p/q/Q4.java"));
+  }
+
+  private static ValidatedRepository twoRoots(Path directory, String changed) throws Exception {
+    return SourceTrees.repository(
+        directory,
+        Map.of(
+            "src/main/java/a/A.java",
+            "package a;\n\npublic class A {}\n",
+            "src/test/java/b/Other.java",
+            "package b;\n\nclass Other {}\n",
+            changed,
+            "package b;\n\nclass Swapped {}\n"));
+  }
+
+  private static BatchVisitor onFirstRoot(FileChange change, List<String> types) {
+    final AtomicBoolean changed = new AtomicBoolean();
+    return batch -> {
+      batch.model().getAllTypes().forEach(type -> types.add(type.getQualifiedName()));
+      if (batch.root().relativePath().equals("src/main/java") && !changed.getAndSet(true)) {
+        try {
+          change.apply();
+        } catch (IOException failure) {
+          throw new UncheckedIOException(failure);
+        }
+      }
+    };
+  }
+
+  @FunctionalInterface
+  private interface FileChange {
+    void apply() throws IOException;
+  }
+
+  private static String tooLarge(String type) {
+    final String declaration = "package b;\n\nclass " + type + " {}\n";
+    return "//"
+        + "x".repeat(AnalysisConstants.MAX_SOURCE_FILE_BYTES - declaration.length() - 2)
+        + "\n"
+        + declaration;
   }
 
   private static SourceAnalysis analyzeAll(ValidatedRepository repository, BatchVisitor visitor) {

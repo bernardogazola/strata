@@ -31,7 +31,7 @@ final class SourceCharsetsTest {
   }
 
   @Test
-  void oBomUtf8EUtf8ValidoEADecisaoSobreEleFicaComOPreParse() {
+  void oBomUtf8EUtf8Valido() {
     final byte[] content = bytes(0xEF, 0xBB, 0xBF, 'c', 'l', 'a', 's', 's');
 
     assertThat(SourceCharsets.detect(content)).isEqualTo(StandardCharsets.UTF_8);
@@ -90,6 +90,62 @@ final class SourceCharsetsTest {
 
     assertThat(decoded).contains("�");
     assertThat(preParse.syntaxError()).isTrue();
+  }
+
+  @Test
+  void oDecodeTiraOBomUtf8DoComeco() {
+    final byte[] content = bytes(0xEF, 0xBB, 0xBF, 'c', 'l', 'a', 's', 's');
+
+    assertThat(new String(SourceCharsets.decode(content))).isEqualTo("class");
+  }
+
+  @Test
+  void oDecodeTiraSoUmBomEOSegundoContinuaSendoOCaractere() {
+    final byte[] content = bytes(0xEF, 0xBB, 0xBF, 0xEF, 0xBB, 0xBF, 'x');
+
+    final char[] decoded = SourceCharsets.decode(content);
+
+    assertThat(decoded).containsExactly((char) 0xFEFF, 'x');
+  }
+
+  @Test
+  void oDecodeNaoTiraUmBomQueNaoEstaNoComeco() {
+    final byte[] content = bytes('a', 0xEF, 0xBB, 0xBF);
+
+    assertThat(SourceCharsets.decode(content)).containsExactly('a', (char) 0xFEFF);
+  }
+
+  @Test
+  void oDecodeSemBomSegueARegraDoDetect() {
+    assertThat(new String(SourceCharsets.decode(latin1Funcao())))
+        .isEqualTo("class A { int função; }");
+    assertThat(new String(SourceCharsets.decode(bytes('a', 0xC3, 0xA7, 0xC3, 0xA3, 'o'))))
+        .isEqualTo("ação");
+  }
+
+  @Test
+  void umBomSeguidoDeLatin1EDecodificadoComoWindows1252SemOBom() {
+    final byte[] content = bytes(0xEF, 0xBB, 0xBF, 'a', 0xE7, 0xE3, 'o');
+
+    assertThat(new String(SourceCharsets.decode(content))).isEqualTo("ação");
+  }
+
+  @Test
+  void umArquivoVazioOuSoComBomDecodificaParaNada() {
+    assertThat(SourceCharsets.decode(new byte[0])).isEmpty();
+    assertThat(SourceCharsets.decode(bytes(0xEF, 0xBB, 0xBF))).isEmpty();
+    assertThat(SourceCharsets.decode(bytes(0xEF, 0xBB))).hasSize(2);
+  }
+
+  @Test
+  void umArquivoComBomDecodificadoNaoEErroDeSintaxe() {
+    final byte[] content =
+        bytes(0xEF, 0xBB, 0xBF, 'c', 'l', 'a', 's', 's', ' ', 'A', ' ', '{', '}');
+
+    final PreParse preParse = SyntaxPreParser.parse("A.java", SourceCharsets.decode(content));
+
+    assertThat(preParse.syntaxError()).isFalse();
+    assertThat(preParse.declarations().topLevelTypes()).containsExactly("A");
   }
 
   private static byte[] latin1Funcao() {
