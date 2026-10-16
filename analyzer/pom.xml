@@ -303,4 +303,32 @@
         </plugins>
     </build>
 
+    <profiles>
+
+        <profile>
+            <id>spike</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <includes>
+                                <include>**/*SpikeIT.java</include>
+                            </includes>
+                            <enableAssertions>false</enableAssertions>
+                            <argLine>-Xmx2g -Xss2m -XX:-HeapDumpOnOutOfMemoryError -Duser.language=en -Duser.country=US -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8</argLine>
+                            <systemPropertyVariables>
+                                <strata.spike>true</strata.spike>
+                                <strata.corpus>${project.basedir}/../corpus</strata.corpus>
+                                <strata.spike.report>${project.basedir}/../benchmarks/spoon-corpus.json</strata.spike.report>
+                                <strata.spoon.version>${spoon.version}</strata.spoon.version>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>
