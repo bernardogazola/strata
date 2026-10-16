@@ -1,0 +1,227 @@
+package br.pucpr.tcc.strata.analyzer.repository;
+
+import br.pucpr.tcc.strata.analyzer.bootstrap.Log;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitOption;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Objects;
+
+final class RepositoryWalker {
+
+  private static final String JAVA_SUFFIX = ".java";
+
+  private final RepositoryLimits limits;
+
+  RepositoryWalker(RepositoryLimits limits) {
+    this.limits = Objects.requireNonNull(limits, "limits");
+  }
+
+  RepositoryOutcome<RepositoryInventory> walk(Path root) {
+    final Visitor visitor = new Visitor(root, limits);
+    try {
+      Files.walkFileTree(
+          root, EnumSet.noneOf(FileVisitOption.class), limits.maxDirectoryDepth(), visitor);
+    } catch (IOException impossible) {
+      Log.error("a varredura de " + root + " falhou fora do visitor", impossible);
+      return new RepositoryOutcome.Rejected<>(RepositoryIssue.rootUnreadable());
+    }
+    return visitor.outcome();
+  }
+
+  private static final class Visitor implements FileVisitor<Path> {
+
+    private final Path root;
+    private final RepositoryLimits limits;
+    private final List<JavaSource> javaSources = new ArrayList<>();
+    private final List<BuildFileEntry> buildFiles = new ArrayList<>();
+    private final List<RepositoryIssue> warnings = new ArrayList<>();
+    private int totalFileCount;
+    private int droppedWarnings;
+    private int loggedEntries;
+    private int silencedEntries;
+    private RepositoryIssue refusal;
+
+    Visitor(Path root, RepositoryLimits limits) {
+      this.root = root;
+      this.limits = limits;
+    }
+
+    @Override
+    public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
+      if (directory.equals(root)) {
+        return FileVisitResult.CONTINUE;
+      }
+      if (isGitMetadata(directory)) {
+        return FileVisitResult.SKIP_SUBTREE;
+      }
+      final String relative = relative(directory);
+      if (tooLong(relative)) {
+        warn(RepositoryIssue.unreadable(relative));
+        return FileVisitResult.SKIP_SUBTREE;
+      }
+      if (attributes.isOther() || attributes.isSymbolicLink()) {
+        // O NIO desce em junções do Windows mesmo sem FOLLOW_LINKS, sem detectar laço.
+        // Aqui elas contam como link e não são percorridas.
+        if (!count()) {
+          return FileVisitResult.TERMINATE;
+        }
+        checkEscape(directory, relative);
+        return FileVisitResult.SKIP_SUBTREE;
+      }
+      return FileVisitResult.CONTINUE;
+    }
+
+    @Override
+    public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+      if (isGitMetadata(file)) {
+        return FileVisitResult.CONTINUE;
+      }
+      final String relative = relative(file);
+      if (attributes.isDirectory()) {
+        warn(RepositoryIssue.unreadable(relative));
+        return FileVisitResult.CONTINUE;
+      }
+      if (!count()) {
+        return FileVisitResult.TERMINATE;
+      }
+      if (tooLong(relative)) {
+        warn(RepositoryIssue.unreadable(relative));
+        return FileVisitResult.CONTINUE;
+      }
+      if (attributes.isSymbolicLink()) {
+        checkEscape(file, relative);
+      }
+      final String name = file.getFileName().toString();
+      if (attributes.isRegularFile() && name.endsWith(JAVA_SUFFIX)) {
+        javaSources.add(
+            new JavaSource(relative, attributes.size(), attributes.lastModifiedTime().toMillis()));
+      }
+      if (BuildSystemDetector.BUILD_FILE_NAMES.contains(name)) {
+        buildFiles.add(new BuildFileEntry(relative, attributes.isRegularFile(), attributes.size()));
+      }
+      return FileVisitResult.CONTINUE;
+    }
+
+    @Override
+    public FileVisitResult visitFileFailed(Path file, IOException failure) {
+      if (file.equals(root)) {
+        Log.error("não foi possível listar a raiz do repositório " + root, failure);
+        refusal = RepositoryIssue.rootUnreadable();
+        return FileVisitResult.TERMINATE;
+      }
+      logEntry("ignorando a entrada ilegível " + file + ": " + failure);
+      if (!isGitMetadata(file)) {
+        warn(RepositoryIssue.unreadable(relative(file)));
+      }
+      return FileVisitResult.CONTINUE;
+    }
+
+    @Override
+    public FileVisitResult postVisitDirectory(Path directory, IOException failure) {
+      if (failure == null) {
+        return FileVisitResult.CONTINUE;
+      }
+      if (directory.equals(root)) {
+        Log.error("a listagem da raiz do repositório " + root + " falhou no meio", failure);
+        refusal = RepositoryIssue.rootUnreadable();
+        return FileVisitResult.TERMINATE;
+      }
+      logEntry("a listagem de " + directory + " falhou no meio: " + failure);
+      warn(RepositoryIssue.unreadable(relative(directory)));
+      return FileVisitResult.CONTINUE;
+    }
+
+    private boolean count() {
+      totalFileCount++;
+      if (totalFileCount <= limits.maxEnumeratedFiles()) {
+        return true;
+      }
+      refusal = RepositoryIssue.tooManyFiles(limits.maxEnumeratedFiles(), totalFileCount);
+      return false;
+    }
+
+    private void checkEscape(Path link, String relative) {
+      final Path target;
+      try {
+        target = link.toRealPath();
+      } catch (IOException danglingOrLoop) {
+        logEntry("o link simbólico " + link + " não resolve: " + danglingOrLoop);
+        return;
+      }
+      if (!target.startsWith(root)) {
+        logEntry("o link simbólico " + link + " escapa da raiz do repositório para " + target);
+        warn(RepositoryIssue.pathEscapesRoot(relative));
+      }
+    }
+
+    private void logEntry(String message) {
+      if (loggedEntries < limits.maxWarnings()) {
+        loggedEntries++;
+        Log.warn(message);
+      } else {
+        silencedEntries++;
+      }
+    }
+
+    private void warn(RepositoryIssue issue) {
+      if (warnings.size() < limits.maxWarnings()) {
+        warnings.add(issue);
+      } else {
+        droppedWarnings++;
+      }
+    }
+
+    private boolean tooLong(String relative) {
+      return relative.getBytes(StandardCharsets.UTF_8).length > limits.maxPathBytes();
+    }
+
+    private static boolean isGitMetadata(Path entry) {
+      final Path name = entry.getFileName();
+      return name != null && ".git".equals(name.toString());
+    }
+
+    private String relative(Path entry) {
+      final StringBuilder joined = new StringBuilder();
+      for (final Path name : root.relativize(entry)) {
+        if (!joined.isEmpty()) {
+          joined.append('/');
+        }
+        joined.append(name);
+      }
+      return joined.toString();
+    }
+
+    RepositoryOutcome<RepositoryInventory> outcome() {
+      if (refusal != null) {
+        return new RepositoryOutcome.Rejected<>(refusal);
+      }
+      if (droppedWarnings > 0) {
+        Log.warn(
+            "mantidos os primeiros "
+                + warnings.size()
+                + " avisos do repositório; outros "
+                + droppedWarnings
+                + " foram descartados");
+      }
+      if (silencedEntries > 0) {
+        Log.warn(
+            "outras "
+                + silencedEntries
+                + " linhas de log por entrada da varredura foram silenciadas");
+      }
+      javaSources.sort(Comparator.comparing(JavaSource::relativePath));
+      buildFiles.sort(Comparator.comparing(BuildFileEntry::relativePath));
+      return new RepositoryOutcome.Accepted<>(
+          new RepositoryInventory(totalFileCount, javaSources, buildFiles), warnings);
+    }
+  }
+}

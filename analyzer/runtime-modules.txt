@@ -1,2 +1,2 @@
-java.base,java.desktop,java.sql
+java.base,java.desktop,java.management,java.security.jgss,java.sql
 +jdk.charsets

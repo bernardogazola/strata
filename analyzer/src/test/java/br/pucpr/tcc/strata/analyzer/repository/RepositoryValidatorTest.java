@@ -4,12 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
+import java.util.Set;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 final class RepositoryValidatorTest {
@@ -183,5 +189,199 @@ final class RepositoryValidatorTest {
     assertThat(validator.validate(repo.resolve("src")))
         .as("subir até o .git do pai analisaria uma pasta que o handle nunca autorizou")
         .isEqualTo(new RepositoryOutcome.Rejected<>(RepositoryIssue.notAGitRepository()));
+  }
+
+  private static RepositoryOutcome.Accepted<RepositorySnapshot> inspecionado(
+      RepositoryOutcome<RepositorySnapshot> outcome) {
+    assertThat(outcome).isInstanceOf(RepositoryOutcome.Accepted.class);
+    return (RepositoryOutcome.Accepted<RepositorySnapshot>) outcome;
+  }
+
+  private Path repositorioComUmCommit(String nome) throws Exception {
+    final Path repo = real.resolve(nome);
+    try (Git git = TestRepositories.init(repo)) {
+      TestRepositories.write(repo, "src/main/java/A.java", "class A {}");
+      TestRepositories.commitAll(git, "primeiro");
+    }
+    return repo;
+  }
+
+  @Test
+  void escolherAPropriaPastaPontoGitERecusado() throws Exception {
+    final Path repo = repositorioComUmCommit("repo");
+
+    assertThat(new RepositoryValidator().inspect(repo.resolve(".git")))
+        .as("o JGit abre o .git e põe a árvore de trabalho no pai, que o handle não autorizou")
+        .isEqualTo(new RepositoryOutcome.Rejected<>(RepositoryIssue.notAGitRepository()));
+  }
+
+  @Test
+  void pontoGitComCoreBareVerdadeiroERecusadoComoBare() throws Exception {
+    final Path repo = repositorioComUmCommit("core-bare");
+    try (Git git = Git.open(repo.toFile())) {
+      final StoredConfig config = git.getRepository().getConfig();
+      config.setBoolean("core", null, "bare", true);
+      config.save();
+    }
+
+    assertThat(new RepositoryValidator().inspect(repo))
+        .as("o git de linha de comando diz \"this operation must be run in a work tree\"")
+        .isEqualTo(new RepositoryOutcome.Rejected<>(RepositoryIssue.isBare()));
+  }
+
+  @Test
+  void coreWorktreeApontandoParaOutraPastaERecusado() throws Exception {
+    final Path repo = repositorioComUmCommit("desviado");
+    final Path outra = Files.createDirectories(real.resolve("outra"));
+    try (Git git = Git.open(repo.toFile())) {
+      final StoredConfig config = git.getRepository().getConfig();
+      config.setString("core", null, "worktree", outra.toString());
+      config.save();
+    }
+
+    assertThat(new RepositoryValidator().inspect(repo))
+        .as("a árvore que o JGit leria não é a pasta escolhida")
+        .isEqualTo(new RepositoryOutcome.Rejected<>(RepositoryIssue.notAGitRepository()));
+  }
+
+  @Test
+  void headDestacadoTemBranchNuloENuncaOSha() throws Exception {
+    final Path repo = real.resolve("destacado");
+    final RevCommit commit;
+    try (Git git = TestRepositories.init(repo)) {
+      TestRepositories.write(repo, "src/main/java/A.java", "class A {}");
+      commit = TestRepositories.commitAll(git, "primeiro");
+    }
+    Files.writeString(repo.resolve(".git/HEAD"), commit.name() + "\n");
+
+    final var accepted = inspecionado(new RepositoryValidator().inspect(repo));
+
+    assertThat(accepted.value().head())
+        .as("getBranch() devolveria o SHA, impresso como se fosse nome de branch")
+        .isEqualTo(new HeadState(commit.name(), null, false));
+    assertThat(accepted.warnings()).isEmpty();
+  }
+
+  @Test
+  void arquivoShallowComOCommitDoHeadMarcaOCloneComoRaso() throws Exception {
+    final Path repo = real.resolve("raso");
+    final RevCommit commit;
+    try (Git git = TestRepositories.init(repo)) {
+      TestRepositories.write(repo, "src/main/java/A.java", "class A {}");
+      commit = TestRepositories.commitAll(git, "primeiro");
+    }
+    Files.writeString(repo.resolve(".git/shallow"), commit.name() + "\n");
+
+    assertThat(inspecionado(new RepositoryValidator().inspect(repo)).value().head())
+        .isEqualTo(new HeadState(commit.name(), "main", true));
+  }
+
+  @Test
+  void headNaoNascidoAvisaNaInspecaoEOInventarioSegue() throws Exception {
+    final Path repo = real.resolve("recem-criado");
+    TestRepositories.init(repo).close();
+    TestRepositories.write(repo, "src/main/java/A.java", "class A {}");
+
+    final var accepted = inspecionado(new RepositoryValidator().inspect(repo));
+
+    assertThat(accepted.warnings()).containsExactly(RepositoryIssue.noHistory());
+    assertThat(accepted.value().head()).isEqualTo(new HeadState(null, "main", false));
+    assertThat(accepted.value().inventory().javaSources())
+        .extracting(JavaSource::relativePath)
+        .containsExactly("src/main/java/A.java");
+    assertThat(accepted.value().root()).isEqualTo(repo);
+    assertThat(accepted.value().displayName()).isEqualTo("recem-criado");
+  }
+
+  @Test
+  void naInspecaoOAvisoDoHeadVemAntesDosDaVarreduraEOTetoValeParaOsDois() throws Exception {
+    final Path fora = Files.createDirectories(real.resolve("fora"));
+    final Path repo = real.resolve("repo");
+    TestRepositories.init(repo).close();
+    TestRepositories.write(repo, "src/main/java/A.java", "class A {}");
+    TestRepositories.symlink(repo.resolve("vazamento"), fora);
+    final RepositoryLimits umAviso =
+        new RepositoryLimits(
+            RepositoryLimits.PRODUCTION.maxEnumeratedFiles(),
+            RepositoryLimits.PRODUCTION.maxDirectoryDepth(),
+            RepositoryLimits.PRODUCTION.maxPathBytes(),
+            RepositoryLimits.PRODUCTION.maxBuildFileBytes(),
+            RepositoryLimits.PRODUCTION.maxGitConfigBytes(),
+            1);
+
+    assertThat(inspecionado(new RepositoryValidator().inspect(repo)).warnings())
+        .containsExactly(RepositoryIssue.noHistory(), RepositoryIssue.pathEscapesRoot("vazamento"));
+    assertThat(inspecionado(new RepositoryValidator(umAviso).inspect(repo)).warnings())
+        .containsExactly(RepositoryIssue.noHistory());
+  }
+
+  @Test
+  void naInspecaoOSymlinkQueFogeViraAvisoEOAlvoNuncaViraFonte() throws Exception {
+    final Path fora = real.resolve("fora");
+    TestRepositories.write(fora, "Segredo.java", "package fora; class Segredo {}");
+    final Path repo = repositorioComUmCommit("repo");
+    TestRepositories.symlink(repo.resolve("src/main/java/Fuga.java"), fora.resolve("Segredo.java"));
+    TestRepositories.symlink(repo.resolve("vazamento"), fora);
+    TestRepositories.write(repo, "src/main/java/b/B.java", "package b; class B {}");
+
+    final var accepted = inspecionado(new RepositoryValidator().inspect(repo));
+
+    assertThat(accepted.warnings())
+        .containsExactlyInAnyOrder(
+            RepositoryIssue.pathEscapesRoot("src/main/java/Fuga.java"),
+            RepositoryIssue.pathEscapesRoot("vazamento"));
+    assertThat(accepted.value().inventory().javaSources())
+        .extracting(JavaSource::relativePath)
+        .containsExactly("src/main/java/A.java", "src/main/java/b/B.java");
+    assertThat(accepted.value().inventory().totalFileCount()).isEqualTo(4);
+  }
+
+  @Test
+  void worktreeLigadoNaInspecaoLeOHeadDoAdministrativoEOsRefsDoPrincipal() throws Exception {
+    final Path principal = real.resolve("principal");
+    final RevCommit commit;
+    try (Git git = TestRepositories.init(principal)) {
+      TestRepositories.write(principal, "src/main/java/A.java", "class A {}");
+      commit = TestRepositories.commitAll(git, "primeiro");
+      git.branchCreate().setName("recurso").call();
+    }
+    final Path worktree =
+        TestRepositories.linkedWorktree(principal, real.resolve("worktree"), "recurso");
+    TestRepositories.write(worktree, "src/main/java/A.java", "class A {}");
+
+    final var accepted = inspecionado(new RepositoryValidator().inspect(worktree));
+
+    assertThat(accepted.value().head()).isEqualTo(new HeadState(commit.name(), "recurso", false));
+    assertThat(accepted.value().displayName()).isEqualTo("worktree");
+    assertThat(accepted.value().inventory().totalFileCount())
+        .as("o arquivo .git do worktree não conta")
+        .isEqualTo(1);
+  }
+
+  @Test
+  void caminhoRelativoERecusadoComRepoPathChanged() throws Exception {
+    repositorioComUmCommit("repo");
+
+    assertThat(new RepositoryValidator().inspect(Path.of("repo")))
+        .as("o Rust só manda caminho absoluto; um relativo seria lido contra o diretório corrente")
+        .isEqualTo(new RepositoryOutcome.Rejected<>(RepositoryIssue.pathChanged()));
+  }
+
+  @Test
+  @DisabledOnOs(value = OS.WINDOWS, disabledReason = "permissão POSIX não existe no Windows")
+  void raizQueNaoPodeSerListadaERecusadaComRepoRootUnreadable() throws Exception {
+    final Path repo = repositorioComUmCommit("trancado");
+    Files.setPosixFilePermissions(repo, Set.of());
+    try {
+      Assumptions.assumeFalse(
+          Files.isReadable(repo),
+          "este usuário lê um diretório sem permissões (rodando como root?): a raiz ilegível"
+              + " não pode ser produzida aqui");
+
+      assertThat(new RepositoryValidator().inspect(repo))
+          .isEqualTo(new RepositoryOutcome.Rejected<>(RepositoryIssue.rootUnreadable()));
+    } finally {
+      Files.setPosixFilePermissions(repo, Set.of(PosixFilePermission.values()));
+    }
   }
 }
