@@ -275,7 +275,7 @@ const errorRegistry: ErrorRegistry = {
     format: () => ({
       body: [
         t(
-          "O caminho verificado no início da análise deixou de apontar para a mesma pasta, então a análise foi interrompida."
+          "A pasta aberta deixou de estar no mesmo lugar: ela foi movida, renomeada ou trocada depois de escolhida."
         ),
       ],
       hint: "Abra o repositório novamente.",
@@ -296,11 +296,24 @@ const errorRegistry: ErrorRegistry = {
     retryable: false,
     severity: "warning",
   },
+  REPO_ROOT_UNREADABLE: {
+    format: () => ({
+      body: [
+        t(
+          "O sistema operacional não deixou o Strata listar a pasta escolhida."
+        ),
+      ],
+      hint: "Confira as permissões da pasta. No macOS, veja Ajustes do Sistema › Privacidade e Segurança › Arquivos e Pastas.",
+      title: "Sem permissão para ler a pasta",
+    }),
+    retryable: true,
+    severity: "error",
+  },
   REPO_TOO_MANY_FILES: {
     format: (p) => ({
       body: [
         t(
-          `O repositório tem ${formatInteger(p.found)} arquivos, acima do limite de ${formatInteger(p.limit)} que o Strata percorre.`
+          `O repositório tem mais de ${formatInteger(p.limit)} arquivos e pastas, o limite que o Strata percorre com segurança.`
         ),
       ],
       title: "Repositório grande demais",
@@ -311,11 +324,11 @@ const errorRegistry: ErrorRegistry = {
   REPO_UNREADABLE: {
     format: (p) => ({
       body: [
-        t("O sistema de arquivos não permitiu ler "),
+        t("Não foi possível ler "),
         u(p.filePath),
         t(", que ficou de fora da análise."),
       ],
-      title: "Arquivo inacessível",
+      title: "Caminho inacessível",
     }),
     retryable: false,
     severity: "warning",

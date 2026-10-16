@@ -30,6 +30,30 @@ public final class AnalysisConstants {
 
   public static final int EXIT_PLATFORM_ENCODING = 78;
 
+  public static final int MAX_SOURCE_FILE_BYTES = 2_097_152;
+
+  public static final int MAX_ENUMERATED_FILES = 200_000;
+
+  public static final int MAX_JAVA_SOURCES = 60_000;
+
+  public static final int MAX_DIRECTORY_DEPTH = 64;
+
+  public static final int MAX_PATH_BYTES = 1_024;
+
+  public static final int MAX_DISPLAY_NAME_CHARS = 255;
+
+  public static final int MAX_BRANCH_NAME_CHARS = 255;
+
+  public static final int MAX_BUILD_FILE_BYTES = 1_048_576;
+
+  public static final int MAX_GIT_CONFIG_BYTES = 1_048_576;
+
+  public static final int MAX_PACKED_REFS_BYTES = 67_108_864;
+
+  public static final int PACKAGE_DECLARATION_SCAN_BYTES = 65_536;
+
+  public static final int MAX_REPOSITORY_WARNINGS = 100;
+
   private AnalysisConstants() {}
 
   public static Map<String, Object> asMetadata() {

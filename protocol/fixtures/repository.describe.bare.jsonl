@@ -1,0 +1,2 @@
+{"id":"req_01JQ8ZC1B2C3D4E5F6G7H8J9K1","kind":"request","method":"repository.describe","payload":{},"protocol":1}
+{"error":{"code":"REPO_IS_BARE","detail":"o repositório é bare e não tem árvore de trabalho para analisar","origin":"analyzer","params":{}},"id":"req_01JQ8ZC1B2C3D4E5F6G7H8J9K1","kind":"response","ok":false,"protocol":1}

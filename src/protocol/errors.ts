@@ -28,6 +28,7 @@ export interface ErrorParamsByCode {
   REPO_NOT_A_GIT_REPOSITORY: Record<string, never>;
   REPO_PATH_CHANGED: Record<string, never>;
   REPO_PATH_ESCAPES_ROOT: { filePath: string };
+  REPO_ROOT_UNREADABLE: Record<string, never>;
   REPO_TOO_MANY_FILES: { limit: number; found: number };
   REPO_UNREADABLE: { filePath: string };
   SOURCE_FILE_TOO_LARGE: { filePath: string; limitBytes: number };
@@ -73,6 +74,7 @@ export const errorParamsSchemaByCode = {
   REPO_NOT_A_GIT_REPOSITORY: z.object({}),
   REPO_PATH_CHANGED: z.object({}),
   REPO_PATH_ESCAPES_ROOT: z.object({ filePath: z.string().max(1024) }),
+  REPO_ROOT_UNREADABLE: z.object({}),
   REPO_TOO_MANY_FILES: z.object({
     found: z.number().int().nonnegative(),
     limit: z.number().int().positive(),

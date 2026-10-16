@@ -1,6 +1,7 @@
 package br.pucpr.tcc.strata.analyzer.protocol;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
+import br.pucpr.tcc.strata.analyzer.bootstrap.Log;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
@@ -109,11 +110,13 @@ public final class Dispatcher {
     } catch (IOException invalid) {
       return respondError(
           request.id(), ErrorCodes.invalidPayload(method, "o payload não segue o schema"));
+    } catch (RequestRejected rejected) {
+      return respondError(request.id(), rejected.error());
     } catch (RuntimeException unexpected) {
+      // No fio vai só o nome da classe; a mensagem, que pode ter caminho absoluto, fica no stderr.
+      Log.error("o handler de " + method + " falhou", unexpected);
       return respondError(
-          request.id(),
-          ErrorCodes.internalUnexpected(
-              unexpected.getClass().getName() + ": " + unexpected.getMessage()));
+          request.id(), ErrorCodes.internalUnexpected(unexpected.getClass().getName()));
     }
   }
 

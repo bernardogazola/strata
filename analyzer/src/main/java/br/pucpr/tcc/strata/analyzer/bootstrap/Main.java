@@ -5,8 +5,6 @@ import br.pucpr.tcc.strata.analyzer.protocol.Dispatcher;
 import br.pucpr.tcc.strata.analyzer.protocol.Envelope;
 import br.pucpr.tcc.strata.analyzer.protocol.JsonLines;
 import br.pucpr.tcc.strata.analyzer.protocol.MethodHandler;
-import br.pucpr.tcc.strata.analyzer.protocol.method.SystemPing;
-import br.pucpr.tcc.strata.analyzer.protocol.method.SystemShutdown;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -40,8 +38,7 @@ public final class Main {
 
       writer.emit(Envelope.protocolReady(analyzerVersion()));
 
-      final List<MethodHandler<?>> handlers =
-          List.of(new SystemPing(Uptime.monotonic()), new SystemShutdown(shutdownRequested));
+      final List<MethodHandler<?>> handlers = Handlers.all(Uptime.monotonic(), shutdownRequested);
       final Dispatcher dispatcher = Dispatcher.of(JsonLines.strictInboundMapper(), handlers);
 
       exitCode =

@@ -104,4 +104,31 @@ describe("formatProtocolError", () => {
     expect(timeout.severity).toBe("error");
     expect(timeout.retryable).toBe(true);
   });
+
+  test("a raiz ilegível bloqueia e admite nova tentativa; um caminho ilegível só avisa", () => {
+    const root = formatProtocolError({ code: "REPO_ROOT_UNREADABLE" });
+    expect(root.severity).toBe("error");
+    expect(root.retryable).toBe(true);
+
+    const entry = formatProtocolError({
+      code: "REPO_UNREADABLE",
+      params: { filePath: "src/main/java/Exemplo.java" },
+    });
+    expect(entry.severity).toBe("warning");
+  });
+
+  test("REPO_TOO_MANY_FILES não imprime `found`, que é só um piso", () => {
+    const message = formatProtocolError({
+      code: "REPO_TOO_MANY_FILES",
+      params: { found: 200_001, limit: 200_000 },
+    });
+    const text = message.body
+      .map((segment) =>
+        segment.kind === "chrome" ? segment.text : segment.value
+      )
+      .join("");
+
+    expect(text).toContain("mais de 200.000 arquivos e pastas");
+    expect(text).not.toContain("200.001");
+  });
 });

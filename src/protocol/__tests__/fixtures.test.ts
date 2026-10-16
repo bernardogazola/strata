@@ -472,7 +472,6 @@ const EXPECTED_COVERAGE_GAP = [
   "hotspot.profile",
   "hotspots.ids",
   "hotspots.list",
-  "repository.describe",
   "tour",
 ];
 
@@ -876,6 +875,6 @@ describe("estritude fora do fio", () => {
     expect(
       sample.safeParse({ method: "graph.slice", sobrando: 1 }).success
     ).toBe(true);
-    expect(ERROR_CODES).toHaveLength(28);
+    expect(ERROR_CODES).toHaveLength(29);
   });
 });
