@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "measuredAt": "2026-10-16T17:50:08Z",
-  "baseCommit": "fe082fc",
+  "measuredAt": "2026-10-16T19:02:45Z",
+  "baseCommit": "6df505d",
   "measure": "Spoon in no-classpath mode over every detected source root of each corpus repository, one model alive at a time, with a visitor that walks types, type references (getTypeDeclaration) and executable references (getExecutableDeclaration) while the model is alive",
   "rule": {
     "source": "SpoonCorpusSpikeIT",
@@ -94,18 +94,27 @@
       "parseFailures": [],
       "tooLarge": [],
       "heap": {
-        "peakLiveBytes": 575607336,
-        "peakUsedBytes": 597198624
+        "peakLiveBytes": 244682440,
+        "peakUsedBytes": 640521192
       },
       "timing": {
-        "wallMillis": 15241,
-        "preParseMillis": 381,
-        "buildMillis": 11956,
-        "visitMillis": 2891,
-        "longestBuildMillis": 10768,
+        "wallMillis": 15483,
+        "preParseMillis": 454,
+        "buildMillis": 11986,
+        "visitMillis": 2994,
+        "longestBuildMillis": 10809,
         "longestBuildRoot": "src/test/java",
-        "longestCancellationGapMillis": 3804,
-        "longestCancellationGapBetween": "SpoonLaunchers$CancellationCheckpoint.check -> SpoonLaunchers$CancellationCheckpoint.check"
+        "longestCancellationGapMillis": 3855,
+        "longestCancellationGapBetween": "SpoonLaunchers$CancellationCheckpoint.check -> SpoonLaunchers$CancellationCheckpoint.check",
+        "cancellationGaps": {
+          "SpoonLaunchers$CancellationCheckpoint.check -> SpoonLaunchers$CancellationCheckpoint.check": 3855,
+          "ModeledBatch.perCompilationUnit -> ModeledBatch.perCompilationUnit": 444,
+          "SourceAnalysisRun.checkCancelled -> SpoonLaunchers$CancellationCheckpoint.check": 108,
+          "SourceAnalysisRun.checkCancelled -> SourceAnalysisRun.checkCancelled": 88,
+          "ModeledBatch.perCompilationUnit -> SourceAnalysisRun.checkCancelled": 21,
+          "SpoonLaunchers$CancellationCheckpoint.check -> ModeledBatch.perCompilationUnit": 21,
+          "start -> SourceAnalysisRun.checkCancelled": 8
+        }
       },
       "models": {
         "batches": 2,
@@ -166,18 +175,27 @@
       "parseFailures": [],
       "tooLarge": [],
       "heap": {
-        "peakLiveBytes": 247109888,
-        "peakUsedBytes": 506247056
+        "peakLiveBytes": 157100400,
+        "peakUsedBytes": 461675280
       },
       "timing": {
-        "wallMillis": 11659,
-        "preParseMillis": 462,
-        "buildMillis": 3786,
-        "visitMillis": 7399,
-        "longestBuildMillis": 963,
+        "wallMillis": 12082,
+        "preParseMillis": 471,
+        "buildMillis": 3956,
+        "visitMillis": 7566,
+        "longestBuildMillis": 986,
         "longestBuildRoot": "jupiter-tests/src/test/java",
-        "longestCancellationGapMillis": 838,
-        "longestCancellationGapBetween": "ModeledBatch.perCompilationUnit -> ModeledBatch.perCompilationUnit"
+        "longestCancellationGapMillis": 847,
+        "longestCancellationGapBetween": "ModeledBatch.perCompilationUnit -> ModeledBatch.perCompilationUnit",
+        "cancellationGaps": {
+          "ModeledBatch.perCompilationUnit -> ModeledBatch.perCompilationUnit": 847,
+          "SpoonLaunchers$CancellationCheckpoint.check -> SpoonLaunchers$CancellationCheckpoint.check": 98,
+          "SourceAnalysisRun.checkCancelled -> SpoonLaunchers$CancellationCheckpoint.check": 19,
+          "ModeledBatch.perCompilationUnit -> SourceAnalysisRun.checkCancelled": 13,
+          "SpoonLaunchers$CancellationCheckpoint.check -> ModeledBatch.perCompilationUnit": 8,
+          "SourceAnalysisRun.checkCancelled -> SourceAnalysisRun.checkCancelled": 8,
+          "start -> SourceAnalysisRun.checkCancelled": 3
+        }
       },
       "models": {
         "batches": 59,
@@ -238,18 +256,27 @@
       "parseFailures": [],
       "tooLarge": [],
       "heap": {
-        "peakLiveBytes": 485108984,
-        "peakUsedBytes": 692393608
+        "peakLiveBytes": 353538272,
+        "peakUsedBytes": 855657208
       },
       "timing": {
-        "wallMillis": 89077,
-        "preParseMillis": 1565,
-        "buildMillis": 13694,
-        "visitMillis": 73791,
-        "longestBuildMillis": 1497,
+        "wallMillis": 94027,
+        "preParseMillis": 1613,
+        "buildMillis": 14072,
+        "visitMillis": 77542,
+        "longestBuildMillis": 1549,
         "longestBuildRoot": "spring-core/src/test/java",
-        "longestCancellationGapMillis": 19800,
-        "longestCancellationGapBetween": "ModeledBatch.perCompilationUnit -> ModeledBatch.perCompilationUnit"
+        "longestCancellationGapMillis": 22033,
+        "longestCancellationGapBetween": "ModeledBatch.perCompilationUnit -> ModeledBatch.perCompilationUnit",
+        "cancellationGaps": {
+          "ModeledBatch.perCompilationUnit -> ModeledBatch.perCompilationUnit": 22033,
+          "SpoonLaunchers$CancellationCheckpoint.check -> SpoonLaunchers$CancellationCheckpoint.check": 213,
+          "ModeledBatch.perCompilationUnit -> SourceAnalysisRun.checkCancelled": 124,
+          "SourceAnalysisRun.checkCancelled -> SpoonLaunchers$CancellationCheckpoint.check": 70,
+          "SpoonLaunchers$CancellationCheckpoint.check -> ModeledBatch.perCompilationUnit": 14,
+          "start -> SourceAnalysisRun.checkCancelled": 5,
+          "SourceAnalysisRun.checkCancelled -> SourceAnalysisRun.checkCancelled": 4
+        }
       },
       "models": {
         "batches": 60,
@@ -336,18 +363,28 @@
       ],
       "tooLarge": [],
       "heap": {
-        "peakLiveBytes": 1622553472,
-        "peakUsedBytes": 1759392640
+        "peakLiveBytes": 948762496,
+        "peakUsedBytes": 1852724736
       },
       "timing": {
-        "wallMillis": 353613,
-        "preParseMillis": 5533,
-        "buildMillis": 129515,
-        "visitMillis": 218468,
-        "longestBuildMillis": 11636,
+        "wallMillis": 353908,
+        "preParseMillis": 6201,
+        "buildMillis": 128106,
+        "visitMillis": 217087,
+        "longestBuildMillis": 11543,
         "longestBuildRoot": "server/src/test/java",
-        "longestCancellationGapMillis": 13698,
-        "longestCancellationGapBetween": "ModeledBatch.perCompilationUnit -> ModeledBatch.perCompilationUnit"
+        "longestCancellationGapMillis": 13465,
+        "longestCancellationGapBetween": "ModeledBatch.perCompilationUnit -> ModeledBatch.perCompilationUnit",
+        "cancellationGaps": {
+          "ModeledBatch.perCompilationUnit -> ModeledBatch.perCompilationUnit": 13465,
+          "SpoonLaunchers$CancellationCheckpoint.check -> SpoonLaunchers$CancellationCheckpoint.check": 1408,
+          "ModeledBatch.perCompilationUnit -> SourceAnalysisRun.checkCancelled": 378,
+          "SourceAnalysisRun.checkCancelled -> SpoonLaunchers$CancellationCheckpoint.check": 133,
+          "SpoonLaunchers$CancellationCheckpoint.check -> ModeledBatch.perCompilationUnit": 56,
+          "SpoonLaunchers$CancellationCheckpoint.check -> SourceAnalysisRun.checkCancelled": 29,
+          "start -> SourceAnalysisRun.checkCancelled": 13,
+          "SourceAnalysisRun.checkCancelled -> SourceAnalysisRun.checkCancelled": 11
+        }
       },
       "models": {
         "batches": 647,
@@ -357,16 +394,16 @@
       },
       "extraction": {
         "types": 53966,
-        "typeReferences": 17361202,
-        "resolvedTypeReferences": 12746719,
-        "executableReferences": 2595454,
-        "resolvedExecutableReferences": 820740
+        "typeReferences": 17360803,
+        "resolvedTypeReferences": 12744987,
+        "executableReferences": 2595444,
+        "resolvedExecutableReferences": 820575
       }
     },
     {
       "name": "broken-tree",
       "origin": "derived",
-      "commitId": "9c871d6d29b55db2a0d98819855885ed6c2b41d5",
+      "commitId": "961b02c3ce73d09e98efd9817e9639883c1e0dec",
       "derivedFrom": "commons-lang",
       "mutations": [
         "truncate-half  ./src/main/java/org/apache/commons/lang3/AnnotationUtils.java",
@@ -430,18 +467,27 @@
       ],
       "tooLarge": [],
       "heap": {
-        "peakLiveBytes": 433033320,
-        "peakUsedBytes": 837307600
+        "peakLiveBytes": 290564840,
+        "peakUsedBytes": 715310592
       },
       "timing": {
-        "wallMillis": 14444,
-        "preParseMillis": 197,
-        "buildMillis": 11243,
-        "visitMillis": 3001,
-        "longestBuildMillis": 10861,
+        "wallMillis": 14171,
+        "preParseMillis": 218,
+        "buildMillis": 10985,
+        "visitMillis": 2936,
+        "longestBuildMillis": 10614,
         "longestBuildRoot": "src/test/java",
-        "longestCancellationGapMillis": 3998,
-        "longestCancellationGapBetween": "SpoonLaunchers$CancellationCheckpoint.check -> SpoonLaunchers$CancellationCheckpoint.check"
+        "longestCancellationGapMillis": 3932,
+        "longestCancellationGapBetween": "SpoonLaunchers$CancellationCheckpoint.check -> SpoonLaunchers$CancellationCheckpoint.check",
+        "cancellationGaps": {
+          "SpoonLaunchers$CancellationCheckpoint.check -> SpoonLaunchers$CancellationCheckpoint.check": 3932,
+          "ModeledBatch.perCompilationUnit -> ModeledBatch.perCompilationUnit": 444,
+          "SourceAnalysisRun.checkCancelled -> SpoonLaunchers$CancellationCheckpoint.check": 18,
+          "SpoonLaunchers$CancellationCheckpoint.check -> ModeledBatch.perCompilationUnit": 17,
+          "ModeledBatch.perCompilationUnit -> SourceAnalysisRun.checkCancelled": 17,
+          "SourceAnalysisRun.checkCancelled -> SourceAnalysisRun.checkCancelled": 11,
+          "start -> SourceAnalysisRun.checkCancelled": 1
+        }
       },
       "models": {
         "batches": 2,
