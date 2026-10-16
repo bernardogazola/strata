@@ -1,0 +1,2 @@
+{"id":"req_01JQ8ZC1B2C3D4E5F6G7H8J9K2","kind":"request","method":"repository.describe","payload":{},"protocol":1}
+{"error":{"code":"REPO_NO_JAVA_SOURCES","detail":"nenhuma raiz de código foi encontrada sob a raiz do repositório","origin":"analyzer","params":{}},"id":"req_01JQ8ZC1B2C3D4E5F6G7H8J9K2","kind":"response","ok":false,"protocol":1}

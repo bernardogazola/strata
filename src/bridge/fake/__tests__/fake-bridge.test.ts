@@ -35,6 +35,7 @@ describe("a descoberta das transcrições", () => {
       "graph.search": ["hit"],
       "graph.slice": ["package", "type"],
       "outline.children": ["root"],
+      "repository.describe": ["ok"],
       "system.ping": ["ok"],
       "system.shutdown": ["ok"],
     });

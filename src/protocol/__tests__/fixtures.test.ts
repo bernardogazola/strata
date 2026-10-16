@@ -472,7 +472,6 @@ const EXPECTED_COVERAGE_GAP = [
   "hotspot.profile",
   "hotspots.ids",
   "hotspots.list",
-  "repository.describe",
   "tour",
 ];
 

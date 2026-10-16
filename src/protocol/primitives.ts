@@ -35,7 +35,7 @@ export type ShortCommitId = z.infer<typeof shortCommitIdSchema>;
 export const sourceRootIdSchema = z
   .string()
   .max(11)
-  .regex(/^sr_[a-z0-9]{8}$/);
+  .regex(/^sr_[0-9a-hjkmnp-tv-z]{8}$/);
 export type SourceRootId = z.infer<typeof sourceRootIdSchema>;
 
 export const edgeIdSchema = z

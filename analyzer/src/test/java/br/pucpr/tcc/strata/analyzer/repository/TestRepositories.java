@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -29,7 +30,41 @@ public final class TestRepositories {
           Instant.ofEpochSecond(1_704_164_645L),
           ZoneOffset.UTC);
 
+  private static final List<String> SIDECARS =
+      List.of("expected.json", "README.md", "cloc-golden.txt");
+
   private TestRepositories() {}
+
+  public static RevCommit reproduceCorpusFixture(String fixture, Path target)
+      throws IOException, GitAPIException {
+    final Path source = corpus(fixture);
+    try (Stream<Path> tree = Files.walk(source)) {
+      for (final Path file : tree.filter(Files::isRegularFile).toList()) {
+        final Path relative = source.relativize(file);
+        final boolean sidecar =
+            relative.getNameCount() == 1 && SIDECARS.contains(relative.toString());
+        final boolean underGit = relative.getName(0).toString().equals(".git");
+        if (sidecar || underGit || ".DS_Store".equals(file.getFileName().toString())) {
+          continue;
+        }
+        final Path copy = target.resolve(posix(relative));
+        Files.createDirectories(copy.getParent());
+        Files.copy(file, copy);
+      }
+    }
+    try (Git git = init(target)) {
+      return commitAll(git, "adiciona a fixture " + fixture + "\n");
+    }
+  }
+
+  public static String corpusCommitId(String fixture) throws IOException {
+    final String prefix = fixture + " ";
+    return Files.readAllLines(corpusRoot().resolve("commits.txt"), StandardCharsets.UTF_8).stream()
+        .filter(line -> line.startsWith(prefix))
+        .map(line -> line.substring(prefix.length()).trim())
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("commits.txt não tem " + fixture));
+  }
 
   public static Path write(Path root, String relativePath, String content) throws IOException {
     final Path file = root.resolve(relativePath);

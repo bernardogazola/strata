@@ -3,10 +3,11 @@ package br.pucpr.tcc.strata.analyzer.protocol;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
-import br.pucpr.tcc.strata.analyzer.protocol.method.SystemPing;
-import br.pucpr.tcc.strata.analyzer.protocol.method.SystemShutdown;
+import br.pucpr.tcc.strata.analyzer.bootstrap.Handlers;
+import br.pucpr.tcc.strata.analyzer.repository.TestRepositories;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -20,6 +21,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 final class ProtocolFixtureTest {
 
@@ -39,7 +41,10 @@ final class ProtocolFixtureTest {
           "protocol.discarded-frame.jsonl",
           "protocol.unknown-method.jsonl",
           "system.ping.ok.jsonl",
-          "system.shutdown.ok.jsonl");
+          "system.shutdown.ok.jsonl",
+          "repository.describe.ok.jsonl",
+          "repository.describe.bare.jsonl",
+          "repository.describe.no-java.jsonl");
 
   private static final Map<String, String> EXPECTADOS_NAO_DIRIGIVEIS = criarBaseline();
 
@@ -77,8 +82,7 @@ final class ProtocolFixtureTest {
 
   private final AtomicBoolean encerrar = new AtomicBoolean(false);
   private final ObjectMapper inbound = JsonLines.strictInboundMapper();
-  private final Dispatcher dispatcher =
-      Dispatcher.of(inbound, List.of(new SystemPing(() -> 0L), new SystemShutdown(encerrar)));
+  private final Dispatcher dispatcher = Dispatcher.of(inbound, Handlers.all(() -> 0L, encerrar));
   private final CanonicalJson canonical = new CanonicalJson();
 
   private String emitido(Envelope envelope) {
@@ -92,7 +96,7 @@ final class ProtocolFixtureTest {
   @Test
   void aPastaDeFixturesExisteEFoiLida() throws IOException {
     assertThat(FIXTURES).isDirectory();
-    assertThat(arquivos()).contains("protocol.ready.mvp.jsonl").hasSize(19);
+    assertThat(arquivos()).contains("protocol.ready.mvp.jsonl").hasSize(22);
   }
 
   @Test
@@ -147,6 +151,54 @@ final class ProtocolFixtureTest {
         .isEqualTo(Dispatcher.DiscardReason.PROTOCOL_MISMATCH);
   }
 
+  private String despacharEmRepositorio(String arquivo, Path repositorio) throws IOException {
+    final List<String> l = linhas(arquivo);
+    assertThat(l).as(arquivo + ": requisição e resposta").hasSize(2);
+    final ObjectNode requisicao = (ObjectNode) inbound.readTree(l.get(0));
+    assertThat(requisicao.has("repositoryPath"))
+        .as("a fixture não pode trazer o caminho absoluto da máquina de quem a escreveu")
+        .isFalse();
+    requisicao.put("repositoryPath", repositorio.toRealPath().toString());
+    final Dispatcher.Outcome fora =
+        dispatcher.dispatch(
+            dispatcher.parse(
+                inbound.writeValueAsString(requisicao).getBytes(StandardCharsets.UTF_8)));
+    assertThat(fora).isInstanceOf(Dispatcher.Outcome.Respond.class);
+    return emitido(((Dispatcher.Outcome.Respond) fora).envelope());
+  }
+
+  @Test
+  void repositoryDescribeOkBateByteAByte(@TempDir Path temp) throws Exception {
+    final Path repositorio = temp.toRealPath().resolve("multi-module");
+    final var commit = TestRepositories.reproduceCorpusFixture("multi-module", repositorio);
+    assertThat(commit.name())
+        .as("a reprodução tem de dar o id que o make-fixtures.sh gravou; arquivo solto no corpus?")
+        .isEqualTo(TestRepositories.corpusCommitId("multi-module"));
+
+    assertThat(despacharEmRepositorio("repository.describe.ok.jsonl", repositorio))
+        .isEqualTo(linhas("repository.describe.ok.jsonl").get(1));
+  }
+
+  @Test
+  void repositoryDescribeBareBateByteAByte(@TempDir Path temp) throws Exception {
+    final Path bare = TestRepositories.bare(temp.toRealPath().resolve("bare.git"));
+
+    assertThat(despacharEmRepositorio("repository.describe.bare.jsonl", bare))
+        .isEqualTo(linhas("repository.describe.bare.jsonl").get(1));
+  }
+
+  @Test
+  void repositoryDescribeSemJavaBateByteAByte(@TempDir Path temp) throws Exception {
+    final Path repositorio = temp.toRealPath().resolve("sem-java");
+    try (var git = TestRepositories.init(repositorio)) {
+      TestRepositories.write(repositorio, "README.md", "# sem java\n");
+      TestRepositories.commitAll(git, "primeiro");
+    }
+
+    assertThat(despacharEmRepositorio("repository.describe.no-java.jsonl", repositorio))
+        .isEqualTo(linhas("repository.describe.no-java.jsonl").get(1));
+  }
+
   @Test
   void todaFixtureOuEDirigidaOuEDeclaradaNaoDirigivel() throws IOException {
     final Set<String> uniao = new TreeSet<>(DIRIGIDOS);
@@ -173,9 +225,9 @@ final class ProtocolFixtureTest {
   }
 
   @Test
-  void oDespachanteRegistraExatamenteOsDoisMetodosDaFase() {
+  void oDespachanteRegistraExatamenteOsTresMetodosJaImplementados() {
     assertThat(dispatcher.registeredMethods())
-        .containsExactlyInAnyOrder("system.ping", "system.shutdown");
+        .containsExactlyInAnyOrder("system.ping", "system.shutdown", "repository.describe");
   }
 
   @Test
