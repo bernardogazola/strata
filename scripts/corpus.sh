@@ -22,6 +22,11 @@ PINS
 DERIVED_NAME="broken-tree"
 DERIVED_FROM="commons-lang"
 
+DERIVED_AUTHOR="strata corpus.sh"
+DERIVED_EMAIL="corpus@strata.invalid"
+DERIVED_DATE="1704164645 +0000"
+DERIVED_MESSAGE="deriva broken-tree de commons-lang"
+
 usage() {
   cat <<'USAGE'
 uso: corpus.sh [opções]
@@ -148,6 +153,25 @@ JAVA
         ;;
     esac
   done
+
+  commit_derived_tree "$dir"
+}
+
+commit_derived_tree() {
+  local dir="$1"
+  local -a git_hermetic=(
+    env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_CONFIG_PARAMETERS -u GIT_CONFIG_COUNT
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+    GIT_AUTHOR_NAME="$DERIVED_AUTHOR" GIT_AUTHOR_EMAIL="$DERIVED_EMAIL"
+    GIT_COMMITTER_NAME="$DERIVED_AUTHOR" GIT_COMMITTER_EMAIL="$DERIVED_EMAIL"
+    GIT_AUTHOR_DATE="$DERIVED_DATE" GIT_COMMITTER_DATE="$DERIVED_DATE"
+    git -C "$dir"
+    -c core.excludesFile=/dev/null -c core.attributesFile=/dev/null
+    -c core.autocrlf=false -c commit.gpgsign=false -c core.hooksPath=/dev/null
+  )
+  "${git_hermetic[@]}" init -q --template= --initial-branch=main
+  "${git_hermetic[@]}" add --all --force .
+  "${git_hermetic[@]}" commit -q -m "$DERIVED_MESSAGE"
 }
 
 run() {
@@ -178,6 +202,7 @@ EOF
     if [ -d "$out/$DERIVED_FROM" ]; then
       echo "  $DERIVED_NAME derivado de $DERIVED_FROM"
       derive_broken_tree "$out/$DERIVED_FROM" "$out/$DERIVED_NAME"
+      echo "  $DERIVED_NAME está em $(git --git-dir="$out/$DERIVED_NAME/.git" rev-parse HEAD)"
     else
       echo "corpus: $DERIVED_NAME precisa de $DERIVED_FROM, que não foi clonado" >&2
       failed=$((failed + 1))
@@ -242,6 +267,49 @@ self_test() {
     ok "um HEAD que diverge do pino é recusado, e um que confere não"
   else
     no "um HEAD que diverge do pino é recusado" "divergente=$rc_pin igual=$rc_good"
+  fi
+
+  local n derived="$tmp/derived" again="$tmp/derived-again" first second mutations why=""
+  mkdir -p "$tmp/synthetic/src/pkg" "$tmp/hostile/.config/git"
+  for n in $(seq -w 1 120); do
+    printf 'package pkg;\n\npublic class F%s {\n  int value() {\n    return 1;\n  }\n}\n' "$n" \
+      > "$tmp/synthetic/src/pkg/F$n.java"
+  done
+  printf '[user]\n\tname = intruder\n\temail = intruder@example.invalid\n[commit]\n\tgpgsign = true\n[i18n]\n\tcommitEncoding = ISO-8859-1\n' \
+    > "$tmp/hostile/.gitconfig"
+  printf '*.java\nMUTATIONS.txt\n' > "$tmp/hostile/.config/git/ignore"
+  printf '*.java working-tree-encoding=UTF-16\n' > "$tmp/hostile/.config/git/attributes"
+  set +e
+  ( set -e; derive_broken_tree "$tmp/synthetic" "$derived" ) >"$tmp/derive.log" 2>&1
+  local rc_first=$?
+  ( set -e
+    export HOME="$tmp/hostile" XDG_CONFIG_HOME="$tmp/hostile/.config" GIT_DIR="$tmp/hostile/stolen.git"
+    export GIT_CONFIG_SYSTEM="$tmp/hostile/.gitconfig"
+    export GIT_CONFIG_PARAMETERS="'i18n.commitencoding'='ISO-8859-1'"
+    export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=i18n.commitEncoding GIT_CONFIG_VALUE_0=ISO-8859-1
+    export GIT_AUTHOR_NAME=intruder GIT_COMMITTER_NAME=intruder
+    export GIT_AUTHOR_DATE="1 +0000" GIT_COMMITTER_DATE="1 +0000"
+    derive_broken_tree "$tmp/synthetic" "$again" ) >>"$tmp/derive.log" 2>&1
+  local rc_again=$?
+  set -e
+  first=$(git --git-dir="$derived/.git" rev-parse -q --verify 'HEAD^{commit}' 2>/dev/null) || first=""
+  second=$(git --git-dir="$again/.git" rev-parse -q --verify 'HEAD^{commit}' 2>/dev/null) || second=""
+  mutations=$(grep -c -v -e '^#' -e '^[[:space:]]*$' "$derived/MUTATIONS.txt" 2>/dev/null) || true
+  [ "$rc_first" = 0 ] && [ "$rc_again" = 0 ] || why="$why a derivação saiu com $rc_first/$rc_again ($(tr '\n' ' ' < "$tmp/derive.log"));"
+  [ -d "$derived/.git" ] || why="$why sem .git;"
+  [ -n "$first" ] || why="$why o HEAD não resolve;"
+  [ "$(git --git-dir="$derived/.git" symbolic-ref HEAD 2>/dev/null)" = refs/heads/main ] &&
+    [ "$(git --git-dir="$derived/.git" rev-list --count HEAD 2>/dev/null)" = 1 ] ||
+    why="$why não há exatamente um commit na main;"
+  [ "$(git --git-dir="$derived/.git" ls-tree -r --name-only HEAD 2>/dev/null | wc -l | tr -d ' ')" = \
+    "$(cd "$derived" && find . -path ./.git -prune -o -type f -print | wc -l | tr -d ' ')" ] ||
+    why="$why o commit não contém todos os arquivos da árvore;"
+  [ "$mutations" = 3 ] || why="$why MUTATIONS.txt tem ${mutations:-0} linha(s) de mutação;"
+  [ -n "$first" ] && [ "$first" = "$second" ] || why="$why os ids diferem: '$first' e depois '$second';"
+  if [ -z "$why" ]; then
+    ok "broken-tree é derivado offline em um commit na main, com o mesmo id em uma máquina hostil"
+  else
+    no "broken-tree é derivado offline em um commit determinístico" "$why"
   fi
 
   set +e
