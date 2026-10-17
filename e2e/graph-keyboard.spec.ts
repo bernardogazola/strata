@@ -17,6 +17,7 @@ import {
   fixtureResponse,
   historyLength,
   outlineIds,
+  renderedPosition,
   searchOf,
   serveTranscripts,
   styleOf,
@@ -28,6 +29,7 @@ const ANALYSIS_ID = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 const LEVEL_ONE_URL = `/repository/repo_AAAAAAAAAAAAAAAAAAAAAQ?analysis=${ANALYSIS_ID}`;
 const ORDERS_ID = "pkg:br.pucpr.orders";
 const BILLING_ID = "pkg:br.pucpr.billing";
+const SHARED_ID = "pkg:br.pucpr.shared";
 const ORDER_ID = "type:br.pucpr.orders.Order";
 const TYPE_URL = `${LEVEL_ONE_URL}&level=TYPE&parent=${ORDERS_ID}`;
 
@@ -372,5 +374,32 @@ test.describe("A estrutura da arquitetura pelo teclado, par do canvas", () => {
     );
     await expect.poll(() => outlineIds(page, 2)).toStrictEqual(TYPE_IDS);
     expect(await countMarks(page, GRAPH_PERF.request)).toBe(requestsBeforeBack);
+  });
+
+  test("o ponteiro que salta de um nó para fora do canvas devolve o destaque ao foco de teclado", async ({
+    page,
+  }) => {
+    await page.goto(LEVEL_ONE_URL);
+    await expectGraph(page, PACKAGE_IDS);
+    await rowOf(page, BILLING_ID).focus();
+    await expect
+      .poll(() => styleOf(page, BILLING_ID, "border-width"))
+      .toBe(ACTIVE_BORDER_WIDTH);
+
+    const shared = await renderedPosition(page, SHARED_ID);
+    await page.mouse.move(shared.x, shared.y);
+    await expect
+      .poll(() => styleOf(page, SHARED_ID, "border-width"))
+      .toBe(ACTIVE_BORDER_WIDTH);
+    await page.mouse.move(2, 790);
+
+    await expect(rowOf(page, BILLING_ID)).toBeFocused();
+    await expect
+      .poll(() => styleOf(page, BILLING_ID, "border-width"))
+      .toBe(ACTIVE_BORDER_WIDTH);
+    await expect(rowOf(page, BILLING_ID)).toHaveAttribute("data-active", "");
+    await expect
+      .poll(() => styleOf(page, SHARED_ID, "border-width"))
+      .not.toBe(ACTIVE_BORDER_WIDTH);
   });
 });
