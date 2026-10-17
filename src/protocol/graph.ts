@@ -70,7 +70,7 @@ export interface SliceBudget {
 
 export const GRAPH_SLICE_BUDGETS = {
   PACKAGE: { edges: 1200, nodes: 300 },
-  TYPE: { edges: 10_000, nodes: 2000 },
+  TYPE: { edges: 5000, nodes: 1000 },
   TYPE_NEIGHBORHOOD: { edges: 2500, nodes: 500 },
 } as const satisfies Record<GraphLevel, SliceBudget>;
 
