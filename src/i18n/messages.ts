@@ -116,7 +116,7 @@ const ptBR = {
 
   search: {
     capped:
-      "A busca mostra até {limit} resultados. Refine o termo para encontrar outros.",
+      "{count}. A busca mostra até {limit} resultados. Refine o termo para encontrar outros.",
     count: {
       one: "{count} resultado",
       other: "{count} resultados",
