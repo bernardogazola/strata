@@ -465,15 +465,26 @@ describe("NodeSummary", () => {
     render(<NodeSummary node={null} onExpand={vi.fn()} />);
 
     expect(screen.getByText(t.inspector.empty)).toBeDefined();
-    expect(screen.queryByText(t.inspector.notOnMap)).toBeNull();
+    expect(screen.queryByText(t.inspector.notOnMap.truncated)).toBeNull();
+    expect(screen.queryByText(t.inspector.notOnMap.aggregated)).toBeNull();
   });
 
   test("uma seleção que a fatia truncada deixou fora do mapa diz isso, e não que nada foi selecionado", () => {
-    render(<NodeSummary node={null} notOnMap onExpand={vi.fn()} />);
+    render(<NodeSummary node={null} notOnMap="truncated" onExpand={vi.fn()} />);
 
-    expect(screen.getByText(t.inspector.notOnMap)).toBeDefined();
+    expect(screen.getByText(t.inspector.notOnMap.truncated)).toBeDefined();
     expect(screen.queryByText(t.inspector.empty)).toBeNull();
     expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  test("um pacote dentro de um nível 1 agrupado diz que está em um grupo, e não que foi cortado", () => {
+    render(
+      <NodeSummary node={null} notOnMap="aggregated" onExpand={vi.fn()} />
+    );
+
+    expect(screen.getByText(t.inspector.notOnMap.aggregated)).toBeDefined();
+    expect(screen.queryByText(t.inspector.notOnMap.truncated)).toBeNull();
+    expect(screen.queryByText(t.inspector.empty)).toBeNull();
   });
 
   test("um pacote mostra o rótulo isolado, o tipo, as métricas e o botão de expandir", async () => {

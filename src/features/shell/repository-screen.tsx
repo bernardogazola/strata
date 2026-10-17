@@ -6,7 +6,10 @@ import { buttonVariants } from "@/components/ui/button";
 import { AnalyzerStatus } from "@/features/backend/analyzer-status";
 import { ElementLabel } from "@/features/graph/element-label";
 import { GraphPanel } from "@/features/graph/graph-panel";
-import { NodeSummary } from "@/features/graph/node-summary";
+import {
+  NodeSummary,
+  type NotOnMapReason,
+} from "@/features/graph/node-summary";
 import {
   ArchitectureOutline,
   type OutlineHandle,
@@ -38,7 +41,7 @@ const routeApi = getRouteApi(ROUTE_ID);
 interface FocusedNode {
   readonly node: GraphNode | null;
 
-  readonly notOnMap: boolean;
+  readonly notOnMap: NotOnMapReason | undefined;
 }
 
 const describeFocus = (
@@ -46,12 +49,16 @@ const describeFocus = (
   elementId: string | null
 ): FocusedNode => {
   if (elementId === null) {
-    return { node: null, notOnMap: false };
+    return { node: null, notOnMap: undefined };
   }
   const node = slice.nodes.find((candidate) => candidate.id === elementId);
-  return node === undefined
-    ? { node: null, notOnMap: slice.truncated }
-    : { node, notOnMap: false };
+  if (node !== undefined) {
+    return { node, notOnMap: undefined };
+  }
+  if (slice.aggregated) {
+    return { node: null, notOnMap: "aggregated" };
+  }
+  return { node: null, notOnMap: slice.truncated ? "truncated" : undefined };
 };
 
 function ParentCrumb({
@@ -191,7 +198,7 @@ function FocusedNodeSummary({
   return (
     <NodeSummary
       node={data?.node ?? null}
-      notOnMap={data?.notOnMap ?? false}
+      notOnMap={data?.notOnMap}
       onExpand={onExpand}
     />
   );

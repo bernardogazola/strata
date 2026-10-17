@@ -11,10 +11,12 @@ import { DEFAULT_UNTRUSTED_MAX_CHARS } from "@/lib/untrusted";
 import type { GraphNode } from "@/protocol/graph";
 import { ElementLabel } from "./element-label";
 
+export type NotOnMapReason = keyof typeof t.inspector.notOnMap;
+
 export interface NodeSummaryProps {
   readonly node: GraphNode | null;
 
-  readonly notOnMap?: boolean;
+  readonly notOnMap?: NotOnMapReason;
 
   readonly onExpand: (elementId: string) => void;
 }
@@ -61,17 +63,15 @@ function ExpandButton({
   );
 }
 
-export function NodeSummary({
-  node,
-  notOnMap = false,
-  onExpand,
-}: NodeSummaryProps) {
+export function NodeSummary({ node, notOnMap, onExpand }: NodeSummaryProps) {
   const titleId = useId();
 
   if (node === null) {
     return (
       <p className="text-muted-foreground text-sm">
-        {notOnMap ? t.inspector.notOnMap : t.inspector.empty}
+        {notOnMap === undefined
+          ? t.inspector.empty
+          : t.inspector.notOnMap[notOnMap]}
       </p>
     );
   }

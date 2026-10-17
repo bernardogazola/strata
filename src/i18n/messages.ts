@@ -93,8 +93,12 @@ const ptBR = {
     empty: "Selecione um elemento no mapa para ver os detalhes.",
     expand: "Ver os tipos deste pacote",
     kind: "Elemento",
-    notOnMap:
-      "Este elemento não aparece no mapa: o limite de exibição do nível o deixou de fora.",
+    notOnMap: {
+      aggregated:
+        "Este pacote não aparece sozinho no mapa: o primeiro nível agrupa os pacotes pelos prefixos de topo.",
+      truncated:
+        "Este elemento não aparece no mapa: o limite de exibição do nível o deixou de fora.",
+    },
     typeCount: "tipos neste pacote",
   },
 

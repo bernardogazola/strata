@@ -968,7 +968,7 @@ describe("/repository/$handle: um elemento que o mapa cortou", () => {
     await waitForCanvas(3, "tipos");
 
     expect(
-      await within(inspector()).findByText(t.inspector.notOnMap)
+      await within(inspector()).findByText(t.inspector.notOnMap.truncated)
     ).toBeDefined();
     expect(within(inspector()).queryByText(t.inspector.empty)).toBeNull();
   });
@@ -981,7 +981,34 @@ describe("/repository/$handle: um elemento que o mapa cortou", () => {
     await waitForCanvas(3, "tipos");
 
     expect(await within(inspector()).findByText("Order")).toBeDefined();
-    expect(within(inspector()).queryByText(t.inspector.notOnMap)).toBeNull();
+    expect(
+      within(inspector()).queryByText(t.inspector.notOnMap.truncated)
+    ).toBeNull();
+  });
+
+  test("fora de um nível 1 agrupado, o inspetor diz que o pacote está em um grupo", async () => {
+    const fixture = (await fakeRequest("graph.slice", {
+      analysisId: AN,
+      level: "PACKAGE",
+    })) as GraphSlice;
+    vi.stubGlobal("__STRATA_FAKE_TRANSCRIPTS__", [
+      {
+        method: "graph.slice",
+        request: { level: "PACKAGE" },
+        result: {
+          ...fixture,
+          aggregated: true,
+          totals: { edges: 9120, nodes: 1842 },
+        },
+      },
+    ] satisfies readonly FakeTranscriptOverride[]);
+    await renderAt(`${SCREEN_URL}&focus=pkg:br.pucpr.legacy.deep`);
+    await waitForCanvas(3, "pacotes");
+
+    expect(
+      await within(inspector()).findByText(t.inspector.notOnMap.aggregated)
+    ).toBeDefined();
+    expect(within(inspector()).queryByText(t.inspector.empty)).toBeNull();
   });
 
   test("em uma fatia completa, um focus ausente continua sendo seleção nenhuma", async () => {
@@ -991,7 +1018,9 @@ describe("/repository/$handle: um elemento que o mapa cortou", () => {
     await waitForCanvas(3, "tipos");
 
     expect(within(inspector()).getByText(t.inspector.empty)).toBeDefined();
-    expect(within(inspector()).queryByText(t.inspector.notOnMap)).toBeNull();
+    expect(
+      within(inspector()).queryByText(t.inspector.notOnMap.truncated)
+    ).toBeNull();
   });
 });
 
