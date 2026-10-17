@@ -352,3 +352,75 @@ describe("toGraphView", () => {
     expect(view.elements.nodes).toHaveLength(typeSlice.nodes.length);
   });
 });
+
+const deepFreeze = <T>(value: T): T => {
+  if (typeof value === "object" && value !== null) {
+    for (const nested of Object.values(value)) {
+      deepFreeze(nested);
+    }
+    Object.freeze(value);
+  }
+  return value;
+};
+
+describe("toGraphElements: mais garantias do contrato", () => {
+  test("não toca na fatia, que é o dado em cache da query", () => {
+    const before = structuredClone(packageSlice);
+    const frozen = deepFreeze(structuredClone(packageSlice));
+
+    const elements = toGraphElements(frozen);
+
+    expect(frozen).toEqual(before);
+    expect(elements.edges[0]?.data.types).not.toBe(frozen.edges[0]?.types);
+    expect(elements.nodes[0]?.data.resolutionMix).not.toBe(
+      frozen.nodes[0]?.resolutionMix
+    );
+  });
+
+  test("duas arestas com o mesmo id lançam", () => {
+    const [first] = packageSlice.edges;
+    const slice: GraphSlice = {
+      ...packageSlice,
+      edges: [first, { ...first, target: "pkg:br.pucpr.billing" }],
+      totals: { edges: 2, nodes: packageSlice.nodes.length },
+    };
+
+    expect(violationOf(slice)).toBe("DUPLICATE_ID");
+  });
+
+  test("a vizinhança de um tipo sem pai lança, como o nível de tipos", () => {
+    const slice: GraphSlice = {
+      ...typeSlice,
+      budget: { ...GRAPH_SLICE_BUDGETS.TYPE_NEIGHBORHOOD },
+      level: "TYPE_NEIGHBORHOOD",
+      parentId: null,
+    };
+
+    expect(violationOf(slice)).toBe("PARENT_MISMATCH");
+  });
+
+  test("a unicidade é conferida antes das pontas, em uma fatia com os dois defeitos", () => {
+    const [first, second] = packageSlice.edges;
+    const slice: GraphSlice = {
+      ...packageSlice,
+      edges: [
+        { ...first, target: "pkg:fora.da.fatia" },
+        { ...second, id: first.id },
+      ],
+      totals: { edges: 2, nodes: packageSlice.nodes.length },
+    };
+
+    expect(violationOf(slice)).toBe("DUPLICATE_ID");
+  });
+
+  test("o nome do pacote padrão é só do pacote: um tipo de rótulo vazio continua vazio", () => {
+    const slice: GraphSlice = {
+      ...typeSlice,
+      nodes: typeSlice.nodes.map((node, index) =>
+        index === 0 ? { ...node, label: "‮" } : node
+      ),
+    };
+
+    expect(toGraphElements(slice).nodes[0]?.data.label).toBe("");
+  });
+});
