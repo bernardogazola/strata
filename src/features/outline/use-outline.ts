@@ -1,13 +1,15 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { OutlineNode } from "@/protocol/graph";
 import {
   type GraphViewParams,
   outlineChildrenQueryOptions,
 } from "@/queries/options";
 
+export type OutlineFailure = "load" | "nextPage";
+
 export interface OutlineLevel {
-  readonly failed: boolean;
+  readonly failure: OutlineFailure | null;
   readonly hasNextPage: boolean;
 
   readonly nodes: readonly OutlineNode[] | undefined;
@@ -45,6 +47,7 @@ export interface OutlineMoreRow extends OutlineRowBase {
 }
 
 export interface OutlineErrorRow extends OutlineRowBase {
+  readonly failure: OutlineFailure;
   readonly type: "error";
 }
 
@@ -62,6 +65,8 @@ const ROOT_OWNER = "root";
 
 const UNKNOWN_SET_SIZE = -1;
 
+const PACKAGE_ID_PREFIX = "pkg:";
+
 const levelTail = (
   level: OutlineLevel,
   rowLevel: 1 | 2,
@@ -70,9 +75,15 @@ const levelTail = (
   total: number | null
 ): OutlineRow[] => {
   const owner = parentId ?? ROOT_OWNER;
-  if (level.failed) {
+  if (level.failure !== null) {
     return [
-      { key: `error:${owner}`, level: rowLevel, parentId, type: "error" },
+      {
+        failure: level.failure,
+        key: `error:${owner}`,
+        level: rowLevel,
+        parentId,
+        type: "error",
+      },
     ];
   }
   if (!level.hasNextPage) {
@@ -97,10 +108,19 @@ const childRows = (
   level: ExpandedOutlineLevel,
   childCount: number
 ): OutlineRow[] => {
-  const { nodes, parentId } = level;
+  const { failure, nodes, parentId } = level;
   if (nodes === undefined) {
-    const type = level.failed ? "error" : "loading";
-    return [{ key: `${type}:${parentId}`, level: 2, parentId, type }];
+    return [
+      failure === null
+        ? { key: `loading:${parentId}`, level: 2, parentId, type: "loading" }
+        : {
+            failure,
+            key: `error:${parentId}`,
+            level: 2,
+            parentId,
+            type: "error",
+          },
+    ];
   }
   const setSize = level.hasNextPage ? childCount : nodes.length;
   const rows = nodes.map(
@@ -116,7 +136,7 @@ const childRows = (
     })
   );
   const settledEmpty =
-    nodes.length === 0 && !level.hasNextPage && !level.failed;
+    nodes.length === 0 && !level.hasNextPage && failure === null;
   return [
     ...rows,
     ...(settledEmpty
@@ -177,25 +197,40 @@ export interface OutlineModel {
 
 interface LevelQuery {
   readonly data: readonly OutlineNode[] | undefined;
-  readonly fetchNextPage: () => unknown;
+  readonly fetchNextPage: (options: {
+    readonly cancelRefetch: boolean;
+  }) => unknown;
   readonly hasNextPage: boolean;
   readonly isError: boolean;
   readonly isFetching: boolean;
+  readonly isFetchingNextPage: boolean;
   readonly isFetchNextPageError: boolean;
   readonly refetch: () => unknown;
 }
 
+const NO_CANCEL = { cancelRefetch: false } as const;
+
+const failureOf = ({
+  isError,
+  isFetchNextPageError,
+}: LevelQuery): OutlineFailure | null => {
+  if (!isError) {
+    return null;
+  }
+  return isFetchNextPageError ? "nextPage" : "load";
+};
+
 const useFetchUntilFound = (level: LevelQuery, sought: string | null) => {
   const { data, fetchNextPage, hasNextPage, isError, isFetching } = level;
-  const missing =
-    sought !== null &&
-    data !== undefined &&
-    !data.some((node) => node.id === sought);
   useEffect(() => {
+    const missing =
+      sought !== null &&
+      data !== undefined &&
+      !data.some((node) => node.id === sought);
     if (missing && hasNextPage && !isFetching && !isError) {
-      fetchNextPage();
+      fetchNextPage(NO_CANCEL);
     }
-  }, [fetchNextPage, hasNextPage, isError, isFetching, missing]);
+  }, [data, fetchNextPage, hasNextPage, isError, isFetching, sought]);
 };
 
 interface LevelActions {
@@ -205,15 +240,30 @@ interface LevelActions {
 
 const useLevelActions = ({
   fetchNextPage,
+  hasNextPage,
+  isError,
   isFetching,
+  isFetchingNextPage,
   isFetchNextPageError,
   refetch,
 }: LevelQuery): LevelActions => {
+  const [queued, setQueued] = useState(false);
   const loadMore = useCallback(() => {
     if (!isFetching) {
-      fetchNextPage();
+      fetchNextPage(NO_CANCEL);
+    } else if (!isFetchingNextPage) {
+      setQueued(true);
     }
-  }, [fetchNextPage, isFetching]);
+  }, [fetchNextPage, isFetching, isFetchingNextPage]);
+  useEffect(() => {
+    if (!queued || isFetching) {
+      return;
+    }
+    setQueued(false);
+    if (hasNextPage && !isError) {
+      fetchNextPage(NO_CANCEL);
+    }
+  }, [fetchNextPage, hasNextPage, isError, isFetching, queued]);
   const retry = useCallback(() => {
     if (isFetchNextPageError) {
       loadMore();
@@ -236,7 +286,9 @@ export function useOutline(
     enabled: expandedId !== null,
   });
 
-  useFetchUntilFound(root, expandedId ?? focus);
+  const rootSought =
+    expandedId ?? (focus?.startsWith(PACKAGE_ID_PREFIX) ? focus : null);
+  useFetchUntilFound(root, rootSought);
   useFetchUntilFound(children, expandedId === null ? null : focus);
 
   const { loadMore: loadMoreRoot, retry: retryRoot } = useLevelActions(root);
@@ -253,24 +305,18 @@ export function useOutline(
     [retryChildren, retryRoot]
   );
 
-  const {
-    data: rootNodes,
-    hasNextPage: rootHasMore,
-    isError: rootFailed,
-  } = root;
-  const {
-    data: childNodes,
-    hasNextPage: childrenHaveMore,
-    isError: childrenFailed,
-  } = children;
+  const { data: rootNodes, hasNextPage: rootHasMore } = root;
+  const { data: childNodes, hasNextPage: childrenHaveMore } = children;
+  const rootFailure = failureOf(root);
+  const childrenFailure = failureOf(children);
   const rows = useMemo(
     () =>
       flattenOutline(
-        { failed: rootFailed, hasNextPage: rootHasMore, nodes: rootNodes },
+        { failure: rootFailure, hasNextPage: rootHasMore, nodes: rootNodes },
         expandedId === null
           ? null
           : {
-              failed: childrenFailed,
+              failure: childrenFailure,
               hasNextPage: childrenHaveMore,
               nodes: childNodes,
               parentId: expandedId,
@@ -278,10 +324,10 @@ export function useOutline(
       ),
     [
       childNodes,
-      childrenFailed,
+      childrenFailure,
       childrenHaveMore,
       expandedId,
-      rootFailed,
+      rootFailure,
       rootHasMore,
       rootNodes,
     ]

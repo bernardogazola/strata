@@ -161,16 +161,22 @@ const moreText = (row: OutlineMoreRow): string =>
         total: row.total,
       });
 
+const errorText = (row: OutlineErrorRow): string => {
+  if (row.parentId !== null) {
+    return t.outline.failed;
+  }
+  return row.failure === "nextPage"
+    ? t.outline.failedRoot
+    : t.outline.failedRefresh;
+};
+
 export interface OutlineTreeRowProps extends PositionedRow<OutlineRow> {
   readonly focus: string | null;
-
-  readonly rootFailureText: string;
 }
 
 export function OutlineTreeRow({
   focus,
   index,
-  rootFailureText,
   row,
   start,
   tabbable,
@@ -203,7 +209,7 @@ export function OutlineTreeRow({
           row={row}
           start={start}
           tabbable={tabbable}
-          text={row.parentId === null ? rootFailureText : t.outline.failed}
+          text={errorText(row)}
         />
       );
     default:

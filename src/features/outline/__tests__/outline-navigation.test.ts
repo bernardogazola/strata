@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   EMPTY_TYPEAHEAD,
   extendTypeahead,
+  followTarget,
   intentOf,
   isTypeaheadKey,
   pinIndexes,
@@ -48,7 +49,7 @@ const ROOT = [
 ];
 
 const settled = (nodes: readonly OutlineNode[] | undefined) => ({
-  failed: false,
+  failure: null,
   hasNextPage: false,
   nodes,
 });
@@ -71,7 +72,7 @@ const LOADING_ROWS = flattenOutline(settled(ROOT), {
 
 const FAILED_ROWS = flattenOutline(settled(ROOT), {
   ...settled(undefined),
-  failed: true,
+  failure: "load",
   parentId: ORDERS,
 });
 
@@ -356,7 +357,7 @@ describe("resolveTarget", () => {
 
   test("a página que falha leva o foco à linha de erro; a que vem vazia fica na última que havia", () => {
     const failed = flattenOutline(
-      { failed: true, hasNextPage: true, nodes: ROOT.slice(0, 2) },
+      { failure: "nextPage", hasNextPage: true, nodes: ROOT.slice(0, 2) },
       null
     );
     const emptyPage = flattenOutline(settled(ROOT.slice(0, 2)), null);
@@ -374,6 +375,74 @@ describe("resolveTarget", () => {
         resolveTarget(target, emptyPage, indexByKeyOf(emptyPage)) ?? undefined
       )
     ).toBe(ORDERS);
+  });
+});
+
+describe("followTarget: pedir de novo os tipos que falharam", () => {
+  const retry = { after: ORDERS, waitingOn: `error:${ORDERS}` };
+
+  test("o alvo segue a linha a caminho que trocou a de erro, e vai à de erro que volta", () => {
+    expect(
+      resolveTarget(retry, FAILED_ROWS, indexByKeyOf(FAILED_ROWS))
+    ).toBeNull();
+    expect(followTarget(retry, FAILED_ROWS, indexByKeyOf(FAILED_ROWS))).toBe(
+      retry
+    );
+
+    const followed = followTarget(
+      retry,
+      LOADING_ROWS,
+      indexByKeyOf(LOADING_ROWS)
+    );
+    expect(followed).toStrictEqual({
+      after: ORDERS,
+      waitingOn: `loading:${ORDERS}`,
+    });
+    expect(
+      resolveTarget(followed, LOADING_ROWS, indexByKeyOf(LOADING_ROWS))
+    ).toBeNull();
+    expect(
+      followTarget(followed, LOADING_ROWS, indexByKeyOf(LOADING_ROWS))
+    ).toBe(followed);
+
+    expect(
+      keyAt(
+        FAILED_ROWS,
+        resolveTarget(followed, FAILED_ROWS, indexByKeyOf(FAILED_ROWS)) ??
+          undefined
+      )
+    ).toBe(`error:${ORDERS}`);
+    expect(
+      keyAt(
+        OPEN_ROWS,
+        resolveTarget(followed, OPEN_ROWS, indexByKeyOf(OPEN_ROWS)) ?? undefined
+      )
+    ).toBe(ORDER);
+  });
+
+  test("os tipos pedidos de novo vêm vazios: o foco fica no pacote, sem esperar a linha do vazio", () => {
+    const empty = flattenOutline(settled(ROOT), {
+      ...settled([]),
+      parentId: ORDERS,
+    });
+    const followed = { after: ORDERS, waitingOn: `loading:${ORDERS}` };
+
+    expect(
+      keyAt(
+        empty,
+        resolveTarget(followed, empty, indexByKeyOf(empty)) ?? undefined
+      )
+    ).toBe(ORDERS);
+  });
+
+  test("uma chave conhecida, ou um alvo sem linha a caminho depois dele, não muda", () => {
+    const moved = { key: SHARED };
+    const more = { after: ORDERS, waitingOn: "more:root" };
+
+    expect(followTarget(moved, LOADING_ROWS, indexByKeyOf(LOADING_ROWS))).toBe(
+      moved
+    );
+    expect(followTarget(more, OPEN_ROWS, indexByKeyOf(OPEN_ROWS))).toBe(more);
   });
 });
 

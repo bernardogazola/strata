@@ -30,6 +30,7 @@ import {
   EMPTY_TYPEAHEAD,
   extendTypeahead,
   type FocusTarget,
+  followTarget,
   intentOf,
   isTypeaheadKey,
   type KeyIntent,
@@ -82,7 +83,7 @@ const elementIdOf = (target: EventTarget | null): string | null => {
   );
 };
 
-const useCrossHighlight = () => {
+const useCrossHighlight = (treeRef: RefObject<HTMLDivElement | null>) => {
   const written = useRef<string | null>(null);
   const write = useCallback((elementId: string) => {
     written.current = elementId;
@@ -96,6 +97,24 @@ const useCrossHighlight = () => {
     }
   }, []);
   useEffect(() => release, [release]);
+  useEffect(
+    () =>
+      useAppStore.subscribe((state, previous) => {
+        if (
+          state.activeElementId !== null ||
+          previous.activeElementId === null
+        ) {
+          return;
+        }
+        const focused = treeRef.current?.contains(document.activeElement)
+          ? elementIdOf(document.activeElement)
+          : null;
+        if (focused !== null) {
+          write(focused);
+        }
+      }),
+    [treeRef, write]
+  );
   return { release, write };
 };
 
@@ -109,8 +128,6 @@ interface OutlineTreeProps {
   readonly onLoadMore: (parentId: string | null) => void;
   readonly onRetry: (parentId: string | null) => void;
   readonly onSelect: (elementId: string, kind: ElementKind) => void;
-
-  readonly rootFailureText: string;
   readonly rows: readonly OutlineRow[];
   readonly treeRef: RefObject<HTMLDivElement | null>;
   readonly view: GraphViewParams;
@@ -126,12 +143,11 @@ function OutlineTree({
   onLoadMore,
   onRetry,
   onSelect,
-  rootFailureText,
   rows,
   treeRef,
   view,
 }: OutlineTreeProps) {
-  const { release, write } = useCrossHighlight();
+  const { release, write } = useCrossHighlight(treeRef);
 
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [containsFocus, setContainsFocus] = useState(false);
@@ -186,6 +202,16 @@ function OutlineTree({
   }, [targetIndex, treeRef]);
 
   useLayoutEffect(() => {
+    if (focusTarget === null) {
+      return;
+    }
+    const followed = followTarget(focusTarget, rows, indexByKey);
+    if (followed !== focusTarget) {
+      setFocusTarget(followed);
+    }
+  }, [focusTarget, indexByKey, rows]);
+
+  useLayoutEffect(() => {
     const armedFrom = refocusFrom.current;
     if (armedFrom === null || armedFrom === viewKey) {
       return;
@@ -198,6 +224,13 @@ function OutlineTree({
       ?.querySelector<HTMLElement>(`[data-index="${tabbableIndex}"]`)
       ?.focus({ preventScroll: true });
   }, [tabbableIndex, treeRef, viewKey]);
+
+  useLayoutEffect(() => {
+    if (containsFocus && !treeRef.current?.contains(document.activeElement)) {
+      setContainsFocus(false);
+      release();
+    }
+  });
 
   useEffect(() => {
     if (!containsFocus && tabbableIndex !== null) {
@@ -224,6 +257,10 @@ function OutlineTree({
         }
         onLoadMore(row.parentId);
       } else if (row?.type === "error") {
+        const previous = rows[index - 1];
+        if (previous !== undefined) {
+          setFocusTarget({ after: previous.key, waitingOn: row.key });
+        }
         onRetry(row.parentId);
       }
     },
@@ -396,7 +433,6 @@ function OutlineTree({
               focus={focus}
               index={index}
               key={row.key}
-              rootFailureText={rootFailureText}
               row={row}
               start={start}
               tabbable={index === tabbableIndex}
@@ -470,7 +506,6 @@ export function ArchitectureOutline({
   );
 
   const retryRoot = useCallback(() => retry(null), [retry]);
-  const rootFailureText = t.outline.failedRoot;
 
   let body: ReactNode;
   if (rows.length > 0) {
@@ -485,7 +520,6 @@ export function ArchitectureOutline({
         onLoadMore={outline.loadMore}
         onRetry={retry}
         onSelect={onSelect}
-        rootFailureText={rootFailureText}
         rows={rows}
         treeRef={treeRef}
         view={view}
@@ -500,10 +534,7 @@ export function ArchitectureOutline({
   }
 
   return (
-    <section
-      aria-labelledby={headingId}
-      className="flex min-h-0 flex-1 flex-col"
-    >
+    <div className="flex min-h-0 flex-1 flex-col">
       <h2
         className="mb-2 rounded-sm px-2 font-medium text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         id={headingId}
@@ -513,6 +544,6 @@ export function ArchitectureOutline({
         {t.outline.title}
       </h2>
       {body}
-    </section>
+    </div>
   );
 }

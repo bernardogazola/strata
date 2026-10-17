@@ -9,6 +9,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import type { Core, CytoscapeOptions } from "cytoscape";
 import { createRef, type Ref } from "react";
 import {
   afterEach,
@@ -45,6 +46,30 @@ const PAYMENT_GATEWAY = "type:br.pucpr.orders.PaymentGateway";
 
 const LEVEL_ONE: GraphViewParams = { level: "PACKAGE" };
 const ordersTypes: GraphViewParams = { level: "TYPE", parentId: ORDERS };
+
+const instances = vi.hoisted(() => [] as Core[]);
+vi.mock("cytoscape", async (importOriginal) => {
+  const real = (
+    (await importOriginal()) as { default: typeof import("cytoscape") }
+  ).default;
+  const recording = Object.assign((options?: CytoscapeOptions) => {
+    const cy = real(options);
+    instances.push(cy);
+    return cy;
+  }, real);
+  return { default: recording };
+});
+
+const liveInstance = (): Core => {
+  const live = instances.filter((instance) => !instance.destroyed());
+  const [cy] = live;
+  if (cy === undefined || live.length > 1) {
+    throw new Error(
+      `esperava exatamente uma instância viva, há ${live.length}`
+    );
+  }
+  return cy;
+};
 
 const WHEEL_WARNING = /custom wheel sensitivity/;
 const GLOBAL_CSS = path.resolve(
@@ -187,6 +212,40 @@ const tabbableRows = (): HTMLElement[] =>
 const activeElementId = (): string | null =>
   useAppStore.getState().activeElementId;
 
+const activeBorder = `${GRAPH_STYLE.node.activeBorderWidth}px`;
+
+const renderWithCanvas = async (): Promise<void> => {
+  const slice = (await fakeRequest("graph.slice", {
+    analysisId: AN,
+    level: "PACKAGE",
+  })) as GraphSlice;
+  const { elements } = toGraphView(slice);
+  const noop = (): void => undefined;
+  render(
+    <QueryClientProvider client={createQueryClient()}>
+      <ArchitectureOutline
+        analysisId={AN}
+        focus={null}
+        onCollapse={noop}
+        onExpand={noop}
+        onSelect={noop}
+        view={LEVEL_ONE}
+      />
+      <ArchitectureGraph
+        elements={elements}
+        label={t.shell.regions.canvas}
+        onExpand={noop}
+        onRenderError={noop}
+        onSelect={noop}
+        selectedElementId={null}
+        slice={slice}
+      />
+    </QueryClientProvider>
+  );
+  await waitForRows(3);
+  await waitFor(() => expect(window.__STRATA_GRAPH__).toBeDefined());
+};
+
 describe("ArchitectureOutline: uma parada de Tab", () => {
   test("exatamente uma linha tabulável, e a árvore em si sem tabIndex", async () => {
     setup();
@@ -221,36 +280,7 @@ describe("ArchitectureOutline: uma parada de Tab", () => {
   });
 
   test("ArrowDown move o foco do DOM e o activeElementId, e o canvas destaca o nó", async () => {
-    const slice = (await fakeRequest("graph.slice", {
-      analysisId: AN,
-      level: "PACKAGE",
-    })) as GraphSlice;
-    const { elements } = toGraphView(slice);
-    const noop = (): void => undefined;
-    render(
-      <QueryClientProvider client={createQueryClient()}>
-        <ArchitectureOutline
-          analysisId={AN}
-          focus={null}
-          onCollapse={noop}
-          onExpand={noop}
-          onSelect={noop}
-          view={LEVEL_ONE}
-        />
-        <ArchitectureGraph
-          elements={elements}
-          label={t.shell.regions.canvas}
-          onExpand={noop}
-          onRenderError={noop}
-          onSelect={noop}
-          selectedElementId={null}
-          slice={slice}
-        />
-      </QueryClientProvider>
-    );
-    await waitForRows(3);
-    await waitFor(() => expect(window.__STRATA_GRAPH__).toBeDefined());
-    const activeBorder = `${GRAPH_STYLE.node.activeBorderWidth}px`;
+    await renderWithCanvas();
 
     focusRow(BILLING);
     expect(window.__STRATA_GRAPH__?.style(BILLING, "border-width")).toBe(
@@ -490,6 +520,60 @@ describe("ArchitectureOutline: o destaque cruzado", () => {
     expect(activeElementId()).toBe(SHARED);
     fireEvent.mouseOut(rowById(SHARED), { relatedTarget: outside });
     expect(activeElementId()).toBe(BILLING);
+  });
+
+  test("o ponteiro cruzando outro nó do canvas não apaga o destaque que o foco de teclado segura", async () => {
+    await renderWithCanvas();
+    focusRow(BILLING);
+    const shared = liveInstance().getElementById(SHARED);
+
+    act(() => {
+      shared.emit("mouseover");
+    });
+    expect(window.__STRATA_GRAPH__?.style(SHARED, "border-width")).toBe(
+      activeBorder
+    );
+    act(() => {
+      shared.emit("mouseout");
+    });
+
+    expect(document.activeElement).toBe(rowById(BILLING));
+    expect(activeElementId()).toBe(BILLING);
+    expect(rowById(BILLING).hasAttribute("data-active")).toBe(true);
+    expect(window.__STRATA_GRAPH__?.style(BILLING, "border-width")).toBe(
+      activeBorder
+    );
+    expect(window.__STRATA_GRAPH__?.style(SHARED, "border-width")).not.toBe(
+      activeBorder
+    );
+  });
+
+  test("a linha focada que uma troca de vista de fora tira do DOM solta o destaque que a árvore escreveu", async () => {
+    const { rerender } = setup({ view: ordersTypes });
+    await waitForRows(6);
+    focusRow(ORDER);
+    expect(activeElementId()).toBe(ORDER);
+
+    rerender({ view: LEVEL_ONE });
+    await waitForRows(3);
+
+    expect(document.activeElement).toBe(document.body);
+    expect(activeElementId()).toBeNull();
+  });
+
+  test("depois dessa troca a árvore não se diz mais focada: no Avançar, a tabulável é o pacote aberto", async () => {
+    const { rerender } = setup({ view: ordersTypes });
+    await waitForRows(6);
+    focusRow(ORDER);
+
+    rerender({ view: LEVEL_ONE });
+    await waitForRows(3);
+    rerender({ view: ordersTypes });
+    await waitForRows(6);
+
+    expect(document.activeElement).toBe(document.body);
+    expect(tabbableRows()).toStrictEqual([rowById(ORDERS)]);
+    expect(rowById(ORDER).hasAttribute("data-active")).toBe(false);
   });
 
   test("focar uma pseudo-linha solta o id que a árvore escreveu", async () => {

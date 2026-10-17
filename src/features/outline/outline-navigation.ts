@@ -199,9 +199,25 @@ export const resolveTarget = (
   if (next === undefined) {
     return indexByKey.has(target.waitingOn) ? null : before;
   }
-  return next.key === target.waitingOn || !isFocusable(next)
-    ? null
-    : before + 1;
+  if (next.key === target.waitingOn || next.type === "loading") {
+    return null;
+  }
+  return isFocusable(next) ? before + 1 : before;
+};
+
+export const followTarget = (
+  target: FocusTarget,
+  rows: readonly OutlineRow[],
+  indexByKey: ReadonlyMap<string, number>
+): FocusTarget => {
+  if ("key" in target) {
+    return target;
+  }
+  const before = indexByKey.get(target.after);
+  const next = before === undefined ? undefined : rows[before + 1];
+  return next?.type === "loading" && next.key !== target.waitingOn
+    ? { after: target.after, waitingOn: next.key }
+    : target;
 };
 
 export const pinIndexes = (
