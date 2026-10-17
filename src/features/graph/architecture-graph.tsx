@@ -179,7 +179,11 @@ interface GraphCallbacks {
   readonly onSelect: (elementId: string | null) => void;
 }
 
-const bindIntent = (cy: Core, callbacks: GraphCallbacks): void => {
+const bindIntent = (
+  cy: Core,
+  container: HTMLElement,
+  callbacks: GraphCallbacks
+): (() => void) => {
   cy.on("tap", "node", (event: EventObjectNode) => {
     callbacks.onSelect(event.target.id());
   });
@@ -195,13 +199,26 @@ const bindIntent = (cy: Core, callbacks: GraphCallbacks): void => {
       callbacks.onExpand(event.target.id());
     }
   );
-  const { setActiveElementId } = useAppStore.getState();
+  const { releaseActiveElementId, setActiveElementId } = useAppStore.getState();
+  let hoveredId: string | null = null;
   cy.on("mouseover", "node", (event: EventObjectNode) => {
-    setActiveElementId(event.target.id());
+    hoveredId = event.target.id();
+    setActiveElementId(hoveredId);
   });
-  cy.on("mouseout", "node", () => {
-    setActiveElementId(null);
+  cy.on("mouseout", "node", (event: EventObjectNode) => {
+    hoveredId = null;
+    releaseActiveElementId(event.target.id());
   });
+  const releaseOnLeave = (): void => {
+    if (hoveredId !== null) {
+      releaseActiveElementId(hoveredId);
+      hoveredId = null;
+    }
+  };
+  container.addEventListener("mouseleave", releaseOnLeave);
+  return () => {
+    container.removeEventListener("mouseleave", releaseOnLeave);
+  };
 };
 
 class GraphCanvas {
@@ -235,10 +252,11 @@ class GraphCanvas {
       style: buildStylesheet(readGraphPalette()),
       wheelSensitivity: WHEEL_SENSITIVITY,
     });
-    bindIntent(this.#cy, callbacks);
+    const unbindIntent = bindIntent(this.#cy, container, callbacks);
     this.#writeState("idle");
     this.#highlight(useAppStore.getState().activeElementId);
     this.#teardown = [
+      unbindIntent,
       useAppStore.subscribe((state, previous) => {
         if (state.activeElementId !== previous.activeElementId) {
           this.#highlight(state.activeElementId);

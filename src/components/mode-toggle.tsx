@@ -8,13 +8,10 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { t } from "@/i18n/messages";
 import type { Theme } from "@/lib/theme";
 
-const THEME_OPTIONS: ReadonlyArray<{ label: string; value: Theme }> = [
-  { label: "Claro", value: "light" },
-  { label: "Escuro", value: "dark" },
-  { label: "Sistema", value: "system" },
-];
+const THEME_OPTIONS: readonly Theme[] = ["light", "dark", "system"];
 
 export function ModeToggle() {
   const { theme, resolvedTheme, setTheme } = useTheme();
@@ -23,17 +20,13 @@ export function ModeToggle() {
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button size="icon" variant="outline" />}>
         {resolvedTheme === "dark" ? <IconMoon /> : <IconSun />}
-        <span className="sr-only">Alternar tema</span>
+        <span className="sr-only">{t.theme.label}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuRadioGroup onValueChange={setTheme} value={theme}>
           {THEME_OPTIONS.map((option) => (
-            <DropdownMenuRadioItem
-              closeOnClick
-              key={option.value}
-              value={option.value}
-            >
-              {option.label}
+            <DropdownMenuRadioItem closeOnClick key={option} value={option}>
+              {t.theme.options[option]}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

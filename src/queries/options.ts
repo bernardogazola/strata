@@ -1,4 +1,8 @@
-import { queryOptions } from "@tanstack/react-query";
+import {
+  infiniteQueryOptions,
+  keepPreviousData,
+  queryOptions,
+} from "@tanstack/react-query";
 import {
   analyzerRequest,
   type MethodInput,
@@ -9,7 +13,8 @@ import {
 } from "@/bridge/analyzer";
 import { toGraphView } from "@/features/graph/adapter";
 import { GRAPH_PERF } from "@/features/graph/perf";
-import type { GraphLevel } from "@/protocol/enums";
+import type { ElementKind, GraphLevel } from "@/protocol/enums";
+import type { OutlineNode, OutlinePage } from "@/protocol/graph";
 import { queryKeys } from "./keys";
 
 export const analyzerQueryOptions = <M extends PlainMethod>(
@@ -55,3 +60,50 @@ export const graphSliceQueryOptions = (
     select: toGraphView,
   });
 };
+
+export const OUTLINE_PAGE_LIMIT = 500;
+
+interface OutlinePageParam {
+  readonly pageParam: string | null;
+}
+
+const fetchOutlinePage =
+  (analysisId: string, parentId: string | null) =>
+  ({ pageParam }: OutlinePageParam): Promise<OutlinePage> =>
+    analyzerRequest("outline.children", {
+      analysisId,
+      cursor: pageParam ?? undefined,
+      limit: OUTLINE_PAGE_LIMIT,
+      parentId,
+    });
+
+const flattenOutlinePages = (data: {
+  readonly pages: readonly OutlinePage[];
+}): OutlineNode[] => data.pages.flatMap((page) => page.items);
+
+export const outlineChildrenQueryOptions = (
+  analysisId: string,
+  parentId: string | null
+) =>
+  infiniteQueryOptions({
+    getNextPageParam: (last: OutlinePage) => last.nextCursor,
+    initialPageParam: null as string | null,
+    queryFn: fetchOutlinePage(analysisId, parentId),
+    queryKey: queryKeys.structure.outline(analysisId, parentId),
+    select: flattenOutlinePages,
+  });
+
+export const SEARCH_KINDS: readonly ElementKind[] = ["PACKAGE", "TYPE"];
+
+export const graphSearchQueryOptions = (analysisId: string, query: string) =>
+  queryOptions({
+    enabled: query !== "",
+    placeholderData: keepPreviousData,
+    queryFn: () =>
+      analyzerRequest("graph.search", {
+        analysisId,
+        kinds: [...SEARCH_KINDS],
+        query,
+      }),
+    queryKey: queryKeys.structure.search(analysisId, query),
+  });

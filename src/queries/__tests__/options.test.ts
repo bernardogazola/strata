@@ -1,4 +1,8 @@
-import { QueryClientProvider, useQuery } from "@tanstack/react-query";
+import {
+  QueryClientProvider,
+  useInfiniteQuery,
+  useQuery,
+} from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
@@ -15,8 +19,12 @@ import { queryKeys } from "@/queries/keys";
 import {
   analyzerQueryOptions,
   type GraphViewParams,
+  graphSearchQueryOptions,
   graphSliceQueryOptions,
+  OUTLINE_PAGE_LIMIT,
+  outlineChildrenQueryOptions,
   repositoryQueryOptions,
+  SEARCH_KINDS,
 } from "@/queries/options";
 
 const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
@@ -240,5 +248,134 @@ describe("as fábricas genéricas", () => {
 
     expect(request).toHaveBeenCalledWith("repository.describe", {}, handle);
     expect(description).toHaveProperty("buildSystem");
+  });
+});
+
+const wrapperFor =
+  (queryClient: ReturnType<typeof createQueryClient>) =>
+  ({ children }: { readonly children: ReactNode }) =>
+    createElement(QueryClientProvider, { client: queryClient }, children);
+
+describe("outlineChildrenQueryOptions", () => {
+  test("a chave fica sob structure.all e não carrega cursor", () => {
+    const { queryKey } = outlineChildrenQueryOptions(AN, ORDERS);
+
+    expect(queryKey).toStrictEqual(queryKeys.structure.outline(AN, ORDERS));
+    expect(queryKey.slice(0, 3)).toStrictEqual(queryKeys.structure.all(AN));
+  });
+
+  test("a primeira página da raiz pede parentId nulo, sem cursor, na página máxima", async () => {
+    const request = vi.spyOn(transport, "request");
+    const queryClient = createQueryClient();
+    const { result } = renderHook(
+      () => useInfiniteQuery(outlineChildrenQueryOptions(AN, null)),
+      { wrapper: wrapperFor(queryClient) }
+    );
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    const [method, payload] = request.mock.calls[0] ?? [];
+    expect(method).toBe("outline.children");
+    expect(payload).toMatchObject({
+      analysisId: AN,
+      limit: OUTLINE_PAGE_LIMIT,
+      parentId: null,
+    });
+    expect((payload as { cursor?: unknown }).cursor).toBeUndefined();
+    expect(result.current.data?.map((node) => node.id)).toStrictEqual([
+      "pkg:br.pucpr.billing",
+      ORDERS,
+      "pkg:br.pucpr.shared",
+    ]);
+    expect(result.current.hasNextPage).toBe(false);
+  });
+
+  test("a segunda página vai pelo cursor da primeira, na mesma entrada de cache", async () => {
+    const nextCursor = "Y3Vyc29yLTI";
+    const node = (id: string) => ({
+      childCount: 0,
+      id,
+      kind: "TYPE",
+      label: id,
+    });
+    const request = vi
+      .spyOn(transport, "request")
+      .mockImplementation((_method, payload) => {
+        const { cursor } = payload as { cursor?: string };
+        return Promise.resolve(
+          cursor === undefined
+            ? { items: [node("type:a.A")], nextCursor }
+            : { items: [node("type:a.B")], nextCursor: null }
+        );
+      });
+    const queryClient = createQueryClient();
+    const { result } = renderHook(
+      () => useInfiniteQuery(outlineChildrenQueryOptions(AN, ORDERS)),
+      { wrapper: wrapperFor(queryClient) }
+    );
+    await waitFor(() => {
+      expect(result.current.hasNextPage).toBe(true);
+    });
+
+    await result.current.fetchNextPage();
+
+    await waitFor(() => {
+      expect(result.current.data?.map((item) => item.id)).toStrictEqual([
+        "type:a.A",
+        "type:a.B",
+      ]);
+    });
+    expect(result.current.hasNextPage).toBe(false);
+    expect(request.mock.calls[1]?.[1]).toMatchObject({
+      cursor: nextCursor,
+      parentId: ORDERS,
+    });
+    expect(
+      queryClient.getQueryCache().findAll({
+        queryKey: queryKeys.structure.outline(AN, ORDERS),
+      })
+    ).toHaveLength(1);
+  });
+});
+
+describe("graphSearchQueryOptions", () => {
+  test("a chave fica sob structure.all", () => {
+    const { queryKey } = graphSearchQueryOptions(AN, "order");
+
+    expect(queryKey).toStrictEqual(queryKeys.structure.search(AN, "order"));
+    expect(queryKey.slice(0, 3)).toStrictEqual(queryKeys.structure.all(AN));
+  });
+
+  test("pede só pacotes e tipos, com a consulta como veio", async () => {
+    const request = vi.spyOn(transport, "request");
+
+    const result = await createQueryClient().fetchQuery(
+      graphSearchQueryOptions(AN, "order")
+    );
+
+    expect(request).toHaveBeenCalledWith("graph.search", {
+      analysisId: AN,
+      kinds: [...SEARCH_KINDS],
+      query: "order",
+    });
+    expect(result.results.map((hit) => hit.elementId)).toContain(ORDERS);
+  });
+
+  test("a consulta vazia não vira pedido", async () => {
+    const request = vi.spyOn(transport, "request");
+    const queryClient = createQueryClient();
+    const { result } = renderHook(
+      () => useQuery(graphSearchQueryOptions(AN, "")),
+      { wrapper: wrapperFor(queryClient) }
+    );
+
+    await waitFor(() => {
+      expect(result.current.fetchStatus).toBe("idle");
+    });
+    expect(request).not.toHaveBeenCalled();
+    expect(result.current.data).toBeUndefined();
   });
 });

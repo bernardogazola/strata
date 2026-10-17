@@ -63,6 +63,8 @@ const ptBR = {
     },
     legend: {
       expandHint: "Clique duas vezes em um pacote para ver os tipos dele.",
+      keyboardHint:
+        "Pelo teclado, use a estrutura da arquitetura: as setas percorrem, Enter seleciona e a seta para a direita abre um pacote.",
       kind: "Forma do elemento",
       kindShapes: {
         PACKAGE: "Retângulo: pacote",
@@ -91,12 +93,44 @@ const ptBR = {
     empty: "Selecione um elemento no mapa para ver os detalhes.",
     expand: "Ver os tipos deste pacote",
     kind: "Elemento",
+    notOnMap: {
+      aggregated:
+        "Este pacote não aparece sozinho no mapa: o primeiro nível agrupa os pacotes pelos prefixos de topo.",
+      truncated:
+        "Este elemento não aparece no mapa: o limite de exibição do nível o deixou de fora.",
+    },
     typeCount: "tipos neste pacote",
+  },
+
+  outline: {
+    failed: "Não foi possível carregar os tipos deste pacote. Tentar de novo",
+    failedRefresh: "Não foi possível atualizar os pacotes. Tentar de novo",
+    failedRoot: "Não foi possível carregar mais pacotes. Tentar de novo",
+    loading: "Carregando a estrutura…",
+    loadingTypes: "Carregando os tipos…",
+    loadMore: {
+      PACKAGE: "Carregar mais pacotes",
+      TYPE: "Carregar mais tipos ({shown} de {total})",
+    },
+    title: "Estrutura da arquitetura",
   },
 
   repository: {
     open: "Abrir repositório",
     restart: "Reiniciar",
+  },
+
+  search: {
+    capped:
+      "{count}. A busca mostra até {limit} resultados. Refine o termo para encontrar outros.",
+    count: {
+      one: "{count} resultado",
+      other: "{count} resultados",
+      zero: "Nenhum pacote ou tipo encontrado",
+    },
+    label: "Buscar pacotes e tipos por nome",
+    placeholder: "Buscar…",
+    results: "Resultados da busca",
   },
 
   shell: {
@@ -109,6 +143,16 @@ const ptBR = {
       canvas: "Mapa da arquitetura",
       inspector: "Inspetor",
       sidebar: "Estrutura",
+    },
+    skipToOutline: "Pular para a estrutura da arquitetura",
+  },
+
+  theme: {
+    label: "Alternar tema",
+    options: {
+      dark: "Escuro",
+      light: "Claro",
+      system: "Sistema",
     },
   },
 

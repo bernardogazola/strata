@@ -7,11 +7,16 @@ import {
   englishTermAccessibleNames,
 } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
-import { clampText, sanitizeUntrusted } from "@/lib/untrusted";
+import { DEFAULT_UNTRUSTED_MAX_CHARS } from "@/lib/untrusted";
 import type { GraphNode } from "@/protocol/graph";
+import { ElementLabel } from "./element-label";
+
+export type NotOnMapReason = keyof typeof t.inspector.notOnMap;
 
 export interface NodeSummaryProps {
   readonly node: GraphNode | null;
+
+  readonly notOnMap?: NotOnMapReason;
 
   readonly onExpand: (elementId: string) => void;
 }
@@ -58,11 +63,17 @@ function ExpandButton({
   );
 }
 
-export function NodeSummary({ node, onExpand }: NodeSummaryProps) {
+export function NodeSummary({ node, notOnMap, onExpand }: NodeSummaryProps) {
   const titleId = useId();
 
   if (node === null) {
-    return <p className="text-muted-foreground text-sm">{t.inspector.empty}</p>;
+    return (
+      <p className="text-muted-foreground text-sm">
+        {notOnMap === undefined
+          ? t.inspector.empty
+          : t.inspector.notOnMap[notOnMap]}
+      </p>
+    );
   }
 
   const isPackage = node.kind === "PACKAGE";
@@ -73,9 +84,11 @@ export function NodeSummary({ node, onExpand }: NodeSummaryProps) {
       className="flex select-text flex-col gap-3 text-sm"
     >
       <h2 className="break-words font-medium font-mono" id={titleId}>
-        <bdi lang="" translate="no">
-          {clampText(sanitizeUntrusted(node.label))}
-        </bdi>
+        <ElementLabel
+          kind={node.kind}
+          label={node.label}
+          maxChars={DEFAULT_UNTRUSTED_MAX_CHARS}
+        />
       </h2>
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">

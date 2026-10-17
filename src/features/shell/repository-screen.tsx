@@ -4,30 +4,62 @@ import { useCallback, useEffect, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
 import { buttonVariants } from "@/components/ui/button";
 import { AnalyzerStatus } from "@/features/backend/analyzer-status";
-import { GRAPH_LABEL_MAX_CHARS } from "@/features/graph/adapter";
-import { GraphLegend } from "@/features/graph/graph-legend";
+import { ElementLabel } from "@/features/graph/element-label";
 import { GraphPanel } from "@/features/graph/graph-panel";
-import { NodeSummary } from "@/features/graph/node-summary";
+import {
+  NodeSummary,
+  type NotOnMapReason,
+} from "@/features/graph/node-summary";
+import {
+  ArchitectureOutline,
+  type OutlineHandle,
+} from "@/features/outline/architecture-outline";
+import { NodeSearch } from "@/features/outline/node-search";
 import { t } from "@/i18n/messages";
-import { clampText, sanitizeUntrusted } from "@/lib/untrusted";
-import type { GraphNode, GraphSlice } from "@/protocol/graph";
+import type { ElementKind } from "@/protocol/enums";
+import type { GraphNode, GraphSlice, SearchHit } from "@/protocol/graph";
 import {
   type GraphViewParams,
   graphSliceQueryOptions,
 } from "@/queries/options";
 import { AppShell } from "./app-shell";
-import { type RepositorySearch, resolveGraphView } from "./repository-search";
+import {
+  backToLevelOne,
+  changesView,
+  expandPackage,
+  resolveGraphView,
+  revealSearchHit,
+  type SearchTransition,
+  selectElement,
+  selectWhereDrawn,
+} from "./repository-search";
+import { SkipToOutline } from "./skip-to-outline";
 
 const ROUTE_ID = "/repository/$handle";
 const routeApi = getRouteApi(ROUTE_ID);
 
-const findNode = (
+interface FocusedNode {
+  readonly node: GraphNode | null;
+
+  readonly notOnMap: NotOnMapReason | undefined;
+}
+
+const describeFocus = (
   slice: GraphSlice,
   elementId: string | null
-): GraphNode | null =>
-  elementId === null
-    ? null
-    : (slice.nodes.find((node) => node.id === elementId) ?? null);
+): FocusedNode => {
+  if (elementId === null) {
+    return { node: null, notOnMap: undefined };
+  }
+  const node = slice.nodes.find((candidate) => candidate.id === elementId);
+  if (node !== undefined) {
+    return { node, notOnMap: undefined };
+  }
+  if (slice.aggregated) {
+    return { node: null, notOnMap: "aggregated" };
+  }
+  return { node: null, notOnMap: slice.truncated ? "truncated" : undefined };
+};
 
 function ParentCrumb({
   analysisId,
@@ -48,23 +80,8 @@ function ParentCrumb({
   if (label === undefined) {
     return <>{t.shell.breadcrumb.selectedPackage}</>;
   }
-  const clean = clampText(sanitizeUntrusted(label), GRAPH_LABEL_MAX_CHARS);
-  if (clean === "") {
-    return <>{t.graph.defaultPackage}</>;
-  }
-  return (
-    <bdi className="font-mono" lang="" translate="no">
-      {clean}
-    </bdi>
-  );
+  return <ElementLabel className="font-mono" kind="PACKAGE" label={label} />;
 }
-
-const backToLevelOne = (prev: RepositorySearch): RepositorySearch => ({
-  ...prev,
-  focus: prev.parent,
-  level: "PACKAGE",
-  parent: undefined,
-});
 
 const useFocusOnViewChange = (viewKey: string) => {
   const targetRef = useRef<HTMLSpanElement>(null);
@@ -170,15 +187,21 @@ function FocusedNodeSummary({
   readonly onExpand: (elementId: string) => void;
   readonly view: GraphViewParams;
 }) {
-  const selectNode = useCallback(
-    (slice: GraphSlice) => findNode(slice, focus),
+  const selectFocus = useCallback(
+    (slice: GraphSlice) => describeFocus(slice, focus),
     [focus]
   );
   const { data } = useQuery({
     ...graphSliceQueryOptions(analysisId, view),
-    select: selectNode,
+    select: selectFocus,
   });
-  return <NodeSummary node={data ?? null} onExpand={onExpand} />;
+  return (
+    <NodeSummary
+      node={data?.node ?? null}
+      notOnMap={data?.notOnMap}
+      onExpand={onExpand}
+    />
+  );
 }
 
 export function RepositoryScreen() {
@@ -187,30 +210,37 @@ export function RepositoryScreen() {
   const view = resolveGraphView(search);
   const focus = search.focus ?? null;
   const analysisId = search.analysis;
+  const outlineRef = useRef<OutlineHandle>(null);
+
+  const go = useCallback(
+    (transition: SearchTransition) => {
+      navigate({
+        replace: !changesView(search, transition(search)),
+        search: transition,
+      });
+    },
+    [navigate, search]
+  );
 
   const onSelect = useCallback(
-    (elementId: string | null) => {
-      navigate({
-        replace: true,
-        search: (prev) => ({ ...prev, focus: elementId ?? undefined }),
-      });
-    },
-    [navigate]
+    (elementId: string | null) => go(selectElement(elementId)),
+    [go]
   );
-
   const onExpand = useCallback(
-    (elementId: string) => {
-      navigate({
-        search: (prev) => ({
-          ...prev,
-          focus: undefined,
-          level: "TYPE",
-          parent: elementId,
-        }),
-      });
-    },
-    [navigate]
+    (packageId: string) => go(expandPackage(packageId)),
+    [go]
   );
+  const onCollapse = useCallback(() => go(backToLevelOne), [go]);
+  const onOutlineSelect = useCallback(
+    (elementId: string, kind: ElementKind) =>
+      go(selectWhereDrawn(elementId, kind)),
+    [go]
+  );
+  const onReveal = useCallback(
+    (hit: SearchHit) => go(revealSearchHit(hit)),
+    [go]
+  );
+  const onSkip = useCallback(() => outlineRef.current?.focus(), []);
 
   return (
     <AppShell
@@ -240,16 +270,38 @@ export function RepositoryScreen() {
         analysisId === undefined ? (
           <NoAnalysis />
         ) : (
-          <GraphPanel
-            analysisId={analysisId}
-            focus={focus}
-            onExpand={onExpand}
-            onSelect={onSelect}
-            view={view}
-          />
+          <>
+            <SkipToOutline onSkip={onSkip} />
+            <GraphPanel
+              analysisId={analysisId}
+              focus={focus}
+              onExpand={onExpand}
+              onSelect={onSelect}
+              view={view}
+            />
+          </>
         )
       }
-      sidebar={<GraphLegend />}
+      sidebar={
+        analysisId === undefined ? null : (
+          <div className="flex h-full min-h-0 flex-col gap-4">
+            <NodeSearch
+              analysisId={analysisId}
+              focus={focus}
+              onReveal={onReveal}
+            />
+            <ArchitectureOutline
+              analysisId={analysisId}
+              focus={focus}
+              onCollapse={onCollapse}
+              onExpand={onExpand}
+              onSelect={onOutlineSelect}
+              ref={outlineRef}
+              view={view}
+            />
+          </div>
+        )
+      }
     />
   );
 }

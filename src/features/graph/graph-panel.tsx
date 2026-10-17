@@ -1,12 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { BridgeError } from "@/bridge/analyzer";
+import { protocolErrorOf } from "@/bridge/analyzer";
 import { Button } from "@/components/ui/button";
 import { formatProtocolError } from "@/i18n/errors";
 import { interpolate, plural } from "@/i18n/format";
 import { graphLevelLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
-import type { ProtocolError } from "@/protocol/errors";
 import type { GraphSlice } from "@/protocol/graph";
 import {
   type GraphViewParams,
@@ -14,6 +13,7 @@ import {
 } from "@/queries/options";
 import { GraphSliceViolationError, type GraphView } from "./adapter";
 import { ArchitectureGraph } from "./architecture-graph";
+import { GraphLegend } from "./graph-legend";
 
 export interface GraphPanelProps {
   readonly analysisId: string;
@@ -28,11 +28,6 @@ interface RenderFailure {
   readonly error: Error;
   readonly view: GraphView;
 }
-
-const protocolErrorOf = (error: Error): ProtocolError =>
-  error instanceof BridgeError
-    ? error.protocolError
-    : { code: "INTERNAL_UNEXPECTED", origin: "frontend" };
 
 interface CountForms {
   readonly one: string;
@@ -194,6 +189,7 @@ export function GraphPanel({
         )}
         {emptyText === null ? null : <CenteredStatus text={emptyText} />}
       </div>
+      <GraphLegend />
     </div>
   );
 }

@@ -1,7 +1,13 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { act, render, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import type { Core, CytoscapeOptions } from "cytoscape";
 import { StrictMode } from "react";
 import {
@@ -835,6 +841,52 @@ describe("ArchitectureGraph: seleção, destaque e intenção", () => {
       cy.getElementById(id).emit("mouseout");
     });
     expect(useAppStore.getState().activeElementId).toBeNull();
+  });
+
+  test("o ponteiro que sai do canvas direto de cima de um nó solta o destaque", () => {
+    render(<ArchitectureGraph {...propsFor(packageSlice)} />);
+    const cy = onlyLiveInstance();
+    const id = packageSlice.nodes[1]?.id ?? "";
+
+    act(() => {
+      cy.getElementById(id).emit("mouseover");
+    });
+    expect(useAppStore.getState().activeElementId).toBe(id);
+
+    act(() => {
+      fireEvent.mouseLeave(screen.getByRole("img"));
+    });
+
+    expect(useAppStore.getState().activeElementId).toBeNull();
+    expect(cy.getElementById(id).hasClass(ACTIVE_CLASS)).toBe(false);
+  });
+
+  test("sair do canvas sem nó sob o ponteiro não solta o destaque de outro escritor", () => {
+    render(<ArchitectureGraph {...propsFor(packageSlice)} />);
+    const focused = packageSlice.nodes[2]?.id ?? "";
+
+    act(() => {
+      useAppStore.getState().setActiveElementId(focused);
+      fireEvent.mouseLeave(screen.getByRole("img"));
+    });
+
+    expect(useAppStore.getState().activeElementId).toBe(focused);
+  });
+
+  test("sair de um nó não apaga o destaque que outro escritor pôs depois", () => {
+    render(<ArchitectureGraph {...propsFor(packageSlice)} />);
+    const cy = onlyLiveInstance();
+    const hovered = packageSlice.nodes[1]?.id ?? "";
+    const focused = packageSlice.nodes[2]?.id ?? "";
+
+    act(() => {
+      cy.getElementById(hovered).emit("mouseover");
+      useAppStore.getState().setActiveElementId(focused);
+      cy.getElementById(hovered).emit("mouseout");
+    });
+
+    expect(useAppStore.getState().activeElementId).toBe(focused);
+    expect(cy.getElementById(focused).hasClass(ACTIVE_CLASS)).toBe(true);
   });
 
   test("tocar uma aresta não seleciona nem limpa", () => {

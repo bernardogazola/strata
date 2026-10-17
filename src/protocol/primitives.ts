@@ -68,7 +68,8 @@ export const elementLabelSchema = z.string().max(512);
 export const commitSubjectSchema = z.string().max(512);
 export const commitBodySchema = z.string().max(4000);
 export const authorDisplayNameSchema = z.string().max(128);
-export const searchQuerySchema = z.string().max(128);
+export const SEARCH_QUERY_MAX_CHARS = 128;
+export const searchQuerySchema = z.string().max(SEARCH_QUERY_MAX_CHARS);
 
 export const percentileSchema = z.number().min(0).max(100);
 

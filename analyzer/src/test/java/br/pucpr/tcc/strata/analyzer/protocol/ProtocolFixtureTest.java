@@ -63,6 +63,7 @@ final class ProtocolFixtureTest {
     m.put("graph.search.hit.jsonl", "ainda não implementado");
     m.put("graph.slice.package.jsonl", "ainda não implementado");
     m.put("graph.slice.type.jsonl", "ainda não implementado");
+    m.put("outline.children.orders.jsonl", "ainda não implementado");
     m.put("outline.children.root.jsonl", "ainda não implementado");
     return Map.copyOf(m);
   }
@@ -96,7 +97,7 @@ final class ProtocolFixtureTest {
   @Test
   void aPastaDeFixturesExisteEFoiLida() throws IOException {
     assertThat(FIXTURES).isDirectory();
-    assertThat(arquivos()).contains("protocol.ready.mvp.jsonl").hasSize(22);
+    assertThat(arquivos()).contains("protocol.ready.mvp.jsonl").hasSize(23);
   }
 
   @Test

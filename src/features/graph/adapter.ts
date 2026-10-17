@@ -5,6 +5,7 @@ import type {
 } from "cytoscape";
 import { t } from "@/i18n/messages";
 import { clampText, sanitizeUntrusted } from "@/lib/untrusted";
+import type { ElementKind } from "@/protocol/enums";
 import {
   GRAPH_SLICE_BUDGETS,
   type GraphEdge,
@@ -131,12 +132,17 @@ const assertIdentity = ({ edges, nodes }: GraphSlice): void => {
   }
 };
 
-const toNodeLabel = (node: GraphNode): string => {
-  const label = clampText(sanitizeUntrusted(node.label), GRAPH_LABEL_MAX_CHARS);
-  return label === "" && node.kind === "PACKAGE"
-    ? t.graph.defaultPackage
-    : label;
+export const elementDisplayLabel = (
+  kind: ElementKind,
+  label: string,
+  maxChars: number = GRAPH_LABEL_MAX_CHARS
+): string => {
+  const clean = clampText(sanitizeUntrusted(label), maxChars);
+  return clean === "" && kind === "PACKAGE" ? t.graph.defaultPackage : clean;
 };
+
+const toNodeLabel = (node: GraphNode): string =>
+  elementDisplayLabel(node.kind, node.label);
 
 const toNodeDefinition = (node: GraphNode): NodeDefinition => {
   const data: GraphNode = {

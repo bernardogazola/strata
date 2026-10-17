@@ -4,9 +4,10 @@ import {
   type Browser,
   type BrowserContextOptions,
   expect,
+  type Locator,
   type Page,
 } from "@playwright/test";
-import type { GraphSlice } from "@/protocol/graph";
+import type { GraphSlice, OutlinePage } from "@/protocol/graph";
 import { recordGesture } from "./frames";
 import { mulberry32 } from "./synthetic-slice";
 
@@ -42,6 +43,18 @@ export const fixtureNodeIds = (fileName: string): string[] => {
     throw new Error(`${fileName} não tem frame de resposta`);
   }
   return response.payload.nodes.map((node) => node.id).sort();
+};
+
+export const fixtureResponse = (fileName: string): unknown => {
+  const response = readFileSync(new URL(fileName, FIXTURES_DIR), "utf8")
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => JSON.parse(line) as { kind: string; payload: unknown })
+    .find((frame) => frame.kind === "response");
+  if (response === undefined) {
+    throw new Error(`${fileName} não tem frame de resposta`);
+  }
+  return response.payload;
 };
 
 interface GraphReading {
@@ -138,6 +151,24 @@ export const tokenAsCytoscapeRgb = (
 export const serveSlices = async (
   page: Page,
   overrides: readonly SliceOverride[]
+): Promise<void> => {
+  await page.addInitScript((served) => {
+    window.__STRATA_FAKE_TRANSCRIPTS__ = served;
+  }, overrides);
+};
+
+export interface OutlineOverride {
+  readonly method: "outline.children";
+
+  readonly request: { readonly parentId: string | null };
+  readonly result: OutlinePage;
+}
+
+export type TranscriptOverride = SliceOverride | OutlineOverride;
+
+export const serveTranscripts = async (
+  page: Page,
+  overrides: readonly TranscriptOverride[]
 ): Promise<void> => {
   await page.addInitScript((served) => {
     window.__STRATA_FAKE_TRANSCRIPTS__ = served;
@@ -454,3 +485,82 @@ export const readSelectionLatency = (page: Page): Promise<number> =>
     }
     return pending;
   });
+
+export const canvasNodeIds = (page: Page): Promise<string[] | null> =>
+  page.evaluate(() => window.__STRATA_GRAPH__?.nodeIds() ?? null);
+
+export const elementIdsOf = (elements: Locator): Promise<string[]> =>
+  elements.evaluateAll((found) =>
+    found.map((element) => element.getAttribute("data-element-id") ?? "")
+  );
+
+export const outlineIds = async (
+  page: Page,
+  level: 1 | 2
+): Promise<string[]> => {
+  const ids = await elementIdsOf(
+    page.locator(
+      `[role="tree"] [role="treeitem"][aria-level="${level}"][data-element-id]`
+    )
+  );
+  return ids.sort();
+};
+
+export const historyLength = (page: Page): Promise<number> =>
+  page.evaluate(() => history.length);
+
+export interface TabStop {
+  readonly name: string;
+  readonly role: string;
+}
+
+export const BODY_STOP: TabStop = { name: "", role: "<body>" };
+
+const SNAPSHOT_HEAD = /^- ([\w-]+)(?: "((?:[^"\\]|\\.)*)")?/;
+
+export const focusedStop = async (page: Page): Promise<TabStop> => {
+  const onBody = await page.evaluate(
+    () =>
+      document.activeElement === null ||
+      document.activeElement === document.body
+  );
+  if (onBody) {
+    return BODY_STOP;
+  }
+  const [head = ""] = (await page.locator(":focus").ariaSnapshot()).split("\n");
+  const match = SNAPSHOT_HEAD.exec(head);
+  if (match === null) {
+    throw new Error(`início ilegível do snapshot ARIA: ${head}`);
+  }
+  return { name: match[2] ?? "", role: match[1] };
+};
+
+const pressTab = async (
+  page: Page,
+  target: Locator
+): Promise<TabStop | null> => {
+  await page.keyboard.press("Tab");
+  const reached = await target.evaluateAll((elements) =>
+    elements.some((element) => element === document.activeElement)
+  );
+  return reached ? null : focusedStop(page);
+};
+
+export const tabUntil = async (
+  page: Page,
+  target: Locator,
+  maxStops: number
+): Promise<TabStop[]> => {
+  const passed: TabStop[] = [];
+  for (let press = 0; press < maxStops; press += 1) {
+    // biome-ignore lint/performance/noAwaitInLoops: cada Tab parte do foco deixado pelo anterior
+    const stop = await pressTab(page, target);
+    if (stop === null) {
+      return passed;
+    }
+    passed.push(stop);
+  }
+  throw new Error(
+    `${target} não recebeu o foco em ${maxStops} toques de Tab; passou por ${JSON.stringify(passed)}`
+  );
+};
