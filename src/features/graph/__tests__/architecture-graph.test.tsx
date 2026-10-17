@@ -17,12 +17,15 @@ import { notifyResolvedThemeApplied } from "@/lib/theme";
 import { type GraphSlice, graphSliceSchema } from "@/protocol/graph";
 import { useAppStore } from "@/state/app-store";
 import { installCanvasStub } from "@/test/canvas";
+import { syntheticSlice } from "../../../../e2e/support/synthetic-slice";
 import { toGraphElements } from "../adapter";
 import {
   ArchitectureGraph,
   type ArchitectureGraphProps,
+  GRAPH_PERF,
 } from "../architecture-graph";
-import { ACTIVE_CLASS, SELECTED_CLASS } from "../stylesheet";
+import { MAX_FIT_ZOOM } from "../layout";
+import { ACTIVE_CLASS, readGraphRuntime, SELECTED_CLASS } from "../stylesheet";
 
 const instances = vi.hoisted(() => [] as Core[]);
 vi.mock("cytoscape", async (importOriginal) => {
@@ -374,5 +377,495 @@ describe("ArchitectureGraph: tema e ciclo de vida", () => {
     await new Promise((resolve) => setTimeout(resolve, 80));
 
     expect(liveInstances()).toHaveLength(0);
+  });
+});
+
+const FRAMES_SETTLED_MS = 80;
+const settleFrames = (): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, FRAMES_SETTLED_MS));
+
+const wrapperOf = (root: HTMLElement): HTMLElement => {
+  const wrapper = cytoscapeContainer(root).parentElement;
+  if (wrapper === null) {
+    throw new Error("falta o wrapper do contêiner");
+  }
+  return wrapper;
+};
+
+const waitForReady = async (wrapper: HTMLElement): Promise<void> => {
+  await waitFor(() => expect(wrapper.dataset.graphState).toBe("ready"));
+};
+
+const readyMarks = (): number =>
+  performance.getEntriesByName(GRAPH_PERF.ready, "mark").length;
+
+const isBatching = (cy: Core): boolean =>
+  (cy as Core & { readonly batching: () => boolean }).batching();
+
+const sortedIds = (items: readonly { readonly id: string }[]): string[] =>
+  items.map((item) => item.id).sort();
+
+describe("ArchitectureGraph: layout, enquadramento e medição", () => {
+  test("wheelSensitivity avisa uma vez por instância, e nenhuma cor é descartada", async () => {
+    const { container } = render(
+      <StrictMode>
+        <ArchitectureGraph {...propsFor(packageSlice)} />
+      </StrictMode>
+    );
+    await waitForReady(wrapperOf(container));
+
+    const messages = vi
+      .mocked(console.warn)
+      .mock.calls.map(([message]) => String(message));
+    expect(
+      messages.filter((message) => WHEEL_WARNING.test(message))
+    ).toHaveLength(instances.length);
+    expect(messages.filter((message) => !WHEEL_WARNING.test(message))).toEqual(
+      []
+    );
+  });
+
+  test("uma fatia pequena não é ampliada além do teto, fica centrada e o traço segue o zoom", async () => {
+    const { container } = render(
+      <ArchitectureGraph {...propsFor(packageSlice)} />
+    );
+    await waitForReady(wrapperOf(container));
+    const cy = onlyLiveInstance();
+    const box = cy.elements().renderedBoundingBox();
+
+    expect(cy.zoom()).toBe(MAX_FIT_ZOOM);
+    expect((box.x1 + box.x2) / 2).toBeCloseTo(VIEWPORT.width / 2);
+    expect((box.y1 + box.y2) / 2).toBeCloseTo(VIEWPORT.height / 2);
+    expect(readGraphRuntime(cy).dashScale).toBe(1 / MAX_FIT_ZOOM);
+    expect(readGraphRuntime(cy).maxLoc).toBe(
+      Math.max(...packageSlice.nodes.map((node) => node.loc))
+    );
+  });
+
+  test("uma fatia no orçamento fica no zoom do enquadramento, e o traço é reescalado por ele", async () => {
+    const slice = syntheticSlice({
+      edges: 1200,
+      level: "PACKAGE",
+      nodes: 300,
+      seed: 1,
+    });
+    const { container } = render(<ArchitectureGraph {...propsFor(slice)} />);
+    const wrapper = wrapperOf(container);
+    await waitForReady(wrapper);
+    const cy = onlyLiveInstance();
+
+    expect(cy.zoom()).toBeLessThan(MAX_FIT_ZOOM);
+    expect(readGraphRuntime(cy).dashScale).toBe(1 / cy.zoom());
+    expect(wrapper.dataset.nodeCount).toBe("300");
+    expect(wrapper.dataset.edgeCount).toBe("1200");
+  });
+
+  test("uma fatia substituída antes dos dois quadros não marca ready", async () => {
+    const before = readyMarks();
+    const { container, rerender } = render(
+      <ArchitectureGraph {...propsFor(packageSlice)} />
+    );
+    const wrapper = wrapperOf(container);
+
+    rerender(<ArchitectureGraph {...propsFor(typeSlice)} />);
+    await waitForReady(wrapper);
+    await settleFrames();
+
+    expect(readyMarks()).toBe(before + 1);
+    expect(wrapper.dataset.nodeCount).toBe(String(typeSlice.nodes.length));
+  });
+
+  test("os dois quadros de uma instância destruída não marcam ready", async () => {
+    const before = readyMarks();
+    const { unmount } = render(
+      <ArchitectureGraph {...propsFor(packageSlice)} />
+    );
+    unmount();
+
+    await settleFrames();
+
+    expect(readyMarks()).toBe(before);
+  });
+
+  test("trocar a fatia sai de ready até a nova estar desenhada", async () => {
+    const { container, rerender } = render(
+      <ArchitectureGraph {...propsFor(packageSlice)} />
+    );
+    const wrapper = wrapperOf(container);
+    await waitForReady(wrapper);
+
+    rerender(<ArchitectureGraph {...propsFor(typeSlice)} />);
+
+    expect(wrapper.dataset.graphState).toBe("rendering");
+    expect(wrapper.dataset.nodeCount).toBeUndefined();
+    await waitForReady(wrapper);
+    expect(wrapper.dataset.nodeCount).toBe(String(typeSlice.nodes.length));
+  });
+
+  test("sem pedido de fatia não há medida: o render não inventa um início", async () => {
+    performance.clearMarks();
+    performance.clearMeasures();
+    const { container } = render(
+      <ArchitectureGraph {...propsFor(packageSlice)} />
+    );
+
+    await waitForReady(wrapperOf(container));
+
+    expect(readyMarks()).toBe(1);
+    expect(
+      performance.getEntriesByName(GRAPH_PERF.render, "measure")
+    ).toHaveLength(0);
+  });
+
+  test("a medida vai do último pedido ao ready, e uma fatia do cache não mede de novo", async () => {
+    performance.clearMarks();
+    performance.clearMeasures();
+    const measures = () =>
+      performance.getEntriesByName(GRAPH_PERF.render, "measure");
+    const lastReady = () =>
+      performance.getEntriesByName(GRAPH_PERF.ready, "mark").at(-1);
+    const request = performance.mark(GRAPH_PERF.request);
+    const { container, rerender } = render(
+      <ArchitectureGraph {...propsFor(packageSlice)} />
+    );
+    const wrapper = wrapperOf(container);
+    await waitForReady(wrapper);
+
+    expect(measures()).toHaveLength(1);
+    expect(measures()[0]?.startTime).toBe(request.startTime);
+    expect(measures()[0]?.duration).toBeCloseTo(
+      (lastReady()?.startTime ?? 0) - request.startTime
+    );
+
+    rerender(<ArchitectureGraph {...propsFor(typeSlice)} />);
+    await waitForReady(wrapper);
+    expect(readyMarks()).toBe(2);
+    expect(measures()).toHaveLength(1);
+
+    const secondRequest = performance.mark(GRAPH_PERF.request);
+    rerender(<ArchitectureGraph {...propsFor(packageSlice)} />);
+    await waitForReady(wrapper);
+
+    expect(measures()).toHaveLength(2);
+    expect(measures()[1]?.startTime).toBe(secondRequest.startTime);
+  });
+
+  test("a 0×0 o layout espera o primeiro tamanho não nulo que o ResizeObserver relata", async () => {
+    const size = { height: 0, width: 0 };
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get: () => size.width,
+    });
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+      configurable: true,
+      get: () => size.height,
+    });
+    const observers: { callback: () => void; disconnected: boolean }[] = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        readonly #entry: { callback: () => void; disconnected: boolean };
+        constructor(callback: () => void) {
+          this.#entry = { callback, disconnected: false };
+          observers.push(this.#entry);
+        }
+        readonly observe = noop;
+        readonly unobserve = noop;
+        disconnect() {
+          this.#entry.disconnected = true;
+        }
+      }
+    );
+    const resize = () => {
+      for (const observer of observers) {
+        observer.callback();
+      }
+    };
+    const { container, unmount } = render(
+      <ArchitectureGraph {...propsFor(packageSlice)} />
+    );
+    const wrapper = wrapperOf(container);
+
+    resize();
+    await settleFrames();
+    expect(wrapper.dataset.graphState).toBe("rendering");
+
+    size.width = VIEWPORT.width;
+    size.height = VIEWPORT.height;
+    act(resize);
+    await waitForReady(wrapper);
+    expect(onlyLiveInstance().zoom()).toBe(MAX_FIT_ZOOM);
+
+    const marks = readyMarks();
+    resize();
+    await settleFrames();
+    expect(readyMarks()).toBe(marks);
+
+    unmount();
+    expect(observers.length).toBeGreaterThan(0);
+    expect(observers.every((observer) => observer.disconnected)).toBe(true);
+  });
+});
+
+describe("ArchitectureGraph: falhas de render", () => {
+  test("um id repetido que o cy.add descarta vira onRenderError e um canvas vazio", () => {
+    const onRenderError = vi.fn();
+    const elements = toGraphElements(packageSlice);
+    const [first] = elements.nodes;
+    const duplicated = {
+      edges: elements.edges,
+      nodes: first === undefined ? elements.nodes : [...elements.nodes, first],
+    };
+    vi.mocked(console.warn).mockImplementation(() => undefined);
+    const { container } = render(
+      <ArchitectureGraph
+        {...propsFor(packageSlice, { elements: duplicated, onRenderError })}
+      />
+    );
+    const cy = onlyLiveInstance();
+
+    expect(onRenderError).toHaveBeenCalledTimes(1);
+    expect(onRenderError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
+    expect(cy.elements()).toHaveLength(0);
+    expect(isBatching(cy)).toBe(false);
+    expect(wrapperOf(container).dataset.graphState).toBe("idle");
+  });
+
+  test("uma ponta solta que faz o cy.add lançar vira onRenderError, sem prender o lote", () => {
+    const onRenderError = vi.fn();
+    const elements = toGraphElements(packageSlice);
+    const dangling = {
+      edges: [
+        {
+          data: { id: "e_dangling", source: "pkg:missing", target: "pkg:gone" },
+          group: "edges" as const,
+        },
+      ],
+      nodes: elements.nodes,
+    };
+    render(
+      <ArchitectureGraph
+        {...propsFor(packageSlice, { elements: dangling, onRenderError })}
+      />
+    );
+    const cy = onlyLiveInstance();
+    const error: unknown = onRenderError.mock.calls[0]?.[0];
+
+    expect(onRenderError).toHaveBeenCalledTimes(1);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).cause).toBeInstanceOf(Error);
+    expect((error as Error).message).not.toContain("pkg:");
+    expect(cy.elements()).toHaveLength(0);
+    expect(isBatching(cy)).toBe(false);
+  });
+
+  test("elementos sem a fatia deles não são desenhados", () => {
+    const { container } = render(
+      <ArchitectureGraph {...propsFor(packageSlice, { slice: null })} />
+    );
+
+    expect(onlyLiveInstance().elements()).toHaveLength(0);
+    expect(wrapperOf(container).dataset.graphState).toBe("idle");
+  });
+});
+
+describe("ArchitectureGraph: seleção, destaque e intenção", () => {
+  test("um focus que chega antes da fatia é aplicado quando ela chega", () => {
+    const id = packageSlice.nodes[2]?.id ?? "";
+    const { rerender } = render(
+      <ArchitectureGraph {...propsFor(null, { selectedElementId: id })} />
+    );
+
+    rerender(
+      <ArchitectureGraph
+        {...propsFor(packageSlice, { selectedElementId: id })}
+      />
+    );
+
+    expect(onlyLiveInstance().getElementById(id).hasClass(SELECTED_CLASS)).toBe(
+      true
+    );
+  });
+
+  test("trocar o focus move a classe; limpar o focus a retira", () => {
+    const [first, second] = packageSlice.nodes;
+    const { rerender } = render(
+      <ArchitectureGraph
+        {...propsFor(packageSlice, { selectedElementId: first?.id ?? "" })}
+      />
+    );
+    const cy = onlyLiveInstance();
+
+    rerender(
+      <ArchitectureGraph
+        {...propsFor(packageSlice, { selectedElementId: second?.id ?? "" })}
+      />
+    );
+    expect(cy.$(`.${SELECTED_CLASS}`).map((node) => node.id())).toEqual([
+      second?.id,
+    ]);
+
+    rerender(<ArchitectureGraph {...propsFor(packageSlice)} />);
+    expect(cy.$(`.${SELECTED_CLASS}`)).toHaveLength(0);
+  });
+
+  test("o destaque que já estava na store vale para a instância nova e para a fatia nova", () => {
+    const id = typeSlice.nodes[0]?.id ?? "";
+    useAppStore.setState({ activeElementId: id });
+    const { rerender } = render(
+      <ArchitectureGraph {...propsFor(packageSlice)} />
+    );
+    const cy = onlyLiveInstance();
+
+    rerender(<ArchitectureGraph {...propsFor(typeSlice)} />);
+
+    const node = cy.getElementById(id);
+    expect(node.hasClass(ACTIVE_CLASS)).toBe(true);
+    expect(node.connectedEdges().not(`.${ACTIVE_CLASS}`)).toHaveLength(0);
+  });
+
+  test("uma escrita de outro campo da store não reestiliza o canvas", () => {
+    render(<ArchitectureGraph {...propsFor(packageSlice)} />);
+    const cy = onlyLiveInstance();
+    const startBatch = vi.spyOn(cy, "startBatch");
+
+    act(() => {
+      useAppStore.getState().clearWarnings();
+    });
+
+    expect(startBatch).not.toHaveBeenCalled();
+  });
+
+  test("passar o ponteiro sobre um nó escreve activeElementId; sair limpa", () => {
+    render(<ArchitectureGraph {...propsFor(packageSlice)} />);
+    const cy = onlyLiveInstance();
+    const id = packageSlice.nodes[1]?.id ?? "";
+
+    act(() => {
+      cy.getElementById(id).emit("mouseover");
+    });
+    expect(useAppStore.getState().activeElementId).toBe(id);
+    expect(cy.getElementById(id).hasClass(ACTIVE_CLASS)).toBe(true);
+
+    act(() => {
+      cy.getElementById(id).emit("mouseout");
+    });
+    expect(useAppStore.getState().activeElementId).toBeNull();
+  });
+
+  test("tocar uma aresta não seleciona nem limpa", () => {
+    const onSelect = vi.fn();
+    render(<ArchitectureGraph {...propsFor(packageSlice, { onSelect })} />);
+
+    onlyLiveInstance().edges().first().emit("tap");
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  test("o callback chamado é sempre o do render mais recente, sem recriar a instância", () => {
+    const stale = vi.fn();
+    const fresh = vi.fn();
+    const { rerender } = render(
+      <ArchitectureGraph {...propsFor(packageSlice, { onSelect: stale })} />
+    );
+    const cy = onlyLiveInstance();
+
+    rerender(
+      <ArchitectureGraph {...propsFor(packageSlice, { onSelect: fresh })} />
+    );
+    cy.emit("tap");
+
+    expect(onlyLiveInstance()).toBe(cy);
+    expect(stale).not.toHaveBeenCalled();
+    expect(fresh).toHaveBeenCalledWith(null);
+  });
+
+  test("o placeholder do <style> é um só, por mais instâncias que se montem", () => {
+    render(<ArchitectureGraph {...propsFor(packageSlice)} />);
+    render(<ArchitectureGraph {...propsFor(typeSlice)} />);
+
+    expect(document.querySelectorAll(`#${PLACEHOLDER_ID}`)).toHaveLength(1);
+  });
+});
+
+describe("ArchitectureGraph: a leitura de DEV", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  test("lê ids ordenados, posições em px da página e estilo; ausente é nulo", async () => {
+    const id = packageSlice.nodes[0]?.id ?? "";
+    const { container } = render(
+      <ArchitectureGraph
+        {...propsFor(packageSlice, { selectedElementId: id })}
+      />
+    );
+    await waitForReady(wrapperOf(container));
+    vi.spyOn(
+      cytoscapeContainer(container),
+      "getBoundingClientRect"
+    ).mockReturnValue(
+      DOMRect.fromRect({ height: 800, width: 1280, x: 100, y: 50 })
+    );
+    const cy = onlyLiveInstance();
+    const handle = window.__STRATA_GRAPH__;
+    const node = cy.getElementById(id).renderedPosition();
+    const edge = cy.edges().first();
+    const midpoint = edge.renderedMidpoint();
+
+    expect(handle?.nodeIds()).toEqual(sortedIds(packageSlice.nodes));
+    expect(handle?.edgeIds()).toEqual(sortedIds(packageSlice.edges));
+    expect(handle?.renderedPosition(id)).toEqual({
+      x: 100 + node.x,
+      y: 50 + node.y,
+    });
+    expect(handle?.renderedPosition(edge.id())).toEqual({
+      x: 100 + midpoint.x,
+      y: 50 + midpoint.y,
+    });
+    expect(handle?.renderedPosition("pkg:missing")).toBeNull();
+    expect(handle?.style(id, "border-width")).toBe("4px");
+    expect(handle?.style("pkg:missing", "border-width")).toBeNull();
+  });
+
+  test("setZoom muda o zoom; fit volta ao enquadramento com teto e traço reescalado", async () => {
+    const { container } = render(
+      <ArchitectureGraph {...propsFor(packageSlice)} />
+    );
+    await waitForReady(wrapperOf(container));
+    const cy = onlyLiveInstance();
+    const handle = window.__STRATA_GRAPH__;
+
+    handle?.setZoom(0.5);
+    expect(handle?.zoom()).toBe(0.5);
+
+    handle?.fit();
+    expect(handle?.zoom()).toBe(MAX_FIT_ZOOM);
+    expect(readGraphRuntime(cy).dashScale).toBe(1 / MAX_FIT_ZOOM);
+  });
+
+  test("desmontar retira a leitura só se ela ainda for da instância que desmonta", () => {
+    const first = render(<ArchitectureGraph {...propsFor(packageSlice)} />);
+    const second = render(<ArchitectureGraph {...propsFor(typeSlice)} />);
+
+    first.unmount();
+    expect(window.__STRATA_GRAPH__?.nodeIds()).toEqual(
+      sortedIds(typeSlice.nodes)
+    );
+
+    second.unmount();
+    expect(window.__STRATA_GRAPH__).toBeUndefined();
+  });
+
+  test("fora de DEV a leitura nunca é registrada", () => {
+    vi.stubEnv("DEV", false);
+
+    const { unmount } = render(
+      <ArchitectureGraph {...propsFor(packageSlice)} />
+    );
+
+    expect(window.__STRATA_GRAPH__).toBeUndefined();
+    unmount();
+    expect(window.__STRATA_GRAPH__).toBeUndefined();
   });
 });
