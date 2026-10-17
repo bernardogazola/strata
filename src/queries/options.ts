@@ -7,6 +7,10 @@ import {
   type RepositoryMethod,
   repositoryRequest,
 } from "@/bridge/analyzer";
+import { toGraphView } from "@/features/graph/adapter";
+import { GRAPH_PERF } from "@/features/graph/architecture-graph";
+import type { GraphLevel } from "@/protocol/enums";
+import { queryKeys } from "./keys";
 
 export const analyzerQueryOptions = <M extends PlainMethod>(
   queryKey: readonly unknown[],
@@ -28,3 +32,24 @@ export const repositoryQueryOptions = <M extends RepositoryMethod>(
     queryFn: () => repositoryRequest(method, payload, handle),
     queryKey,
   });
+
+export interface GraphViewParams {
+  readonly level: GraphLevel;
+
+  readonly parentId?: string;
+}
+
+export const graphSliceQueryOptions = (
+  analysisId: string,
+  { level, parentId }: GraphViewParams
+) => {
+  const params = parentId === undefined ? { level } : { level, parentId };
+  return queryOptions({
+    queryFn: () => {
+      performance.mark(GRAPH_PERF.request);
+      return analyzerRequest("graph.slice", { analysisId, ...params });
+    },
+    queryKey: queryKeys.structure.slice(analysisId, params),
+    select: toGraphView,
+  });
+};

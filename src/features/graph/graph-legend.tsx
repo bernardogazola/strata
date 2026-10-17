@@ -1,0 +1,128 @@
+import { type ReactElement, useId } from "react";
+import { resolutionQualityLabels } from "@/i18n/labels";
+import { t } from "@/i18n/messages";
+import { cn } from "@/lib/utils";
+import { resolutionQualitySchema } from "@/protocol/enums";
+import {
+  EDGE_LINES,
+  type EdgeLine,
+  GRAPH_STYLE,
+  NODE_SHAPES,
+} from "./stylesheet";
+
+const LEGEND_KINDS = [
+  "PACKAGE",
+  "TYPE",
+] as const satisfies readonly (keyof typeof t.graph.legend.kindShapes)[];
+
+type LegendKind = (typeof LEGEND_KINDS)[number];
+type LegendShape = (typeof NODE_SHAPES)[LegendKind];
+
+const SAMPLE_EDGE_WIDTH = 2;
+
+const SHAPE_GLYPHS = {
+  ellipse: <circle cx="8" cy="8" r="6" />,
+  "round-rectangle": <rect height="12" rx="3" width="14" x="1" y="2" />,
+} as const satisfies Record<LegendShape, ReactElement>;
+
+const KIND_FILLS = {
+  PACKAGE: "fill-(--graph-node-package)",
+  TYPE: "fill-(--graph-node)",
+} as const satisfies Record<LegendKind, string>;
+
+function EdgeSample({ line }: { readonly line: EdgeLine }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="shrink-0 stroke-(--graph-edge-structural)"
+      height="10"
+      viewBox="0 0 32 10"
+      width="32"
+    >
+      <line
+        strokeDasharray={line.dashPattern?.join(" ")}
+        strokeLinecap={line.cap}
+        strokeWidth={SAMPLE_EDGE_WIDTH}
+        x1="3"
+        x2="29"
+        y1="5"
+        y2="5"
+      />
+    </svg>
+  );
+}
+
+function NodeSample({
+  kind,
+  selected,
+}: {
+  readonly kind: LegendKind;
+  readonly selected: boolean;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={cn(
+        "shrink-0",
+        KIND_FILLS[kind],
+        selected
+          ? "stroke-(--graph-node-selected)"
+          : "stroke-(--graph-node-border)"
+      )}
+      height="16"
+      strokeWidth={
+        selected
+          ? GRAPH_STYLE.node.selectedBorderWidth
+          : GRAPH_STYLE.node.borderWidth
+      }
+      viewBox="-2 -2 20 20"
+      width="16"
+    >
+      {SHAPE_GLYPHS[NODE_SHAPES[kind]]}
+    </svg>
+  );
+}
+
+export function GraphLegend() {
+  const titleId = useId();
+
+  return (
+    <section aria-labelledby={titleId} className="flex flex-col gap-4 text-sm">
+      <h2 className="font-medium" id={titleId}>
+        {t.graph.legend.title}
+      </h2>
+
+      <div className="flex flex-col gap-2">
+        <h3 className="text-muted-foreground text-xs">
+          {t.graph.legend.resolution}
+        </h3>
+        <ul className="flex flex-col gap-1.5">
+          {resolutionQualitySchema.options.map((quality) => (
+            <li className="flex items-center gap-2" key={quality}>
+              <EdgeSample line={EDGE_LINES[quality]} />
+              {resolutionQualityLabels[quality]}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <h3 className="text-muted-foreground text-xs">{t.graph.legend.kind}</h3>
+        <ul className="flex flex-col gap-1.5">
+          {LEGEND_KINDS.map((kind) => (
+            <li className="flex items-center gap-2" key={kind}>
+              <NodeSample kind={kind} selected={false} />
+              {t.graph.legend.kindShapes[kind]}
+            </li>
+          ))}
+          <li className="flex items-center gap-2">
+            <NodeSample kind="TYPE" selected />
+            {t.graph.legend.selection}
+          </li>
+        </ul>
+      </div>
+
+      <p className="text-muted-foreground">{t.graph.legend.expandHint}</p>
+    </section>
+  );
+}

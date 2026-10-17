@@ -66,7 +66,7 @@ const ptBR = {
       aggregated:
         "Este repositório tem {total} pacotes, mais do que o primeiro nível comporta. Eles aparecem agrupados pelos prefixos de pacote de topo.",
       truncated:
-        "Este nível tem mais elementos do que o mapa mostra: {shown} de {total}. O limite de exibição do nível deixou o restante de fora.",
+        "Este nível tem mais elementos do que o mapa mostra: {nodesShown} de {nodes} e {edgesShown} de {edges}. O limite de exibição do nível deixou o restante de fora.",
     },
     retry: "Tentar de novo",
   },
