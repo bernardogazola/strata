@@ -33,14 +33,7 @@ pub(crate) fn spawn_reader(
                     }
                 }
                 Ok(Frame::Oversized { received_bytes }) => {
-                    let fault = ProtocolError::MessageTooLarge {
-                        limit_bytes: shared.config.max_frame_bytes as u64,
-                        received_bytes,
-                    };
-                    if let Some(id) = protocol::scan_id(&buf) {
-                        shared.resolve(id, Err(fault.clone()));
-                    }
-                    if shared.note_fault(fault) {
+                    if refuse_oversized(&shared, &buf, received_bytes) {
                         break;
                     }
                 }
@@ -49,6 +42,18 @@ pub(crate) fn spawn_reader(
         }
         drop(guard);
     });
+}
+
+fn refuse_oversized(shared: &Shared, prefix: &[u8], received_bytes: u64) -> bool {
+    let fault = ProtocolError::MessageTooLarge {
+        limit_bytes: shared.config.max_frame_bytes as u64,
+        received_bytes,
+    };
+    let desynchronised = shared.note_fault(fault.clone());
+    if let Some(id) = protocol::scan_id(prefix) {
+        shared.resolve(id, Err(fault));
+    }
+    desynchronised
 }
 
 #[derive(PartialEq, Eq)]
@@ -229,4 +234,85 @@ pub(crate) fn spawn_emitter(
             }));
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::sync::{Arc, Mutex, PoisonError};
+    use std::task::{Context, Wake, Waker};
+
+    use tokio::sync::{mpsc, oneshot};
+
+    use super::{Shared, refuse_oversized};
+    use crate::analyzer::{AnalyzerConfig, RequestId};
+    use crate::error::ErrorCode;
+
+    struct DiagnosticsAtWake {
+        shared: Arc<Shared>,
+        malformed_count: Mutex<Option<u32>>,
+    }
+
+    impl Wake for DiagnosticsAtWake {
+        fn wake(self: Arc<Self>) {
+            self.wake_by_ref();
+        }
+
+        fn wake_by_ref(self: &Arc<Self>) {
+            let seen = self.shared.diagnostics().malformed_count;
+            *self
+                .malformed_count
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner) = Some(seen);
+        }
+    }
+
+    fn ready_shared() -> Arc<Shared> {
+        let (writer, _writer_rx) = mpsc::channel(1);
+        let (handshake, _handshake_rx) = oneshot::channel();
+        let (events, _events_rx) = std::sync::mpsc::channel();
+        let shared = Shared::new(AnalyzerConfig::default(), writer, handshake, events);
+        shared.set_ready(1);
+        Arc::new(shared)
+    }
+
+    #[test]
+    fn an_oversized_frame_is_recorded_before_its_caller_wakes() {
+        let shared = ready_shared();
+        let id = RequestId::generate().expect("há entropia disponível nos testes");
+        let (reply, mut caller) = oneshot::channel();
+        shared
+            .register(id, reply, false)
+            .expect("um analisador pronto registra quem chamou");
+
+        let probe = Arc::new(DiagnosticsAtWake {
+            shared: Arc::clone(&shared),
+            malformed_count: Mutex::new(None),
+        });
+        let waker = Waker::from(Arc::clone(&probe));
+        let mut cx = Context::from_waker(&waker);
+        assert!(Pin::new(&mut caller).poll(&mut cx).is_pending());
+
+        let prefix = format!(r#"{{"id":"{}","kind":"response""#, id.as_str());
+        let limit = AnalyzerConfig::default().max_frame_bytes as u64;
+        let desynchronised = refuse_oversized(&shared, prefix.as_bytes(), limit + 1);
+
+        assert!(
+            !desynchronised,
+            "um frame recusado está dentro da tolerância"
+        );
+        assert_eq!(
+            *probe
+                .malformed_count
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner),
+            Some(1),
+            "quem chamou acordou antes de os diagnósticos registrarem a falha que o derrubou"
+        );
+        match caller.try_recv() {
+            Ok(Err(fault)) => assert_eq!(fault.code(), ErrorCode::MessageTooLarge),
+            other => panic!("quem chamou deve falhar com MessageTooLarge, mas veio {other:?}"),
+        }
+    }
 }
