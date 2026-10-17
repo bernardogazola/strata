@@ -12,7 +12,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { BridgeError } from "@/bridge/analyzer";
+import { protocolErrorOf } from "@/bridge/analyzer";
 import { Button } from "@/components/ui/button";
 import { ElementLabel } from "@/features/graph/element-label";
 import { isRevealable } from "@/features/shell/repository-search";
@@ -413,11 +413,7 @@ function SearchFailure({
   readonly error: Error;
   readonly onRetry: () => void;
 }) {
-  const message = formatProtocolError(
-    error instanceof BridgeError
-      ? error.protocolError
-      : { code: "INTERNAL_UNEXPECTED", origin: "frontend" }
-  );
+  const message = formatProtocolError(protocolErrorOf(error));
   return (
     <div className="flex flex-col items-start gap-2">
       <div className="flex flex-col gap-1" role="alert">

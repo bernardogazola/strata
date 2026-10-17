@@ -46,6 +46,11 @@ export class BridgeError extends Error {
   }
 }
 
+export const protocolErrorOf = (error: unknown): ProtocolError =>
+  error instanceof BridgeError
+    ? error.protocolError
+    : { code: "INTERNAL_UNEXPECTED", origin: "frontend" };
+
 export const toProtocolError = (rejection: unknown): ProtocolError => {
   if (rejection instanceof FakeBridgeError) {
     return rejection.protocolError;

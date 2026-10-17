@@ -447,6 +447,58 @@ describe("ArchitectureOutline: páginas", () => {
 });
 
 describe("ArchitectureOutline: estados", () => {
+  test("a página seguinte de pacotes que falha vira a linha de erro da raiz, e ativá-la pede de novo", async () => {
+    let nextPageFails = true;
+    const request = vi
+      .spyOn(transport, "request")
+      .mockImplementation((_method: string, payload: unknown) => {
+        const { cursor } = payload as { readonly cursor?: string };
+        if (cursor === undefined) {
+          return Promise.resolve({
+            items: ROOT_NODES.slice(0, 2),
+            nextCursor: NEXT_CURSOR,
+          });
+        }
+        if (nextPageFails) {
+          nextPageFails = false;
+          return Promise.reject(new Error("a página 2 caiu"));
+        }
+        return Promise.resolve({
+          items: ROOT_NODES.slice(2),
+          nextCursor: null,
+        });
+      });
+    renderOutline();
+
+    const [, , more] = await waitForRows(3);
+    if (more === undefined) {
+      throw new Error("sem linha de carregar mais");
+    }
+    fireEvent.click(more);
+
+    await waitFor(() =>
+      expect(treeItems().at(-1)?.textContent).toBe(t.outline.failedRoot)
+    );
+    const failed = treeItems().at(-1);
+    if (failed === undefined) {
+      throw new Error("sem linha de erro");
+    }
+    fireEvent.click(failed);
+
+    await waitFor(() =>
+      expect(treeItems().map((row) => row.dataset.elementId)).toStrictEqual([
+        BILLING,
+        ORDERS,
+        SHARED,
+      ])
+    );
+    expect(
+      outlineCalls(request).map(
+        ([, payload]) => (payload as { readonly cursor?: string }).cursor
+      )
+    ).toStrictEqual([undefined, NEXT_CURSOR, NEXT_CURSOR]);
+  });
+
   test("os filhos que falham viram uma linha de erro no nível 2; ativá-la pede de novo", async () => {
     const request = vi.spyOn(transport, "request");
     renderOutline({ view: { level: "TYPE", parentId: BILLING } });

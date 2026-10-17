@@ -100,6 +100,7 @@ const ptBR = {
 
   outline: {
     failed: "Não foi possível carregar os tipos deste pacote. Tentar de novo",
+    failedRoot: "Não foi possível carregar mais pacotes. Tentar de novo",
     loading: "Carregando a estrutura…",
     loadingTypes: "Carregando os tipos…",
     loadMore: {

@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
 import {
-  BridgeError,
   closeRepository,
   openRepository,
+  protocolErrorOf,
 } from "@/bridge/analyzer";
 import type { OpenedRepository } from "@/bridge/contracts";
 import { Button } from "@/components/ui/button";
@@ -23,13 +23,7 @@ export function RepositoryProbe() {
     try {
       setOpened(await openRepository());
     } catch (error) {
-      setFailure(
-        formatProtocolError(
-          error instanceof BridgeError
-            ? error.protocolError
-            : { code: "INTERNAL_UNEXPECTED", origin: "frontend" }
-        ).title
-      );
+      setFailure(formatProtocolError(protocolErrorOf(error)).title);
     } finally {
       setBusy(false);
     }

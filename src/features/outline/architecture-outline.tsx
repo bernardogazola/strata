@@ -19,12 +19,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { BridgeError } from "@/bridge/analyzer";
+import { protocolErrorOf } from "@/bridge/analyzer";
 import { Button } from "@/components/ui/button";
 import { formatProtocolError } from "@/i18n/errors";
 import { t } from "@/i18n/messages";
 import type { ElementKind } from "@/protocol/enums";
-import type { ProtocolError } from "@/protocol/errors";
 import type { GraphViewParams } from "@/queries/options";
 import { useAppStore } from "@/state/app-store";
 import {
@@ -65,11 +64,6 @@ export interface ArchitectureOutlineProps {
 const OVERSCAN = 8;
 
 const estimateRowSize = (): number => ROW_HEIGHT;
-
-const protocolErrorOf = (error: Error): ProtocolError =>
-  error instanceof BridgeError
-    ? error.protocolError
-    : { code: "INTERNAL_UNEXPECTED", origin: "frontend" };
 
 const rowIndexOf = (target: EventTarget | null): number | null => {
   if (!(target instanceof Element)) {
@@ -476,10 +470,7 @@ export function ArchitectureOutline({
   );
 
   const retryRoot = useCallback(() => retry(null), [retry]);
-  const rootFailureText =
-    rootError === null
-      ? t.graph.retry
-      : `${formatProtocolError(protocolErrorOf(rootError)).title} ${t.graph.retry}`;
+  const rootFailureText = t.outline.failedRoot;
 
   let body: ReactNode;
   if (rows.length > 0) {

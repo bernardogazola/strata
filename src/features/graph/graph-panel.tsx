@@ -1,12 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { BridgeError } from "@/bridge/analyzer";
+import { protocolErrorOf } from "@/bridge/analyzer";
 import { Button } from "@/components/ui/button";
 import { formatProtocolError } from "@/i18n/errors";
 import { interpolate, plural } from "@/i18n/format";
 import { graphLevelLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
-import type { ProtocolError } from "@/protocol/errors";
 import type { GraphSlice } from "@/protocol/graph";
 import {
   type GraphViewParams,
@@ -29,11 +28,6 @@ interface RenderFailure {
   readonly error: Error;
   readonly view: GraphView;
 }
-
-const protocolErrorOf = (error: Error): ProtocolError =>
-  error instanceof BridgeError
-    ? error.protocolError
-    : { code: "INTERNAL_UNEXPECTED", origin: "frontend" };
 
 interface CountForms {
   readonly one: string;
