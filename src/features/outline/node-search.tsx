@@ -9,6 +9,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -46,13 +47,18 @@ export interface NodeSearchProps {
   readonly onReveal: (hit: SearchHit) => void;
 }
 
-function useDebouncedValue(value: string, delayMs: number): string {
-  const [debounced, setDebounced] = useState(value);
+function useDebouncedQuery(input: string, delayMs: number): string {
+  const query = input.trim();
+  const [debounced, setDebounced] = useState(query);
   useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
+    if (query === "") {
+      setDebounced("");
+      return;
+    }
+    const timer = setTimeout(() => setDebounced(query), delayMs);
     return () => clearTimeout(timer);
-  }, [value, delayMs]);
-  return debounced;
+  }, [query, delayMs]);
+  return query === "" ? "" : debounced;
 }
 
 const optionOf = (target: EventTarget | null): HTMLElement | null =>
@@ -111,17 +117,25 @@ export function NodeSearch({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
-  const debounced = useDebouncedValue(input, SEARCH_DEBOUNCE_MS).trim();
-  const query = input.trim() === "" ? "" : debounced;
+  const query = useDebouncedQuery(input, SEARCH_DEBOUNCE_MS);
   const { data, error, isFetching, isPlaceholderData, refetch } = useQuery(
     graphSearchQueryOptions(analysisId, query)
   );
 
   const searching = query !== "";
   const failure = searching ? error : null;
-  const hits = searching && failure === null ? (data?.results ?? []) : [];
   const settled =
     searching && failure === null && data !== undefined && !isPlaceholderData;
+
+  const [emptied, setEmptied] = useState(true);
+  if (!(searching || emptied)) {
+    setEmptied(true);
+  } else if (settled && emptied) {
+    setEmptied(false);
+  }
+  const resurrected = isPlaceholderData && emptied;
+  const hits =
+    searching && failure === null && !resurrected ? (data?.results ?? []) : [];
 
   const handleChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     setInput(event.target.value);
@@ -247,6 +261,25 @@ function SearchResults({
     []
   );
 
+  useEffect(
+    () =>
+      useAppStore.subscribe((state, previous) => {
+        if (
+          state.activeElementId !== null ||
+          previous.activeElementId === null
+        ) {
+          return;
+        }
+        const focused = listRef.current?.contains(document.activeElement)
+          ? optionOf(document.activeElement)?.dataset.elementId
+          : undefined;
+        if (focused !== undefined) {
+          write(focused);
+        }
+      }),
+    [listRef, write]
+  );
+
   const activate = useCallback(
     (option: HTMLElement) => {
       const hit = hits.find(
@@ -358,6 +391,7 @@ function SearchResults({
         <SearchOption
           hit={hit}
           key={hit.elementId}
+          onRemovedWithFocus={onReturn}
           selected={hit.elementId === focus}
           tabbable={hit.elementId === tabbableId}
         />
@@ -368,13 +402,27 @@ function SearchResults({
 
 function SearchOption({
   hit,
+  onRemovedWithFocus,
   selected,
   tabbable,
 }: {
   readonly hit: SearchHit;
+
+  readonly onRemovedWithFocus: () => void;
   readonly selected: boolean;
   readonly tabbable: boolean;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Chromium e WebKit não disparam blur quando o nó focado é removido. A limpeza de layout
+  // roda antes da remoção, com o foco ainda na opção.
+  useLayoutEffect(() => {
+    const option = ref.current;
+    return () => {
+      if (option?.contains(document.activeElement)) {
+        onRemovedWithFocus();
+      }
+    };
+  }, [onRemovedWithFocus]);
   const revealable = isRevealable(hit);
   return (
     <div
@@ -382,6 +430,7 @@ function SearchOption({
       aria-selected={selected}
       className={OPTION_CLASS}
       data-element-id={hit.elementId}
+      ref={ref}
       role="option"
       tabIndex={tabbable ? 0 : -1}
     >
