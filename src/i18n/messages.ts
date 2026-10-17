@@ -29,9 +29,71 @@ const ptBR = {
       "Relação evolutiva inferida do histórico de alterações. Não é uma dependência no código.",
   },
 
+  graph: {
+    canvas: {
+      edges: { one: "{count} dependência", other: "{count} dependências" },
+      label: "Mapa da arquitetura, {level}: {nodes} e {edges}.",
+      nodes: {
+        PACKAGE: { one: "{count} pacote", other: "{count} pacotes" },
+        TYPE: { one: "{count} tipo", other: "{count} tipos" },
+        TYPE_NEIGHBORHOOD: { one: "{count} tipo", other: "{count} tipos" },
+      },
+    },
+    defaultPackage: "(pacote padrão)",
+    empty: {
+      PACKAGE: "Esta análise não encontrou nenhum pacote.",
+      TYPE: "Este pacote não tem tipos para mostrar.",
+      TYPE_NEIGHBORHOOD: "Este tipo não tem vizinhos para mostrar.",
+    },
+    legend: {
+      expandHint: "Clique duas vezes em um pacote para ver os tipos dele.",
+      kind: "Forma do elemento",
+      kindShapes: {
+        PACKAGE: "Retângulo: pacote",
+        TYPE: "Círculo: tipo",
+      },
+      resolution: "Qualidade de resolução",
+      selection: "Borda larga: elemento selecionado",
+      title: "Legenda",
+    },
+    loading: "Carregando o mapa…",
+    noAnalysis: {
+      action: "Voltar ao início",
+      body: "Abra um repositório e analise-o para ver o mapa da arquitetura.",
+      title: "Nenhuma análise aberta",
+    },
+    notice: {
+      aggregated:
+        "Este repositório tem {total} pacotes, mais do que o primeiro nível comporta. Eles aparecem agrupados pelos prefixos de pacote de topo.",
+      truncated:
+        "Este nível tem mais elementos do que o mapa mostra: {shown} de {total}. O limite de exibição do nível deixou o restante de fora.",
+    },
+    retry: "Tentar de novo",
+  },
+
+  inspector: {
+    empty: "Selecione um elemento no mapa para ver os detalhes.",
+    expand: "Ver os tipos deste pacote",
+    kind: "Elemento",
+    typeCount: "tipos neste pacote",
+  },
+
   repository: {
     open: "Abrir repositório",
     restart: "Reiniciar",
+  },
+
+  shell: {
+    breadcrumb: {
+      label: "Nível do mapa",
+      root: "Todos os pacotes",
+      selectedPackage: "Pacote selecionado",
+    },
+    regions: {
+      canvas: "Mapa da arquitetura",
+      inspector: "Inspetor",
+      sidebar: "Estrutura",
+    },
   },
 
   tour: {
