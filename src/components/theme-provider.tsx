@@ -9,6 +9,7 @@ import {
 import {
   applyResolvedTheme,
   getSystemTheme,
+  notifyResolvedThemeApplied,
   type ResolvedTheme,
   readStoredTheme,
   resolveTheme,
@@ -63,6 +64,7 @@ export function ThemeProvider({
   useEffect(() => {
     applyResolvedTheme(resolvedTheme);
     syncNativeBackground(resolvedTheme);
+    notifyResolvedThemeApplied(resolvedTheme);
   }, [resolvedTheme]);
 
   const setTheme = useCallback(
