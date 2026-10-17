@@ -9,6 +9,7 @@ import {
 } from "@playwright/test";
 import { GRAPH_PERF } from "@/features/graph/perf";
 import { GRAPH_STYLE } from "@/features/graph/stylesheet";
+import { t } from "@/i18n/messages";
 import {
   GRAPH_SLICE_BUDGETS,
   type GraphSlice,
@@ -156,6 +157,23 @@ test("um clique seleciona o nó: focus na URL e a borda de 4 px", async ({
   await expect
     .poll(() => styleOf(page, BILLING_ID, "border-width"))
     .toBe(SELECTED_BORDER_WIDTH);
+});
+
+test("Enter no botão do inspetor expande, e o foco vai para a trilha e não para o <body>", async ({
+  page,
+}) => {
+  await page.goto(`${LEVEL_ONE_URL}&focus=${ORDERS_ID}`);
+  await expectGraph(page, PACKAGE_IDS);
+  await page.getByRole("button", { name: t.inspector.expand }).focus();
+
+  await page.keyboard.press("Enter");
+
+  await expect.poll(() => searchOf(page)).toMatchObject({ level: "TYPE" });
+  await expectGraph(page, TYPE_IDS);
+  const trail = page.getByRole("navigation", {
+    name: t.shell.breadcrumb.label,
+  });
+  await expect(trail.locator('[aria-current="page"]')).toBeFocused();
 });
 
 test("o canvas é uma instância só e o Cytoscape não injeta <style>", async ({
