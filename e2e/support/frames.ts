@@ -40,7 +40,7 @@ const nearestRank = (
   return sorted[Math.min(sorted.length - 1, Math.max(0, rank))];
 };
 
-const median = (values: readonly number[]): number | null => {
+export const median = (values: readonly number[]): number | null => {
   if (values.length === 0) {
     return null;
   }

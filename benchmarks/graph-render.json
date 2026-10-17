@@ -1,0 +1,451 @@
+{
+  "schema": 1,
+  "measuredAt": "2026-10-17T04:42:23Z",
+  "baseCommit": "4dca03b",
+  "measure": "STRATA_BENCHMARK_OUT=benchmarks/graph-render.json pnpm exec playwright test graph --grep @benchmark",
+  "rule": {
+    "levelOneRender": {
+      "criterion": "PASS iff every run < maxRenderMs; render = the strata:graph:render measure, from the strata:graph:request mark (graph.slice queryFn) to strata:graph:ready (the 2nd animation frame after layoutstop)",
+      "freshPages": 7,
+      "maxRenderMs": 1000,
+      "slice": {
+        "edges": 1200,
+        "nodes": 300,
+        "level": "PACKAGE",
+        "seed": 20
+      }
+    },
+    "recordedNotGating": {
+      "clickSelectionLatency": "RNF05, < 100 ms, gated at P50: 10 clicks at zoom 1 on mulberry32(20)-drawn nodes, pointerdown timeStamp to the first rAF with border-width 4px",
+      "positionsHash": "SHA-256 of the sorted { id: renderedPosition } JSON, one per level-1 page",
+      "webkit": "Playwright WebKit, informative, in graph-render.webkit.json"
+    },
+    "typeBudgetPanZoom": {
+      "baseline": "b = median idle rAF interval over 3 s on the page",
+      "criterion": "frameRatio = frames / (span / b); PASS iff frameRatio >= minFrameRatio in all 9 sessions",
+      "freshPages": 3,
+      "gestureMs": 3000,
+      "gestures": {
+        "G1": "at the fit zoom: real mouse drag in a 150 px circle advancing 0.06666666666666667 rad per move, one move then a 8 ms pause, from the empty point nearest the canvas centre",
+        "G2": "at the fit zoom: page.mouse.wheel at the canvas centre, deltas cycling 25-35 px (trackpad-like), direction flipping every 25 events, one event then a 8 ms pause",
+        "G3": "__STRATA_GRAPH__.setZoom(4 x the fit zoom), then: real mouse drag in a 150 px circle advancing 0.06666666666666667 rad per move, one move then a 8 ms pause, from the empty point nearest the canvas centre"
+      },
+      "minFrameRatio": 0.5,
+      "settleBeforeEachGestureMs": 500,
+      "slice": {
+        "edges": 10000,
+        "nodes": 2000,
+        "level": "TYPE",
+        "seed": 20
+      }
+    }
+  },
+  "verdict": {
+    "clauses": {
+      "levelOneRender": {
+        "maxRenderMs": 1000,
+        "observedMaxMs": 136.89999997615814,
+        "observedMedianMs": 129,
+        "pass": true,
+        "runsMs": [
+          136.89999997615814, 129, 127.69999998807907, 126.59999999403954,
+          129.30000001192093, 130.30000001192093, 128.09999999403954
+        ]
+      },
+      "typeBudgetPanZoom": {
+        "minFrameRatio": 0.5,
+        "observedMinFrameRatio": 0.41521710698405284,
+        "pass": false,
+        "sessions": [
+          {
+            "frameRatio": 0.85808789309221,
+            "gesture": "G1",
+            "page": 1
+          },
+          {
+            "frameRatio": 0.46678001569447825,
+            "gesture": "G2",
+            "page": 1
+          },
+          {
+            "frameRatio": 0.43152835000980744,
+            "gesture": "G3",
+            "page": 1
+          },
+          {
+            "frameRatio": 0.8578027382693264,
+            "gesture": "G1",
+            "page": 2
+          },
+          {
+            "frameRatio": 0.4730911983032977,
+            "gesture": "G2",
+            "page": 2
+          },
+          {
+            "frameRatio": 0.41521710698405284,
+            "gesture": "G3",
+            "page": 2
+          },
+          {
+            "frameRatio": 0.8550710142028594,
+            "gesture": "G1",
+            "page": 3
+          },
+          {
+            "frameRatio": 0.48024466854026515,
+            "gesture": "G2",
+            "page": 3
+          },
+          {
+            "frameRatio": 0.42831801322368296,
+            "gesture": "G3",
+            "page": 3
+          }
+        ]
+      }
+    },
+    "decides": true,
+    "outcome": "FAIL",
+    "project": "chromium",
+    "recorded": {
+      "clickSelectionLatency": {
+        "budgetMs": 100,
+        "clicks": 10,
+        "gatedAt": "P50",
+        "maxMs": 9.500000005960374,
+        "medianMs": 4.4999999970196995,
+        "minMs": 1.400000011920838
+      },
+      "positionsHash": {
+        "freshPages": 7,
+        "identical": true,
+        "sha256": [
+          "730451191c631223d116a8bffddce9089695b3125fb3b9198b06078b21573a1a"
+        ]
+      }
+    }
+  },
+  "environment": {
+    "arch": "arm64",
+    "browser": {
+      "channel": "chromium",
+      "executablePath": "~/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+      "name": "chromium",
+      "project": "chromium",
+      "version": "151.0.7922.34",
+      "webglRenderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)"
+    },
+    "cpu": "Apple M4 Pro",
+    "devicePixelRatio": 1,
+    "displayRefreshHz": 120.48192771084074,
+    "loadAverage": [3.19970703125, 2.97021484375, 2.99755859375],
+    "logicalCores": 14,
+    "os": "macOS 27.0.1",
+    "ramBytes": 25769803776,
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    }
+  },
+  "generator": {
+    "edgeId": "e_ + FNV-1a-64 hex of source \\0 target \\0 <first type in enum order>",
+    "edges": "source uniform, target = floor(U² · n) (hub-skewed); no self-loops, no duplicate (source, target)",
+    "loc": "20..4020, 20 + floor(U³ · 4001)",
+    "pagerank": "power iteration, d = 0.85, 60 iterations, dangling mass spread uniformly, mass flows from dependent to dependency; rounded to 6 decimals by largest remainder so that Σ = 1",
+    "prng": "mulberry32",
+    "resolution": "exactly 75 % RESOLVED, 20 % INFERRED, 5 % UNRESOLVED_EXTERNAL, by edge position",
+    "resolutionMix": "Σ weight of the node's outgoing edges, per resolution",
+    "source": "e2e/support/synthetic-slice.ts",
+    "typeCount": "1 for a type; 1..40 for a package",
+    "types": "each of the 8 type-graph dependency types with p = 0.25 (at least one), 1..24 occurrences; weight = Σ dependency-type weight × occurrences",
+    "clickTargets": "at zoom 1 around the canvas centre, mulberry32(20) over the nodes a click at their rendered position hits unambiguously (no other node's hit area within 4 px of it, 20 px from the canvas edge), sorted by id",
+    "seeds": {
+      "clickTargets": 20,
+      "levelOneRender": 20,
+      "typeBudget": 20
+    },
+    "slices": {
+      "levelOneRender": {
+        "edges": 1200,
+        "nodes": 300,
+        "level": "PACKAGE",
+        "seed": 20
+      },
+      "typeBudget": {
+        "edges": 10000,
+        "nodes": 2000,
+        "level": "TYPE",
+        "seed": 20
+      }
+    }
+  },
+  "results": {
+    "clickSelectionLatency": [
+      {
+        "click": 1,
+        "elementId": "type:synthetic.core.T0046",
+        "latencyMs": 5.0000000059603735
+      },
+      {
+        "click": 2,
+        "elementId": "type:synthetic.core.T0011",
+        "latencyMs": 9.500000005960374
+      },
+      {
+        "click": 3,
+        "elementId": "type:synthetic.core.T0029",
+        "latencyMs": 4.89999999403949
+      },
+      {
+        "click": 4,
+        "elementId": "type:synthetic.core.T0009",
+        "latencyMs": 3.999999988079253
+      },
+      {
+        "click": 5,
+        "elementId": "type:synthetic.core.T0006",
+        "latencyMs": 1.8000000059605554
+      },
+      {
+        "click": 6,
+        "elementId": "type:synthetic.core.T1049",
+        "latencyMs": 4.9000000059604645
+      },
+      {
+        "click": 7,
+        "elementId": "type:synthetic.core.T1355",
+        "latencyMs": 1.400000011920838
+      },
+      {
+        "click": 8,
+        "elementId": "type:synthetic.core.T0008",
+        "latencyMs": 4.099999999999909
+      },
+      {
+        "click": 9,
+        "elementId": "type:synthetic.core.T0005",
+        "latencyMs": 3.199999999999818
+      },
+      {
+        "click": 10,
+        "elementId": "type:synthetic.core.T0027",
+        "latencyMs": 7.099999999999909
+      }
+    ],
+    "levelOneRender": [
+      {
+        "loadAverage": [3.53076171875, 2.98046875, 3.0048828125],
+        "positionsSha256": "730451191c631223d116a8bffddce9089695b3125fb3b9198b06078b21573a1a",
+        "renderMs": 136.89999997615814,
+        "run": 1
+      },
+      {
+        "loadAverage": [3.53076171875, 2.98046875, 3.0048828125],
+        "positionsSha256": "730451191c631223d116a8bffddce9089695b3125fb3b9198b06078b21573a1a",
+        "renderMs": 129,
+        "run": 2
+      },
+      {
+        "loadAverage": [3.53076171875, 2.98046875, 3.0048828125],
+        "positionsSha256": "730451191c631223d116a8bffddce9089695b3125fb3b9198b06078b21573a1a",
+        "renderMs": 127.69999998807907,
+        "run": 3
+      },
+      {
+        "loadAverage": [3.53076171875, 2.98046875, 3.0048828125],
+        "positionsSha256": "730451191c631223d116a8bffddce9089695b3125fb3b9198b06078b21573a1a",
+        "renderMs": 126.59999999403954,
+        "run": 4
+      },
+      {
+        "loadAverage": [3.53076171875, 2.98046875, 3.0048828125],
+        "positionsSha256": "730451191c631223d116a8bffddce9089695b3125fb3b9198b06078b21573a1a",
+        "renderMs": 129.30000001192093,
+        "run": 5
+      },
+      {
+        "loadAverage": [3.40771484375, 2.9638671875, 2.99853515625],
+        "positionsSha256": "730451191c631223d116a8bffddce9089695b3125fb3b9198b06078b21573a1a",
+        "renderMs": 130.30000001192093,
+        "run": 6
+      },
+      {
+        "loadAverage": [3.40771484375, 2.9638671875, 2.99853515625],
+        "positionsSha256": "730451191c631223d116a8bffddce9089695b3125fb3b9198b06078b21573a1a",
+        "renderMs": 128.09999999403954,
+        "run": 7
+      }
+    ],
+    "typeBudgetPanZoom": [
+      {
+        "baselineMs": 8.299999999999955,
+        "fitZoom": 0.034680805894283524,
+        "loadAverage": [3.40771484375, 2.9638671875, 2.99853515625],
+        "page": 1,
+        "sessions": {
+          "G1": {
+            "baselineMs": 8.299999999999955,
+            "frameRatio": 0.85808789309221,
+            "frames": 311,
+            "max": 83.09999999999945,
+            "p50": 8.300000000000182,
+            "p95": 10.099999999999454,
+            "spanMs": 3008.2,
+            "inputEvents": 147,
+            "start": {
+              "x": 644,
+              "y": 426.5
+            },
+            "zoomAfter": 0.034680805894283524,
+            "zoomBefore": 0.034680805894283524
+          },
+          "G2": {
+            "baselineMs": 8.299999999999955,
+            "frameRatio": 0.46678001569447825,
+            "frames": 172,
+            "max": 75.10000000000036,
+            "p50": 8.400000000001455,
+            "p95": 58.80000000000109,
+            "spanMs": 3058.3999999999996,
+            "inputEvents": 64,
+            "start": {
+              "x": 624,
+              "y": 426.5
+            },
+            "zoomAfter": 0.06369262980307315,
+            "zoomBefore": 0.034680805894283524
+          },
+          "G3": {
+            "baselineMs": 8.299999999999955,
+            "frameRatio": 0.43152835000980744,
+            "frames": 159,
+            "max": 58.29999999999927,
+            "p50": 8.899999999999636,
+            "p95": 41.70000000000073,
+            "spanMs": 3058.199999999999,
+            "inputEvents": 43,
+            "start": {
+              "x": 642.4775906502257,
+              "y": 434.1536686473018
+            },
+            "zoomAfter": 0.1387232235771341,
+            "zoomBefore": 0.1387232235771341
+          }
+        }
+      },
+      {
+        "baselineMs": 8.300000000000182,
+        "fitZoom": 0.034680805894283524,
+        "loadAverage": [3.1015625, 2.916015625, 2.98095703125],
+        "page": 2,
+        "sessions": {
+          "G1": {
+            "baselineMs": 8.300000000000182,
+            "frameRatio": 0.8578027382693264,
+            "frames": 311,
+            "max": 74.80000000000018,
+            "p50": 8.300000000000182,
+            "p95": 10.199999999999818,
+            "spanMs": 3009.2,
+            "inputEvents": 148,
+            "start": {
+              "x": 644,
+              "y": 426.5
+            },
+            "zoomAfter": 0.034680805894283524,
+            "zoomBefore": 0.034680805894283524
+          },
+          "G2": {
+            "baselineMs": 8.300000000000182,
+            "frameRatio": 0.4730911983032977,
+            "frames": 172,
+            "max": 74.59999999999854,
+            "p50": 8.5,
+            "p95": 58.399999999999636,
+            "spanMs": 3017.6000000000004,
+            "inputEvents": 65,
+            "start": {
+              "x": 624,
+              "y": 426.5
+            },
+            "zoomAfter": 0.06793431189891255,
+            "zoomBefore": 0.034680805894283524
+          },
+          "G3": {
+            "baselineMs": 8.300000000000182,
+            "frameRatio": 0.41521710698405284,
+            "frames": 153,
+            "max": 58.29999999999927,
+            "p50": 8.900000000001455,
+            "p95": 41.70000000000073,
+            "spanMs": 3058.4000000000015,
+            "inputEvents": 44,
+            "start": {
+              "x": 642.4775906502257,
+              "y": 434.1536686473018
+            },
+            "zoomAfter": 0.1387232235771341,
+            "zoomBefore": 0.1387232235771341
+          }
+        }
+      },
+      {
+        "baselineMs": 8.300000000000182,
+        "fitZoom": 0.034680805894283524,
+        "loadAverage": [3.05419921875, 2.91845703125, 2.98095703125],
+        "page": 3,
+        "sessions": {
+          "G1": {
+            "baselineMs": 8.300000000000182,
+            "frameRatio": 0.8550710142028594,
+            "frames": 309,
+            "max": 75,
+            "p50": 8.300000000000182,
+            "p95": 10.199999999999818,
+            "spanMs": 2999.3999999999996,
+            "inputEvents": 149,
+            "start": {
+              "x": 644,
+              "y": 426.5
+            },
+            "zoomAfter": 0.034680805894283524,
+            "zoomBefore": 0.034680805894283524
+          },
+          "G2": {
+            "baselineMs": 8.300000000000182,
+            "frameRatio": 0.48024466854026515,
+            "frames": 175,
+            "max": 74.89999999999964,
+            "p50": 8.600000000000364,
+            "p95": 58.399999999999636,
+            "spanMs": 3024.5,
+            "inputEvents": 65,
+            "start": {
+              "x": 624,
+              "y": 426.5
+            },
+            "zoomAfter": 0.06793431189891255,
+            "zoomBefore": 0.034680805894283524
+          },
+          "G3": {
+            "baselineMs": 8.300000000000182,
+            "frameRatio": 0.42831801322368296,
+            "frames": 160,
+            "max": 58.5,
+            "p50": 9.399999999999636,
+            "p95": 41.69999999999891,
+            "spanMs": 3100.5,
+            "inputEvents": 44,
+            "start": {
+              "x": 642.4775906502257,
+              "y": 434.1536686473018
+            },
+            "zoomAfter": 0.1387232235771341,
+            "zoomBefore": 0.1387232235771341
+          }
+        }
+      }
+    ]
+  }
+}

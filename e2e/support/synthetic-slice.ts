@@ -70,7 +70,7 @@ export const SYNTHETIC_SLICE_GENERATOR = {
 
 // biome-ignore-start lint/suspicious/noBitwiseOperators: mulberry32 e FNV-1a operam sobre bits
 
-const mulberry32 = (seed: number): (() => number) => {
+export const mulberry32 = (seed: number): (() => number) => {
   let state = seed >>> 0;
   return () => {
     state = (state + 0x6d_2b_79_f5) >>> 0;

@@ -3,8 +3,41 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { Browser, FullProject, Page } from "@playwright/test";
+import { GRAPH_SLICE_BUDGETS } from "@/protocol/graph";
 
 export const BENCHMARK_OUT_ENV = "STRATA_BENCHMARK_OUT";
+
+export const TYPE_NODES_ENV = "STRATA_BENCHMARK_TYPE_NODES";
+
+const TYPE_EDGES_PER_NODE = 5;
+const POSITIVE_INTEGER = /^[1-9]\d*$/;
+
+export interface BenchmarkTypeBudget {
+  readonly edges: number;
+  readonly nodes: number;
+
+  readonly source: string;
+}
+
+export const benchmarkTypeBudget = (
+  environment: NodeJS.ProcessEnv = process.env
+): BenchmarkTypeBudget => {
+  const configured = environment[TYPE_NODES_ENV];
+  if (configured === undefined || configured === "") {
+    return { ...GRAPH_SLICE_BUDGETS.TYPE, source: "GRAPH_SLICE_BUDGETS.TYPE" };
+  }
+  if (!POSITIVE_INTEGER.test(configured)) {
+    throw new RangeError(
+      `${TYPE_NODES_ENV} precisa ser um inteiro positivo, e não "${configured}"`
+    );
+  }
+  const nodes = Number(configured);
+  return {
+    edges: nodes * TYPE_EDGES_PER_NODE,
+    nodes,
+    source: `${TYPE_NODES_ENV}=${nodes}`,
+  };
+};
 
 export const GATING_PROJECT = "chromium";
 
@@ -126,6 +159,13 @@ export const readWebglRenderer = (page: Page): Promise<string | null> =>
     );
   });
 
+const redactHome = (executablePath: string | null): string | null => {
+  const home = os.homedir();
+  return executablePath?.startsWith(home)
+    ? `~${executablePath.slice(home.length)}`
+    : executablePath;
+};
+
 export const captureEnvironment = async ({
   baselineMs,
   browser,
@@ -144,7 +184,7 @@ export const captureEnvironment = async ({
     arch: os.arch(),
     browser: {
       channel: project.use.channel ?? null,
-      executablePath,
+      executablePath: redactHome(executablePath),
       name,
       project: project.name,
       version: browser.version(),
