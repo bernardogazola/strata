@@ -837,6 +837,22 @@ describe("ArchitectureGraph: seleção, destaque e intenção", () => {
     expect(useAppStore.getState().activeElementId).toBeNull();
   });
 
+  test("sair de um nó não apaga o destaque que outro escritor pôs depois", () => {
+    render(<ArchitectureGraph {...propsFor(packageSlice)} />);
+    const cy = onlyLiveInstance();
+    const hovered = packageSlice.nodes[1]?.id ?? "";
+    const focused = packageSlice.nodes[2]?.id ?? "";
+
+    act(() => {
+      cy.getElementById(hovered).emit("mouseover");
+      useAppStore.getState().setActiveElementId(focused);
+      cy.getElementById(hovered).emit("mouseout");
+    });
+
+    expect(useAppStore.getState().activeElementId).toBe(focused);
+    expect(cy.getElementById(focused).hasClass(ACTIVE_CLASS)).toBe(true);
+  });
+
   test("tocar uma aresta não seleciona nem limpa", () => {
     const onSelect = vi.fn();
     render(<ArchitectureGraph {...propsFor(packageSlice, { onSelect })} />);

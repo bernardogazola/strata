@@ -47,6 +47,7 @@ interface AppActions {
   readonly clearProgress: () => void;
   readonly clearWarnings: () => void;
   readonly recoverBackend: () => void;
+  readonly releaseActiveElementId: (elementId: string) => void;
   readonly setActiveElementId: (elementId: string | null) => void;
   readonly setBackend: (backend: BackendState) => void;
 }
@@ -96,6 +97,16 @@ export const useAppStore = create<AppStore>()(
               : state,
           false,
           "recoverBackend"
+        ),
+
+      releaseActiveElementId: (elementId) =>
+        set(
+          (state) =>
+            state.activeElementId === elementId
+              ? { activeElementId: null }
+              : state,
+          false,
+          "releaseActiveElementId"
         ),
 
       setActiveElementId: (elementId) =>

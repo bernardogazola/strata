@@ -195,12 +195,12 @@ const bindIntent = (cy: Core, callbacks: GraphCallbacks): void => {
       callbacks.onExpand(event.target.id());
     }
   );
-  const { setActiveElementId } = useAppStore.getState();
+  const { releaseActiveElementId, setActiveElementId } = useAppStore.getState();
   cy.on("mouseover", "node", (event: EventObjectNode) => {
     setActiveElementId(event.target.id());
   });
-  cy.on("mouseout", "node", () => {
-    setActiveElementId(null);
+  cy.on("mouseout", "node", (event: EventObjectNode) => {
+    releaseActiveElementId(event.target.id());
   });
 };
 

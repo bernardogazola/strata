@@ -121,6 +121,7 @@ const repositoryRoute = createRoute({
   component: RepositoryRoute.options.component,
   getParentRoute: () => rootRoute,
   path: "/repository/$handle",
+  search: RepositoryRoute.options.search,
   validateSearch: RepositoryRoute.options.validateSearch,
 });
 const routeTree = rootRoute.addChildren([indexRoute, repositoryRoute]);
