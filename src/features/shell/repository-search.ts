@@ -19,7 +19,7 @@ export const resolveGraphView = ({
   level,
   parent,
 }: RepositorySearch): GraphViewParams => {
-  if (level === "PACKAGE" || parent === undefined) {
+  if (level !== "TYPE" || parent === undefined) {
     return { level: "PACKAGE" };
   }
   return { level, parentId: parent };

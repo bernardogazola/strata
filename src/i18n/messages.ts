@@ -31,12 +31,28 @@ const ptBR = {
 
   graph: {
     canvas: {
-      edges: { one: "{count} dependência", other: "{count} dependências" },
+      edges: {
+        one: "{count} dependência",
+        other: "{count} dependências",
+        zero: "nenhuma dependência",
+      },
       label: "Mapa da arquitetura, {level}: {nodes} e {edges}.",
       nodes: {
-        PACKAGE: { one: "{count} pacote", other: "{count} pacotes" },
-        TYPE: { one: "{count} tipo", other: "{count} tipos" },
-        TYPE_NEIGHBORHOOD: { one: "{count} tipo", other: "{count} tipos" },
+        PACKAGE: {
+          one: "{count} pacote",
+          other: "{count} pacotes",
+          zero: "nenhum pacote",
+        },
+        TYPE: {
+          one: "{count} tipo",
+          other: "{count} tipos",
+          zero: "nenhum tipo",
+        },
+        TYPE_NEIGHBORHOOD: {
+          one: "{count} tipo",
+          other: "{count} tipos",
+          zero: "nenhum tipo",
+        },
       },
     },
     defaultPackage: "(pacote padrão)",

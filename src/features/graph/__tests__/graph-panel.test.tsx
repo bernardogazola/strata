@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import type { MouseEvent } from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { fakeRequest } from "@/bridge/fake";
+import { FakeBridgeError, fakeRequest } from "@/bridge/fake";
 import { transport } from "@/bridge/transport";
 import { toGraphElements } from "@/features/graph/adapter";
 import type { ArchitectureGraphProps } from "@/features/graph/architecture-graph";
@@ -17,13 +17,14 @@ import { GraphPanel } from "@/features/graph/graph-panel";
 import { NodeSummary } from "@/features/graph/node-summary";
 import { EDGE_LINES, GRAPH_STYLE } from "@/features/graph/stylesheet";
 import { formatProtocolError } from "@/i18n/errors";
+import { interpolate, plural } from "@/i18n/format";
 import {
   elementKindLabels,
   englishTermAccessibleNames,
   resolutionQualityLabels,
 } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
-import { resolutionQualitySchema } from "@/protocol/enums";
+import { graphLevelSchema, resolutionQualitySchema } from "@/protocol/enums";
 import type { GraphNode, GraphSlice } from "@/protocol/graph";
 import { createQueryClient } from "@/queries/client";
 import type { GraphViewParams } from "@/queries/options";
@@ -134,6 +135,9 @@ const renderPanel = ({
 
 const canvas = () => screen.getByRole("img");
 
+const liveRegion = () =>
+  document.querySelector<HTMLElement>('[aria-live="polite"]');
+
 const waitForNodes = async (count: number) => {
   await waitFor(() =>
     expect(canvas().getAttribute("data-node-count")).toBe(String(count))
@@ -193,8 +197,34 @@ describe("GraphPanel: carregando e pronto", () => {
     await waitForNodes(1);
 
     expect(canvas().getAttribute("aria-label")).toBe(
-      "Mapa da arquitetura, pacotes: 1 pacote e 0 dependência."
+      "Mapa da arquitetura, pacotes: 1 pacote e nenhuma dependência."
     );
+  });
+
+  test("o zero tem redação própria, e não o singular do CLDR", async () => {
+    const fixture = await fixtureSlice({ level: "PACKAGE" });
+    overrideSlice(
+      { level: "PACKAGE" },
+      { ...fixture, edges: [], nodes: [], totals: { edges: 0, nodes: 0 } }
+    );
+    renderPanel();
+    await screen.findByText(t.graph.empty.PACKAGE);
+
+    expect(canvas().getAttribute("aria-label")).toBe(
+      "Mapa da arquitetura, pacotes: nenhum pacote e nenhuma dependência."
+    );
+  });
+
+  test("todo nível tem a forma zero, nos nós e nas arestas", () => {
+    const zeroOf = (forms: Parameters<typeof plural>[1]): string =>
+      interpolate(plural(0, forms), { count: 0 });
+
+    expect(zeroOf(t.graph.canvas.edges)).toBe("nenhuma dependência");
+    expect(
+      graphLevelSchema.options.map((level) =>
+        zeroOf(t.graph.canvas.nodes[level])
+      )
+    ).toStrictEqual(["nenhum pacote", "nenhum tipo", "nenhum tipo"]);
   });
 
   test("o nível TYPE pede os tipos do pacote", async () => {
@@ -203,6 +233,20 @@ describe("GraphPanel: carregando e pronto", () => {
 
     expect(canvas().getAttribute("aria-label")).toBe(
       "Mapa da arquitetura, tipos: 3 tipos e 2 dependências."
+    );
+  });
+
+  test("uma região viva, vazia enquanto carrega, anuncia a vista com o nome do canvas", async () => {
+    renderPanel();
+
+    expect(liveRegion()?.textContent).toBe("");
+    expect(liveRegion()?.className).toContain("sr-only");
+
+    await waitForNodes(3);
+
+    expect(liveRegion()?.textContent).toBe(canvas().getAttribute("aria-label"));
+    expect(liveRegion()?.textContent).toBe(
+      "Mapa da arquitetura, pacotes: 3 pacotes e 3 dependências."
     );
   });
 
@@ -234,13 +278,12 @@ describe("GraphPanel: carregando e pronto", () => {
 });
 
 describe("GraphPanel: erro", () => {
-  test("uma violação do adaptador mostra o erro inesperado, com nova tentativa", async () => {
+  test("uma violação do adaptador mostra o erro inesperado, sem nova tentativa", async () => {
     const fixture = await fixtureSlice({ level: "PACKAGE" });
     overrideSlice(
       { level: "PACKAGE" },
       { ...fixture, budget: { edges: 1200, nodes: 2 } }
     );
-    const request = vi.spyOn(transport, "request");
     renderPanel();
 
     const alert = await screen.findByRole("alert");
@@ -251,10 +294,32 @@ describe("GraphPanel: erro", () => {
     expect(within(alert).getByText(expected.title)).toBeDefined();
     expect(expected.hint).toBeDefined();
     expect(within(alert).getByText(expected.hint ?? "")).toBeDefined();
+    expect(expected.retryable).toBe(true);
+    expect(screen.queryByRole("button", { name: t.graph.retry })).toBeNull();
     expect(canvas().getAttribute("data-node-count")).toBe("none");
     expect(canvas().getAttribute("aria-label")).toBe(t.shell.regions.canvas);
+    expect(liveRegion()?.textContent).toBe("");
+  });
 
-    vi.stubGlobal("__STRATA_FAKE_TRANSCRIPTS__", []);
+  test("um BridgeError que admite nova tentativa oferece o botão, e tentar pede de novo", async () => {
+    const request = vi.spyOn(transport, "request").mockRejectedValueOnce(
+      new FakeBridgeError({
+        code: "PROC_ANALYZER_CRASHED",
+        origin: "shell",
+        params: { exitCode: 1 },
+      })
+    );
+    renderPanel();
+
+    const alert = await screen.findByRole("alert");
+    const expected = formatProtocolError({
+      code: "PROC_ANALYZER_CRASHED",
+      origin: "shell",
+      params: { exitCode: 1 },
+    });
+    expect(within(alert).getByText(expected.title)).toBeDefined();
+    expect(expected.retryable).toBe(true);
+
     fireEvent.click(screen.getByRole("button", { name: t.graph.retry }));
 
     await waitForNodes(3);
@@ -277,7 +342,7 @@ describe("GraphPanel: erro", () => {
     expect(screen.queryByRole("button", { name: t.graph.retry })).toBeNull();
   });
 
-  test("uma falha de render do canvas vira o mesmo estado de erro, e só para aquela fatia", async () => {
+  test("uma falha de render do canvas vira o mesmo estado de erro, e a nova tentativa desenha", async () => {
     renderPanel();
     await waitForNodes(3);
 
@@ -334,6 +399,25 @@ describe("GraphPanel: vazio e avisos", () => {
     expect(screen.getByRole("status").textContent).toBe(
       "Este nível tem mais elementos do que o mapa mostra: 3 de 1.842 tipos e 2 de 9.120 dependências. O limite de exibição do nível deixou o restante de fora."
     );
+  });
+
+  test('o aviso compara números: um total zero de arestas não vira "de nenhuma"', async () => {
+    const fixture = await fixtureSlice({ level: "TYPE", parentId: ORDERS });
+    overrideSlice(
+      { level: "TYPE", parentId: ORDERS },
+      {
+        ...fixture,
+        edges: [],
+        totals: { edges: 0, nodes: 1842 },
+        truncated: true,
+      }
+    );
+    renderPanel({ view: { level: "TYPE", parentId: ORDERS } });
+    await waitForNodes(3);
+
+    const notice = screen.getByRole("status").textContent ?? "";
+    expect(notice).toContain("3 de 1.842 tipos e 0 de 0 dependência.");
+    expect(notice).not.toContain("nenhuma");
   });
 
   test("uma fatia agregada diz quantos pacotes existem e que foram agrupados", async () => {

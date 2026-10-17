@@ -90,10 +90,10 @@ describe("resolveGraphView", () => {
     ).toStrictEqual({ level: "TYPE", parentId: PACKAGE_ID });
   });
 
-  test("TYPE_NEIGHBORHOOD com parent pede a vizinhança", () => {
+  test("TYPE_NEIGHBORHOOD com parent cai no nível 1 até haver a vista da vizinhança", () => {
     expect(
       resolveGraphView(search({ level: "TYPE_NEIGHBORHOOD", parent: TYPE_ID }))
-    ).toStrictEqual({ level: "TYPE_NEIGHBORHOOD", parentId: TYPE_ID });
+    ).toStrictEqual({ level: "PACKAGE" });
   });
 
   test("abaixo de PACKAGE sem parent cai no nível 1", () => {

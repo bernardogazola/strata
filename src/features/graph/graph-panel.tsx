@@ -12,7 +12,7 @@ import {
   type GraphViewParams,
   graphSliceQueryOptions,
 } from "@/queries/options";
-import type { GraphView } from "./adapter";
+import { GraphSliceViolationError, type GraphView } from "./adapter";
 import { ArchitectureGraph } from "./architecture-graph";
 
 export interface GraphPanelProps {
@@ -34,10 +34,17 @@ const protocolErrorOf = (error: Error): ProtocolError =>
     ? error.protocolError
     : { code: "INTERNAL_UNEXPECTED", origin: "frontend" };
 
-const countPhrase = (
-  count: number,
-  forms: { readonly one: string; readonly other: string }
-): string => interpolate(plural(count, forms), { count });
+interface CountForms {
+  readonly one: string;
+  readonly other: string;
+  readonly zero?: string;
+}
+
+const countPhrase = (count: number, forms: CountForms): string =>
+  interpolate(plural(count, forms), { count });
+
+const totalPhrase = (count: number, { one, other }: CountForms): string =>
+  countPhrase(count, { one, other });
 
 const canvasLabel = ({ edges, level, nodes }: GraphSlice): string =>
   interpolate(t.graph.canvas.label, {
@@ -60,9 +67,9 @@ const sliceNotices = ({
   ...(truncated
     ? [
         interpolate(t.graph.notice.truncated, {
-          edges: countPhrase(totals.edges, t.graph.canvas.edges),
+          edges: totalPhrase(totals.edges, t.graph.canvas.edges),
           edgesShown: edges.length,
-          nodes: countPhrase(totals.nodes, t.graph.canvas.nodes[level]),
+          nodes: totalPhrase(totals.nodes, t.graph.canvas.nodes[level]),
           nodesShown: nodes.length,
         }),
       ]
@@ -77,6 +84,8 @@ function FailureState({
   readonly onRetry: () => void;
 }) {
   const message = formatProtocolError(protocolErrorOf(error));
+  const retryable =
+    message.retryable && !(error instanceof GraphSliceViolationError);
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
       <div className="flex max-w-sm flex-col gap-1" role="alert">
@@ -85,7 +94,7 @@ function FailureState({
           <p className="text-muted-foreground text-sm">{message.hint}</p>
         )}
       </div>
-      {message.retryable ? (
+      {retryable ? (
         <Button onClick={onRetry} size="sm" variant="outline">
           {t.graph.retry}
         </Button>
@@ -159,20 +168,20 @@ export function GraphPanel({
       ? t.graph.empty[drawable.slice.level]
       : null;
   const shown = emptyText === null ? drawable : null;
+  const viewLabel = drawable === null ? null : canvasLabel(drawable.slice);
 
   return (
     <div aria-busy={isPending} className="flex h-full flex-col">
+      <p aria-live="polite" className="sr-only">
+        {viewLabel}
+      </p>
       {drawable === null ? null : (
         <NoticeBar notices={sliceNotices(drawable.slice)} />
       )}
       <div className="relative min-h-0 flex-1">
         <ArchitectureGraph
           elements={shown?.elements ?? null}
-          label={
-            drawable === null
-              ? t.shell.regions.canvas
-              : canvasLabel(drawable.slice)
-          }
+          label={viewLabel ?? t.shell.regions.canvas}
           onExpand={onExpand}
           onRenderError={onRenderError}
           onSelect={onSelect}

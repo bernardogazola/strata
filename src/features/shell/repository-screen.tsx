@@ -1,19 +1,16 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
 import { buttonVariants } from "@/components/ui/button";
 import { AnalyzerStatus } from "@/features/backend/analyzer-status";
-import {
-  GRAPH_LABEL_MAX_CHARS,
-  type GraphView,
-} from "@/features/graph/adapter";
+import { GRAPH_LABEL_MAX_CHARS } from "@/features/graph/adapter";
 import { GraphLegend } from "@/features/graph/graph-legend";
 import { GraphPanel } from "@/features/graph/graph-panel";
 import { NodeSummary } from "@/features/graph/node-summary";
 import { t } from "@/i18n/messages";
 import { clampText, sanitizeUntrusted } from "@/lib/untrusted";
-import type { GraphNode } from "@/protocol/graph";
+import type { GraphNode, GraphSlice } from "@/protocol/graph";
 import {
   type GraphViewParams,
   graphSliceQueryOptions,
@@ -25,12 +22,12 @@ const ROUTE_ID = "/repository/$handle";
 const routeApi = getRouteApi(ROUTE_ID);
 
 const findNode = (
-  view: GraphView | undefined,
-  elementId: string
-): GraphNode | null => {
-  const found = view?.elements.nodes.find((node) => node.data.id === elementId);
-  return found === undefined ? null : (found.data as GraphNode);
-};
+  slice: GraphSlice,
+  elementId: string | null
+): GraphNode | null =>
+  elementId === null
+    ? null
+    : (slice.nodes.find((node) => node.id === elementId) ?? null);
 
 function ParentCrumb({
   analysisId,
@@ -69,6 +66,26 @@ const backToLevelOne = (prev: RepositorySearch): RepositorySearch => ({
   parent: undefined,
 });
 
+const useFocusOnViewChange = (viewKey: string) => {
+  const targetRef = useRef<HTMLSpanElement>(null);
+  const shownKey = useRef(viewKey);
+
+  useEffect(() => {
+    if (shownKey.current === viewKey) {
+      return;
+    }
+    shownKey.current = viewKey;
+    if (document.activeElement === document.body) {
+      targetRef.current?.focus();
+    }
+  }, [viewKey]);
+
+  return targetRef;
+};
+
+const CRUMB_FOCUS_CLASS =
+  "rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
+
 function MapBreadcrumb({
   analysisId,
   view,
@@ -77,13 +94,23 @@ function MapBreadcrumb({
   readonly view: GraphViewParams;
 }) {
   const atRoot = view.level === "PACKAGE";
+  const currentRef = useFocusOnViewChange(
+    `${view.level}:${view.parentId ?? ""}`
+  );
 
   return (
     <nav aria-label={t.shell.breadcrumb.label}>
       <ol className="flex items-center gap-2 text-sm">
         <li>
           {atRoot ? (
-            <span aria-current="page">{t.shell.breadcrumb.root}</span>
+            <span
+              aria-current="page"
+              className={CRUMB_FOCUS_CLASS}
+              ref={currentRef}
+              tabIndex={-1}
+            >
+              {t.shell.breadcrumb.root}
+            </span>
           ) : (
             <Link
               className="text-muted-foreground underline-offset-4 hover:underline"
@@ -96,11 +123,18 @@ function MapBreadcrumb({
           )}
         </li>
         {atRoot ? null : (
-          <li aria-current="page" className="flex items-center gap-2">
+          <li className="flex items-center gap-2">
             <span aria-hidden="true" className="text-muted-foreground">
               /
             </span>
-            <ParentCrumb analysisId={analysisId} parentId={view.parentId} />
+            <span
+              aria-current="page"
+              className={CRUMB_FOCUS_CLASS}
+              ref={currentRef}
+              tabIndex={-1}
+            >
+              <ParentCrumb analysisId={analysisId} parentId={view.parentId} />
+            </span>
           </li>
         )}
       </ol>
@@ -136,13 +170,15 @@ function FocusedNodeSummary({
   readonly onExpand: (elementId: string) => void;
   readonly view: GraphViewParams;
 }) {
-  const { data } = useQuery(graphSliceQueryOptions(analysisId, view));
-  return (
-    <NodeSummary
-      node={focus === null ? null : findNode(data, focus)}
-      onExpand={onExpand}
-    />
+  const selectNode = useCallback(
+    (slice: GraphSlice) => findNode(slice, focus),
+    [focus]
   );
+  const { data } = useQuery({
+    ...graphSliceQueryOptions(analysisId, view),
+    select: selectNode,
+  });
+  return <NodeSummary node={data ?? null} onExpand={onExpand} />;
 }
 
 export function RepositoryScreen() {

@@ -19,6 +19,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { fakeRequest } from "@/bridge/fake";
 import { transport } from "@/bridge/transport";
 import { ThemeProvider } from "@/components/theme-provider";
+import { toGraphView } from "@/features/graph/adapter";
 import type { ArchitectureGraphProps } from "@/features/graph/architecture-graph";
 import { t } from "@/i18n/messages";
 import type { GraphSlice } from "@/protocol/graph";
@@ -26,6 +27,12 @@ import { createQueryClient } from "@/queries/client";
 import { graphSliceQueryOptions } from "@/queries/options";
 import type { RouterContext } from "@/router";
 import { Route as RepositoryRoute } from "@/routes/repository.$handle";
+
+vi.mock("@/features/graph/adapter", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/features/graph/adapter")>();
+  return { ...actual, toGraphView: vi.fn(actual.toGraphView) };
+});
 
 vi.mock("@/features/graph/architecture-graph", async (importOriginal) => {
   const actual =
@@ -94,6 +101,7 @@ const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 const HANDLE = "repo_AAAAAAAAAAAAAAAAAAAAAQ";
 const ORDERS = "pkg:br.pucpr.orders";
 const BILLING = "pkg:br.pucpr.billing";
+const ORDER_TYPE = "type:br.pucpr.orders.Order";
 const SCREEN_URL = `/repository/${HANDLE}?analysis=${AN}`;
 const BIDI_OVERRIDE = String.fromCodePoint(0x20_2e);
 
@@ -158,6 +166,19 @@ const inspector = () =>
 
 const breadcrumb = () =>
   screen.getByRole("navigation", { name: t.shell.breadcrumb.label });
+
+const currentCrumb = () =>
+  breadcrumb().querySelector<HTMLElement>('[aria-current="page"]');
+
+const liveRegion = () =>
+  screen
+    .getByRole("main", { name: t.shell.regions.canvas })
+    .querySelector<HTMLElement>('[aria-live="polite"]');
+
+const LEVEL_ONE_LABEL =
+  "Mapa da arquitetura, pacotes: 3 pacotes e 3 dependências.";
+const ORDERS_TYPES_LABEL =
+  "Mapa da arquitetura, tipos: 3 tipos e 2 dependências.";
 
 describe("/repository/$handle: a moldura", () => {
   test("monta os landmarks, o cabeçalho e a legenda, e a fatia chega ao canvas", async () => {
@@ -232,6 +253,26 @@ describe("/repository/$handle: a moldura", () => {
   });
 });
 
+describe("/repository/$handle: a vizinhança de um tipo", () => {
+  test("TYPE_NEIGHBORHOOD cai no nível 1 até haver a vista da vizinhança", async () => {
+    const request = vi.spyOn(transport, "request");
+    const { router } = await renderAt(
+      `${SCREEN_URL}&level=TYPE_NEIGHBORHOOD&parent=${ORDER_TYPE}`
+    );
+
+    await waitForCanvas(3, "pacotes");
+    expect(request.mock.calls.map(([, payload]) => payload)).toStrictEqual([
+      { analysisId: AN, level: "PACKAGE" },
+    ]);
+    expect(currentCrumb()?.textContent).toBe(t.shell.breadcrumb.root);
+    expect(within(breadcrumb()).queryByRole("link")).toBeNull();
+    expect(urlSearch(router)).toMatchObject({
+      level: "TYPE_NEIGHBORHOOD",
+      parent: ORDER_TYPE,
+    });
+  });
+});
+
 describe("/repository/$handle: navegação", () => {
   test("expandir empilha level=TYPE&parent=…, e voltar acha o nível 1 no cache", async () => {
     const request = vi.spyOn(transport, "request");
@@ -286,7 +327,7 @@ describe("/repository/$handle: navegação", () => {
     expect(within(inspector()).getByText(t.inspector.empty)).toBeDefined();
   });
 
-  test("o botão do inspetor é o caminho de teclado para expandir", async () => {
+  test("com um pacote já selecionado, o botão do inspetor expande sem ponteiro", async () => {
     const { router } = await renderAt(`${SCREEN_URL}&focus=${ORDERS}`);
     await waitForCanvas(3, "pacotes");
 
@@ -300,6 +341,13 @@ describe("/repository/$handle: navegação", () => {
       level: "TYPE",
       parent: ORDERS,
     });
+  });
+
+  test("um focus que não está na fatia deixa o inspetor vazio", async () => {
+    await renderAt(`${SCREEN_URL}&focus=pkg:br.pucpr.inexistente`);
+    await waitForCanvas(3, "pacotes");
+
+    expect(within(inspector()).getByText(t.inspector.empty)).toBeDefined();
   });
 
   test("a raiz da trilha volta ao nível 1 com o pacote de onde se saiu selecionado", async () => {
@@ -318,6 +366,108 @@ describe("/repository/$handle: navegação", () => {
       focus: ORDERS,
       level: "PACKAGE",
     });
+  });
+});
+
+describe("/repository/$handle: o foco em uma troca de nível", () => {
+  test("a montagem não move o foco", async () => {
+    await renderAt(SCREEN_URL);
+    await waitForCanvas(3, "pacotes");
+
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  test("expandir pelo inspetor leva o foco à trilha e anuncia a vista nova", async () => {
+    await renderAt(`${SCREEN_URL}&focus=${ORDERS}`);
+    await waitForCanvas(3, "pacotes");
+    expect(liveRegion()?.textContent).toBe(LEVEL_ONE_LABEL);
+    const expand = within(inspector()).getByRole("button", {
+      name: t.inspector.expand,
+    });
+    expand.focus();
+
+    fireEvent.click(expand);
+
+    await waitForCanvas(3, "tipos");
+    await waitFor(() => expect(document.activeElement).toBe(currentCrumb()));
+    expect(currentCrumb()?.textContent).toBe("orders");
+    expect(currentCrumb()?.tabIndex).toBe(-1);
+    expect(liveRegion()?.textContent).toBe(ORDERS_TYPES_LABEL);
+  });
+
+  test("voltar pela raiz da trilha leva o foco ao item da raiz", async () => {
+    await renderAt(`${SCREEN_URL}&level=TYPE&parent=${ORDERS}`);
+    await waitForCanvas(3, "tipos");
+    const root = within(breadcrumb()).getByRole("link", {
+      name: t.shell.breadcrumb.root,
+    });
+    root.focus();
+
+    fireEvent.click(root);
+
+    await waitForCanvas(3, "pacotes");
+    await waitFor(() => expect(document.activeElement).toBe(currentCrumb()));
+    expect(currentCrumb()?.textContent).toBe(t.shell.breadcrumb.root);
+    expect(liveRegion()?.textContent).toBe(LEVEL_ONE_LABEL);
+  });
+
+  test("uma troca de nível com o foco em outro controle não o rouba", async () => {
+    const { router } = await renderAt(
+      `${SCREEN_URL}&level=TYPE&parent=${ORDERS}`
+    );
+    await waitForCanvas(3, "tipos");
+    const toggle = screen.getByRole("button", { name: "Alternar tema" });
+    toggle.focus();
+
+    router.history.push(SCREEN_URL);
+
+    await waitForCanvas(3, "pacotes");
+    expect(document.activeElement).toBe(toggle);
+  });
+});
+
+describe("/repository/$handle: a falha de render e a fatia", () => {
+  test("a falha de render vale só para a fatia dela: o drill-down desenha", async () => {
+    await renderAt(`${SCREEN_URL}&focus=${ORDERS}`);
+    await waitForCanvas(3, "pacotes");
+
+    fireEvent.click(screen.getByRole("button", { name: "render-error" }));
+    await screen.findByRole("alert");
+    expect(canvas().getAttribute("data-node-count")).toBe("none");
+
+    fireEvent.click(
+      within(inspector()).getByRole("button", { name: t.inspector.expand })
+    );
+
+    await waitForCanvas(3, "tipos");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(canvas().getAttribute("data-slice-level")).toBe("TYPE");
+  });
+});
+
+describe("/repository/$handle: o inspetor e o adaptador", () => {
+  test("o inspetor não adapta a fatia de novo: um pedido e uma adaptação por fatia", async () => {
+    const adapt = vi.mocked(toGraphView);
+    adapt.mockClear();
+    const request = vi.spyOn(transport, "request");
+    await renderAt(`${SCREEN_URL}&focus=${ORDERS}`);
+    await waitForCanvas(3, "pacotes");
+    await within(inspector()).findByText("orders");
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(adapt).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(
+      within(inspector()).getByRole("button", { name: t.inspector.expand })
+    );
+    await waitForCanvas(3, "tipos");
+    fireEvent.click(
+      screen.getByRole("button", { name: `select:${ORDER_TYPE}` })
+    );
+    await within(inspector()).findByText("Order");
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(adapt).toHaveBeenCalledTimes(2);
   });
 });
 
