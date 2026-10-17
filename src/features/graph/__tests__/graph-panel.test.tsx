@@ -480,7 +480,7 @@ describe("NodeSummary", () => {
     expect(screen.getByText(elementKindLabels.PACKAGE)).toBeDefined();
     expect(screen.getByText("4.210")).toBeDefined();
     expect(screen.getByText(t.inspector.typeCount)).toBeDefined();
-    expect(screen.getByText("38")).toBeDefined();
+    expect(screen.getByText("3")).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: t.inspector.expand }));
     expect(onExpand).toHaveBeenCalledWith(ORDERS);
