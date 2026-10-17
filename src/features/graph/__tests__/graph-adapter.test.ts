@@ -75,6 +75,9 @@ const violationOf = (slice: GraphSlice): string | undefined => {
   }
 };
 
+const RLO = String.fromCodePoint(0x20_2e);
+const PDF = String.fromCodePoint(0x20_2c);
+
 const MENTIONS_CLIENT_TEXT = /segredo/;
 
 const NODE_KEYS = Object.keys(graphNodeSchema.shape).sort();
@@ -159,7 +162,7 @@ describe("toGraphElements: o que pode morar em um nó", () => {
     const slice: GraphSlice = {
       ...base,
       nodes: [
-        { ...base.nodes[0], label: "‮evil‬" },
+        { ...base.nodes[0], label: `${RLO}evil${PDF}` },
         { ...base.nodes[1], label: long },
       ] as GraphSlice["nodes"],
     };
@@ -417,7 +420,7 @@ describe("toGraphElements: mais garantias do contrato", () => {
     const slice: GraphSlice = {
       ...typeSlice,
       nodes: typeSlice.nodes.map((node, index) =>
-        index === 0 ? { ...node, label: "‮" } : node
+        index === 0 ? { ...node, label: RLO } : node
       ),
     };
 

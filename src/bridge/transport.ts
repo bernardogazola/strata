@@ -76,7 +76,10 @@ const browserTransport: BridgeTransport = {
   closeRepository: () => Promise.resolve(),
   exportDiagnostics: () => Promise.resolve({ written: false }),
   openRepository: () =>
-    Promise.resolve({ displayName: "orders‮ecivres", handle: BROWSER_HANDLE }),
+    Promise.resolve({
+      displayName: `orders${String.fromCodePoint(0x20_2e)}ecivres`,
+      handle: BROWSER_HANDLE,
+    }),
   request: (method, payload) => fakeRequest(method, payload),
   subscribe: (listener) =>
     Promise.resolve(
