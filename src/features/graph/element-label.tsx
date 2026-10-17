@@ -7,10 +7,17 @@ export interface ElementLabelProps {
   readonly kind: ElementKind;
 
   readonly label: string;
+
+  readonly maxChars?: number;
 }
 
-export function ElementLabel({ className, kind, label }: ElementLabelProps) {
-  const text = elementDisplayLabel(kind, label);
+export function ElementLabel({
+  className,
+  kind,
+  label,
+  maxChars,
+}: ElementLabelProps) {
+  const text = elementDisplayLabel(kind, label, maxChars);
   if (kind === "PACKAGE" && text === t.graph.defaultPackage) {
     return <span className={className}>{text}</span>;
   }

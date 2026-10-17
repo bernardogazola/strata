@@ -465,6 +465,15 @@ describe("NodeSummary", () => {
     render(<NodeSummary node={null} onExpand={vi.fn()} />);
 
     expect(screen.getByText(t.inspector.empty)).toBeDefined();
+    expect(screen.queryByText(t.inspector.notOnMap)).toBeNull();
+  });
+
+  test("uma seleção que a fatia truncada deixou fora do mapa diz isso, e não que nada foi selecionado", () => {
+    render(<NodeSummary node={null} notOnMap onExpand={vi.fn()} />);
+
+    expect(screen.getByText(t.inspector.notOnMap)).toBeDefined();
+    expect(screen.queryByText(t.inspector.empty)).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   test("um pacote mostra o rótulo isolado, o tipo, as métricas e o botão de expandir", async () => {
@@ -523,6 +532,19 @@ describe("NodeSummary", () => {
     expect(label.length).toBeLessThan(hostile.length);
     expect(label.endsWith("…")).toBe(true);
   });
+
+  test("o pacote padrão do Java tem título, e não um cabeçalho vazio", async () => {
+    render(
+      <NodeSummary
+        node={{ ...(await packageNode()), id: "pkg:", label: "" }}
+        onExpand={vi.fn()}
+      />
+    );
+
+    const heading = screen.getByRole("heading", { level: 2 });
+    expect(heading.textContent).toBe(t.graph.defaultPackage);
+    expect(heading.querySelector("bdi")).toBeNull();
+  });
 });
 
 describe("GraphLegend", () => {
@@ -562,6 +584,7 @@ describe("GraphLegend", () => {
     expect(screen.getByText(t.graph.legend.kindShapes.TYPE)).toBeDefined();
     expect(screen.getByText(t.graph.legend.selection)).toBeDefined();
     expect(screen.getByText(t.graph.legend.expandHint)).toBeDefined();
+    expect(screen.getByText(t.graph.legend.keyboardHint)).toBeDefined();
 
     const svgs = [...container.querySelectorAll("svg")];
     expect(svgs).toHaveLength(6);
@@ -587,5 +610,37 @@ describe("GraphLegend", () => {
     expect(
       sampleOf(t.graph.legend.selection)?.getAttribute("stroke-width")
     ).toBe(String(GRAPH_STYLE.node.selectedBorderWidth));
+  });
+});
+
+describe("GraphPanel: a legenda", () => {
+  const legend = () =>
+    screen.getByRole("region", { name: t.graph.legend.title });
+
+  test("é um rodapé do painel: irmã do invólucro do canvas, logo depois dele, e nunca dentro", async () => {
+    renderPanel();
+    await waitForNodes(3);
+
+    const wrapper = canvas().parentElement;
+    expect(wrapper?.nextElementSibling).toBe(legend());
+    expect(wrapper?.contains(legend())).toBe(false);
+    expect(canvas().contains(legend())).toBe(false);
+  });
+
+  test("está lá em todo estado do painel, inclusive carregando", () => {
+    renderPanel();
+
+    expect(screen.getByRole("status").textContent).toBe(t.graph.loading);
+    expect(legend()).toBeDefined();
+  });
+
+  test("não tem parada de Tab: ela explica o canvas, não é controle", () => {
+    render(<GraphLegend />);
+
+    expect(
+      legend().querySelectorAll(
+        "a[href], button, input, select, textarea, [tabindex]"
+      )
+    ).toHaveLength(0);
   });
 });

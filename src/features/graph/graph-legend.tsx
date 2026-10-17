@@ -87,16 +87,19 @@ export function GraphLegend() {
   const titleId = useId();
 
   return (
-    <section aria-labelledby={titleId} className="flex flex-col gap-4 text-sm">
+    <section
+      aria-labelledby={titleId}
+      className="flex flex-wrap items-start gap-x-8 gap-y-2 border-t px-4 py-2 text-sm"
+    >
       <h2 className="font-medium" id={titleId}>
         {t.graph.legend.title}
       </h2>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
         <h3 className="text-muted-foreground text-xs">
           {t.graph.legend.resolution}
         </h3>
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1">
           {resolutionQualitySchema.options.map((quality) => (
             <li className="flex items-center gap-2" key={quality}>
               <EdgeSample line={EDGE_LINES[quality]} />
@@ -106,9 +109,9 @@ export function GraphLegend() {
         </ul>
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1">
         <h3 className="text-muted-foreground text-xs">{t.graph.legend.kind}</h3>
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1">
           {LEGEND_KINDS.map((kind) => (
             <li className="flex items-center gap-2" key={kind}>
               <NodeSample kind={kind} selected={false} />
@@ -122,7 +125,10 @@ export function GraphLegend() {
         </ul>
       </div>
 
-      <p className="text-muted-foreground">{t.graph.legend.expandHint}</p>
+      <div className="flex max-w-prose flex-col gap-1 text-muted-foreground">
+        <p>{t.graph.legend.expandHint}</p>
+        <p>{t.graph.legend.keyboardHint}</p>
+      </div>
     </section>
   );
 }

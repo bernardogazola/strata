@@ -53,6 +53,18 @@ describe("AppShell", () => {
     ).toBeDefined();
   });
 
+  test("a barra lateral é uma coluna de altura limitada e não rola: quem rola é o filho", () => {
+    renderShell();
+
+    const classes = screen
+      .getByRole("complementary", { name: t.shell.regions.sidebar })
+      .className.split(" ");
+    expect(classes).toStrictEqual(
+      expect.arrayContaining(["flex", "flex-col", "min-h-0"])
+    );
+    expect(classes).not.toContain("overflow-y-auto");
+  });
+
   test("há um <main> só", () => {
     renderShell();
 

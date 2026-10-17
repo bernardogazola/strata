@@ -6,6 +6,7 @@ export interface AppShellProps {
   readonly inspector: ReactNode;
 
   readonly main: ReactNode;
+
   readonly sidebar: ReactNode;
 }
 
@@ -17,7 +18,7 @@ export function AppShell({ header, inspector, main, sidebar }: AppShellProps) {
       </header>
       <aside
         aria-label={t.shell.regions.sidebar}
-        className="min-h-0 overflow-y-auto border-r p-4"
+        className="flex min-h-0 flex-col border-r p-4"
       >
         {sidebar}
       </aside>

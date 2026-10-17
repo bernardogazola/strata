@@ -134,9 +134,10 @@ const assertIdentity = ({ edges, nodes }: GraphSlice): void => {
 
 export const elementDisplayLabel = (
   kind: ElementKind,
-  label: string
+  label: string,
+  maxChars: number = GRAPH_LABEL_MAX_CHARS
 ): string => {
-  const clean = clampText(sanitizeUntrusted(label), GRAPH_LABEL_MAX_CHARS);
+  const clean = clampText(sanitizeUntrusted(label), maxChars);
   return clean === "" && kind === "PACKAGE" ? t.graph.defaultPackage : clean;
 };
 

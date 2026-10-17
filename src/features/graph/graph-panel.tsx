@@ -14,6 +14,7 @@ import {
 } from "@/queries/options";
 import { GraphSliceViolationError, type GraphView } from "./adapter";
 import { ArchitectureGraph } from "./architecture-graph";
+import { GraphLegend } from "./graph-legend";
 
 export interface GraphPanelProps {
   readonly analysisId: string;
@@ -194,6 +195,7 @@ export function GraphPanel({
         )}
         {emptyText === null ? null : <CenteredStatus text={emptyText} />}
       </div>
+      <GraphLegend />
     </div>
   );
 }
