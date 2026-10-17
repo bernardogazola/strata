@@ -28,7 +28,7 @@ export default defineConfig({
   },
   webServer: {
     command: "pnpm dev",
-    reuseExistingServer: true,
+    reuseExistingServer: process.env.STRATA_REUSE_SERVER === "1",
     timeout: 120_000,
     url: BASE_URL,
   },
