@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   dependencyTypeSchema,
   elementKindSchema,
+  type GraphLevel,
   graphLevelSchema,
   resolutionQualitySchema,
   typeKindSchema,
@@ -61,6 +62,17 @@ export const graphSliceSchema = z.strictObject({
   truncated: z.boolean(),
 });
 export type GraphSlice = z.infer<typeof graphSliceSchema>;
+
+export interface SliceBudget {
+  readonly edges: number;
+  readonly nodes: number;
+}
+
+export const GRAPH_SLICE_BUDGETS = {
+  PACKAGE: { edges: 1200, nodes: 300 },
+  TYPE: { edges: 5000, nodes: 1000 },
+  TYPE_NEIGHBORHOOD: { edges: 2500, nodes: 500 },
+} as const satisfies Record<GraphLevel, SliceBudget>;
 
 export const outlineNodeSchema = z.strictObject({
   childCount: z.number().int().nonnegative(),

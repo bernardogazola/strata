@@ -45,3 +45,24 @@ export const applyResolvedTheme = (resolved: ResolvedTheme): void => {
 export const syncNativeBackground = (resolved: ResolvedTheme): void => {
   setNativeBackground(BACKGROUND_COLORS[resolved]);
 };
+
+export type ResolvedThemeListener = (resolved: ResolvedTheme) => void;
+
+const resolvedThemeListeners = new Set<ResolvedThemeListener>();
+
+// O canvas assina aqui em vez de usar um efeito: o React roda os efeitos dos filhos antes
+// dos do pai, e o efeito leria a paleta antiga antes de o ThemeProvider trocar a classe.
+export const onResolvedThemeApplied = (
+  listener: ResolvedThemeListener
+): (() => void) => {
+  resolvedThemeListeners.add(listener);
+  return () => {
+    resolvedThemeListeners.delete(listener);
+  };
+};
+
+export const notifyResolvedThemeApplied = (resolved: ResolvedTheme): void => {
+  for (const listener of resolvedThemeListeners) {
+    listener(resolved);
+  }
+};

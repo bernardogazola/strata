@@ -27,7 +27,7 @@ export default defineConfig({
       },
     },
     environment: "jsdom",
-    exclude: [...configDefaults.exclude, "corpus/**"],
+    exclude: [...configDefaults.exclude, "corpus/**", "e2e/**"],
     globals: false,
     setupFiles: ["./src/test/setup.ts"],
     unstubGlobals: true,
