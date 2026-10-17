@@ -138,14 +138,28 @@ const EVENT_ROUTES = readEventTranscripts();
 
 const matchesDiscriminants = (
   method: ProtocolMethod,
-  transcript: Transcript,
+  request: Record<string, unknown>,
   payload: Record<string, unknown>
 ): boolean => {
   const fields = DISCRIMINANTS[method];
   if (fields === undefined) {
     return true;
   }
-  return fields.every((field) => transcript.request[field] === payload[field]);
+  return fields.every((field) => request[field] === payload[field]);
+};
+
+const findOverride = (
+  method: ProtocolMethod,
+  payload: Record<string, unknown>
+): FakeTranscriptOverride | undefined => {
+  if (!import.meta.env.DEV) {
+    return undefined;
+  }
+  return window.__STRATA_FAKE_TRANSCRIPTS__?.find(
+    (override) =>
+      override.method === method &&
+      matchesDiscriminants(method, override.request, payload)
+  );
 };
 
 const reject = (protocolError: ProtocolError): Promise<never> =>
@@ -192,10 +206,14 @@ export const fakeRequest = (
       params: { method },
     });
   }
-  const transcripts = METHOD_ROUTES.get(method) ?? [];
   const asRecord = (parsed.data ?? {}) as Record<string, unknown>;
+  const override = findOverride(method, asRecord);
+  if (override !== undefined) {
+    return Promise.resolve(override.result);
+  }
+  const transcripts = METHOD_ROUTES.get(method) ?? [];
   const chosen = transcripts.find((transcript) =>
-    matchesDiscriminants(method, transcript, asRecord)
+    matchesDiscriminants(method, transcript.request, asRecord)
   );
   if (chosen === undefined) {
     return reject({

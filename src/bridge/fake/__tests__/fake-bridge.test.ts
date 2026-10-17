@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { isTauri } from "@/bridge/environment";
 import {
   FakeBridgeError,
@@ -130,6 +130,117 @@ describe("as três recusas, que dizem coisas diferentes", () => {
       "frontend",
     ]);
     expect(error.detail).toContain("tour");
+  });
+});
+
+describe("os overrides de desenvolvimento", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const PACKAGE_REQUEST = { analysisId: AN, level: "PACKAGE" } as const;
+  const OVERRIDE_RESULT = { marker: "override" };
+
+  const installOverrides = (
+    overrides: readonly FakeTranscriptOverride[]
+  ): void => {
+    vi.stubGlobal("__STRATA_FAKE_TRANSCRIPTS__", overrides);
+  };
+
+  test("um override que casa vence a fixture e volta tal como está", async () => {
+    installOverrides([
+      {
+        method: "graph.slice",
+        request: { level: "PACKAGE" },
+        result: OVERRIDE_RESULT,
+      },
+    ]);
+    expect(await fakeRequest("graph.slice", PACKAGE_REQUEST)).toBe(
+      OVERRIDE_RESULT
+    );
+  });
+
+  test("o primeiro override que casa vence os seguintes", async () => {
+    const second = { marker: "second" };
+    installOverrides([
+      {
+        method: "graph.slice",
+        request: { level: "PACKAGE" },
+        result: OVERRIDE_RESULT,
+      },
+      { method: "graph.slice", request: { level: "PACKAGE" }, result: second },
+    ]);
+    expect(await fakeRequest("graph.slice", PACKAGE_REQUEST)).toBe(
+      OVERRIDE_RESULT
+    );
+  });
+
+  test("um override que não casa pelos discriminantes cai na fixture", async () => {
+    installOverrides([
+      {
+        method: "graph.slice",
+        request: { level: "TYPE", parentId: "pkg:br.pucpr.orders" },
+        result: OVERRIDE_RESULT,
+      },
+    ]);
+    const slice = graphSliceSchema.parse(
+      await fakeRequest("graph.slice", PACKAGE_REQUEST)
+    );
+    expect([slice.level, slice.nodes.length]).toStrictEqual(["PACKAGE", 3]);
+  });
+
+  test("um override de outro método é ignorado", async () => {
+    installOverrides([
+      {
+        method: "outline.children",
+        request: { level: "PACKAGE" },
+        result: OVERRIDE_RESULT,
+      },
+    ]);
+    const slice = graphSliceSchema.parse(
+      await fakeRequest("graph.slice", PACKAGE_REQUEST)
+    );
+    expect(slice.level).toBe("PACKAGE");
+  });
+
+  test("sem discriminantes, a primeira fixture e o primeiro override casam com qualquer pedido", async () => {
+    expect(await fakeRequest("system.ping", {})).toStrictEqual({
+      uptimeMillis: 0,
+    });
+    installOverrides([
+      {
+        method: "system.ping",
+        request: { ignored: true },
+        result: OVERRIDE_RESULT,
+      },
+    ]);
+    expect(await fakeRequest("system.ping", {})).toBe(OVERRIDE_RESULT);
+  });
+
+  test("um override não faz um pedido inválido passar", async () => {
+    installOverrides([
+      { method: "graph.slice", request: {}, result: OVERRIDE_RESULT },
+    ]);
+    const error = await protocolErrorOf("graph.slice", {
+      analysisId: AN,
+      level: "GALAXY",
+    });
+    expect(error.code).toBe("PROTO_INVALID_PAYLOAD");
+  });
+
+  test("fora do DEV o global nunca é lido", async () => {
+    vi.stubEnv("DEV", false);
+    installOverrides([
+      {
+        method: "graph.slice",
+        request: { level: "PACKAGE" },
+        result: OVERRIDE_RESULT,
+      },
+    ]);
+    const slice = graphSliceSchema.parse(
+      await fakeRequest("graph.slice", PACKAGE_REQUEST)
+    );
+    expect(slice.nodes.length).toBe(3);
   });
 });
 
