@@ -8,7 +8,7 @@ import {
   repositoryRequest,
 } from "@/bridge/analyzer";
 import { toGraphView } from "@/features/graph/adapter";
-import { GRAPH_PERF } from "@/features/graph/architecture-graph";
+import { GRAPH_PERF } from "@/features/graph/perf";
 import type { GraphLevel } from "@/protocol/enums";
 import { queryKeys } from "./keys";
 
@@ -46,7 +46,9 @@ export const graphSliceQueryOptions = (
   const params = parentId === undefined ? { level } : { level, parentId };
   return queryOptions({
     queryFn: () => {
-      performance.mark(GRAPH_PERF.request);
+      if (import.meta.env.DEV) {
+        performance.mark(GRAPH_PERF.request);
+      }
       return analyzerRequest("graph.slice", { analysisId, ...params });
     },
     queryKey: queryKeys.structure.slice(analysisId, params),

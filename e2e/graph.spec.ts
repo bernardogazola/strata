@@ -7,7 +7,7 @@ import {
   type TestInfo,
   test,
 } from "@playwright/test";
-import { GRAPH_PERF } from "@/features/graph/architecture-graph";
+import { GRAPH_PERF } from "@/features/graph/perf";
 import { GRAPH_STYLE } from "@/features/graph/stylesheet";
 import {
   GRAPH_SLICE_BUDGETS,

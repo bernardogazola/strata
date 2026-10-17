@@ -11,6 +11,7 @@ import type { GraphSlice } from "@/protocol/graph";
 import { useAppStore } from "@/state/app-store";
 import { concentricLayout, FIT_PADDING_PX, MAX_FIT_ZOOM } from "./layout";
 import { readGraphPalette } from "./palette";
+import { GRAPH_PERF } from "./perf";
 import {
   ACTIVE_CLASS,
   buildStylesheet,
@@ -28,12 +29,6 @@ export interface ArchitectureGraphProps {
   readonly selectedElementId: string | null;
   readonly slice: GraphSlice | null;
 }
-
-export const GRAPH_PERF = {
-  ready: "strata:graph:ready",
-  render: "strata:graph:render",
-  request: "strata:graph:request",
-} as const;
 
 type GraphState = "idle" | "ready" | "rendering";
 
@@ -87,6 +82,9 @@ const settleViewport = (cy: Core): void => {
 };
 
 const markRenderReady = (): void => {
+  if (!import.meta.env.DEV) {
+    return;
+  }
   const previousReady = performance
     .getEntriesByName(GRAPH_PERF.ready, "mark")
     .at(-1);
@@ -247,7 +245,7 @@ class GraphCanvas {
         }
       }),
       onResolvedThemeApplied(() => {
-        this.#cy.style(buildStylesheet(readGraphPalette()));
+        this.#restyle();
       }),
       observeSize(container, () => {
         this.#runPendingLayout();
@@ -300,6 +298,18 @@ class GraphCanvas {
     });
   }
 
+  #restyle(): void {
+    try {
+      this.#cy.style(buildStylesheet(readGraphPalette()));
+    } catch (error) {
+      this.#callbacks.onRenderError(
+        new Error("o tema resolvido não conseguiu reestilizar o canvas", {
+          cause: error,
+        })
+      );
+    }
+  }
+
   #elementOf(id: string | null): CollectionReturnValue {
     return id === null ? this.#cy.collection() : this.#cy.getElementById(id);
   }
@@ -343,12 +353,14 @@ class GraphCanvas {
       return;
     }
     this.#pendingLayout = null;
-    this.#cy.resize();
     this.#runLayout(slice);
   }
 
   #runLayout(slice: GraphSlice): void {
     const cy = this.#cy;
+    // O resize() do Cytoscape tem debounce de 100 ms; sem a chamada explícita, o layout leria
+    // o tamanho antigo.
+    cy.resize();
     const layout = cy.layout(concentricLayout(slice));
     layout.one(
       "layoutstop",

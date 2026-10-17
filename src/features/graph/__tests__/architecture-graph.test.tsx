@@ -13,6 +13,7 @@ import {
   test,
   vi,
 } from "vitest";
+import { ThemeProvider } from "@/components/theme-provider";
 import { notifyResolvedThemeApplied } from "@/lib/theme";
 import { type GraphSlice, graphSliceSchema } from "@/protocol/graph";
 import { useAppStore } from "@/state/app-store";
@@ -22,9 +23,10 @@ import { toGraphElements } from "../adapter";
 import {
   ArchitectureGraph,
   type ArchitectureGraphProps,
-  GRAPH_PERF,
 } from "../architecture-graph";
 import { MAX_FIT_ZOOM } from "../layout";
+import { UnsupportedGraphColorError } from "../palette";
+import { GRAPH_PERF } from "../perf";
 import { ACTIVE_CLASS, readGraphRuntime, SELECTED_CLASS } from "../stylesheet";
 
 const instances = vi.hoisted(() => [] as Core[]);
@@ -51,6 +53,7 @@ const FIXTURES = path.resolve(
 
 const WHEEL_WARNING = /custom wheel sensitivity/;
 const PLACEHOLDER_ID = "__________cytoscape_stylesheet";
+const THEME_TEST_STORAGE_KEY = "strata-test-architecture-graph-theme";
 
 const readSliceFixture = async (stem: string): Promise<GraphSlice> => {
   const text = await readFile(path.join(FIXTURES, `${stem}.jsonl`), "utf8");
@@ -268,6 +271,7 @@ describe("ArchitectureGraph: elementos e intenção", () => {
     const id = packageSlice.nodes[0]?.id ?? "";
 
     cy.getElementById(id).emit("tap");
+    expect(onSelect).toHaveBeenCalledTimes(1);
     cy.emit("tap");
 
     expect(onSelect).toHaveBeenNthCalledWith(1, id);
@@ -348,13 +352,56 @@ describe("ArchitectureGraph: tema e ciclo de vida", () => {
     expect(node.style("color")).not.toBe(light);
   });
 
-  test("desmontar cancela a escuta do tema: notificar depois não lança", () => {
+  test("desmontar cancela a escuta do tema: notificar depois não reestiliza a instância destruída", () => {
     const { unmount } = render(
       <ArchitectureGraph {...propsFor(packageSlice)} />
     );
+    const cy = onlyLiveInstance();
     unmount();
+    const style = vi.spyOn(cy, "style");
 
     expect(() => notifyResolvedThemeApplied("dark")).not.toThrow();
+    expect(style).not.toHaveBeenCalled();
+  });
+
+  test("desmontar cancela a assinatura da store: um destaque escrito depois não toca a instância destruída", () => {
+    const { unmount } = render(
+      <ArchitectureGraph {...propsFor(packageSlice)} />
+    );
+    const cy = onlyLiveInstance();
+    unmount();
+    const startBatch = vi.spyOn(cy, "startBatch");
+
+    act(() => {
+      useAppStore
+        .getState()
+        .setActiveElementId(packageSlice.nodes[0]?.id ?? "");
+    });
+
+    expect(startBatch).not.toHaveBeenCalled();
+  });
+
+  test("uma cor do tema que o Cytoscape descartaria vira onRenderError, e não um throw no efeito do provedor", () => {
+    const onRenderError = vi.fn();
+    const regressed = document.createElement("style");
+    regressed.textContent = ".dark { --graph-node: oklch(0.7 0.1 250); }";
+    document.head.append(regressed);
+    try {
+      render(
+        <ThemeProvider defaultTheme="dark" storageKey={THEME_TEST_STORAGE_KEY}>
+          <ArchitectureGraph {...propsFor(packageSlice, { onRenderError })} />
+        </ThemeProvider>
+      );
+    } finally {
+      regressed.remove();
+    }
+    const error: unknown = onRenderError.mock.calls[0]?.[0];
+
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(onRenderError).toHaveBeenCalledTimes(1);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).cause).toBeInstanceOf(UnsupportedGraphColorError);
+    expect(liveInstances()).toHaveLength(1);
   });
 
   test("o layout termina com o invólucro em ready e as contagens da fatia", async () => {
@@ -548,6 +595,43 @@ describe("ArchitectureGraph: layout, enquadramento e medição", () => {
 
     expect(measures()).toHaveLength(2);
     expect(measures()[1]?.startTime).toBe(secondRequest.startTime);
+  });
+
+  test("fora de DEV o render não marca nem mede: o User Timing é do benchmark e do e2e", async () => {
+    vi.stubEnv("DEV", false);
+    performance.clearMarks();
+    performance.clearMeasures();
+    performance.mark(GRAPH_PERF.request);
+    try {
+      const { container } = render(
+        <ArchitectureGraph {...propsFor(packageSlice)} />
+      );
+      await waitForReady(wrapperOf(container));
+
+      expect(readyMarks()).toBe(0);
+      expect(
+        performance.getEntriesByName(GRAPH_PERF.render, "measure")
+      ).toHaveLength(0);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  test("com o contêiner já medido, o layout imediato também relê o tamanho antes de rodar", () => {
+    const { rerender } = render(
+      <ArchitectureGraph {...propsFor(packageSlice)} />
+    );
+    const cy = onlyLiveInstance();
+    const resize = vi.spyOn(cy, "resize");
+    const layout = vi.spyOn(cy, "layout");
+
+    rerender(<ArchitectureGraph {...propsFor(typeSlice)} />);
+
+    expect(resize).toHaveBeenCalledTimes(1);
+    expect(layout).toHaveBeenCalledTimes(1);
+    expect(resize.mock.invocationCallOrder[0]).toBeLessThan(
+      layout.mock.invocationCallOrder[0] ?? Number.NEGATIVE_INFINITY
+    );
   });
 
   test("a 0×0 o layout espera o primeiro tamanho não nulo que o ResizeObserver relata", async () => {

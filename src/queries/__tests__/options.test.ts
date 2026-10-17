@@ -8,7 +8,7 @@ import {
   GraphSliceViolationError,
   toGraphElements,
 } from "@/features/graph/adapter";
-import { GRAPH_PERF } from "@/features/graph/architecture-graph";
+import { GRAPH_PERF } from "@/features/graph/perf";
 import type { GraphSlice } from "@/protocol/graph";
 import { createQueryClient } from "@/queries/client";
 import { queryKeys } from "@/queries/keys";
@@ -24,6 +24,7 @@ const ORDERS = "pkg:br.pucpr.orders";
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 const fixtureSlice = async (view: GraphViewParams): Promise<GraphSlice> =>
@@ -119,6 +120,37 @@ describe("graphSliceQueryOptions: o pedido", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(mark).toHaveBeenCalledWith(GRAPH_PERF.request);
+  });
+
+  test("fora de DEV o pedido não marca: um refetch em segundo plano não deixa entrada", async () => {
+    vi.stubEnv("DEV", false);
+    const mark = vi.spyOn(performance, "mark");
+    const { result } = renderSliceQuery({ level: "PACKAGE" });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mark).not.toHaveBeenCalledWith(GRAPH_PERF.request);
+  });
+});
+
+describe("graphSliceQueryOptions: a camada", () => {
+  afterEach(() => {
+    vi.doUnmock("@/features/graph/architecture-graph");
+    vi.doUnmock("cytoscape");
+    vi.resetModules();
+  });
+
+  test("importar as queries não carrega o componente do canvas nem o Cytoscape", async () => {
+    vi.resetModules();
+    vi.doMock("@/features/graph/architecture-graph", () => {
+      throw new Error("queries/ importou o componente do canvas");
+    });
+    vi.doMock("cytoscape", () => {
+      throw new Error("queries/ carregou o Cytoscape");
+    });
+
+    await expect(import("@/queries/options")).resolves.toHaveProperty(
+      "graphSliceQueryOptions"
+    );
   });
 });
 

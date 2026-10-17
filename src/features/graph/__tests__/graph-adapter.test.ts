@@ -64,6 +64,18 @@ const packageSliceOf = (count: number): GraphSlice => {
   };
 };
 
+const edgesOf = (slice: GraphSlice, count: number): GraphSlice["edges"] => {
+  const [from, to] = slice.nodes;
+  return Array.from({ length: count }, (_, index) => ({
+    id: `e_${String(index).padStart(16, "0")}`,
+    resolution: "RESOLVED" as const,
+    source: from?.id ?? "",
+    target: to?.id ?? "",
+    types: { IMPORTS: 1 },
+    weight: 1,
+  }));
+};
+
 const violationOf = (slice: GraphSlice): string | undefined => {
   try {
     toGraphElements(slice);
@@ -203,23 +215,26 @@ describe("toGraphElements: afirma o orçamento e lança", () => {
 
   test("uma aresta acima do orçamento da fatia lança", () => {
     const base = packageSliceOf(2);
-    const [from, to] = base.nodes;
-    const edges = Array.from({ length: 3 }, (_, index) => ({
-      id: `e_${String(index).padStart(16, "0")}`,
-      resolution: "RESOLVED" as const,
-      source: from?.id ?? "",
-      target: to?.id ?? "",
-      types: { IMPORTS: 1 },
-      weight: 1,
-    }));
     const slice: GraphSlice = {
       ...base,
       budget: { edges: 2, nodes: 300 },
-      edges,
+      edges: edgesOf(base, 3),
       totals: { edges: 3, nodes: 2 },
     };
 
     expect(violationOf(slice)).toBe("EDGES_OVER_BUDGET");
+  });
+
+  test("um orçamento de arestas acima do teto do nível lança, com os nós dentro do teto", () => {
+    const slice: GraphSlice = {
+      ...packageSliceOf(3),
+      budget: {
+        edges: GRAPH_SLICE_BUDGETS.PACKAGE.edges + 1,
+        nodes: GRAPH_SLICE_BUDGETS.PACKAGE.nodes,
+      },
+    };
+
+    expect(violationOf(slice)).toBe("BUDGET_OVER_LEVEL_CEILING");
   });
 
   test("um orçamento declarado acima do teto do nível lança, mesmo com a fatia pequena", () => {
@@ -244,10 +259,32 @@ describe("toGraphElements: afirma o orçamento e lança", () => {
     expect(violationOf(slice)).toBe("COUNTS_OVER_TOTALS");
   });
 
+  test("mais arestas do que o total declarado lança, com os nós no total", () => {
+    const base = packageSliceOf(2);
+    const slice: GraphSlice = {
+      ...base,
+      edges: edgesOf(base, 3),
+      totals: { edges: 2, nodes: 2 },
+    };
+
+    expect(violationOf(slice)).toBe("COUNTS_OVER_TOTALS");
+  });
+
   test("menos elementos do que o total, sem truncated nem aggregated, lança", () => {
     const slice: GraphSlice = {
       ...packageSliceOf(5),
       totals: { edges: 0, nodes: 9 },
+    };
+
+    expect(violationOf(slice)).toBe("COUNTS_BELOW_TOTALS");
+  });
+
+  test("menos arestas do que o total, com os nós no total e sem bandeira, lança", () => {
+    const base = packageSliceOf(2);
+    const slice: GraphSlice = {
+      ...base,
+      edges: edgesOf(base, 1),
+      totals: { edges: 3, nodes: 2 },
     };
 
     expect(violationOf(slice)).toBe("COUNTS_BELOW_TOTALS");
