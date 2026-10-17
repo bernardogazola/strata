@@ -2184,5 +2184,123 @@
         ]
       }
     }
-  ]
+  ],
+  "closingRecheck": {
+    "why": "The four candidates above were measured before later fixes changed the canvas (resize before the layout, DEV-only User Timing, focus and live region), so the two candidates that decide the choice were re-measured on the final code with clause (2) unchanged.",
+    "baseCommit": "29b1529",
+    "how": "1000: STRATA_BENCHMARK_OUT=<scratch>.json pnpm exec playwright test graph --grep @benchmark --project chromium. 1500: the same with STRATA_BENCHMARK_TYPE_NODES=1500 and GRAPH_SLICE_BUDGETS.TYPE raised to 1500/7500 in the working tree for the run only (the generator and the adapter refuse a slice above the ceiling), then restored.",
+    "candidates": [
+      {
+        "nodes": 1500,
+        "edges": 7500,
+        "pass": false,
+        "observedMinFrameRatio": 0.438700884249727,
+        "sessions": [
+          {
+            "gesture": "G1",
+            "page": 1,
+            "frameRatio": 0.9155329745629777
+          },
+          {
+            "gesture": "G2",
+            "page": 1,
+            "frameRatio": 0.438700884249727
+          },
+          {
+            "gesture": "G3",
+            "page": 1,
+            "frameRatio": 0.6191180336488041
+          },
+          {
+            "gesture": "G1",
+            "page": 2,
+            "frameRatio": 0.9077219692184905
+          },
+          {
+            "gesture": "G2",
+            "page": 2,
+            "frameRatio": 0.44027450850379374
+          },
+          {
+            "gesture": "G3",
+            "page": 2,
+            "frameRatio": 0.6102737207980982
+          },
+          {
+            "gesture": "G1",
+            "page": 3,
+            "frameRatio": 0.9045419809283516
+          },
+          {
+            "gesture": "G2",
+            "page": 3,
+            "frameRatio": 0.44200046307016494
+          },
+          {
+            "gesture": "G3",
+            "page": 3,
+            "frameRatio": 0.633212758960882
+          }
+        ],
+        "measuredAt": "2026-10-17T06:01:55Z",
+        "loadAverage": [7.9375, 4.697265625, 3.59619140625]
+      },
+      {
+        "nodes": 1000,
+        "edges": 5000,
+        "pass": true,
+        "observedMinFrameRatio": 0.6942047670997447,
+        "sessions": [
+          {
+            "gesture": "G1",
+            "page": 1,
+            "frameRatio": 0.9433704419705431
+          },
+          {
+            "gesture": "G2",
+            "page": 1,
+            "frameRatio": 0.7514425946806457
+          },
+          {
+            "gesture": "G3",
+            "page": 1,
+            "frameRatio": 0.6942047670997447
+          },
+          {
+            "gesture": "G1",
+            "page": 2,
+            "frameRatio": 0.9472300781899928
+          },
+          {
+            "gesture": "G2",
+            "page": 2,
+            "frameRatio": 0.7445182724252554
+          },
+          {
+            "gesture": "G3",
+            "page": 2,
+            "frameRatio": 0.6960917558922056
+          },
+          {
+            "gesture": "G1",
+            "page": 3,
+            "frameRatio": 0.9466945996275683
+          },
+          {
+            "gesture": "G2",
+            "page": 3,
+            "frameRatio": 0.7532161021174811
+          },
+          {
+            "gesture": "G3",
+            "page": 3,
+            "frameRatio": 0.699669421487609
+          }
+        ],
+        "measuredAt": "2026-10-17T06:00:37Z",
+        "loadAverage": [4.09619140625, 3.494140625, 3.1162109375]
+      }
+    ],
+    "chosenHolds": true
+  }
 }
