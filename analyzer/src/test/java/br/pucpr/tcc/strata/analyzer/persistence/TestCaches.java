@@ -63,8 +63,8 @@ final class TestCaches {
   static List<String> userTables(Connection connection) throws SQLException {
     return column(
         connection,
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
-            + " ORDER BY name");
+        "SELECT name FROM sqlite_master WHERE type = 'table'"
+            + " AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' ORDER BY name");
   }
 
   static int strictTables(Connection connection) throws SQLException {
@@ -72,7 +72,7 @@ final class TestCaches {
         scalar(
             connection,
             "SELECT count(*) FROM sqlite_master WHERE type = 'table'"
-                + " AND name NOT LIKE 'sqlite_%' AND sql LIKE '%STRICT%'"));
+                + " AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND sql LIKE '%STRICT%'"));
   }
 
   static byte[] overwrite(Path file, long offset, int count, long seed) throws IOException {
