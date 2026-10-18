@@ -75,8 +75,10 @@ pub fn run() {
                 PlanSource::Discovered {
                     home: std::env::var_os(HOME_VAR).map(Into::into),
                     resource_dir: app.path().resource_dir().ok(),
-                    data_dir: app.path().app_data_dir().map_err(|error| {
-                        format!("sem diretório de dados do aplicativo: {error}")
+                    // Pasta local, e não app_data_dir: no Windows aquela é sincronizada com o perfil móvel,
+                    // e aqui ficam o cache, a biblioteca nativa do JDBC e os temporários do Java.
+                    data_dir: app.path().app_local_data_dir().map_err(|error| {
+                        format!("sem diretório local de dados do aplicativo: {error}")
                     })?,
                     max_heap: std::env::var(MAX_HEAP_VAR).ok(),
                 },
