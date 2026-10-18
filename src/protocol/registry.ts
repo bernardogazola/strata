@@ -5,6 +5,7 @@ import {
   progressTickSchema,
 } from "./analysis";
 import {
+  type CacheInvalidationReason,
   cacheInvalidationReasonSchema,
   dependencyDirectionSchema,
   dependencyTypeSchema,
@@ -19,7 +20,7 @@ import {
   protocolEventSchema,
   protocolVersionSchema,
 } from "./envelope";
-import { protocolErrorSchema } from "./errors";
+import { type ErrorCode, protocolErrorSchema } from "./errors";
 import {
   dependencyEvidenceResultSchema,
   dependencyPageSchema,
@@ -250,6 +251,30 @@ const analysisCompletenessPayloadSchema = z.strictObject({
   completeness: analysisCompletenessSchema,
 });
 
+const CACHE_INVALIDATION_ERROR_CODE = {
+  CONFIG_CHANGED: null,
+  CORRUPT: "CACHE_CORRUPT",
+  HEAD_CHANGED: null,
+  SCHEMA_VERSION: "CACHE_MIGRATION_FAILED",
+  WORKTREE_DIRTY: null,
+} as const satisfies Record<CacheInvalidationReason, ErrorCode | null>;
+
+export const cacheInvalidatedPayloadSchema = z
+  .strictObject({
+    error: protocolErrorSchema.nullable(),
+    reason: cacheInvalidationReasonSchema,
+  })
+  .refine(
+    ({ error, reason }) =>
+      (error === null ? null : error.code) ===
+      CACHE_INVALIDATION_ERROR_CODE[reason],
+    {
+      error:
+        "cache.invalidated associa CORRUPT a CACHE_CORRUPT, SCHEMA_VERSION a CACHE_MIGRATION_FAILED e todo outro motivo a um error nulo",
+      path: ["error"],
+    }
+  );
+
 export const EVENTS = {
   "analysis.cancelled": analysisCompletenessPayloadSchema,
   "analysis.completed": analysisCompletenessPayloadSchema,
@@ -258,9 +283,7 @@ export const EVENTS = {
   "analysis.stage.completed": analysisStageCompletedPayloadSchema,
   "analysis.started": z.strictObject({ analysisId: analysisIdSchema }),
   "analysis.warning": analysisErrorPayloadSchema,
-  "cache.invalidated": z.strictObject({
-    reason: cacheInvalidationReasonSchema,
-  }),
+  "cache.invalidated": cacheInvalidatedPayloadSchema,
   "protocol.ready": protocolReadyPayloadSchema,
 } satisfies Record<ProtocolEventName, z.ZodType>;
 

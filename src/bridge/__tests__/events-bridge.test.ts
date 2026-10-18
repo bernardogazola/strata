@@ -160,19 +160,70 @@ describe("avisos", () => {
   });
 });
 
+const CACHE_CORRUPT_ERROR = {
+  code: "CACHE_CORRUPT",
+  detail: "o cache da análise não pôde ser lido e foi reconstruído vazio",
+  origin: "analyzer",
+  params: {},
+};
+const CACHE_MIGRATION_FAILED_ERROR = {
+  code: "CACHE_MIGRATION_FAILED",
+  detail:
+    "o cache da análise não pôde ser migrado para esta versão do schema e foi reconstruído vazio",
+  origin: "analyzer",
+  params: { fromVersion: 2, toVersion: 1 },
+};
+
 describe("invalidação", () => {
-  test("cache.invalidated limpa o cache inteiro", () => {
-    queryClient.setQueryData(["analysis", AN, "structure"], { any: true });
-    expect(
-      handleFrame(
-        forwarded("cache.invalidated", { reason: "HEAD_CHANGED" }),
-        queryClient
-      )
-    ).toBe(true);
-    expect(
-      queryClient.getQueryData(["analysis", AN, "structure"])
-    ).toBeUndefined();
-  });
+  const pairedCacheEvents = {
+    CORRUPT: { error: CACHE_CORRUPT_ERROR, reason: "CORRUPT" },
+    HEAD_CHANGED: { error: null, reason: "HEAD_CHANGED" },
+    SCHEMA_VERSION: {
+      error: CACHE_MIGRATION_FAILED_ERROR,
+      reason: "SCHEMA_VERSION",
+    },
+  } as const;
+
+  for (const [reason, payload] of Object.entries(pairedCacheEvents)) {
+    test(`cache.invalidated ${reason} limpa o cache inteiro`, () => {
+      queryClient.setQueryData(["analysis", AN, "structure"], { any: true });
+      expect(
+        handleFrame(forwarded("cache.invalidated", payload), queryClient)
+      ).toBe(true);
+      expect(
+        queryClient.getQueryData(["analysis", AN, "structure"])
+      ).toBeUndefined();
+    });
+  }
+
+  const mispairedCacheEvents = {
+    "CORRUPT carregando CACHE_MIGRATION_FAILED": {
+      error: CACHE_MIGRATION_FAILED_ERROR,
+      reason: "CORRUPT",
+    },
+    "CORRUPT com error nulo": { error: null, reason: "CORRUPT" },
+    "HEAD_CHANGED com um erro": {
+      error: CACHE_CORRUPT_ERROR,
+      reason: "HEAD_CHANGED",
+    },
+    "SCHEMA_VERSION carregando CACHE_CORRUPT": {
+      error: CACHE_CORRUPT_ERROR,
+      reason: "SCHEMA_VERSION",
+    },
+    "sem a chave error": { reason: "HEAD_CHANGED" },
+  } as const;
+
+  for (const [name, payload] of Object.entries(mispairedCacheEvents)) {
+    test(`cache.invalidated ${name} é recusado e não limpa nada`, () => {
+      queryClient.setQueryData(["analysis", AN, "structure"], { any: true });
+      expect(
+        handleFrame(forwarded("cache.invalidated", payload), queryClient)
+      ).toBe(false);
+      expect(
+        queryClient.getQueryData(["analysis", AN, "structure"])
+      ).toStrictEqual({ any: true });
+    });
+  }
 
   test("todo estágio tem regra, e SOURCE_ANALYSIS não invalida nada de propósito", () => {
     queryClient.setQueryData(["analysis", AN, "structure"], { any: true });

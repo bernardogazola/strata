@@ -1,0 +1,1 @@
+{"event":"cache.invalidated","kind":"event","payload":{"error":{"code":"CACHE_MIGRATION_FAILED","detail":"o cache da análise não pôde ser migrado para esta versão do schema e foi reconstruído vazio","origin":"analyzer","params":{"fromVersion":2,"toVersion":1}},"reason":"SCHEMA_VERSION"},"protocol":1}

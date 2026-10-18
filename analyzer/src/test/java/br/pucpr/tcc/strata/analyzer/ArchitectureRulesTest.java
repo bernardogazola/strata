@@ -9,6 +9,7 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.lang.EvaluationResult;
 import org.junit.jupiter.api.Test;
 
 @AnalyzeClasses(packages = "br.pucpr.tcc.strata.analyzer")
@@ -51,19 +52,57 @@ final class ArchitectureRulesTest {
               "a análise é local; a única rede permitida é a integração opt-in, desligada por"
                   + " padrão");
 
+  @ArchTest
+  static final ArchRule aPersistenciaNaoDependeDoProtocolo =
+      semDependencia("..persistence..", "..protocol..")
+          .because(
+              "a persistência devolve valores e quem abre o cache emite o evento; o contrário"
+                  + " acoplaria o formato do fio ao SQLite");
+
+  private static ArchRule semDependencia(String origem, String destino) {
+    return noClasses()
+        .that()
+        .resideInAPackage(origem)
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage(destino);
+  }
+
+  private static JavaClasses importar() {
+    return new ClassFileImporter().importPackages("br.pucpr.tcc.strata.analyzer");
+  }
+
   @Test
   void oConjuntoImportadoNaoEstaVazio() {
-    final JavaClasses importadas =
-        new ClassFileImporter().importPackages("br.pucpr.tcc.strata.analyzer");
+    final JavaClasses importadas = importar();
 
     assertThat(importadas)
-        .as("um pacote errado devolve conjunto vazio e deixa as três regras verdes para sempre")
+        .as("um pacote errado devolve conjunto vazio e deixa as quatro regras verdes para sempre")
         .isNotEmpty();
     assertThat(importadas.stream().map(c -> c.getFullName()))
         .as(
             "produção e teste: as regras valem para os dois, e um grep não sabe distinguir"
                 + " a proibição do violador")
         .contains("br.pucpr.tcc.strata.analyzer.bootstrap.Main")
-        .contains("br.pucpr.tcc.strata.analyzer.protocol.FramingTest");
+        .contains("br.pucpr.tcc.strata.analyzer.protocol.FramingTest")
+        .as("os dois lados da quarta regra: sem um deles ela é verde por vacuidade")
+        .contains("br.pucpr.tcc.strata.analyzer.persistence.CacheInvalidation")
+        .contains("br.pucpr.tcc.strata.analyzer.protocol.Envelope");
+  }
+
+  @Test
+  void aFronteiraInvertidaReprovaNoEnvelope() {
+    final JavaClasses importadas = importar();
+
+    final EvaluationResult invertida =
+        semDependencia("..protocol..", "..persistence..").evaluate(importadas);
+
+    assertThat(invertida.hasViolation()).isTrue();
+    assertThat(invertida.getFailureReport().getDetails())
+        .anySatisfy(
+            detalhe ->
+                assertThat(detalhe)
+                    .contains("br.pucpr.tcc.strata.analyzer.protocol.Envelope")
+                    .contains("br.pucpr.tcc.strata.analyzer.persistence.CacheInvalidation"));
   }
 }
