@@ -17,3 +17,5 @@ analyzer/mvnw text eol=lf
 analyzer/mvnw.cmd text eol=crlf
 
 analyzer/src/**/*.java text eol=lf
+
+analyzer/src/main/resources/db/migration/*.sql text eol=lf

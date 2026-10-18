@@ -30,6 +30,8 @@ public final class AnalysisConstants {
 
   public static final int EXIT_PLATFORM_ENCODING = 78;
 
+  public static final int EXIT_DATA_DIRECTORY_UNUSABLE = 73;
+
   public static final int MAX_SOURCE_FILE_BYTES = 2_097_152;
 
   public static final int MAX_MODEL_SOURCE_BYTES = 16_777_216;
@@ -57,6 +59,20 @@ public final class AnalysisConstants {
   public static final int PACKAGE_DECLARATION_SCAN_BYTES = 65_536;
 
   public static final int MAX_REPOSITORY_WARNINGS = 100;
+
+  public static final int SQLITE_BUSY_TIMEOUT_MILLIS = 5_000;
+
+  public static final int SQLITE_READER_CONNECTIONS = 4;
+
+  public static final int SQLITE_CACHE_SIZE_KIB = 65_536;
+
+  public static final long SQLITE_MMAP_SIZE_BYTES = 268_435_456L;
+
+  public static final long SQLITE_JOURNAL_SIZE_LIMIT_BYTES = 67_108_864L;
+
+  public static final int MAX_CACHE_BACKUPS = 2;
+
+  public static final int CACHE_LOCK_WAIT_MILLIS = 3_500;
 
   private AnalysisConstants() {}
 
