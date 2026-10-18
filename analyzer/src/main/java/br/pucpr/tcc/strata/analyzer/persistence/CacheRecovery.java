@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.sql.SQLException;
 import java.time.InstantSource;
 import java.util.List;
+import org.sqlite.SQLiteException;
 
 public final class CacheRecovery {
 
@@ -14,6 +15,14 @@ public final class CacheRecovery {
     BUG
   }
 
+  private static final int PRIMARY_CODE_MASK = 0xFF;
+
+  private static final int SQLITE_ERROR = 1;
+  private static final int SQLITE_CORRUPT = 11;
+  private static final int SQLITE_CONSTRAINT = 19;
+  private static final int SQLITE_MISMATCH = 20;
+  private static final int SQLITE_NOTADB = 26;
+
   private CacheRecovery() {}
 
   public static boolean isCorruption(SQLException failure) {
@@ -21,7 +30,14 @@ public final class CacheRecovery {
   }
 
   static Verdict classify(Throwable failure) {
-    throw new UnsupportedOperationException("CacheRecovery em implementação");
+    if (!(failure instanceof SQLiteException sqlite)) {
+      return Verdict.BUG;
+    }
+    return switch (sqlite.getResultCode().code & PRIMARY_CODE_MASK) {
+      case SQLITE_CORRUPT, SQLITE_NOTADB -> Verdict.CORRUPT;
+      case SQLITE_ERROR, SQLITE_CONSTRAINT, SQLITE_MISMATCH -> Verdict.BUG;
+      default -> Verdict.ENVIRONMENT;
+    };
   }
 
   static Path quarantine(Path databaseFile, InstantSource clock) throws IOException {
