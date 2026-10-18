@@ -99,7 +99,8 @@ fi
 
 OUT="$(mktemp)"; ERR="$(mktemp)"
 set +e
-printf '' | java -cp "$JAR:$REPO_ROOT/analyzer/target/lib/*" "$MAIN_CLASS" \
+printf '' | java --enable-native-access=ALL-UNNAMED \
+  -cp "$JAR:$REPO_ROOT/analyzer/target/lib/*" "$MAIN_CLASS" \
   --data-dir=/tmp/strata-smoke > "$OUT" 2> "$ERR"
 CODE=$?
 set -e

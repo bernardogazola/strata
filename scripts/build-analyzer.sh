@@ -115,6 +115,7 @@ self_check() {
     printf '%s\n' "$listed" | grep -qx "$module" || fail "falta o módulo $module no runtime preparado"
   done
   "$STAGE/runtime/bin/java" -Xss2m -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 \
+    --enable-native-access=ALL-UNNAMED \
     -cp "$STAGE/analyzer.jar:$STAGE/lib/*" "$MAIN_CLASS" "--data-dir=$SCRATCH/data" \
     < /dev/null > "$stdout_file" 2> "$SCRATCH/stderr.log" || status=$?
   if [ "$status" -ne 0 ]; then

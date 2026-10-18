@@ -213,6 +213,7 @@ pub fn analyzer_args(
         OsString::from("-Dstderr.encoding=UTF-8"),
         OsString::from("-Duser.language=en"),
         OsString::from("-Duser.country=US"),
+        OsString::from("--enable-native-access=ALL-UNNAMED"),
     ];
     args.push(prefixed("-Djava.io.tmpdir=", data_dir));
     args.push(prefixed("-Dorg.sqlite.tmpdir=", data_dir));
@@ -390,6 +391,7 @@ mod tests {
             "-Dstderr.encoding=UTF-8",
             "-Duser.language=en",
             "-Duser.country=US",
+            "--enable-native-access=ALL-UNNAMED",
             "-Djava.io.tmpdir=/data",
             "-Dorg.sqlite.tmpdir=/data",
             "-cp",
@@ -398,6 +400,11 @@ mod tests {
         ] {
             assert!(text.iter().any(|a| a == expected), "falta {expected}");
         }
+        let index = |wanted: &str| text.iter().position(|a| a == wanted);
+        assert!(
+            index("--enable-native-access=ALL-UNNAMED") < index(super::MAIN_CLASS),
+            "a flag de native-access é uma opção da JVM: {text:?}"
+        );
         assert!(!text.iter().any(|a| a.contains("HeapDump")));
     }
 
