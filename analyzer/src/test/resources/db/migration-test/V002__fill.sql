@@ -1,0 +1,13 @@
+CREATE TABLE migration_fill (x BLOB) STRICT;
+INSERT INTO migration_fill (x) VALUES (randomblob(4000));
+INSERT INTO migration_fill (x) VALUES (randomblob(4000));
+INSERT INTO migration_fill (x) VALUES (randomblob(4000));
+INSERT INTO migration_fill (x) VALUES (randomblob(4000));
+INSERT INTO migration_fill (x) VALUES (randomblob(4000));
+INSERT INTO migration_fill (x) VALUES (randomblob(4000));
+INSERT INTO migration_fill (x) VALUES (randomblob(4000));
+INSERT INTO migration_fill (x) VALUES (randomblob(4000));
+INSERT INTO migration_fill (x) VALUES (randomblob(4000));
+INSERT INTO migration_fill (x) VALUES (randomblob(4000));
+INSERT INTO migration_fill (x) VALUES (randomblob(4000));
+INSERT INTO migration_fill (x) VALUES (randomblob(4000));

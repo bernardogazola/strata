@@ -4,9 +4,12 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
+import java.nio.file.Files;
 import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Set;
@@ -28,6 +31,7 @@ final class CacheLock implements AutoCloseable {
   private final FileChannel channel;
   private final FileLock lock;
   private final AtomicBoolean closed = new AtomicBoolean();
+  private final AtomicBoolean keptUntilExit = new AtomicBoolean();
 
   private CacheLock(Path lockFile, FileChannel channel, FileLock lock) {
     this.lockFile = lockFile;
@@ -50,19 +54,14 @@ final class CacheLock implements AutoCloseable {
     }
     final FileChannel channel;
     try {
-      channel =
-          FileChannel.open(
-              lockFile,
-              StandardOpenOption.CREATE,
-              StandardOpenOption.WRITE,
-              LinkOption.NOFOLLOW_LINKS);
-    } catch (IOException | RuntimeException failure) {
+      channel = openRegularFile(lockFile);
+    } catch (Throwable failure) {
       HELD_IN_THIS_PROCESS.remove(lockFile);
       throw failure;
     }
     try {
       return new CacheLock(lockFile, channel, waitFor(channel, patience, attempt, lockFile));
-    } catch (CacheUnavailableException | IOException | RuntimeException failure) {
+    } catch (Throwable failure) {
       closeAfter(channel, failure);
       HELD_IN_THIS_PROCESS.remove(lockFile);
       throw failure;
@@ -79,9 +78,13 @@ final class CacheLock implements AutoCloseable {
     FileLock tryLock(FileChannel channel) throws IOException;
   }
 
+  void keepUntilExit() {
+    keptUntilExit.set(true);
+  }
+
   @Override
   public void close() throws IOException {
-    if (!closed.compareAndSet(false, true)) {
+    if (keptUntilExit.get() || !closed.compareAndSet(false, true)) {
       return;
     }
     IOException failure = null;
@@ -103,6 +106,24 @@ final class CacheLock implements AutoCloseable {
     if (failure != null) {
       throw failure;
     }
+  }
+
+  private static FileChannel openRegularFile(Path lockFile) throws IOException {
+    final BasicFileAttributes attributes;
+    try {
+      attributes =
+          Files.readAttributes(lockFile, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+      if (!attributes.isRegularFile()) {
+        throw new IOException(lockFile + " existe e não é um arquivo comum");
+      }
+    } catch (NoSuchFileException absent) {
+    }
+    return FileChannel.open(
+        lockFile,
+        StandardOpenOption.CREATE,
+        StandardOpenOption.READ,
+        StandardOpenOption.WRITE,
+        LinkOption.NOFOLLOW_LINKS);
   }
 
   private static Path lockFileOf(Path cacheDirectory) throws IOException {
@@ -153,7 +174,7 @@ final class CacheLock implements AutoCloseable {
     }
   }
 
-  private static void closeAfter(FileChannel channel, Exception original) {
+  private static void closeAfter(FileChannel channel, Throwable original) {
     try {
       channel.close();
     } catch (IOException cleanup) {

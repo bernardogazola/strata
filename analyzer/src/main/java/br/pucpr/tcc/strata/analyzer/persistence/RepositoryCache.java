@@ -2,6 +2,7 @@ package br.pucpr.tcc.strata.analyzer.persistence;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.bootstrap.Log;
+import br.pucpr.tcc.strata.analyzer.persistence.SqliteConnections.ConnectionLeftOpenException;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.CacheMetadata;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.CacheMetadataDao;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.RepositoryDao;
@@ -19,6 +20,7 @@ import java.time.InstantSource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class RepositoryCache implements AutoCloseable {
@@ -28,6 +30,10 @@ public final class RepositoryCache implements AutoCloseable {
   private static final SqlWork<Void> WRITE_PROBE = connection -> null;
 
   private static final String USER_VERSION = "PRAGMA user_version";
+
+  private static final String HOLDS_ANY_ROW =
+      "SELECT EXISTS (SELECT 1 FROM repository) OR EXISTS (SELECT 1 FROM analysis)";
+
   private static final String QUICK_CHECK = "PRAGMA quick_check";
   private static final List<String> QUICK_CHECK_HEALTHY = List.of("ok");
 
@@ -72,13 +78,14 @@ public final class RepositoryCache implements AutoCloseable {
     Objects.requireNonNull(root, "root");
     Objects.requireNonNull(repositoryRoot, "repositoryRoot");
     final Recipe recipe = new Recipe(identity, analyzerVersion, clock, migrations);
-    if (root.isInside(repositoryRoot)) {
+    final Path realRepositoryRoot = realPathOf(repositoryRoot);
+    if (root.isInside(realRepositoryRoot)) {
       throw new CacheUnavailableException(
           CacheUnavailableException.Kind.LOCATION_INSIDE_REPOSITORY,
           "o diretório do cache "
               + root.directory()
               + " está dentro do repositório analisado "
-              + repositoryRoot,
+              + realRepositoryRoot,
           null);
     }
     final Path directory;
@@ -96,7 +103,7 @@ public final class RepositoryCache implements AutoCloseable {
     final CacheOpening opening;
     try {
       opening = openLocked(recipe, directory, lock);
-    } catch (CacheUnavailableException | RuntimeException failure) {
+    } catch (Throwable failure) {
       releaseAfter(lock, failure);
       throw failure;
     }
@@ -106,7 +113,7 @@ public final class RepositoryCache implements AutoCloseable {
             + " cache="
             + directory
             + " repository="
-            + repositoryRoot);
+            + realRepositoryRoot);
     return opening;
   }
 
@@ -147,10 +154,16 @@ public final class RepositoryCache implements AutoCloseable {
   }
 
   public CacheOpening.Rebuilt rebuildAfterCorruption() throws CacheUnavailableException {
+    connections.requireOutsideUnits();
     if (!closed.compareAndSet(false, true)) {
       throw new IllegalStateException("o cache de " + directory + " já está fechado");
     }
-    closeConnections();
+    if (!closeConnections()) {
+      throw new CacheUnavailableException(
+          CacheUnavailableException.Kind.STORAGE,
+          "uma conexão com o cache em " + directory + " ainda está aberta; nada foi renomeado",
+          null);
+    }
     try {
       return rebuild(
           recipe,
@@ -158,7 +171,7 @@ public final class RepositoryCache implements AutoCloseable {
           lock,
           new CacheInvalidation.Corrupt(),
           "corrupção encontrada durante o uso");
-    } catch (CacheUnavailableException | RuntimeException failure) {
+    } catch (Throwable failure) {
       releaseAfter(lock, failure);
       throw failure;
     }
@@ -166,10 +179,13 @@ public final class RepositoryCache implements AutoCloseable {
 
   @Override
   public void close() {
+    connections.requireOutsideUnits();
     if (!closed.compareAndSet(false, true)) {
       return;
     }
-    closeConnections();
+    if (!closeConnections()) {
+      return;
+    }
     try {
       lock.close();
     } catch (IOException failure) {
@@ -199,6 +215,12 @@ public final class RepositoryCache implements AutoCloseable {
       final RepositoryCache cache =
           new RepositoryCache(recipe, directory, lock, first.connections(), uncleanShutdown);
       return first.created() ? new CacheOpening.Created(cache) : new CacheOpening.Reused(cache);
+    } catch (ConnectionLeftOpenException leftOpen) {
+      keepLockUntilExit(lock, directory, leftOpen);
+      throw new CacheUnavailableException(
+          CacheUnavailableException.Kind.STORAGE,
+          "não foi possível abrir " + database + "; nada foi renomeado",
+          leftOpen);
     } catch (CacheDiscardException discard) {
       return rebuild(recipe, directory, lock, discard.invalidation(), discard.toString());
     } catch (PragmaRefusedException refused) {
@@ -226,6 +248,16 @@ public final class RepositoryCache implements AutoCloseable {
     final Path backup;
     try {
       backup = CacheRecovery.quarantine(database, recipe.clock());
+    } catch (CacheRecovery.IncompleteQuarantineException incomplete) {
+      throw new CacheUnavailableException(
+          CacheUnavailableException.Kind.STORAGE,
+          "não foi possível terminar a quarentena de "
+              + database
+              + " (movido para "
+              + incomplete.backup()
+              + ")",
+          incomplete,
+          invalidation);
     } catch (IOException failure) {
       throw new CacheUnavailableException(
           CacheUnavailableException.Kind.STORAGE,
@@ -242,15 +274,23 @@ public final class RepositoryCache implements AutoCloseable {
             + "); movido para "
             + backup
             + " e reconstruído no lugar");
-    CacheRecovery.retain(directory, AnalysisConstants.MAX_CACHE_BACKUPS);
+    CacheRecovery.retain(directory, AnalysisConstants.MAX_CACHE_BACKUPS, backup);
     final Attempt fresh;
     try {
       fresh = attempt(database, recipe);
+    } catch (ConnectionLeftOpenException leftOpen) {
+      keepLockUntilExit(lock, directory, leftOpen);
+      throw new CacheUnavailableException(
+          CacheUnavailableException.Kind.STORAGE,
+          "o cache reconstruído " + database + " não pôde ser criado",
+          leftOpen,
+          invalidation);
     } catch (SQLException | CacheDiscardException failure) {
       throw new CacheUnavailableException(
           CacheUnavailableException.Kind.STORAGE,
           "o cache reconstruído " + database + " não pôde ser criado",
-          failure);
+          failure,
+          invalidation);
     }
     return new CacheOpening.Rebuilt(
         new RepositoryCache(recipe, directory, lock, fresh.connections(), false), invalidation);
@@ -272,7 +312,9 @@ public final class RepositoryCache implements AutoCloseable {
             });
         return new Attempt(connections, true);
       }
-      requireSameRepository(connections, recipe.identity());
+      if (confirmIdentity(connections, recipe, reached)) {
+        return new Attempt(connections, true);
+      }
       if (found < reached) {
         connections.write(
             c -> {
@@ -281,22 +323,30 @@ public final class RepositoryCache implements AutoCloseable {
             });
       }
       return new Attempt(connections, false);
-    } catch (SQLException | CacheDiscardException | RuntimeException failure) {
+    } catch (Throwable failure) {
       closeAfter(connections, failure);
+      if (!connections.allClosed()) {
+        throw new ConnectionLeftOpenException(database, failure);
+      }
       throw failure;
     }
   }
 
-  private static void requireSameRepository(
-      SqliteConnections connections, RepositoryIdentity identity)
+  private static boolean confirmIdentity(SqliteConnections connections, Recipe recipe, int reached)
       throws SQLException, CacheDiscardException {
+    final RepositoryIdentity identity = recipe.identity();
     final String key = identity.key().value();
+    final Optional<CacheMetadata> metadata = connections.write(CacheMetadataDao::find);
+    if (metadata.isEmpty()) {
+      final CacheMetadata fresh = recipe.freshMetadata(reached);
+      if (connections.write(c -> resumeInterruptedCreation(c, fresh))) {
+        return true;
+      }
+      throw new CacheDiscardException(
+          new CacheInvalidation.Corrupt(), "cache_metadata está vazia em um cache que tem linhas");
+    }
     final boolean sameKey =
-        connections
-            .write(CacheMetadataDao::find)
-            .map(CacheMetadata::repositoryKey)
-            .filter(key::equals)
-            .isPresent();
+        metadata.map(CacheMetadata::repositoryKey).filter(key::equals).isPresent();
     if (!sameKey) {
       throw new CacheDiscardException(
           new CacheInvalidation.Corrupt(), "cache_metadata não nomeia a repositoryKey " + key);
@@ -311,6 +361,22 @@ public final class RepositoryCache implements AutoCloseable {
           new CacheInvalidation.Corrupt(),
           "a linha de repositório de " + key + " tem outro (path_fingerprint, root_commit_id)");
     }
+    return false;
+  }
+
+  private static boolean resumeInterruptedCreation(Connection writer, CacheMetadata metadata)
+      throws SQLException {
+    try (PreparedStatement statement = writer.prepareStatement(HOLDS_ANY_ROW);
+        ResultSet rows = statement.executeQuery()) {
+      if (!rows.next()) {
+        throw new IllegalStateException("nenhuma linha de " + HOLDS_ANY_ROW);
+      }
+      if (rows.getBoolean(1)) {
+        return false;
+      }
+    }
+    CacheMetadataDao.insert(writer, metadata);
+    return true;
   }
 
   private static boolean isSameRepository(
@@ -340,15 +406,29 @@ public final class RepositoryCache implements AutoCloseable {
     return List.copyOf(report);
   }
 
-  private void closeConnections() {
+  private boolean closeConnections() {
     try {
       connections.close();
     } catch (SQLException | RuntimeException failure) {
+      if (!connections.allClosed()) {
+        keepLockUntilExit(lock, directory, failure);
+        return false;
+      }
       Log.warn("falha ao fechar as conexões do cache de " + directory + ": " + failure);
     }
+    return true;
   }
 
-  private static void closeAfter(SqliteConnections connections, Exception original) {
+  private static void keepLockUntilExit(CacheLock lock, Path directory, Throwable failure) {
+    lock.keepUntilExit();
+    Log.error(
+        "uma conexão com o cache em "
+            + directory
+            + " ficou aberta; nada é renomeado e o lock dele segue preso até o analisador sair",
+        failure);
+  }
+
+  private static void closeAfter(SqliteConnections connections, Throwable original) {
     try {
       connections.close();
     } catch (SQLException | RuntimeException cleanup) {
@@ -356,7 +436,18 @@ public final class RepositoryCache implements AutoCloseable {
     }
   }
 
-  private static void releaseAfter(CacheLock lock, Exception original) {
+  private static Path realPathOf(Path repositoryRoot) throws CacheUnavailableException {
+    try {
+      return repositoryRoot.toRealPath();
+    } catch (IOException failure) {
+      throw new CacheUnavailableException(
+          CacheUnavailableException.Kind.STORAGE,
+          "não foi possível resolver o caminho real da raiz do repositório " + repositoryRoot,
+          failure);
+    }
+  }
+
+  private static void releaseAfter(CacheLock lock, Throwable original) {
     try {
       lock.close();
     } catch (IOException cleanup) {

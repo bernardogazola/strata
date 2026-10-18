@@ -2,14 +2,18 @@ package br.pucpr.tcc.strata.analyzer.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.nio.channels.OverlappingFileLockException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
@@ -19,6 +23,8 @@ import org.junit.jupiter.api.io.TempDir;
 final class CacheLockTest {
 
   private static final Duration POUCA_ESPERA = Duration.ofMillis(50);
+
+  private static final Duration LIMITE = Duration.ofSeconds(10);
 
   @TempDir private Path temp;
 
@@ -127,5 +133,66 @@ final class CacheLockTest {
         .isInstanceOf(IOException.class);
     assertThat(alvo).doesNotExist();
     assertThat(CacheLock.isHeldInThisProcess(pasta)).isFalse();
+  }
+
+  @Test
+  @DisabledOnOs(value = OS.WINDOWS, disabledReason = "FIFO é POSIX")
+  void umFifoNoLugarDoArquivoDeLockERecusadoSemEsperarPorUmLeitor() throws Exception {
+    TestFifos.create(pasta.resolve(CacheLock.FILE_NAME));
+
+    final Throwable falha =
+        assertTimeoutPreemptively(
+            LIMITE, () -> catchThrowable(() -> CacheLock.acquire(pasta, POUCA_ESPERA)));
+
+    assertThat(falha)
+        .isInstanceOf(IOException.class)
+        .hasMessageContaining("não é um arquivo comum");
+    assertThat(CacheLock.isHeldInThisProcess(pasta)).isFalse();
+  }
+
+  @Test
+  void umaPastaNoLugarDoArquivoDeLockERecusadaSemTocarNela() throws Exception {
+    final Path alheia = Files.createDirectory(pasta.resolve(CacheLock.FILE_NAME));
+
+    assertThatThrownBy(() -> CacheLock.acquire(pasta, POUCA_ESPERA))
+        .isInstanceOf(IOException.class)
+        .hasMessageContaining("não é um arquivo comum");
+    assertThat(alheia).isDirectory();
+    assertThat(CacheLock.isHeldInThisProcess(pasta)).isFalse();
+  }
+
+  @Test
+  void umErroNaTentativaSaiDoRegistroEFechaOCanal() throws Exception {
+    final AtomicReference<FileChannel> canalDaTentativa = new AtomicReference<>();
+
+    assertThatThrownBy(
+            () ->
+                CacheLock.acquire(
+                    pasta,
+                    POUCA_ESPERA,
+                    canal -> {
+                      canalDaTentativa.set(canal);
+                      throw new StackOverflowError("probe");
+                    }))
+        .isInstanceOf(StackOverflowError.class);
+
+    assertThat(canalDaTentativa.get().isOpen()).isFalse();
+    assertThat(CacheLock.isHeldInThisProcess(pasta))
+        .as("preso no registro, o cache desta chave nunca mais abriria nesta JVM")
+        .isFalse();
+    final CacheLock depois = CacheLock.acquire(pasta, POUCA_ESPERA);
+    depois.close();
+  }
+
+  @Test
+  void umLockPresoAteAJvmSairNaoESoltoPeloFechamento() throws Exception {
+    final CacheLock preso = CacheLock.acquire(pasta, POUCA_ESPERA);
+
+    preso.keepUntilExit();
+    preso.close();
+
+    assertThat(CacheLock.isHeldInThisProcess(pasta)).isTrue();
+    assertThatThrownBy(() -> CacheLock.acquire(pasta, POUCA_ESPERA))
+        .isInstanceOf(IllegalStateException.class);
   }
 }

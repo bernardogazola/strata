@@ -16,7 +16,7 @@ public final class SqlTransactions {
     try {
       result = work.run(connection);
       connection.commit();
-    } catch (SQLException | RuntimeException failure) {
+    } catch (Throwable failure) {
       rollbackQuietly(connection, failure);
       restoreAutoCommit(connection, failure);
       throw failure;
@@ -25,7 +25,7 @@ public final class SqlTransactions {
     return result;
   }
 
-  private static void rollbackQuietly(Connection connection, Exception original) {
+  private static void rollbackQuietly(Connection connection, Throwable original) {
     try {
       connection.rollback();
     } catch (SQLException cleanup) {
@@ -33,7 +33,7 @@ public final class SqlTransactions {
     }
   }
 
-  private static void restoreAutoCommit(Connection connection, Exception original) {
+  private static void restoreAutoCommit(Connection connection, Throwable original) {
     try {
       connection.setAutoCommit(true);
     } catch (SQLException cleanup) {

@@ -2,6 +2,7 @@ package br.pucpr.tcc.strata.analyzer.persistence;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -222,5 +223,64 @@ final class CacheQuarantineTest {
     assertThat(CacheRecovery.backups(directory)).containsExactly(bak(NOW + 3), bak(NOW + 2));
     assertThat(link).isSymbolicLink();
     assertThat(alvo).hasContent("alheio");
+  }
+
+  @Test
+  void nomesPlantadosComDezenoveDigitosNaoSaoNossosEARetencaoGuardaACopiaNova() throws Exception {
+    final Path plantadaMaior =
+        Files.writeString(directory.resolve("analysis.sqlite." + Long.MAX_VALUE + ".bak"), "x");
+    final Path plantadaMenor =
+        Files.writeString(
+            directory.resolve("analysis.sqlite." + (Long.MAX_VALUE - 1) + ".bak"), "x");
+    Files.writeString(database, "atual", UTF_8);
+
+    final Path backup = CacheRecovery.quarantine(database, em(NOW));
+    CacheRecovery.retain(directory, 2, backup);
+
+    assertThat(backup).isEqualTo(bak(NOW)).hasContent("atual");
+    assertThat(CacheRecovery.backups(directory)).containsExactly(bak(NOW));
+    assertThat(plantadaMaior).hasContent("x");
+    assertThat(plantadaMenor).hasContent("x");
+  }
+
+  @Test
+  void aRetencaoNuncaApagaACopiaQueAQuarentenaAcabouDeFazer() throws Exception {
+    Files.writeString(bak(NOW), "anterior", UTF_8);
+    Files.writeString(database, "atual", UTF_8);
+
+    final Path backup = CacheRecovery.quarantine(database, em(NOW));
+    CacheRecovery.retain(directory, 0, backup);
+
+    assertThat(backup).isEqualTo(bak(NOW + 1)).hasContent("atual");
+    assertThat(bak(NOW)).doesNotExist();
+  }
+
+  @Test
+  void depoisDaUltimaEpocaDeTrezeDigitosACopiaFicaForaDaRetencaoENuncaEApagada() throws Exception {
+    final long ultima = 9_999_999_999_999L;
+    Files.writeString(bak(ultima), "plantada", UTF_8);
+    Files.writeString(database, "atual", UTF_8);
+
+    final Path backup = CacheRecovery.quarantine(database, em(NOW));
+    CacheRecovery.retain(directory, 1, backup);
+
+    assertThat(backup.getFileName()).hasToString("analysis.sqlite.10000000000000.bak");
+    assertThat(backup).hasContent("atual");
+    assertThat(CacheRecovery.backups(directory)).containsExactly(bak(ultima));
+  }
+
+  @Test
+  void umaQuarentenaQueParaNoShmDepoisDeRenomearDizQueRenomeou() throws Exception {
+    Files.writeString(database, "atual", UTF_8);
+    final Path shm = Files.createDirectories(TestCaches.sibling(database, "-shm"));
+    Files.writeString(shm.resolve("x"), "x", UTF_8);
+
+    final Throwable falha = catchThrowable(() -> CacheRecovery.quarantine(database, em(NOW)));
+
+    assertThat(falha).isInstanceOf(CacheRecovery.IncompleteQuarantineException.class);
+    assertThat(((CacheRecovery.IncompleteQuarantineException) falha).backup())
+        .isEqualTo(bak(NOW))
+        .hasContent("atual");
+    assertThat(database).doesNotExist();
   }
 }

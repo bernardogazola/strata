@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.sqlite.SQLiteException;
@@ -42,13 +43,13 @@ public final class CacheRecovery {
   private static final String BACKUP_GROUP = "backup";
 
   private static final Pattern BACKUP =
-      Pattern.compile("^analysis\\.sqlite\\.(?<epoch>\\d{13,})\\.bak$");
+      Pattern.compile("^analysis\\.sqlite\\.(?<epoch>\\d{13})\\.bak$");
 
   private static final Pattern BACKUP_SIDECAR =
-      Pattern.compile("^(?<backup>analysis\\.sqlite\\.\\d{13,}\\.bak)-(?:wal|shm)$");
+      Pattern.compile("^(?<backup>analysis\\.sqlite\\.\\d{13}\\.bak)-(?:wal|shm)$");
 
   private static final Pattern QUARANTINE_NAME =
-      Pattern.compile("^analysis\\.sqlite\\.(?<epoch>\\d{13,})\\.bak(?:-wal|-shm)?$");
+      Pattern.compile("^analysis\\.sqlite\\.(?<epoch>\\d{13})\\.bak(?:-wal|-shm)?$");
 
   private static final long SMALLEST_THIRTEEN_DIGIT_EPOCH = 1_000_000_000_000L;
 
@@ -76,13 +77,17 @@ public final class CacheRecovery {
     final long epoch =
         Math.max(Math.max(clock.millis(), newest + 1), SMALLEST_THIRTEEN_DIGIT_EPOCH);
     final Path backup = moveToFreeName(databaseFile, epoch);
-    final Path wal = sibling(databaseFile, WAL_SUFFIX);
-    if (walHasFrames(databaseFile)) {
-      Files.move(wal, sibling(backup, WAL_SUFFIX));
-    } else {
-      Files.deleteIfExists(wal);
+    try {
+      final Path wal = sibling(databaseFile, WAL_SUFFIX);
+      if (walHasFrames(databaseFile)) {
+        Files.move(wal, sibling(backup, WAL_SUFFIX));
+      } else {
+        Files.deleteIfExists(wal);
+      }
+      Files.deleteIfExists(sibling(databaseFile, SHM_SUFFIX));
+    } catch (IOException failure) {
+      throw new IncompleteQuarantineException(databaseFile, backup, failure);
     }
-    Files.deleteIfExists(sibling(databaseFile, SHM_SUFFIX));
     return backup;
   }
 
@@ -101,6 +106,15 @@ public final class CacheRecovery {
   }
 
   static void retain(Path cacheDirectory, int keep) {
+    retainSparing(cacheDirectory, keep, Set.of());
+  }
+
+  static void retain(Path cacheDirectory, int keep, Path justMade) {
+    Objects.requireNonNull(justMade, "justMade");
+    retainSparing(cacheDirectory, keep, Set.of(justMade.getFileName()));
+  }
+
+  private static void retainSparing(Path cacheDirectory, int keep, Set<Path> sparedNames) {
     if (keep < 0) {
       throw new IllegalArgumentException(
           "não é possível manter um número negativo de backups: " + keep);
@@ -117,6 +131,9 @@ public final class CacheRecovery {
       return;
     }
     for (final Path stale : backups.subList(Math.min(keep, backups.size()), backups.size())) {
+      if (sparedNames.contains(stale.getFileName())) {
+        continue;
+      }
       if (deleteRegularFile(stale)) {
         deleteRegularFile(sibling(stale, WAL_SUFFIX));
         deleteRegularFile(sibling(stale, SHM_SUFFIX));
@@ -163,11 +180,7 @@ public final class CacheRecovery {
     if (!name.matches()) {
       return OptionalLong.empty();
     }
-    try {
-      return OptionalLong.of(Long.parseLong(name.group(EPOCH_GROUP)));
-    } catch (NumberFormatException beyondLong) {
-      return OptionalLong.empty();
-    }
+    return OptionalLong.of(Long.parseLong(name.group(EPOCH_GROUP)));
   }
 
   private static void deleteOrphanSidecars(Path cacheDirectory) {
@@ -229,4 +242,26 @@ public final class CacheRecovery {
   }
 
   private record Backup(Path path, long epoch) {}
+
+  static final class IncompleteQuarantineException extends IOException {
+
+    private static final long serialVersionUID = 1L;
+
+    private final transient Path backup;
+
+    IncompleteQuarantineException(Path databaseFile, Path backup, IOException cause) {
+      super(
+          "moveu "
+              + databaseFile
+              + " para "
+              + backup
+              + " mas não conseguiu mover os arquivos auxiliares dele",
+          cause);
+      this.backup = backup;
+    }
+
+    Path backup() {
+      return backup;
+    }
+  }
 }

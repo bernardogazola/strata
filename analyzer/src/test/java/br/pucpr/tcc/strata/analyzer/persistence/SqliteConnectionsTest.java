@@ -2,6 +2,7 @@ package br.pucpr.tcc.strata.analyzer.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import java.nio.file.Files;
@@ -10,6 +11,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,6 +21,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
@@ -371,6 +374,117 @@ final class SqliteConnectionsTest {
         .isTrue();
     try (Connection raw = TestCaches.raw(database)) {
       assertThat(TestCaches.scalar(raw, "SELECT count(*) FROM probe")).isEqualTo("1");
+    }
+  }
+
+  @Test
+  void umFechamentoQueDeuCertoDizQueTudoFechouEFecharDeNovoNaoFazNada() throws Exception {
+    final SqliteConnections connections = SqliteConnections.open(database);
+    criarProbe(connections);
+    assertThat(contar(connections)).isEqualTo("0");
+    assertThat(connections.allClosed()).as("aberto, com um leitor ocioso").isFalse();
+
+    connections.close();
+    connections.close();
+
+    assertThat(connections.allClosed()).isTrue();
+  }
+
+  @Test
+  @DisabledOnOs(
+      value = OS.WINDOWS,
+      disabledReason = "o leitor envenenado segura o arquivo, e o Windows não apaga o @TempDir")
+  void umLeitorCujaUnidadeEOFechamentoFalhamContinuaRastreadoEOFechamentoOFecha() throws Exception {
+    final SqliteConnections connections = SqliteConnections.open(database);
+    final AtomicReference<Connection> perdido = new AtomicReference<>();
+
+    final Throwable falha =
+        catchThrowable(
+            () ->
+                connections.read(
+                    c -> {
+                      perdido.set(c);
+                      assertThatThrownBy(() -> c.prepareStatement(""))
+                          .isInstanceOf(SQLException.class);
+                      throw new SQLException("a unidade falhou");
+                    }));
+
+    assertThat(falha).hasMessage("a unidade falhou");
+    assertThat(Arrays.stream(falha.getSuppressed()).map(Throwable::getMessage))
+        .as("o close() da limpeza falhou e foi suprimido na falha da unidade")
+        .anyMatch(message -> message.contains("finalized"));
+    assertThat(perdido.get().isClosed()).isFalse();
+
+    connections.close();
+
+    assertThat(perdido.get().isClosed()).isTrue();
+    assertThat(connections.allClosed()).isTrue();
+  }
+
+  @Test
+  @DisabledOnOs(
+      value = OS.WINDOWS,
+      disabledReason = "o leitor envenenado segura o arquivo, e o Windows não apaga o @TempDir")
+  void umFechamentoQueDeixaUmLeitorAbertoDizIssoEOFechamentoSeguinteTentaDeNovo() throws Exception {
+    final SqliteConnections connections = SqliteConnections.open(database);
+    final Connection envenenado =
+        connections.read(
+            c -> {
+              assertThatThrownBy(() -> c.prepareStatement("")).isInstanceOf(SQLException.class);
+              return c;
+            });
+
+    assertThatThrownBy(connections::close)
+        .isInstanceOf(SQLException.class)
+        .hasMessageContaining("finalized");
+    assertThat(envenenado.isClosed()).isFalse();
+    assertThat(connections.allClosed())
+        .as("quem ia renomear o arquivo ou soltar o lock fica sabendo")
+        .isFalse();
+
+    connections.close();
+
+    assertThat(envenenado.isClosed()).as("fechar de novo tentou de novo").isTrue();
+    assertThat(connections.allClosed()).isTrue();
+  }
+
+  @Test
+  void umErroNaUnidadeDeLeituraFechaOLeitorENaoODevolve() throws Exception {
+    try (SqliteConnections connections = SqliteConnections.open(database)) {
+      final AtomicReference<Connection> doErro = new AtomicReference<>();
+
+      assertThatThrownBy(
+              () ->
+                  connections.read(
+                      c -> {
+                        doErro.set(c);
+                        throw new StackOverflowError("probe");
+                      }))
+          .isInstanceOf(StackOverflowError.class);
+      final Connection seguinte = connections.read(c -> c);
+
+      assertThat(doErro.get().isClosed()).isTrue();
+      assertThat(seguinte).isNotSameAs(doErro.get());
+    }
+  }
+
+  @Test
+  void umErroNoTrabalhoDoWithWriterDesfazATransacaoEDevolveOAutocommit() throws Exception {
+    try (SqliteConnections connections = SqliteConnections.open(database)) {
+      criarProbe(connections);
+
+      assertThatThrownBy(
+              () ->
+                  connections.withWriter(
+                      writer -> {
+                        writer.setAutoCommit(false);
+                        executar(writer, "INSERT INTO probe (x) VALUES (1)");
+                        throw new StackOverflowError("probe");
+                      }))
+          .isInstanceOf(StackOverflowError.class);
+
+      assertThat(contar(connections)).isEqualTo("0");
+      assertThat(connections.withWriter(Connection::getAutoCommit)).isTrue();
     }
   }
 }

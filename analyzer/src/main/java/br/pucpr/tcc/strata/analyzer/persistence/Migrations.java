@@ -15,6 +15,7 @@ import java.sql.Statement;
 import java.time.InstantSource;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 public final class Migrations {
@@ -28,6 +29,10 @@ public final class Migrations {
           + " AND c.name IN ('version', 'name', 'checksum')";
 
   private static final int LEDGER_COLUMNS_READ = 3;
+
+  private static final String AUTO_VACUUM = "PRAGMA auto_vacuum";
+
+  private static final long AUTO_VACUUM_INCREMENTAL = 2;
 
   private static final String READ_LEDGER =
       "SELECT version, name, checksum FROM schema_migration ORDER BY version";
@@ -96,6 +101,9 @@ public final class Migrations {
     if (found == 0) {
       if (scalar(writer, COUNT_SCHEMA_OBJECTS) > 0) {
         throw corrupt("um schema não vazio na versão 0 do schema do cache");
+      }
+      if (scalar(writer, AUTO_VACUUM) != AUTO_VACUUM_INCREMENTAL) {
+        throw corrupt("um cache vazio na versão 0 do schema sem auto_vacuum = INCREMENTAL");
       }
       return;
     }
@@ -177,8 +185,10 @@ public final class Migrations {
   }
 
   private static void setUserVersion(Connection writer, int version) throws SQLException {
+    // PRAGMA não aceita bind. Concatenado, e não formatado, porque o %d usaria os dígitos
+    // do locale (sob ar-EG sairia ١).
     try (PreparedStatement statement =
-        writer.prepareStatement("PRAGMA user_version = %d".formatted(version))) {
+        writer.prepareStatement("PRAGMA user_version = " + version)) {
       statement.executeUpdate();
     }
   }
@@ -222,7 +232,7 @@ public final class Migrations {
     public Migration {
       Objects.requireNonNull(name, "name");
       Objects.requireNonNull(resourcePath, "resourcePath");
-      final String fileName = "V%03d__%s.sql".formatted(version, name);
+      final String fileName = String.format(Locale.ROOT, "V%03d__%s.sql", version, name);
       if (version < 1 || !resourcePath.endsWith("/" + fileName)) {
         throw new IllegalArgumentException("não é o recurso de " + fileName + ": " + resourcePath);
       }

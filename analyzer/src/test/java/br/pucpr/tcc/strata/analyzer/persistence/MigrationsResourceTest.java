@@ -2,6 +2,7 @@ package br.pucpr.tcc.strata.analyzer.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,7 +11,9 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.InstantSource;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -28,7 +31,14 @@ final class MigrationsResourceTest {
   private static final Migrations.Migration V002_BROKEN =
       new Migrations.Migration(2, "broken", "/db/migration-test/V002__broken.sql");
 
+  private static final Migrations.Migration V002_FILL =
+      new Migrations.Migration(2, "fill", "/db/migration-test/V002__fill.sql");
+
   private static final int SQLITE_READONLY = 8;
+
+  private static final int SQLITE_FULL = 13;
+
+  private static final int PAGES_OF_ROOM = 2;
 
   @TempDir private Path temp;
 
@@ -232,6 +242,64 @@ final class MigrationsResourceTest {
 
       assertThat(TestCaches.scalar(writer, "PRAGMA user_version")).isEqualTo("1");
       assertThat(TestCaches.userTables(writer)).doesNotContain("migration_probe");
+    }
+  }
+
+  @Test
+  void umSqliteFullNumaMigracaoDeUmCacheExistenteSobeComoAOriginalENaoComoSchemaVersion()
+      throws Exception {
+    try (Connection writer = escritor()) {
+      Migrations.bundled().migrate(writer, clock);
+      final int paginas = Integer.parseInt(TestCaches.scalar(writer, "PRAGMA page_count"));
+      executar(writer, "PRAGMA max_page_count = " + (paginas + PAGES_OF_ROOM));
+
+      final Throwable falha =
+          catchThrowable(() -> Migrations.of(List.of(V001, V002_FILL)).migrate(writer, clock));
+
+      assertThat(falha)
+          .as(
+              "ambiente: reconstruir em um disco cheio entrava em laço e apagava o cache verdadeiro")
+          .isInstanceOf(SQLiteException.class);
+      assertThat(((SQLiteException) falha).getResultCode().code & 0xFF).isEqualTo(SQLITE_FULL);
+      assertThat(Arrays.stream(falha.getSuppressed()).map(Throwable::getMessage))
+          .as("o SQLite já desfez; a limpeza lançou e foi suprimida na original")
+          .isNotEmpty()
+          .allMatch(message -> message.contains("no transaction is active"));
+      assertThat(TestCaches.scalar(writer, "PRAGMA user_version")).isEqualTo("1");
+      assertThat(TestCaches.userTables(writer)).doesNotContain("migration_fill");
+    }
+  }
+
+  @Test
+  void sobUmLocaleDeDigitosArabesAsMigracoesSeConstroemEOUserVersionEhUm() throws Exception {
+    final Locale anterior = Locale.getDefault();
+    Locale.setDefault(Locale.of("ar", "EG"));
+    try (Connection writer = escritor()) {
+      final Migrations migrations = Migrations.bundled();
+
+      assertThat(migrations.migrate(writer, clock)).isEqualTo(1);
+
+      assertThat(TestCaches.scalar(writer, "PRAGMA user_version")).isEqualTo("1");
+      assertThat(TestCaches.userTables(writer)).hasSize(28);
+    } finally {
+      Locale.setDefault(anterior);
+    }
+  }
+
+  @Test
+  void umBancoVazioNaVersaoZeroSemAutoVacuumIncrementalEhCorrupcao() throws Exception {
+    try (Connection writer = TestCaches.raw(database)) {
+      executar(writer, "PRAGMA journal_mode = WAL");
+      executar(writer, "PRAGMA foreign_keys = ON");
+      assertThat(TestCaches.scalar(writer, "PRAGMA auto_vacuum")).isEqualTo("0");
+
+      assertThatThrownBy(() -> Migrations.bundled().migrate(writer, clock))
+          .isInstanceOf(CacheDiscardException.class)
+          .extracting(MigrationsResourceTest::descarte)
+          .isEqualTo(new CacheInvalidation.Corrupt());
+
+      assertThat(TestCaches.scalar(writer, "PRAGMA user_version")).isEqualTo("0");
+      assertThat(TestCaches.userTables(writer)).isEmpty();
     }
   }
 }

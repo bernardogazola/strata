@@ -11,7 +11,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayDeque;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
@@ -37,12 +41,17 @@ public final class SqliteConnections implements AutoCloseable {
 
   private final Deque<Connection> idleReaders = new ArrayDeque<>();
 
+  private final Set<Connection> tracked = Collections.newSetFromMap(new IdentityHashMap<>());
+
+  private final ThreadLocal<Boolean> readingHere = new ThreadLocal<>();
+
   private final AtomicBoolean closed = new AtomicBoolean();
 
   private SqliteConnections(Path databaseFile, boolean created, Connection writer) {
     this.databaseFile = databaseFile;
     this.created = created;
     this.writer = writer;
+    this.tracked.add(writer);
   }
 
   public static SqliteConnections open(Path databaseFile) throws SQLException {
@@ -54,8 +63,11 @@ public final class SqliteConnections implements AutoCloseable {
         requireIncrementalAutoVacuum(writer);
       }
       return new SqliteConnections(databaseFile, created, writer);
-    } catch (SQLException | RuntimeException failure) {
-      closeAfter(writer, failure);
+    } catch (Throwable failure) {
+      closeQuietly(writer, failure);
+      if (!isClosed(writer)) {
+        throw new ConnectionLeftOpenException(databaseFile, failure);
+      }
       throw failure;
     }
   }
@@ -68,8 +80,14 @@ public final class SqliteConnections implements AutoCloseable {
     return databaseFile;
   }
 
+  public boolean allClosed() {
+    synchronized (idleReaders) {
+      return closed.get() && tracked.isEmpty();
+    }
+  }
+
   public <T> T write(SqlWork<T> work) throws SQLException {
-    requireNotNested();
+    requireWriterNotNested();
     writerLock.lock();
     try {
       requireOpen();
@@ -80,7 +98,7 @@ public final class SqliteConnections implements AutoCloseable {
   }
 
   public <T, E extends Exception> T withWriter(WriterWork<T, E> work) throws SQLException, E {
-    requireNotNested();
+    requireWriterNotNested();
     writerLock.lock();
     try {
       requireOpen();
@@ -90,7 +108,7 @@ public final class SqliteConnections implements AutoCloseable {
       final T result;
       try {
         result = work.run(writer);
-      } catch (Exception failure) {
+      } catch (Throwable failure) {
         abandonOpenTransaction(failure);
         throw failure;
       }
@@ -107,60 +125,114 @@ public final class SqliteConnections implements AutoCloseable {
   }
 
   public <T> T read(SqlWork<T> work) throws SQLException {
+    requireNotReadingHere("já há uma unidade de leitura rodando aqui");
     readerPermits.acquireUninterruptibly();
+    readingHere.set(Boolean.TRUE);
     try {
       requireOpen();
       final Connection reader = borrowReader();
       final T result;
       try {
         result = SqlTransactions.run(reader, work);
-      } catch (SQLException | RuntimeException failure) {
+      } catch (Throwable failure) {
         closeAfter(reader, failure);
         throw failure;
       }
       giveBack(reader);
       return result;
     } finally {
+      readingHere.remove();
       readerPermits.release();
     }
   }
 
   @Override
   public void close() throws SQLException {
-    if (!closed.compareAndSet(false, true)) {
+    requireOutsideUnits();
+    final boolean first = closed.compareAndSet(false, true);
+    if (!first && allClosed()) {
       return;
     }
     writerLock.lock();
     readerPermits.acquireUninterruptibly(AnalysisConstants.SQLITE_READER_CONNECTIONS);
     try {
-      closeInOrder();
+      closeInOrder(first);
     } finally {
       readerPermits.release(AnalysisConstants.SQLITE_READER_CONNECTIONS);
       writerLock.unlock();
     }
   }
 
-  private void closeInOrder() throws SQLException {
-    final Failures failures = new Failures();
-    synchronized (idleReaders) {
-      for (Connection reader = idleReaders.poll(); reader != null; reader = idleReaders.poll()) {
-        failures.attempt(reader::close);
-      }
+  void requireOutsideUnits() {
+    if (writerLock.isHeldByCurrentThread()) {
+      throw new IllegalStateException(
+          "não é possível fechar de dentro de uma unidade de trabalho na conexão de escrita");
     }
-    failures.attempt(() -> optimize(writer));
-    failures.attempt(() -> checkpoint(writer, databaseFile));
-    failures.attempt(writer::close);
-    failures.rethrow();
+    requireNotReadingHere("não é possível fechar de dentro de uma unidade de leitura");
   }
 
-  private void requireNotNested() {
+  private void closeInOrder(boolean first) throws SQLException {
+    final Failures failures = new Failures();
+    for (final Connection reader : trackedReaders()) {
+      failures.attempt(() -> closeTracked(reader));
+    }
+    if (first) {
+      failures.attempt(() -> optimize(writer));
+      failures.attempt(() -> checkpoint(writer, databaseFile));
+    }
+    if (isTracked(writer)) {
+      failures.attempt(() -> closeTracked(writer));
+    }
+    failures.rethrow();
+    if (!allClosed()) {
+      throw new SQLException(
+          "uma conexão com " + databaseFile + " ainda está aberta depois do close()");
+    }
+  }
+
+  private List<Connection> trackedReaders() {
+    synchronized (idleReaders) {
+      idleReaders.clear();
+      return tracked.stream().filter(connection -> connection != writer).toList();
+    }
+  }
+
+  private boolean isTracked(Connection connection) {
+    synchronized (idleReaders) {
+      return tracked.contains(connection);
+    }
+  }
+
+  private void closeTracked(Connection connection) throws SQLException {
+    boolean succeeded = false;
+    try {
+      connection.close();
+      succeeded = true;
+    } finally {
+      if (succeeded || isClosed(connection)) {
+        synchronized (idleReaders) {
+          tracked.remove(connection);
+        }
+      }
+    }
+  }
+
+  private void requireWriterNotNested() {
     if (writerLock.isHeldByCurrentThread()) {
       throw new IllegalStateException(
           "já há uma unidade de trabalho na conexão de escrita rodando aqui");
     }
+    requireNotReadingHere(
+        "uma unidade de trabalho na conexão de escrita não pode rodar dentro de uma unidade de leitura");
   }
 
-  private void abandonOpenTransaction(Exception original) {
+  private void requireNotReadingHere(String message) {
+    if (Boolean.TRUE.equals(readingHere.get())) {
+      throw new IllegalStateException(message);
+    }
+  }
+
+  private void abandonOpenTransaction(Throwable original) {
     try {
       if (writer.getAutoCommit()) {
         return;
@@ -194,7 +266,7 @@ public final class SqliteConnections implements AutoCloseable {
         return idle;
       }
     }
-    return openReader(databaseFile);
+    return openReader();
   }
 
   private void giveBack(Connection reader) {
@@ -219,15 +291,18 @@ public final class SqliteConnections implements AutoCloseable {
     return config.createConnection(JDBC_URL_PREFIX + databaseFile);
   }
 
-  private static Connection openReader(Path databaseFile) throws SQLException {
+  private Connection openReader() throws SQLException {
     final SQLiteConfig config = new SQLiteConfig();
     config.setReadOnly(true);
     config.setTransactionMode(SQLiteConfig.TransactionMode.DEFERRED);
     final Connection reader = config.createConnection(JDBC_URL_PREFIX + databaseFile);
+    synchronized (idleReaders) {
+      tracked.add(reader);
+    }
     try {
       SqlitePragmas.applyToReader(reader);
       return reader;
-    } catch (SQLException | RuntimeException failure) {
+    } catch (Throwable failure) {
       closeAfter(reader, failure);
       throw failure;
     }
@@ -266,7 +341,15 @@ public final class SqliteConnections implements AutoCloseable {
     }
   }
 
-  private static void closeAfter(Connection connection, Exception original) {
+  private void closeAfter(Connection connection, Throwable original) {
+    try {
+      closeTracked(connection);
+    } catch (SQLException | RuntimeException cleanup) {
+      original.addSuppressed(cleanup);
+    }
+  }
+
+  private static void closeQuietly(Connection connection, Throwable original) {
     try {
       connection.close();
     } catch (SQLException | RuntimeException cleanup) {
@@ -274,10 +357,29 @@ public final class SqliteConnections implements AutoCloseable {
     }
   }
 
+  private static boolean isClosed(Connection connection) {
+    try {
+      return connection.isClosed();
+    } catch (SQLException unknown) {
+      return false;
+    }
+  }
+
   @FunctionalInterface
   public interface WriterWork<T, E extends Exception> {
 
     T run(Connection writer) throws SQLException, E;
+  }
+
+  static final class ConnectionLeftOpenException extends SQLException {
+
+    private static final long serialVersionUID = 1L;
+
+    ConnectionLeftOpenException(Path databaseFile, Throwable cause) {
+      super(
+          "uma conexão com " + databaseFile + " ficou aberta depois de uma tentativa que falhou",
+          cause);
+    }
   }
 
   @FunctionalInterface
