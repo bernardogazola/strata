@@ -1,5 +1,6 @@
 package br.pucpr.tcc.strata.analyzer.bootstrap;
 
+import br.pucpr.tcc.strata.analyzer.persistence.PersistenceRoot;
 import br.pucpr.tcc.strata.analyzer.protocol.CanonicalJson;
 import br.pucpr.tcc.strata.analyzer.protocol.Dispatcher;
 import br.pucpr.tcc.strata.analyzer.protocol.Envelope;
@@ -30,6 +31,15 @@ public final class Main {
     try {
       final RuntimeArguments arguments = RuntimeArguments.parse(args);
       Log.info("pasta de dados: " + arguments.dataDir());
+
+      final PersistenceRoot persistence;
+      try {
+        persistence = PersistenceRoot.prepare(arguments.dataDir());
+      } catch (IOException unusable) {
+        Log.error("o diretório do cache dentro do diretório de dados não pode ser usado", unusable);
+        System.exit(AnalysisConstants.EXIT_DATA_DIRECTORY_UNUSABLE);
+        return;
+      }
 
       final AtomicBoolean shutdownRequested = new AtomicBoolean(false);
       final JsonLines.Writer writer =

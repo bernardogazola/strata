@@ -127,7 +127,7 @@ final class CacheRecoveryTest {
   }
 
   @Test
-  void umWalComQuadrosVaiParaAQuarentenaComoParDoBakENuncaEReaplicadoNoNovo() throws Exception {
+  void umWalVelhoNuncaEReaplicadoNoCacheNovo() throws Exception {
     criarEFechar(abrir(root, TestCaches.identityV01()));
     final Path database = banco(root);
     final Path wal = TestCaches.sibling(database, "-wal");
@@ -137,8 +137,7 @@ final class CacheRecoveryTest {
           List.of(
               "PRAGMA journal_mode = WAL",
               "PRAGMA wal_autocheckpoint = 0",
-              "CREATE TABLE stale_rows (x INTEGER)",
-              "INSERT INTO stale_rows (x) VALUES (42)")) {
+              "UPDATE cache_metadata SET analyzer_version = 'stale'")) {
         try (PreparedStatement statement = raw.prepareStatement(sql)) {
           statement.execute();
         }
@@ -151,17 +150,24 @@ final class CacheRecoveryTest {
     final CacheOpening reaberto = abrir(root, TestCaches.identityV01());
 
     assertThat(reaberto).isInstanceOf(CacheOpening.Rebuilt.class);
-    final Path bak = CacheRecovery.backups(database.getParent()).get(0);
-    assertThat(TestCaches.sibling(bak, "-wal"))
-        .as("o -wal vai com o banco, no nome em que o SQLite o procura")
-        .hasSameBinaryContentAs(temp.resolve("crash-wal"));
-    assertThat(TestCaches.sibling(database, "-shm")).doesNotExist();
+    assertThat(((CacheOpening.Rebuilt) reaberto).invalidation())
+        .isEqualTo(new CacheInvalidation.Corrupt());
+    final String versao =
+        reaberto
+            .cache()
+            .connections()
+            .read(c -> TestCaches.scalar(c, "SELECT analyzer_version FROM cache_metadata"));
     final List<String> tabelas = reaberto.cache().connections().read(TestCaches::userTables);
-    assertThat(tabelas)
-        .as("montar o novo ao lado e movê-lo para o lugar reaplicaria o -wal velho nele (medido)")
-        .doesNotContain("stale_rows")
-        .hasSize(28);
     reaberto.cache().close();
+
+    assertThat(versao)
+        .as("montar o novo ao lado e movê-lo para o lugar reaplicaria o -wal velho nele (medido)")
+        .isEqualTo("0.0.0-test");
+    assertThat(tabelas).hasSize(28);
+    assertThat(TestCaches.sibling(database, "-wal")).doesNotExist();
+    assertThat(TestCaches.sibling(database, "-shm")).doesNotExist();
+    final Path bak = CacheRecovery.backups(database.getParent()).get(0);
+    assertThat(TestCaches.sibling(bak, "-shm")).doesNotExist();
   }
 
   @Test
