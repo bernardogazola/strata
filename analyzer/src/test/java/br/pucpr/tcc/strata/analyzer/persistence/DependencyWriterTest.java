@@ -453,7 +453,8 @@ final class DependencyWriterTest {
   void oMetodoDeOrigemViraChaveEUmMetodoSemLinhaOuAusenteViraNull() throws Exception {
     final long analise = novaAnalise("an_01");
     final ElementWriter writer = gravador(analise, 1);
-    final MethodElement semLinha = metodo(TIPO_A, "longo");
+    final MethodElement semLinha =
+        metodo(TIPO_A, "l" + "o".repeat(AnalysisConstants.MAX_ELEMENT_ID_BYTES) + "ngo");
     final ExtractedDependency chamada =
         new ExtractedDependency(
             new Dependency(TIPO_A.id(), LISTA, DependencyType.CALLS, ResolutionQuality.RESOLVED, 3),
@@ -469,6 +470,26 @@ final class DependencyWriterTest {
             new EvidenceRow(1, run, null, ARQUIVO_A, 7, ResolutionQuality.RESOLVED),
             new EvidenceRow(1, null, null, ARQUIVO_A, 9, ResolutionQuality.RESOLVED),
             new EvidenceRow(1, null, null, ARQUIVO_A, null, ResolutionQuality.RESOLVED));
+  }
+
+  @Test
+  void umMetodoDeOrigemQueCabeNoTetoEFaltaNaDescargaEDefeito() throws Exception {
+    final long analise = novaAnalise("an_01");
+    final ElementWriter writer = gravador(analise, 1);
+    final MethodElement ausente = metodo(TIPO_A, "ausente");
+    final ExtractedDependency chamada =
+        new ExtractedDependency(
+            new Dependency(TIPO_A.id(), LISTA, DependencyType.CALLS, ResolutionQuality.RESOLVED, 1),
+            A,
+            false,
+            List.of(ocorrencia(ausente, 7)));
+
+    assertThatThrownBy(() -> writer.accept(lote(elementos(TIPO_A, RUN), chamada)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining(ausente.id().value());
+
+    assertThat(contar("code_element")).isEqualTo("0");
+    assertThat(contar("dependency")).isEqualTo("0");
   }
 
   @Test

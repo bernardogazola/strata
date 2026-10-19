@@ -178,6 +178,31 @@ final class DependencyExtractorTest {
   }
 
   @Test
+  void importSobDemandaDePacoteForaDoModeloNaoProduzLinha() throws Exception {
+    final Extraction run =
+        extract(
+            Map.of(
+                "src/main/java/p/Client.java",
+                """
+                package p;
+
+                import com.thirdparty.*;
+
+                public class Client {
+
+                  private java.util.List<String> names;
+
+                  public Client() {}
+                }
+                """));
+
+    assertThat(run.sink().tuples())
+        .containsExactly(
+            "p.Client -> java.lang.String FIELD_TYPE x1 RESOLVED external",
+            "p.Client -> java.util.List FIELD_TYPE x1 RESOLVED external");
+  }
+
+  @Test
   void importEstaticoSimplesNomeiaOTipo() throws Exception {
     final Extraction run = extract(staticImportCase("import static q.Util.helper;"));
 
@@ -336,6 +361,42 @@ final class DependencyExtractorTest {
             "p.Primary -> java.util.List IMPORTS x1 RESOLVED external",
             "p.Primary -> java.util.List FIELD_TYPE x1 RESOLVED external",
             "p.Primary -> q.Thing IMPORTS x1 RESOLVED");
+  }
+
+  @Test
+  void oDonoDosImportsEODoNomeDoArquivoMesmoDepoisDeOutroTipo() throws Exception {
+    final Extraction run =
+        extract(
+            Map.of(
+                "src/main/java/p/Multi.java",
+                """
+                package p;
+
+                import java.util.List;
+
+                class Helper {
+
+                  private List<Order> orders;
+
+                  Helper() {}
+                }
+
+                public class Multi {
+
+                  private Helper helper;
+
+                  public Multi() {}
+                }
+                """,
+                "src/main/java/p/Order.java",
+                ORDER));
+
+    assertThat(run.sink().tuples())
+        .containsExactly(
+            "p.Helper -> java.util.List FIELD_TYPE x1 RESOLVED external",
+            "p.Helper -> p.Order FIELD_TYPE x1 RESOLVED",
+            "p.Multi -> java.util.List IMPORTS x1 RESOLVED external",
+            "p.Multi -> p.Helper FIELD_TYPE x1 RESOLVED");
   }
 
   @Test
@@ -657,6 +718,22 @@ final class DependencyExtractorTest {
   }
 
   @Test
+  void anotacaoDeComponenteDeRecordContaUmaVez() throws Exception {
+    final Extraction run =
+        extract(
+            Map.of(
+                "src/main/java/p/Tagged.java",
+                "package p;\n\npublic record Tagged(@Deprecated Order order) {}\n",
+                "src/main/java/p/Order.java",
+                ORDER));
+
+    assertThat(run.sink().tuples())
+        .containsExactly(
+            "p.Tagged -> java.lang.Deprecated ANNOTATION_REFERENCE x1 RESOLVED external",
+            "p.Tagged -> p.Order FIELD_TYPE x1 RESOLVED");
+  }
+
+  @Test
   void constanteDeEnumNaoEChamadaMasOCorpoEOsArgumentosContam() throws Exception {
     final Extraction run =
         extract(
@@ -762,6 +839,36 @@ final class DependencyExtractorTest {
   }
 
   @Test
+  void anotacaoDeParametroDeLambdaNaoConta() throws Exception {
+    final Extraction run =
+        extract(
+            Map.of(
+                "src/main/java/p/Listener.java",
+                """
+                package p;
+
+                import java.util.function.Consumer;
+
+                public class Listener {
+
+                  public Listener() {}
+
+                  public void listen(@Deprecated Order first) {
+                    Consumer<Order> sink = (@Deprecated Order order) -> {};
+                  }
+                }
+                """,
+                "src/main/java/p/Order.java",
+                ORDER));
+
+    assertThat(run.sink().tuples())
+        .containsExactly(
+            "p.Listener -> java.lang.Deprecated ANNOTATION_REFERENCE x1 RESOLVED external",
+            "p.Listener -> java.util.function.Consumer IMPORTS x1 RESOLVED external",
+            "p.Listener -> p.Order PARAMETER_TYPE x1 RESOLVED");
+  }
+
+  @Test
   void argumentoDeTipoDoSupertipoNaoConta() throws Exception {
     final Extraction run =
         extract(
@@ -785,6 +892,34 @@ final class DependencyExtractorTest {
             "p.Orders -> java.lang.Comparable IMPLEMENTS x1 RESOLVED external",
             "p.Orders -> java.util.ArrayList IMPORTS x1 RESOLVED external",
             "p.Orders -> java.util.ArrayList EXTENDS x1 RESOLVED external");
+  }
+
+  @Test
+  void supertiposDeUmaClasseLocalNaoDaoLinhaAoDono() throws Exception {
+    final Extraction run =
+        extract(
+            Map.of(
+                "src/main/java/p/Host.java",
+                """
+                package p;
+
+                public class Host {
+
+                  private Base base;
+
+                  public Host() {}
+
+                  public void m() {
+                    class Worker extends Base implements Runnable {
+                      public void run() {}
+                    }
+                  }
+                }
+                """,
+                "src/main/java/p/Base.java",
+                "package p;\n\npublic class Base {\n\n  public Base() {}\n}\n"));
+
+    assertThat(run.sink().tuples()).containsExactly("p.Host -> p.Base FIELD_TYPE x1 RESOLVED");
   }
 
   @Test
@@ -1152,6 +1287,78 @@ final class DependencyExtractorTest {
   }
 
   @Test
+  void umNomeComPontosResolveOPrimeiroSegmentoPeloImportDeTipoUnico() throws Exception {
+    final String client =
+        """
+        package b;
+
+        import a.Api;
+
+        public class Client {
+
+          private Api.Inner inner;
+
+          public Client() {}
+        }
+        """;
+    final String remote =
+        """
+        package b;
+
+        import com.x.Api;
+
+        public class Remote {
+
+          private Api.Inner inner;
+
+          public Remote() {}
+        }
+        """;
+    final String api =
+        """
+        package a;
+
+        public class Api {
+
+          public Api() {}
+
+          public static class Inner {
+
+            public Inner() {}
+          }
+        }
+        """;
+
+    final Extraction oneRoot =
+        extract(
+            "one-root",
+            Map.of(
+                "src/main/java/b/Client.java", client,
+                "src/main/java/b/Remote.java", remote,
+                "src/main/java/a/Api.java", api));
+    final Extraction twoRoots =
+        extract(
+            "two-roots",
+            Map.of(
+                "src/main/java/b/Client.java", client,
+                "src/main/java/b/Remote.java", remote,
+                "src/test/java/a/Api.java", api));
+
+    assertThat(oneRoot.sink().tuples())
+        .containsExactly(
+            "b.Client -> a.Api IMPORTS x1 RESOLVED",
+            "b.Client -> a.Api$Inner FIELD_TYPE x1 RESOLVED",
+            "b.Remote -> com.x.Api IMPORTS x1 UNRESOLVED_EXTERNAL external",
+            "b.Remote -> com.x.Api$Inner FIELD_TYPE x1 UNRESOLVED_EXTERNAL external");
+    assertThat(twoRoots.sink().tuples())
+        .containsExactly(
+            "b.Client -> a.Api IMPORTS x1 INFERRED",
+            "b.Client -> a.Api$Inner FIELD_TYPE x1 INFERRED",
+            "b.Remote -> com.x.Api IMPORTS x1 UNRESOLVED_EXTERNAL external",
+            "b.Remote -> com.x.Api$Inner FIELD_TYPE x1 UNRESOLVED_EXTERNAL external");
+  }
+
+  @Test
   void cadaSitioDeUmaCadeiaConta() throws Exception {
     final Extraction run =
         extract(
@@ -1513,7 +1720,11 @@ final class DependencyExtractorTest {
       List<SourceRoot> roots, SourceAnalysis analysis, RecordingStructureSink sink) {}
 
   private Extraction extract(Map<String, String> files) throws Exception {
-    return extract(SourceTrees.repository(temp.resolve("repository"), files));
+    return extract("repository", files);
+  }
+
+  private Extraction extract(String directory, Map<String, String> files) throws Exception {
+    return extract(SourceTrees.repository(temp.resolve(directory), files));
   }
 
   private static Extraction extract(ValidatedRepository repository) {

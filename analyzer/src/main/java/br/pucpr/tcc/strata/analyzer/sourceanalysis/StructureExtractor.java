@@ -55,8 +55,9 @@ public final class StructureExtractor implements BatchVisitor {
         elements.dedupe(units.stream().map(UnitFacts::elements).toList());
     final List<UnitDependencies> unitDependencies =
         units.stream().map(UnitFacts::dependencies).toList();
-    count(unitDependencies);
-    sink.accept(new BatchStructure(batchElements, survivors(unitDependencies, batchElements)));
+    final Map<CodeElementId, String> declaredIn = declaredIn(batchElements);
+    count(unitDependencies, declaredIn);
+    sink.accept(new BatchStructure(batchElements, survivors(unitDependencies, declaredIn)));
   }
 
   @Override
@@ -87,12 +88,16 @@ public final class StructureExtractor implements BatchVisitor {
     return Set.copyOf(SimpleNameIndex.topLevelTypes(files));
   }
 
-  private static BatchDependencies survivors(
-      List<UnitDependencies> units, BatchElements batchElements) {
+  private static Map<CodeElementId, String> declaredIn(BatchElements batchElements) {
     final Map<CodeElementId, String> declaredIn = new HashMap<>();
     for (final TypeElement type : batchElements.types()) {
       declaredIn.put(type.id(), type.filePath());
     }
+    return declaredIn;
+  }
+
+  private static BatchDependencies survivors(
+      List<UnitDependencies> units, Map<CodeElementId, String> declaredIn) {
     final List<ExtractedDependency> rows = new ArrayList<>();
     final List<ModuleDependency> modules = new ArrayList<>();
     for (final UnitDependencies unit : units) {
@@ -106,16 +111,15 @@ public final class StructureExtractor implements BatchVisitor {
     return new BatchDependencies(rows, modules);
   }
 
-  private void count(List<UnitDependencies> units) {
+  private void count(List<UnitDependencies> units, Map<CodeElementId, String> declaredIn) {
     for (final UnitDependencies unit : units) {
-      if (unit.drops().isEmpty()) {
-        continue;
-      }
-      unit.drops().forEach((reason, count) -> drops.merge(reason, (long) count, Long::sum));
-      Log.warn(
-          unit.relativePath()
-              + ": ocorrências de dependência descartadas, cujo alvo não é um id de elemento "
-              + unit.drops());
+      unit.drops()
+          .forEach(
+              (top, reasons) -> {
+                if (unit.relativePath().equals(declaredIn.get(top))) {
+                  reasons.forEach((reason, count) -> drops.merge(reason, (long) count, Long::sum));
+                }
+              });
     }
   }
 

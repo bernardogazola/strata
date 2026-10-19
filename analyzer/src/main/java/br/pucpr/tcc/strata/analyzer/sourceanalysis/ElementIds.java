@@ -1,6 +1,5 @@
 package br.pucpr.tcc.strata.analyzer.sourceanalysis;
 
-import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.Modifier;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.SourceLines;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.TypeKind;
@@ -277,13 +276,6 @@ final class ElementIds {
     final String nested = String.join(nestingSeparator, names);
     final String declaredPackage = packageName(type);
     return declaredPackage.isEmpty() ? nested : declaredPackage + "." + nested;
-  }
-
-  static String label(String name) {
-    if (name.codePointCount(0, name.length()) <= AnalysisConstants.MAX_LABEL_CHARS) {
-      return name;
-    }
-    return name.substring(0, name.offsetByCodePoints(0, AnalysisConstants.MAX_LABEL_CHARS));
   }
 
   static boolean isModelLoss(CtType<?> type) {

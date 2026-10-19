@@ -6,6 +6,7 @@ import br.pucpr.tcc.strata.analyzer.sourceanalysis.TargetNames.Target;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import spoon.reflect.code.CtInvocation;
 import spoon.reflect.declaration.CtElement;
 import spoon.reflect.reference.CtTypeReference;
 
@@ -63,12 +64,11 @@ final class OccurrenceRecorder {
 
   void call(CtElement site, CodeElementId source, Target target) {
     if (target != null) {
-      add(
-          source,
-          target,
-          DependencyType.CALLS,
-          SiteAttribution.at(site),
-          attribution.fromMethod(site));
+      final Anchor anchor =
+          site instanceof CtInvocation<?> invocation
+              ? SiteAttribution.call(invocation)
+              : SiteAttribution.at(site);
+      add(source, target, DependencyType.CALLS, anchor, attribution.fromMethod(site));
     }
   }
 

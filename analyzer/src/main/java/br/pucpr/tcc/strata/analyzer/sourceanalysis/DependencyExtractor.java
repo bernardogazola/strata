@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,27 +35,32 @@ final class DependencyExtractor {
     if (unit.getUnitType() == CtCompilationUnit.UNIT_TYPE.MODULE_DECLARATION) {
       return new UnitDependencies(relativePath, List.of(), modules(relativePath, unit), Map.of());
     }
-    final Map<DropReason, Integer> drops = new EnumMap<>(DropReason.class);
+    final Map<CodeElementId, Map<DropReason, Integer>> drops = new HashMap<>();
     final EvidenceCollector collector = new EvidenceCollector(relativePath);
     final Set<String> onDemand = ElementIds.onDemandPackages(unit);
     final Map<String, String> singleTypeImports = ElementIds.singleTypeImports(unit);
-    final List<CtImport> imports = ImportSites.inSourceOrder(unit);
+    final List<CtImport> imports = unit.getImports();
     final CtType<?> importOwner = ImportSites.owner(relativePath, unit);
     final Set<Long> fieldDeclarations = new HashSet<>();
     for (final CtType<?> top : unit.getDeclaredTypes()) {
       if (!ElementIds.isElementType(top)) {
         continue;
       }
+      final Map<DropReason, Integer> topDrops = new EnumMap<>(DropReason.class);
       final String ownPackage = ElementIds.packageName(top);
       final SimpleNameIndex.Scope scope = index.scope(ownPackage, onDemand, singleTypeImports);
       final TargetNames names =
-          new TargetNames(index, batchTopLevelTypes, ownPackage, singleTypeImports, scope, drops);
+          new TargetNames(
+              index, batchTopLevelTypes, ownPackage, singleTypeImports, scope, topDrops);
       final OccurrenceRecorder recorder =
           new OccurrenceRecorder(collector, new SiteAttribution(scope), names);
       new DependencySites(recorder, ImportSites.staticMembers(imports, names), fieldDeclarations)
           .scan(top);
       if (top == importOwner) {
         ImportSites.record(imports, top, recorder);
+      }
+      if (!topDrops.isEmpty()) {
+        drops.put(CodeElementId.ofType(ElementIds.idName(top)), topDrops);
       }
     }
     return new UnitDependencies(relativePath, collector.collect(), List.of(), drops);
@@ -91,15 +97,20 @@ final class DependencyExtractor {
       String relativePath,
       List<ExtractedDependency> dependencies,
       List<ModuleDependency> modules,
-      Map<DropReason, Integer> drops) {
+      Map<CodeElementId, Map<DropReason, Integer>> drops) {
 
     UnitDependencies {
       Objects.requireNonNull(relativePath, "relativePath");
       dependencies = List.copyOf(dependencies);
       modules = List.copyOf(modules);
-      final Map<DropReason, Integer> ordered = new EnumMap<>(DropReason.class);
-      ordered.putAll(drops);
-      drops = Collections.unmodifiableMap(ordered);
+      final Map<CodeElementId, Map<DropReason, Integer>> byTop = new HashMap<>();
+      drops.forEach(
+          (top, reasons) -> {
+            final Map<DropReason, Integer> ordered = new EnumMap<>(DropReason.class);
+            ordered.putAll(reasons);
+            byTop.put(top, Collections.unmodifiableMap(ordered));
+          });
+      drops = Collections.unmodifiableMap(byTop);
     }
   }
 }

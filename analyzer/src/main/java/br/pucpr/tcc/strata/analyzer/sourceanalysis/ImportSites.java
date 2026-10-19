@@ -1,8 +1,6 @@
 package br.pucpr.tcc.strata.analyzer.sourceanalysis;
 
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.TargetNames.Target;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,12 +22,6 @@ final class ImportSites {
   private static final String ON_DEMAND_SUFFIX = ".*";
 
   private ImportSites() {}
-
-  static List<CtImport> inSourceOrder(CtCompilationUnit unit) {
-    final List<CtImport> imports = new ArrayList<>(unit.getImports());
-    imports.sort(Comparator.comparingInt(ImportSites::start));
-    return imports;
-  }
 
   static CtType<?> owner(String relativePath, CtCompilationUnit unit) {
     final String fileName = relativePath.substring(relativePath.lastIndexOf('/') + 1);

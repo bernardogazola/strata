@@ -1,6 +1,5 @@
 package br.pucpr.tcc.strata.analyzer.persistence;
 
-import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyDraft.EvidenceDraft;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.DependencyDao;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.DependencyRow;
@@ -13,6 +12,7 @@ import br.pucpr.tcc.strata.analyzer.persistence.dao.ModuleDependencyRow;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.BatchStructure;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.DependencyAggregator;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.CodeElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.Dependency;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyEvidence;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
@@ -91,8 +91,7 @@ final class DependencyFlush {
         throw new IllegalStateException(
             "to_method_pk ainda não foi gravado: " + occurrence.toMethod());
       }
-      final Long fromMethodPk =
-          occurrence.fromMethod() == null ? null : methods.get(occurrence.fromMethod());
+      final Long fromMethodPk = fromMethodPk(occurrence.fromMethod());
       final Integer line = occurrence.line() == 0 ? null : occurrence.line();
       evidence.add(new EvidenceDraft(fromMethodPk, line, occurrence.resolution()));
     }
@@ -106,6 +105,17 @@ final class DependencyFlush {
         DependencyAggregator.rowWeight(row),
         filePk,
         evidence);
+  }
+
+  private Long fromMethodPk(CodeElementId fromMethod) {
+    if (fromMethod == null) {
+      return null;
+    }
+    final Long pk = methods.get(fromMethod);
+    if (pk == null && fromMethod.fitsCeiling()) {
+      throw new IllegalStateException("um from-method que este flush nunca numerou: " + fromMethod);
+    }
+    return pk;
   }
 
   private static void requireValidPair(Dependency row, boolean targetDeclared) {
@@ -165,7 +175,7 @@ final class DependencyFlush {
         id,
         ElementKind.TYPE,
         null,
-        label(body.substring(separator + 1)),
+        CodeElement.label(body.substring(separator + 1)),
         body,
         body,
         null,
@@ -176,13 +186,6 @@ final class DependencyFlush {
         null,
         null,
         null);
-  }
-
-  private static String label(String name) {
-    if (name.codePointCount(0, name.length()) <= AnalysisConstants.MAX_LABEL_CHARS) {
-      return name;
-    }
-    return name.substring(0, name.offsetByCodePoints(0, AnalysisConstants.MAX_LABEL_CHARS));
   }
 
   private Long targetPk(DependencyDraft draft, Map<CodeElementId, Long> newExternals) {

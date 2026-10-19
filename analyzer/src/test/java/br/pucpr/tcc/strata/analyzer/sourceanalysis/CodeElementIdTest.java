@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.CodeElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -253,13 +254,13 @@ final class CodeElementIdTest {
 
   @Test
   void oRotuloCortaEmPontosDeCodigoSemPartirUmPar() {
-    final String label = ElementIds.label("a" + EMOJI.repeat(600));
+    final String label = CodeElement.label("a" + EMOJI.repeat(600));
 
     assertThat(label.codePointCount(0, label.length()))
         .isEqualTo(AnalysisConstants.MAX_LABEL_CHARS);
     assertThat(label).hasSize(1 + 2 * 511);
     assertThat(Character.isLowSurrogate(label.charAt(label.length() - 1))).isTrue();
-    assertThat(ElementIds.label("Order")).isEqualTo("Order");
+    assertThat(CodeElement.label("Order")).isEqualTo("Order");
   }
 
   private static final Map<String, String> SOURCES =

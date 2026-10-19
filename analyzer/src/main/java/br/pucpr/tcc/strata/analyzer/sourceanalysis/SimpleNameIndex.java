@@ -58,10 +58,18 @@ final class SimpleNameIndex {
     return (name, writtenSimple) ->
         writtenSimple
             ? canonicalizeSimple(name, ownPackage, imported, single)
-            : canonicalize(name, ownPackage, imported);
+            : canonicalize(name, ownPackage, imported, single);
   }
 
   String canonicalize(String name, String ownPackage, Set<String> onDemandPackages) {
+    return canonicalize(name, ownPackage, onDemandPackages, Map.of());
+  }
+
+  String canonicalize(
+      String name,
+      String ownPackage,
+      Set<String> onDemandPackages,
+      Map<String, String> singleTypeImports) {
     if (name.indexOf('.') < 0) {
       return resolveBare(name, simple -> inScope(simple, ownPackage, onDemandPackages))
           .orElse(name);
@@ -78,7 +86,10 @@ final class SimpleNameIndex {
     }
     final int firstDot = name.indexOf('.');
     return resolveBare(
-            name.substring(0, firstDot), simple -> inScope(simple, ownPackage, onDemandPackages))
+            name.substring(0, firstDot),
+            simple ->
+                singleTypeImport(simple, singleTypeImports)
+                    .or(() -> inScope(simple, ownPackage, onDemandPackages)))
         .map(type -> type + "$" + name.substring(firstDot + 1).replace('.', '$'))
         .orElse(name);
   }
@@ -112,6 +123,14 @@ final class SimpleNameIndex {
       return whole;
     }
     return resolver.apply(top).map(resolved -> resolved + name.substring(top.length()));
+  }
+
+  private Optional<String> singleTypeImport(
+      String simpleName, Map<String, String> singleTypeImports) {
+    final String imported = singleTypeImports.get(simpleName);
+    return imported == null
+        ? Optional.empty()
+        : Optional.of(longestInternalPrefix(imported).orElse(imported));
   }
 
   private Optional<String> inScope(

@@ -2,6 +2,7 @@ package br.pucpr.tcc.strata.analyzer.sourceanalysis;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
+import spoon.reflect.code.CtInvocation;
 import spoon.reflect.cu.SourcePosition;
 import spoon.reflect.declaration.CtElement;
 import spoon.reflect.declaration.CtExecutable;
@@ -61,6 +62,12 @@ final class SiteAttribution {
     return position.isValidPosition()
         ? new Anchor(position.getLine(), position.getSourceStart())
         : Anchor.NONE;
+  }
+
+  static Anchor call(CtInvocation<?> invocation) {
+    final Anchor name =
+        invocation.getExecutable() == null ? Anchor.NONE : at(invocation.getExecutable());
+    return Anchor.NONE.equals(name) ? at(invocation) : name;
   }
 
   static Anchor nearest(CtElement element) {

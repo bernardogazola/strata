@@ -5,6 +5,7 @@ import br.pucpr.tcc.strata.analyzer.repository.SourceRoot;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootKind;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementExtractor.DeclaredType;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementExtractor.UnitElements;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.CodeElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.MethodElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.PackageElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.TypeElement;
@@ -94,7 +95,7 @@ final class UnitExtraction {
   private TypeElement typeElement(CtType<?> type) {
     return new TypeElement(
         CodeElementId.ofType(ElementIds.idName(type)),
-        ElementIds.label(type.getSimpleName()),
+        CodeElement.label(type.getSimpleName()),
         ElementIds.canonicalName(type),
         ElementIds.typeKind(type),
         CodeElementId.ofPackage(ElementIds.packageName(type)),
@@ -121,7 +122,7 @@ final class UnitExtraction {
     }
     return new MethodElement(
         ElementIds.methodId(owner.id().sortKey(), name, executable, scope),
-        ElementIds.label(name),
+        CodeElement.label(name),
         owner.qualifiedName() + "#" + name,
         owner.id(),
         relativePath,
@@ -134,7 +135,7 @@ final class UnitExtraction {
   private static PackageElement packageElement(String qualifiedName) {
     return new PackageElement(
         CodeElementId.ofPackage(qualifiedName),
-        ElementIds.label(qualifiedName.substring(qualifiedName.lastIndexOf('.') + 1)),
+        CodeElement.label(qualifiedName.substring(qualifiedName.lastIndexOf('.') + 1)),
         qualifiedName);
   }
 
