@@ -8,12 +8,18 @@ public record ExtractedDependency(
     Dependency dependency,
     String filePath,
     boolean targetDeclared,
+    boolean ambiguous,
     List<DependencyEvidence> evidence) {
 
   public ExtractedDependency {
     Objects.requireNonNull(dependency, "dependency");
     Objects.requireNonNull(filePath, "filePath");
     evidence = List.copyOf(Objects.requireNonNull(evidence, "evidence"));
+    if (ambiguous
+        && (targetDeclared || dependency.resolution() != ResolutionQuality.UNRESOLVED_EXTERNAL)) {
+      throw new IllegalArgumentException(
+          "uma linha ambígua é uma externa não resolvida: " + dependency);
+    }
     final int expected =
         Math.min(dependency.occurrences(), AnalysisConstants.DEPENDENCY_EVIDENCE_CAP);
     if (evidence.size() != expected) {

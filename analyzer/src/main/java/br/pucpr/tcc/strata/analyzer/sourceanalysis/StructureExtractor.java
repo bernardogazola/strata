@@ -73,6 +73,10 @@ public final class StructureExtractor implements BatchVisitor {
     return elements.issues();
   }
 
+  public ResolutionCounts resolutionCounts() {
+    throw new UnsupportedOperationException("ainda não implementado: resolutionCounts");
+  }
+
   public Map<DropReason, Long> droppedOccurrences() {
     return Collections.unmodifiableMap(new EnumMap<>(drops));
   }

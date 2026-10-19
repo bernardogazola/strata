@@ -189,6 +189,7 @@ final class DependencyWriterTest {
         new Dependency(origem.id(), alvo, tipo, qualidade, ocorrencias),
         origem.filePath(),
         declarado,
+        false,
         evidencia);
   }
 
@@ -332,6 +333,7 @@ final class DependencyWriterTest {
                 TIPO_A.id(), TIPO_B.id(), DependencyType.FIELD_TYPE, ResolutionQuality.INFERRED, 1),
             A,
             true,
+            false,
             List.of(ocorrencia(RUN, 12)));
 
     writer.accept(lote(elementos(TIPO_A, RUN), paraFrente));
@@ -460,6 +462,7 @@ final class DependencyWriterTest {
             new Dependency(TIPO_A.id(), LISTA, DependencyType.CALLS, ResolutionQuality.RESOLVED, 3),
             A,
             false,
+            false,
             List.of(ocorrencia(RUN, 7), ocorrencia(semLinha, 9), ocorrencia(null, 0)));
 
     writer.accept(lote(elementos(TIPO_A, RUN), chamada));
@@ -481,6 +484,7 @@ final class DependencyWriterTest {
         new ExtractedDependency(
             new Dependency(TIPO_A.id(), LISTA, DependencyType.CALLS, ResolutionQuality.RESOLVED, 1),
             A,
+            false,
             false,
             List.of(ocorrencia(ausente, 7)));
 

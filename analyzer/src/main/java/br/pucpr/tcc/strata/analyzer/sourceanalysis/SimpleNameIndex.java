@@ -8,6 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import spoon.reflect.declaration.CtCompilationUnit;
 
 final class SimpleNameIndex {
 
@@ -115,6 +116,54 @@ final class SimpleNameIndex {
     return canonicalize(name, ownPackage, onDemandPackages);
   }
 
+  Scope scopeOf(CtCompilationUnit unit, String ownPackage) {
+    throw new UnsupportedOperationException("ainda não implementado: scopeOf");
+  }
+
+  List<String> topLevelCandidates(String simpleName, String fromPackage) {
+    throw new UnsupportedOperationException("ainda não implementado: topLevelCandidates");
+  }
+
+  MemberAnswer hasMethod(String typeIdName, String methodName) {
+    throw new UnsupportedOperationException("ainda não implementado: hasMethod");
+  }
+
+  FieldLookup field(String typeIdName, String fieldName) {
+    throw new UnsupportedOperationException("ainda não implementado: field");
+  }
+
+  MemberTypeLookup memberType(String typeIdName, String simpleName) {
+    throw new UnsupportedOperationException("ainda não implementado: memberType");
+  }
+
+  enum MemberAnswer {
+    YES,
+    NO,
+    UNKNOWN
+  }
+
+  record FieldLookup(MemberAnswer answer, String declaringType, String typeName) {}
+
+  record MemberTypeLookup(MemberAnswer answer, String typeName, boolean ambiguous) {}
+
+  record NameContext(List<String> enclosingTypes) {
+
+    static final NameContext NONE = new NameContext(List.of());
+
+    NameContext {
+      enclosingTypes = List.copyOf(enclosingTypes);
+    }
+  }
+
+  record NameResolution(String name, Outcome outcome) {}
+
+  enum Outcome {
+    PLACED,
+    UNCHANGED_COMPLETE,
+    UNCHANGED_INCOMPLETE,
+    AMBIGUOUS
+  }
+
   private static Optional<String> resolveBare(
       String name, Function<String, Optional<String>> resolver) {
     final Optional<String> whole = resolver.apply(name);
@@ -179,5 +228,9 @@ final class SimpleNameIndex {
   interface Scope {
 
     String canonical(String name, boolean writtenSimple);
+
+    default NameResolution resolve(String name, boolean writtenSimple, NameContext context) {
+      throw new UnsupportedOperationException("ainda não implementado: Scope.resolve");
+    }
   }
 }

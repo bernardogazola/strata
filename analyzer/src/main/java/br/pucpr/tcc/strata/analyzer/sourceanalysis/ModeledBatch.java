@@ -103,6 +103,10 @@ public final class ModeledBatch {
     return List.copyOf(results);
   }
 
+  SimpleNameIndex index() {
+    throw new UnsupportedOperationException("ainda não implementado: ModeledBatch.index");
+  }
+
   Set<String> modeledFiles() {
     return Set.copyOf(unitsByFile.keySet());
   }

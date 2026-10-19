@@ -101,7 +101,8 @@ final class RecordingStructureSink implements StructureSink {
         + dependency.occurrences()
         + " "
         + dependency.resolution()
-        + (row.targetDeclared() ? "" : " external");
+        + (row.targetDeclared() ? "" : " external")
+        + (row.ambiguous() ? " ambiguous" : "");
   }
 
   static List<String> evidence(ExtractedDependency row) {

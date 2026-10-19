@@ -137,6 +137,8 @@ CREATE TABLE dependency (
                 ('RESOLVED','INFERRED','UNRESOLVED_EXTERNAL')),
   occurrences INTEGER NOT NULL DEFAULT 1,
   weight      INTEGER NOT NULL DEFAULT 1,
+  ambiguous   INTEGER NOT NULL DEFAULT 0 CHECK (ambiguous IN (0,1)),
+  CHECK (ambiguous = 0 OR resolution = 'UNRESOLVED_EXTERNAL'),
   UNIQUE (analysis_pk, source_pk, target_pk, type)
 ) STRICT;
 CREATE INDEX idx_dep_out ON dependency(source_pk, type);

@@ -143,6 +143,15 @@ final class ElementIds {
     };
   }
 
+  static SimpleNameIndex.NameContext context(CtElement element) {
+    throw new UnsupportedOperationException("ainda não implementado: ElementIds.context");
+  }
+
+  static SimpleNameIndex.NameResolution resolveLeaf(
+      CtTypeReference<?> leaf, SimpleNameIndex.Scope scope) {
+    throw new UnsupportedOperationException("ainda não implementado: ElementIds.resolveLeaf");
+  }
+
   static boolean isWrittenSimple(CtTypeReference<?> reference) {
     final CtPackageReference completed = reference.getPackage();
     return reference.getDeclaringType() == null && completed != null && completed.isImplicit();

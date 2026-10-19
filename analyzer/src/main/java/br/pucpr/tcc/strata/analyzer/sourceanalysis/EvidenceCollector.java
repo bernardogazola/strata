@@ -59,6 +59,7 @@ final class EvidenceCollector {
         new Dependency(key.source(), key.target(), key.type(), resolution, occurrences.size()),
         filePath,
         occurrences.getFirst().targetDeclared(),
+        false,
         evidence);
   }
 
