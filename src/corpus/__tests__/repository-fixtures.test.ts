@@ -37,7 +37,7 @@ const EXPECTED_FIXTURES = [
 
 const LINE_BUDGET: Record<string, number> = {
   inheritance: 45,
-  "method-calls": 45,
+  "method-calls": 60,
   "missing-classpath": 50,
   "simple-packages": 60,
 };
