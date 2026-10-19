@@ -52,7 +52,7 @@ export type ConfigHash = z.infer<typeof configHashSchema>;
 
 export const elementIdSchema = z
   .string()
-  .max(1024)
+  .max(4096)
   .regex(/^(?:pkg:|type:|method:|file:)/);
 export type ElementId = z.infer<typeof elementIdSchema>;
 
@@ -63,7 +63,7 @@ export const timestampSchema = z.iso.datetime({ precision: 0 }).max(32);
 export type Timestamp = z.infer<typeof timestampSchema>;
 
 export const filePathSchema = z.string().max(1024);
-export const qualifiedNameSchema = z.string().max(1024);
+export const qualifiedNameSchema = z.string().max(4096);
 export const elementLabelSchema = z.string().max(512);
 export const commitSubjectSchema = z.string().max(512);
 export const commitBodySchema = z.string().max(4000);

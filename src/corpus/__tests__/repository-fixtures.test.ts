@@ -278,7 +278,7 @@ describe("forma do golden", () => {
     expect(checked).toBeGreaterThan(0);
   });
 
-  test("todo id cabe em 1024 bytes, não em 1024 unidades UTF-16", () => {
+  test("todo id cabe em 4096 bytes, não em 4096 unidades UTF-16", () => {
     let checked = 0;
     for (const fixture of corpus) {
       for (const value of collectStrings(fixture.value, [])) {
@@ -286,7 +286,7 @@ describe("forma do golden", () => {
           continue;
         }
         checked += 1;
-        expect(Buffer.byteLength(value, "utf8")).toBeLessThanOrEqual(1024);
+        expect(Buffer.byteLength(value, "utf8")).toBeLessThanOrEqual(4096);
       }
     }
     expect(checked).toBeGreaterThan(0);

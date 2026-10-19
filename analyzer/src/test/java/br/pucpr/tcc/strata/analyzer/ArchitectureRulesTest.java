@@ -59,6 +59,13 @@ final class ArchitectureRulesTest {
               "a persistência devolve valores e quem abre o cache emite o evento; o contrário"
                   + " acoplaria o formato do fio ao SQLite");
 
+  @ArchTest
+  static final ArchRule aAnaliseDeFonteNaoDependeDaPersistencia =
+      semDependencia("..sourceanalysis..", "..persistence..")
+          .because(
+              "o extrator devolve valores por uma porta e a persistência os grava; o contrário"
+                  + " acoplaria a visita ao modelo do Spoon ao SQLite");
+
   private static ArchRule semDependencia(String origem, String destino) {
     return noClasses()
         .that()
@@ -77,7 +84,7 @@ final class ArchitectureRulesTest {
     final JavaClasses importadas = importar();
 
     assertThat(importadas)
-        .as("um pacote errado devolve conjunto vazio e deixa as quatro regras verdes para sempre")
+        .as("um pacote errado devolve conjunto vazio e deixa as cinco regras verdes para sempre")
         .isNotEmpty();
     assertThat(importadas.stream().map(c -> c.getFullName()))
         .as(
@@ -87,7 +94,10 @@ final class ArchitectureRulesTest {
         .contains("br.pucpr.tcc.strata.analyzer.protocol.FramingTest")
         .as("os dois lados da quarta regra: sem um deles ela é verde por vacuidade")
         .contains("br.pucpr.tcc.strata.analyzer.persistence.CacheInvalidation")
-        .contains("br.pucpr.tcc.strata.analyzer.protocol.Envelope");
+        .contains("br.pucpr.tcc.strata.analyzer.protocol.Envelope")
+        .as("os dois lados da quinta regra")
+        .contains("br.pucpr.tcc.strata.analyzer.sourceanalysis.ElementSink")
+        .contains("br.pucpr.tcc.strata.analyzer.persistence.ElementWriter");
   }
 
   @Test
@@ -104,5 +114,21 @@ final class ArchitectureRulesTest {
                 assertThat(detalhe)
                     .contains("br.pucpr.tcc.strata.analyzer.protocol.Envelope")
                     .contains("br.pucpr.tcc.strata.analyzer.persistence.CacheInvalidation"));
+  }
+
+  @Test
+  void aFronteiraInvertidaReprovaNoElementWriter() {
+    final JavaClasses importadas = importar();
+
+    final EvaluationResult invertida =
+        semDependencia("..persistence..", "..sourceanalysis..").evaluate(importadas);
+
+    assertThat(invertida.hasViolation()).isTrue();
+    assertThat(invertida.getFailureReport().getDetails())
+        .anySatisfy(
+            detalhe ->
+                assertThat(detalhe)
+                    .contains("br.pucpr.tcc.strata.analyzer.persistence.ElementWriter")
+                    .contains("br.pucpr.tcc.strata.analyzer.sourceanalysis.ElementSink"));
   }
 }

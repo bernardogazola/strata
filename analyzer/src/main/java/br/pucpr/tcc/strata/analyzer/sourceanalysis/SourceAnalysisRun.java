@@ -72,10 +72,15 @@ final class SourceAnalysisRun {
     assigned.forEach(this::preParseRoot);
     preParsed = List.copyOf(outcomes.values());
     preParseNanos = System.nanoTime() - started;
+    final long beginStarted = System.nanoTime();
+    visitor.begin(preParsed);
+    visitNanos += System.nanoTime() - beginStarted;
     for (final SourceRoot root : assigned.keySet()) {
       modelRoot(root);
     }
-    return result();
+    final SourceAnalysis analysis = result();
+    visitor.end(analysis);
+    return analysis;
   }
 
   private void preParseRoot(SourceRoot root, List<JavaSource> sources) {
