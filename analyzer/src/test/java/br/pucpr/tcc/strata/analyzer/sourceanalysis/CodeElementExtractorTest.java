@@ -416,6 +416,53 @@ final class CodeElementExtractorTest {
   }
 
   @Test
+  void umArquivoQueRepeteVariosTiposAvisaUmaVezPorParDeArquivos() throws Exception {
+    final Extraction run =
+        extract(
+            Map.of(
+                "mod1/src/main/java/q/X.java", "package q;\n\npublic class X {}\n\nclass Y {}\n",
+                "mod2/src/main/java/q/Z.java", "package q;\n\npublic class Z {}\n",
+                "mod3/src/main/java/q/All.java",
+                    "package q;\n\nclass X {}\n\nclass Y {}\n\nclass Z {}\n"));
+
+    assertThat(run.roots()).hasSize(3);
+    assertThat(ids(run.sink().types())).containsExactly("type:q.X", "type:q.Y", "type:q.Z");
+    assertThat(run.issues())
+        .containsExactly(
+            SourceIssue.duplicateElement(
+                "mod3/src/main/java/q/All.java", "mod1/src/main/java/q/X.java"),
+            SourceIssue.duplicateElement(
+                "mod3/src/main/java/q/All.java", "mod2/src/main/java/q/Z.java"));
+  }
+
+  @Test
+  void umaDeclaracaoRepetidaSaiComOsTiposAninhadosEOsMetodosDeles() throws Exception {
+    final Extraction run =
+        extract(
+            Map.of(
+                "api/src/main/java/q/X.java",
+                "package q;\n\npublic class X {}\n",
+                "user/src/main/java/q/X.java",
+                """
+                package q;
+
+                public class X {
+                  static class OnlyHere {
+                    void m() {}
+                  }
+                }
+                """));
+
+    assertThat(ids(run.sink().types())).containsExactly("type:q.X");
+    assertThat(ids(run.sink().methods())).containsExactly("method:q.X#<init>()");
+    assertThat(run.sink().type("type:q.X").filePath()).isEqualTo("api/src/main/java/q/X.java");
+    assertThat(run.issues())
+        .containsExactly(
+            SourceIssue.duplicateElement(
+                "user/src/main/java/q/X.java", "api/src/main/java/q/X.java"));
+  }
+
+  @Test
   void umIdDeMetodoAcimaDoTetoSaiComUmAvisoPorArquivo() throws Exception {
     final String longName = "L".repeat(300);
     final String parameters =
@@ -548,6 +595,26 @@ final class CodeElementExtractorTest {
         .isEqualTo(new SourceLines(16, 19));
     assertThat(run.sink().type("type:p.Note").typeKind()).isEqualTo(TypeKind.ANNOTATION);
     assertThat(run.sink().method("method:p.Note#value()").lines()).isEqualTo(new SourceLines(4, 4));
+  }
+
+  @Test
+  void aPrimeiraLinhaDeUmMetodoEADoTipoDeRetornoQuandoEleVemAntesDoNome() throws Exception {
+    final Extraction run =
+        extract(
+            Map.of(
+                "src/main/java/q/L.java",
+                """
+                package q;
+
+                public class L {
+                  java.util.List<String>
+                  m() {
+                    return null;
+                  }
+                }
+                """));
+
+    assertThat(run.sink().method("method:q.L#m()").lines()).isEqualTo(new SourceLines(4, 7));
   }
 
   @Test

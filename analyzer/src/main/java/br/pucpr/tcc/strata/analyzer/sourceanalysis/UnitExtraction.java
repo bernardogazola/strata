@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.UnaryOperator;
 import spoon.reflect.declaration.CtCompilationUnit;
 import spoon.reflect.declaration.CtExecutable;
 import spoon.reflect.declaration.CtMethod;
@@ -40,6 +39,7 @@ final class UnitExtraction {
 
   UnitElements extract(CtCompilationUnit unit) {
     final Set<String> onDemand = ElementIds.onDemandPackages(unit);
+    final Map<String, String> singleTypeImports = ElementIds.singleTypeImports(unit);
     final Map<String, PackageElement> packages = new LinkedHashMap<>();
     final List<DeclaredType> types = new ArrayList<>();
     for (final CtType<?> top : unit.getDeclaredTypes()) {
@@ -48,12 +48,12 @@ final class UnitExtraction {
       }
       final String declaredPackage = ElementIds.packageName(top);
       packages.computeIfAbsent(declaredPackage, UnitExtraction::packageElement);
-      types.add(walk(top, index.scope(declaredPackage, onDemand)));
+      types.add(walk(top, index.scope(declaredPackage, onDemand, singleTypeImports)));
     }
     return new UnitElements(relativePath, List.copyOf(packages.values()), types);
   }
 
-  private DeclaredType walk(CtType<?> top, UnaryOperator<String> canonical) {
+  private DeclaredType walk(CtType<?> top, SimpleNameIndex.Scope scope) {
     final Map<CtType<?>, TypeBuilder> builders = new IdentityHashMap<>();
     for (final CtType<?> type : top.getElements(new TypeFilter<CtType<?>>(CtType.class))) {
       if (!ElementIds.isElementType(type)) {
@@ -71,7 +71,7 @@ final class UnitExtraction {
     }
     for (final CtExecutable<?> executable :
         top.getElements(new TypeFilter<CtExecutable<?>>(CtExecutable.class))) {
-      offer(executable, builders, canonical);
+      offer(executable, builders, scope);
     }
     return builders.get(top).build();
   }
@@ -79,7 +79,7 @@ final class UnitExtraction {
   private void offer(
       CtExecutable<?> executable,
       Map<CtType<?>, TypeBuilder> builders,
-      UnaryOperator<String> canonical) {
+      SimpleNameIndex.Scope scope) {
     final Optional<String> name = ElementIds.methodName(executable);
     if (name.isEmpty()) {
       return;
@@ -87,7 +87,7 @@ final class UnitExtraction {
     final CtType<?> declaring = executable.getParent(CtType.class);
     final TypeBuilder own = builders.get(declaring);
     if (own != null) {
-      own.offer(methodElement(executable, name.get(), own.type(), canonical), true);
+      own.offer(methodElement(executable, name.get(), own.type(), scope), true);
       return;
     }
     if (executable.isImplicit() || !(executable instanceof CtMethod<?>)) {
@@ -95,7 +95,7 @@ final class UnitExtraction {
     }
     final TypeBuilder owner = builders.get(ElementIds.nearestElementType(declaring));
     if (owner != null) {
-      owner.offer(methodElement(executable, name.get(), owner.type(), canonical), false);
+      owner.offer(methodElement(executable, name.get(), owner.type(), scope), false);
     }
   }
 
@@ -114,7 +114,7 @@ final class UnitExtraction {
   }
 
   private MethodElement methodElement(
-      CtExecutable<?> executable, String name, TypeElement owner, UnaryOperator<String> canonical) {
+      CtExecutable<?> executable, String name, TypeElement owner, SimpleNameIndex.Scope scope) {
     final List<String> parameters = new ArrayList<>();
     for (final CtParameter<?> parameter : executable.getParameters()) {
       if (parameter.getType() == null) {
@@ -127,7 +127,7 @@ final class UnitExtraction {
                 + " não tem tipo no modelo; o id dele usa "
                 + ElementIds.OBJECT);
       }
-      parameters.add(ElementIds.erase(parameter.getType(), canonical));
+      parameters.add(ElementIds.erase(parameter.getType(), scope));
     }
     return new MethodElement(
         CodeElementId.ofMethod(owner.id().sortKey(), name, parameters),

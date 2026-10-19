@@ -2,11 +2,11 @@ package br.pucpr.tcc.strata.analyzer.sourceanalysis;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.function.UnaryOperator;
 
 final class SimpleNameIndex {
 
@@ -29,10 +29,15 @@ final class SimpleNameIndex {
     return new SimpleNameIndex(types);
   }
 
-  UnaryOperator<String> scope(String ownPackage, Set<String> onDemandPackages) {
+  Scope scope(
+      String ownPackage, Set<String> onDemandPackages, Map<String, String> singleTypeImports) {
     Objects.requireNonNull(ownPackage, "ownPackage");
     final Set<String> imported = Set.copyOf(onDemandPackages);
-    return name -> canonicalize(name, ownPackage, imported);
+    final Map<String, String> single = Map.copyOf(singleTypeImports);
+    return (name, writtenSimple) ->
+        writtenSimple
+            ? canonicalizeSimple(name, ownPackage, imported, single)
+            : canonicalize(name, ownPackage, imported);
   }
 
   String canonicalize(String name, String ownPackage, Set<String> onDemandPackages) {
@@ -50,7 +55,32 @@ final class SimpleNameIndex {
         return resolveBare(rest, simple -> onlyOnDemand(simple, onDemandPackages)).orElse(name);
       }
     }
-    return name;
+    final int firstDot = name.indexOf('.');
+    return resolveBare(
+            name.substring(0, firstDot), simple -> inScope(simple, ownPackage, onDemandPackages))
+        .map(type -> type + "$" + name.substring(firstDot + 1).replace('.', '$'))
+        .orElse(name);
+  }
+
+  private String canonicalizeSimple(
+      String name,
+      String ownPackage,
+      Set<String> onDemandPackages,
+      Map<String, String> singleTypeImports) {
+    final int lastDot = name.lastIndexOf('.');
+    final String simpleName = name.substring(lastDot + 1);
+    final String imported = singleTypeImports.get(simpleName);
+    if (imported != null) {
+      return topLevelTypes.contains(imported)
+          ? imported
+          : canonicalize(name, ownPackage, onDemandPackages);
+    }
+    final boolean outsideOwnPackage = lastDot > 0 && !name.substring(0, lastDot).equals(ownPackage);
+    final String own = qualify(ownPackage, simpleName);
+    if (outsideOwnPackage && topLevelTypes.contains(own)) {
+      return own;
+    }
+    return canonicalize(name, ownPackage, onDemandPackages);
   }
 
   private static Optional<String> resolveBare(
@@ -86,7 +116,8 @@ final class SimpleNameIndex {
   }
 
   private Optional<String> longestInternalPrefix(String name) {
-    for (int end = name.length(); end > 0; end = name.lastIndexOf('.', end - 1)) {
+    final int firstDot = name.indexOf('.');
+    for (int end = name.length(); end > firstDot; end = name.lastIndexOf('.', end - 1)) {
       final String prefix = name.substring(0, end);
       if (topLevelTypes.contains(prefix)) {
         return Optional.of(prefix + name.substring(end).replace('.', '$'));
@@ -102,5 +133,11 @@ final class SimpleNameIndex {
 
   private static String qualify(String packageName, String simpleName) {
     return packageName.isEmpty() ? simpleName : packageName + "." + simpleName;
+  }
+
+  @FunctionalInterface
+  interface Scope {
+
+    String canonical(String name, boolean writtenSimple);
   }
 }

@@ -29,6 +29,7 @@ public final class CodeElementExtractor implements BatchVisitor {
 
   private final Set<CodeElementId> emittedPackages = new HashSet<>();
   private final Map<String, List<SourceIssue>> issuesByFile = new LinkedHashMap<>();
+  private final Set<DuplicatePair> reportedDuplicates = new HashSet<>();
   private final Set<String> filesWithTooLongIds = new HashSet<>();
   private SimpleNameIndex index = SimpleNameIndex.of(List.of());
   private List<String> fileOrder = List.of();
@@ -59,16 +60,13 @@ public final class CodeElementExtractor implements BatchVisitor {
     for (final SourceFile file : analysis.files()) {
       final String path = file.relativePath();
       final CodeElementId id = fileId(path);
-      if (id == null) {
-        continue;
-      }
       if (!id.fitsCeiling()) {
         tooLong(path);
         continue;
       }
       final String first = claimedFiles.putIfAbsent(id, path);
       if (first != null) {
-        issue(path, SourceIssue.duplicateElement(path, first));
+        duplicate(path, first);
         continue;
       }
       fileElements.add(fileElement(file, id));
@@ -122,7 +120,7 @@ public final class CodeElementExtractor implements BatchVisitor {
     }
     final String first = claimedTypes.putIfAbsent(type.id(), path);
     if (first != null) {
-      issue(path, SourceIssue.duplicateElement(path, first));
+      duplicate(path, first);
       return;
     }
     if (emittedPackages.add(type.packageId())) {
@@ -138,6 +136,12 @@ public final class CodeElementExtractor implements BatchVisitor {
     }
     for (final DeclaredType nested : declared.nested()) {
       collect(path, nested, unitPackages, collected);
+    }
+  }
+
+  private void duplicate(String path, String first) {
+    if (reportedDuplicates.add(new DuplicatePair(path, first))) {
+      issue(path, SourceIssue.duplicateElement(path, first));
     }
   }
 
@@ -201,4 +205,6 @@ public final class CodeElementExtractor implements BatchVisitor {
 
   private record Collected(
       List<PackageElement> packages, List<TypeElement> types, List<MethodElement> methods) {}
+
+  private record DuplicatePair(String filePath, String firstFilePath) {}
 }

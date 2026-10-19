@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootId;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -57,6 +58,8 @@ final class SimpleNameIndexTest {
   void umTipoDoPacotePadraoNaoEVisivelDeUmPacoteComNome() {
     assertThat(INDEX.canonicalize("Root", "x", Set.of())).isEqualTo("Root");
     assertThat(INDEX.canonicalize("Root", "", Set.of())).isEqualTo("Root");
+    assertThat(INDEX.canonicalize("Root.Inner", "x", Set.of())).isEqualTo("Root.Inner");
+    assertThat(INDEX.canonicalize("Root.Inner", "", Set.of())).isEqualTo("Root$Inner");
   }
 
   @Test
@@ -74,6 +77,20 @@ final class SimpleNameIndexTest {
   void umNomeComPontosGanhaDolarDepoisDoMaiorPrefixoInterno() {
     assertThat(INDEX.canonicalize("a.Api.Inner.Deep", "x", Set.of())).isEqualTo("a.Api$Inner$Deep");
     assertThat(INDEX.canonicalize("c.Other.Inner", "x", Set.of())).isEqualTo("c.Other$Inner");
+  }
+
+  @Test
+  void umNomeComPontosSemPrefixoInternoResolveOPrimeiroSegmentoComoNomeNu() {
+    assertThat(INDEX.canonicalize("Other.Inner", "x", Set.of("c"))).isEqualTo("c.Other$Inner");
+    assertThat(INDEX.canonicalize("Helper.Inner.Deep", "b", Set.of()))
+        .isEqualTo("b.Helper$Inner$Deep");
+    assertThat(INDEX.canonicalize("Api.Inner", "a", Set.of("c"))).isEqualTo("a.Api$Inner");
+  }
+
+  @Test
+  void umPrimeiroSegmentoAmbiguoOuSemTipoInternoFicaComoEsta() {
+    assertThat(INDEX.canonicalize("Api.Inner", "x", Set.of("a", "c"))).isEqualTo("Api.Inner");
+    assertThat(INDEX.canonicalize("Missing.Inner", "x", Set.of("c"))).isEqualTo("Missing.Inner");
   }
 
   @Test
@@ -104,8 +121,35 @@ final class SimpleNameIndexTest {
   }
 
   @Test
+  void umNomeEscritoSimplesCedeAoTipoDoProprioPacote() {
+    final SimpleNameIndex.Scope scope = INDEX.scope("b", Set.of("c"), Map.of());
+
+    assertThat(scope.canonical("java.lang.Helper", true)).isEqualTo("b.Helper");
+    assertThat(scope.canonical("c.Helper", true)).isEqualTo("b.Helper");
+    assertThat(scope.canonical("java.lang.Helper", false)).isEqualTo("java.lang.Helper");
+    assertThat(INDEX.scope("x", Set.of(), Map.of()).canonical("java.lang.Helper", true))
+        .isEqualTo("java.lang.Helper");
+  }
+
+  @Test
+  void umImportDeTipoUnicoVenceOProprioPacote() {
+    final SimpleNameIndex.Scope internal = INDEX.scope("a", Set.of(), Map.of("Api", "c.Api"));
+    final SimpleNameIndex.Scope external = INDEX.scope("a", Set.of(), Map.of("Api", "org.x.Api"));
+    final SimpleNameIndex.Scope nested = INDEX.scope("a", Set.of(), Map.of("Api", "c.Other.Api"));
+
+    assertThat(internal.canonical("java.lang.Api", true)).isEqualTo("c.Api");
+    assertThat(internal.canonical("c.Api", true)).isEqualTo("c.Api");
+    assertThat(external.canonical("org.x.Api", true)).isEqualTo("org.x.Api");
+    assertThat(external.canonical("java.lang.Api", true)).isEqualTo("java.lang.Api");
+    assertThat(nested.canonical("java.lang.Api", true)).isEqualTo("java.lang.Api");
+  }
+
+  @Test
   void oEscopoDeUmaUnidadeAplicaAMesmaRegra() {
-    assertThat(INDEX.scope("x", Set.of("c")).apply("Other")).isEqualTo("c.Other");
+    assertThat(INDEX.scope("x", Set.of("c"), Map.of()).canonical("Other", false))
+        .isEqualTo("c.Other");
+    assertThat(INDEX.scope("x", Set.of("c"), Map.of()).canonical("x.Other", true))
+        .isEqualTo("c.Other");
   }
 
   private static SourceFile analyzed(String path, String packageName, String... types) {

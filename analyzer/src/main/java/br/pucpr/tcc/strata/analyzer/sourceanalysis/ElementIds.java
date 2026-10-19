@@ -6,12 +6,16 @@ import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.SourceLines;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.TypeKind;
 import java.util.ArrayDeque;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 import spoon.experimental.CtUnresolvedImport;
 import spoon.reflect.code.CtLambda;
@@ -50,6 +54,8 @@ final class ElementIds {
   private static final String CONSTRUCTOR = "<init>";
   private static final String STATIC_INITIALIZER = "<clinit>";
   private static final String ON_DEMAND_SUFFIX = ".*";
+  private static final BinaryOperator<String> SMALLER =
+      BinaryOperator.minBy(Comparator.naturalOrder());
 
   private ElementIds() {}
 
@@ -84,34 +90,41 @@ final class ElementIds {
     };
   }
 
+  static String erase(CtTypeReference<?> reference, SimpleNameIndex.Scope scope) {
+    return erase(reference, scope, null);
+  }
+
   static String erase(CtTypeReference<?> reference, UnaryOperator<String> canonical) {
-    return erase(reference, canonical, null);
+    return erase(reference, (name, writtenSimple) -> canonical.apply(name), null);
   }
 
   private static String erase(
-      CtTypeReference<?> reference, UnaryOperator<String> canonical, Set<CtTypeParameter> seen) {
+      CtTypeReference<?> reference, SimpleNameIndex.Scope scope, Set<CtTypeParameter> seen) {
     return switch (reference) {
       case null -> OBJECT;
-      case CtArrayTypeReference<?> array -> erase(array.getComponentType(), canonical, seen) + "[]";
+      case CtArrayTypeReference<?> array -> erase(array.getComponentType(), scope, seen) + "[]";
       case CtIntersectionTypeReference<?> intersection ->
           intersection.getBounds().isEmpty()
               ? OBJECT
-              : erase(intersection.getBounds().getFirst(), canonical, seen);
+              : erase(intersection.getBounds().getFirst(), scope, seen);
       case CtWildcardReference _ -> OBJECT;
-      case CtTypeParameterReference variable -> eraseVariable(variable, canonical, seen);
+      case CtTypeParameterReference variable -> eraseVariable(variable, scope, seen);
       default -> {
         final String name = reference.getQualifiedName();
         yield hasLocalSegment(name)
             ? stripLeadingDigits(reference.getSimpleName())
-            : canonical.apply(name);
+            : scope.canonical(name, isWrittenSimple(reference));
       }
     };
   }
 
+  private static boolean isWrittenSimple(CtTypeReference<?> reference) {
+    final CtPackageReference completed = reference.getPackage();
+    return reference.getDeclaringType() == null && completed != null && completed.isImplicit();
+  }
+
   private static String eraseVariable(
-      CtTypeParameterReference variable,
-      UnaryOperator<String> canonical,
-      Set<CtTypeParameter> seen) {
+      CtTypeParameterReference variable, SimpleNameIndex.Scope scope, Set<CtTypeParameter> seen) {
     final CtTypeParameter declaration = variable.getDeclaration();
     if (declaration == null || declaration.getSuperclass() == null) {
       return OBJECT;
@@ -121,7 +134,7 @@ final class ElementIds {
     if (!path.add(declaration)) {
       return OBJECT;
     }
-    return erase(declaration.getSuperclass(), canonical, path);
+    return erase(declaration.getSuperclass(), scope, path);
   }
 
   private static boolean hasLocalSegment(String name) {
@@ -261,5 +274,21 @@ final class ElementIds {
       }
     }
     return packages;
+  }
+
+  static Map<String, String> singleTypeImports(CtCompilationUnit unit) {
+    final Map<String, String> imports = new HashMap<>();
+    for (final CtImport declaration : unit.getImports()) {
+      if (declaration instanceof CtUnresolvedImport unresolved) {
+        final String text = unresolved.getUnresolvedReference();
+        if (!unresolved.isStatic() && text != null && !text.endsWith(ON_DEMAND_SUFFIX)) {
+          imports.merge(text.substring(text.lastIndexOf('.') + 1), text, SMALLER);
+        }
+      } else if (declaration.getImportKind() == CtImportKind.TYPE
+          && declaration.getReference() instanceof CtTypeReference<?> imported) {
+        imports.merge(imported.getSimpleName(), imported.getQualifiedName(), SMALLER);
+      }
+    }
+    return imports;
   }
 }
