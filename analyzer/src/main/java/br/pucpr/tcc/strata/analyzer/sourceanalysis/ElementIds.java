@@ -41,6 +41,7 @@ import spoon.reflect.declaration.CtRecord;
 import spoon.reflect.declaration.CtType;
 import spoon.reflect.declaration.CtTypeParameter;
 import spoon.reflect.declaration.ModifierKind;
+import spoon.reflect.path.CtRole;
 import spoon.reflect.reference.CtArrayTypeReference;
 import spoon.reflect.reference.CtIntersectionTypeReference;
 import spoon.reflect.reference.CtPackageReference;
@@ -56,6 +57,15 @@ final class ElementIds {
   private static final String CONSTRUCTOR = "<init>";
   private static final String STATIC_INITIALIZER = "<clinit>";
   private static final String ON_DEMAND_SUFFIX = ".*";
+
+  private static final Set<CtRole> HEADER_ROLES =
+      EnumSet.of(
+          CtRole.SUPER_TYPE,
+          CtRole.INTERFACE,
+          CtRole.TYPE_PARAMETER,
+          CtRole.ANNOTATION,
+          CtRole.PERMITTED_TYPE);
+
   private static final BinaryOperator<String> SMALLER =
       BinaryOperator.minBy(Comparator.naturalOrder());
 
@@ -134,22 +144,83 @@ final class ElementIds {
               : erase(intersection.getBounds().getFirst(), scope, seen);
       case CtWildcardReference _ -> OBJECT;
       case CtTypeParameterReference variable -> eraseVariable(variable, scope, seen);
-      default -> {
-        final String name = reference.getQualifiedName();
-        yield hasLocalSegment(name)
-            ? stripLeadingDigits(reference.getSimpleName())
-            : scope.canonical(name, isWrittenSimple(reference));
-      }
+      default -> resolveLeaf(reference, scope).name();
     };
   }
 
   static SimpleNameIndex.NameContext context(CtElement element) {
-    throw new UnsupportedOperationException("ainda não implementado: ElementIds.context");
+    final CtType<?> owner = bodyOwner(element);
+    return owner == null ? SimpleNameIndex.NameContext.NONE : contextOf(owner);
+  }
+
+  static SimpleNameIndex.NameContext contextOf(CtType<?> start) {
+    final List<String> chain = new ArrayList<>();
+    final Map<String, List<SimpleNameIndex.WrittenName>> locals = new HashMap<>();
+    for (CtType<?> type = start; type != null; type = type.getParent(CtType.class)) {
+      if (isElementType(type)) {
+        chain.add(idName(type));
+      } else {
+        final String key = type.getQualifiedName();
+        chain.add(key);
+        locals.put(key, writtenSupertypes(type));
+      }
+    }
+    return chain.isEmpty()
+        ? SimpleNameIndex.NameContext.NONE
+        : new SimpleNameIndex.NameContext(chain, locals);
   }
 
   static SimpleNameIndex.NameResolution resolveLeaf(
       CtTypeReference<?> leaf, SimpleNameIndex.Scope scope) {
-    throw new UnsupportedOperationException("ainda não implementado: ElementIds.resolveLeaf");
+    final String name = leaf.getQualifiedName();
+    if (hasLocalSegment(name)) {
+      return new SimpleNameIndex.NameResolution(
+          stripLeadingDigits(leaf.getSimpleName()), SimpleNameIndex.Outcome.UNCHANGED_INCOMPLETE);
+    }
+    return scope.resolve(name, isWrittenSimple(leaf), scope.context(leaf));
+  }
+
+  static CtType<?> bodyOwner(CtElement element) {
+    if (element instanceof CtType<?> type && !(element instanceof CtTypeParameter)) {
+      return type;
+    }
+    CtElement child = element;
+    while (child.isParentInitialized()) {
+      final CtElement parent = child.getParent();
+      if (parent == null) {
+        return null;
+      }
+      if (parent instanceof CtType<?> type && !(parent instanceof CtTypeParameter)) {
+        return isHeader(child) ? type.getParent(CtType.class) : type;
+      }
+      child = parent;
+    }
+    return null;
+  }
+
+  private static boolean isHeader(CtElement child) {
+    final boolean candidate =
+        child instanceof CtTypeReference<?>
+            || child instanceof CtTypeParameter
+            || child instanceof CtAnnotation<?>;
+    return candidate && HEADER_ROLES.contains(child.getRoleInParent());
+  }
+
+  private static List<SimpleNameIndex.WrittenName> writtenSupertypes(CtType<?> type) {
+    final List<SimpleNameIndex.WrittenName> supertypes = new ArrayList<>();
+    final CtTypeReference<?> superclass = type.getSuperclass();
+    if (superclass != null) {
+      supertypes.add(written(superclass));
+    }
+    for (final CtTypeReference<?> superinterface : type.getSuperInterfaces()) {
+      supertypes.add(written(superinterface));
+    }
+    return supertypes;
+  }
+
+  private static SimpleNameIndex.WrittenName written(CtTypeReference<?> reference) {
+    return new SimpleNameIndex.WrittenName(
+        reference.getQualifiedName(), isWrittenSimple(reference));
   }
 
   static boolean isWrittenSimple(CtTypeReference<?> reference) {

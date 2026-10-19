@@ -109,7 +109,7 @@ public final class UnitCensusPass implements BatchVisitor {
   @Override
   public void visit(ModeledBatch batch) {
     final DependencyExtractor dependencies =
-        new DependencyExtractor(elements.index(), batchTopLevelTypes(batch));
+        new DependencyExtractor(batch.index(), batchTopLevelTypes(batch));
     batch.perCompilationUnit(
         (path, unit) -> {
           final long started = System.nanoTime();

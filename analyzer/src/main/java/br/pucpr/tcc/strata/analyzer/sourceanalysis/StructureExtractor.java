@@ -45,7 +45,7 @@ public final class StructureExtractor implements BatchVisitor {
   @Override
   public void visit(ModeledBatch batch) {
     final DependencyExtractor dependencies =
-        new DependencyExtractor(elements.index(), batchTopLevelTypes(batch));
+        new DependencyExtractor(batch.index(), batchTopLevelTypes(batch));
     final List<UnitFacts> units =
         batch.perCompilationUnit(
             (path, unit) ->

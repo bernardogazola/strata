@@ -23,6 +23,7 @@ public final class ModeledBatch {
   private final SourceRoot root;
   private final List<String> files;
   private final List<SourceFile> analysisFiles;
+  private final SimpleNameIndex index;
   private final Map<String, CtCompilationUnit> unitsByFile = new TreeMap<>();
   private final Set<String> extractionFailures = new TreeSet<>();
   private final BooleanSupplier cancelled;
@@ -36,9 +37,28 @@ public final class ModeledBatch {
       Path repositoryRoot,
       List<SourceFile> analysisFiles,
       BooleanSupplier cancelled) {
+    this(
+        root,
+        files,
+        factory,
+        repositoryRoot,
+        analysisFiles,
+        SimpleNameIndex.of(analysisFiles),
+        cancelled);
+  }
+
+  ModeledBatch(
+      SourceRoot root,
+      List<String> files,
+      Factory factory,
+      Path repositoryRoot,
+      List<SourceFile> analysisFiles,
+      SimpleNameIndex index,
+      BooleanSupplier cancelled) {
     this.root = Objects.requireNonNull(root, "root");
     this.files = List.copyOf(Objects.requireNonNull(files, "files"));
     this.analysisFiles = List.copyOf(Objects.requireNonNull(analysisFiles, "analysisFiles"));
+    this.index = Objects.requireNonNull(index, "index");
     this.cancelled = Objects.requireNonNull(cancelled, "cancelled");
     this.model = Objects.requireNonNull(factory, "factory").getModel();
     final Map<Path, String> byAbsolutePath = new HashMap<>();
@@ -104,7 +124,7 @@ public final class ModeledBatch {
   }
 
   SimpleNameIndex index() {
-    throw new UnsupportedOperationException("ainda não implementado: ModeledBatch.index");
+    return index;
   }
 
   Set<String> modeledFiles() {

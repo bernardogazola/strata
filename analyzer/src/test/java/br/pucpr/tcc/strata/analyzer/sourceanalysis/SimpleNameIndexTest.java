@@ -140,8 +140,8 @@ final class SimpleNameIndexTest {
     assertThat(internal.canonical("java.lang.Api", true)).isEqualTo("c.Api");
     assertThat(internal.canonical("c.Api", true)).isEqualTo("c.Api");
     assertThat(external.canonical("org.x.Api", true)).isEqualTo("org.x.Api");
-    assertThat(external.canonical("java.lang.Api", true)).isEqualTo("java.lang.Api");
-    assertThat(nested.canonical("java.lang.Api", true)).isEqualTo("java.lang.Api");
+    assertThat(external.canonical("java.lang.Api", true)).isEqualTo("org.x.Api");
+    assertThat(nested.canonical("java.lang.Api", true)).isEqualTo("c.Other$Api");
   }
 
   @Test
@@ -169,6 +169,33 @@ final class SimpleNameIndexTest {
         .isEqualTo("c.Other");
     assertThat(INDEX.scope("x", Set.of("c"), Map.of()).canonical("x.Other", true))
         .isEqualTo("c.Other");
+  }
+
+  @Test
+  void oNomeDeUmImportSaiDoMaiorPrefixoInternoOuDoPacoteDoJdk() {
+    assertThat(INDEX.importedTypeName("a.Api.Inner.Deep")).isEqualTo("a.Api$Inner$Deep");
+    assertThat(INDEX.importedTypeName("a.Api$Inner")).isEqualTo("a.Api$Inner");
+    assertThat(INDEX.importedTypeName("java.util.Map.Entry")).isEqualTo("java.util.Map$Entry");
+    assertThat(INDEX.importedTypeName("java.util.Map$Entry")).isEqualTo("java.util.Map$Entry");
+    assertThat(INDEX.importedTypeName("java.net.http.HttpClient.Version"))
+        .isEqualTo("java.net.http.HttpClient$Version");
+    assertThat(INDEX.importedTypeName("javax.servlet.http.HttpServlet"))
+        .as("javax.servlet não é do JDK")
+        .isEqualTo("javax.servlet.http.HttpServlet");
+    assertThat(INDEX.importedTypeName("org.x.Api.Inner")).isEqualTo("org.x.Api.Inner");
+  }
+
+  @Test
+  void umIndiceSoDeDeclaracoesNaoSabeOsMembros() {
+    assertThat(INDEX.hasMethod("a.Api", "run")).isEqualTo(SimpleNameIndex.MemberAnswer.UNKNOWN);
+    assertThat(INDEX.field("a.Api", "value").answer())
+        .isEqualTo(SimpleNameIndex.MemberAnswer.UNKNOWN);
+    assertThat(INDEX.memberType("a.Api", "Inner").answer())
+        .isEqualTo(SimpleNameIndex.MemberAnswer.UNKNOWN);
+    assertThat(INDEX.hasMethod("org.x.Missing", "run"))
+        .as("um tipo que o índice não tem")
+        .isEqualTo(SimpleNameIndex.MemberAnswer.UNKNOWN);
+    assertThat(INDEX.topLevelCandidates("Api", "x")).containsExactly("a.Api", "c.Api");
   }
 
   private static SourceFile analyzed(String path, String packageName, String... types) {

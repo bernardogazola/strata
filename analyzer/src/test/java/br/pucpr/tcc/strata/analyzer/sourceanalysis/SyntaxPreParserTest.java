@@ -4,14 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import br.pucpr.tcc.strata.analyzer.repository.TestRepositories;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SyntaxPreParser.PreParse;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.TypeKind;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.function.UnaryOperator;
 import org.eclipse.jdt.internal.compiler.CompilationResult;
 import org.eclipse.jdt.internal.compiler.DefaultErrorHandlingPolicies;
 import org.eclipse.jdt.internal.compiler.batch.CompilationUnit;
@@ -432,6 +435,201 @@ final class SyntaxPreParserTest {
     assertThat(preParse.declarations().topLevelTypes()).containsExactly("Mae", "Filha");
   }
 
+  @Test
+  void aFormaSeparaOsImportsPorEspecieComoEscritos() {
+    final UnitShape shape =
+        parse(
+                "p/Uso.java",
+                """
+                package p;
+
+                import a.b.Unico;
+                import a.b.Api.Interno;
+                import a.c.*;
+                import a.Api.*;
+                import static a.Util.metodo;
+                import static a.Util.*;
+
+                class Uso {}
+                """)
+            .shape();
+
+    assertThat(shape.packageName()).isEqualTo("p");
+    assertThat(shape.singleTypeImports()).containsExactly("a.b.Unico", "a.b.Api.Interno");
+    assertThat(shape.onDemandImports()).containsExactly("a.c", "a.Api");
+    assertThat(shape.singleStaticImports()).containsExactly("a.Util.metodo");
+    assertThat(shape.staticOnDemandImports()).containsExactly("a.Util");
+    assertThat(shape.moduleImport()).isFalse();
+  }
+
+  @Test
+  void umImportDeModuloMarcaAForma() {
+    final UnitShape shape =
+        parse("p/Modulo.java", "package p;\nimport module java.base;\nclass Modulo {}\n").shape();
+
+    assertThat(shape.moduleImport()).isTrue();
+    assertThat(shape.onDemandImports()).isEmpty();
+  }
+
+  @Test
+  void aFormaDeUmTipoTemEspecieVisibilidadeESupertiposComoEscritos() {
+    final UnitShape shape =
+        parse(
+                "p/Tipos.java",
+                """
+                package p;
+
+                public class Tipos<K, V extends Comparable<V>>
+                    extends java.util.AbstractMap<K, V> implements Map.Entry<K, V>, Cloneable {
+                  interface Membro {}
+                  enum Cor { VERMELHO }
+                  record Par(int a) {}
+                  @interface Marca {}
+                  class Interna {}
+                  private static class Escondida {}
+                  protected class Protegida {}
+                }
+                """)
+            .shape();
+    final UnitShape.TypeShape tipos = shape.types().getFirst();
+
+    assertThat(tipos.name()).isEqualTo("Tipos");
+    assertThat(tipos.kind()).isEqualTo(TypeKind.CLASS);
+    assertThat(MemberTable.visibility(tipos.modifiers())).isEqualTo(MemberTable.PUBLIC);
+    assertThat(tipos.typeParameters()).containsExactly("K", "V");
+    assertThat(tipos.superclass()).isEqualTo("java.util.AbstractMap");
+    assertThat(tipos.superInterfaces()).containsExactly("Map.Entry", "Cloneable");
+    assertThat(MemberTable.isStatic(member(tipos, "Membro").modifiers())).isTrue();
+    assertThat(member(tipos, "Membro").kind()).isEqualTo(TypeKind.INTERFACE);
+    assertThat(MemberTable.isStatic(member(tipos, "Cor").modifiers())).isTrue();
+    assertThat(member(tipos, "Cor").kind()).isEqualTo(TypeKind.ENUM);
+    assertThat(MemberTable.isStatic(member(tipos, "Par").modifiers())).isTrue();
+    assertThat(member(tipos, "Marca").kind()).isEqualTo(TypeKind.ANNOTATION);
+    assertThat(MemberTable.isStatic(member(tipos, "Interna").modifiers())).isFalse();
+    assertThat(MemberTable.visibility(member(tipos, "Interna").modifiers()))
+        .isEqualTo(MemberTable.PACKAGE);
+    assertThat(MemberTable.visibility(member(tipos, "Escondida").modifiers()))
+        .isEqualTo(MemberTable.PRIVATE);
+    assertThat(MemberTable.isStatic(member(tipos, "Escondida").modifiers())).isTrue();
+    assertThat(MemberTable.visibility(member(tipos, "Protegida").modifiers()))
+        .isEqualTo(MemberTable.PROTECTED);
+  }
+
+  @Test
+  void osMembrosDeUmTipoTemAsMarcasDasSobrecargas() {
+    final UnitShape.TypeShape tipo =
+        parse(
+                "p/Metodos.java",
+                """
+                package p;
+
+                class Metodos {
+                  private void sobrecarga(int a) {}
+                  public static void sobrecarga(String a) {}
+                  void pacote() {}
+                  protected int[] campo, outro[];
+                  static final String CONSTANTE = "x";
+                  Metodos() {}
+                  static {}
+                  { }
+                  void local() { class Local {} new Object() {}; }
+                }
+                """)
+            .shape()
+            .types()
+            .getFirst();
+
+    assertThat(namesOf(tipo.methods())).containsExactly("local", "pacote", "sobrecarga");
+    assertThat(tipo.memberTypes()).isEmpty();
+    final byte sobrecarga = flagsOf(tipo.methods(), "sobrecarga");
+    assertThat(MemberTable.visibility(sobrecarga)).isEqualTo(MemberTable.PUBLIC);
+    assertThat(sobrecarga & MemberTable.STATIC).isNotZero();
+    assertThat(sobrecarga & MemberTable.INSTANCE).isNotZero();
+    assertThat(MemberTable.visibility(flagsOf(tipo.methods(), "pacote")))
+        .isEqualTo(MemberTable.PACKAGE);
+    assertThat(namesOf(tipo.fields())).containsExactly("CONSTANTE", "campo", "outro");
+    assertThat(tipo.fieldTypes()).containsExactly("String", "int[]", "int[][]");
+    assertThat(MemberTable.isStatic(flagsOf(tipo.fields(), "CONSTANTE"))).isTrue();
+    assertThat(MemberTable.visibility(flagsOf(tipo.fields(), "campo")))
+        .isEqualTo(MemberTable.PROTECTED);
+  }
+
+  @Test
+  void osMembrosImplicitosDeInterfaceEnumERecordEntramNaForma() {
+    final UnitShape shape =
+        parse(
+                "p/Implicitos.java",
+                """
+                package p;
+
+                interface Contrato {
+                  int LIMITE = 1;
+                  void abstrato();
+                  static void utilidade() {}
+                  private void ajuda() {}
+                  class Aninhada {}
+                }
+
+                enum Estado { LIGADO, DESLIGADO; void alterna() {} }
+
+                record Ponto(int x, java.util.List<String> nomes) {}
+                """)
+            .shape();
+    final UnitShape.TypeShape contrato = shape.types().get(0);
+    final UnitShape.TypeShape estado = shape.types().get(1);
+    final UnitShape.TypeShape ponto = shape.types().get(2);
+
+    assertThat(MemberTable.visibility(flagsOf(contrato.fields(), "LIMITE")))
+        .isEqualTo(MemberTable.PUBLIC);
+    assertThat(MemberTable.isStatic(flagsOf(contrato.fields(), "LIMITE"))).isTrue();
+    assertThat(MemberTable.visibility(flagsOf(contrato.methods(), "abstrato")))
+        .isEqualTo(MemberTable.PUBLIC);
+    assertThat(flagsOf(contrato.methods(), "utilidade") & MemberTable.INSTANCE).isZero();
+    assertThat(MemberTable.visibility(flagsOf(contrato.methods(), "ajuda")))
+        .isEqualTo(MemberTable.PRIVATE);
+    assertThat(MemberTable.visibility(member(contrato, "Aninhada").modifiers()))
+        .isEqualTo(MemberTable.PUBLIC);
+    assertThat(MemberTable.isStatic(member(contrato, "Aninhada").modifiers())).isTrue();
+    assertThat(namesOf(estado.methods())).containsExactly("alterna", "valueOf", "values");
+    assertThat(namesOf(estado.fields())).containsExactly("DESLIGADO", "LIGADO");
+    assertThat(estado.fieldTypes()).containsExactly("Estado", "Estado");
+    assertThat(MemberTable.isStatic(flagsOf(estado.fields(), "LIGADO"))).isTrue();
+    assertThat(namesOf(ponto.fields())).containsExactly("nomes", "x");
+    assertThat(ponto.fieldTypes()).containsExactly("java.util.List", "int");
+    assertThat(MemberTable.visibility(flagsOf(ponto.methods(), "x"))).isEqualTo(MemberTable.PUBLIC);
+    assertThat(ponto.kind()).isEqualTo(TypeKind.RECORD);
+  }
+
+  @Test
+  void oPackageInfoNaoTemTipoNaForma() {
+    final PreParse preParse = parse("p/package-info.java", "@Deprecated\npackage p;\n");
+
+    assertThat(preParse.shape().types()).isEmpty();
+    assertThat(preParse.shape().packageName()).isEqualTo("p");
+  }
+
+  @Test
+  void oInternadorDaExecucaoFazOMesmoTextoUmaStringSo() {
+    final Map<String, String> interned = new HashMap<>();
+    final UnaryOperator<String> interner =
+        text -> {
+          final String known = interned.putIfAbsent(text, text);
+          return known == null ? text : known;
+        };
+
+    final UnitShape one =
+        SyntaxPreParser.parse(
+                "p/A.java", "package p;\nimport q.Comum;\nclass A {}\n".toCharArray(), interner)
+            .shape();
+    final UnitShape other =
+        SyntaxPreParser.parse(
+                "p/B.java", "package p;\nimport q.Comum;\nclass B {}\n".toCharArray(), interner)
+            .shape();
+
+    assertThat(one.singleTypeImports().getFirst()).isSameAs(other.singleTypeImports().getFirst());
+    assertThat(one.packageName()).isSameAs(other.packageName());
+  }
+
   private static PreParse parse(String fileName, String source) {
     return SyntaxPreParser.parse(fileName, source.toCharArray());
   }
@@ -439,7 +637,29 @@ final class SyntaxPreParserTest {
   private static void assertSyntaxError(PreParse preParse) {
     assertThat(preParse.syntaxError()).isTrue();
     assertThat(preParse.declarations()).isNull();
+    assertThat(preParse.shape()).isNull();
     assertThat(preParse.empty()).isFalse();
+  }
+
+  private static UnitShape.TypeShape member(UnitShape.TypeShape type, String name) {
+    return type.memberTypes().stream()
+        .filter(member -> member.name().equals(name))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private static byte flagsOf(MemberTable table, String name) {
+    final int at = table.find(name);
+    assertThat(at).as(name).isNotNegative();
+    return table.flags(at);
+  }
+
+  private static List<String> namesOf(MemberTable table) {
+    final List<String> names = new ArrayList<>();
+    for (int at = 0; at < table.size(); at++) {
+      names.add(table.name(at));
+    }
+    return names;
   }
 
   private static void assertEmpty(PreParse preParse) {
