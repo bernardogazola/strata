@@ -1,0 +1,4832 @@
+{
+  "schema": 1,
+  "measuredAt": "2026-10-19T13:15:01Z",
+  "baseCommit": "2fabc3f",
+  "measure": "The analysis pipeline, wired by hand: RepositoryValidator, the selected roots in MAIN, GENERATED, TEST order, a fresh cache, one RUNNING analysis, then SpoonModelBuilder.analyze with a StructureExtractor over an ElementWriter; every row is read back from code_element, dependency, dependency_evidence, module_dependency, source_file and source_root after end(), edges are DependencyAggregator.aggregate over the rows read back, and the writes are observed by a StructureSink that wraps the ElementWriter and reads each table's max(id) after every accept. A second, untimed pass over the same batches times the two per-unit functions and counts the excluded constructs",
+  "settings": {
+    "spoonVersion": "11.5.0",
+    "maxElementIdBytes": 4096,
+    "elementFlushRows": 32768,
+    "rowsPerInsert": 500,
+    "dependencyEvidenceCap": 20,
+    "maxModelSourceBytes": 16777216,
+    "rootOrder": "MAIN, GENERATED, TEST",
+    "selections": {
+      "DEFAULT": "MAIN and GENERATED, no TEST: the analysis default and spoon-corpus.json's population",
+      "ALL": "every detected root"
+    },
+    "baseline": {
+      "file": "benchmarks/element-extraction.json",
+      "measuredAt": "2026-10-19T03:53:49Z",
+      "baseCommit": "fb12a9a"
+    }
+  },
+  "environment": {
+    "os": "Mac OS X 27.0.1",
+    "arch": "aarch64",
+    "cpu": "Apple M4 Pro",
+    "logicalCores": 14,
+    "ramBytes": 25769803776,
+    "storage": "APPLE SSD AP1024Z internal NVMe SSD",
+    "runtime": "full JDK under Maven Surefire, not the jlink image the application ships",
+    "jvm": "Eclipse Adoptium 25.0.4.1+1-LTS",
+    "jvmFlags": ["-Xmx2g", "-Xss2m", "-XX:-HeapDumpOnOutOfMemoryError"],
+    "maxHeapBytes": 2147483648,
+    "garbageCollectors": [
+      "G1 Young Generation",
+      "G1 Concurrent GC",
+      "G1 Old Generation"
+    ]
+  },
+  "repositories": [
+    {
+      "name": "commons-lang",
+      "origin": "clone",
+      "commitId": "598dfc163b8b410fb3bb8794521206ec8dcec82a",
+      "sourceRoots": {
+        "MAIN": 1,
+        "GENERATED": 0,
+        "TEST": 1
+      },
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "roots": {
+            "MAIN": 1,
+            "GENERATED": 0,
+            "TEST": 0
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 259,
+            "analyzed": 259,
+            "tooLarge": 0,
+            "parseFailed": 0,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 0,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 18,
+            "types": 364,
+            "methods": 4383,
+            "files": 259,
+            "externalTypes": 251,
+            "sourceFiles": 259,
+            "sourceRoots": 1,
+            "sourceFileStatuses": {
+              "ANALYZED": 259,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 0
+            }
+          },
+          "dependencies": {
+            "rows": 5365,
+            "occurrences": 19007,
+            "rowsByType": {
+              "IMPORTS": 1097,
+              "EXTENDS": 110,
+              "IMPLEMENTS": 105,
+              "CALLS": 1818,
+              "FIELD_TYPE": 390,
+              "PARAMETER_TYPE": 840,
+              "RETURN_TYPE": 582,
+              "ANNOTATION_REFERENCE": 423
+            },
+            "occurrencesByType": {
+              "IMPORTS": 1097,
+              "EXTENDS": 110,
+              "IMPLEMENTS": 105,
+              "CALLS": 10106,
+              "FIELD_TYPE": 880,
+              "PARAMETER_TYPE": 3470,
+              "RETURN_TYPE": 2104,
+              "ANNOTATION_REFERENCE": 1135
+            },
+            "selfRows": 414,
+            "selfOccurrences": 4285,
+            "rowsToExternal": 3774,
+            "occurrencesToExternal": 12219,
+            "resolutionPairs": {
+              "RESOLVED,0": 1591,
+              "INFERRED,0": 0,
+              "UNRESOLVED_EXTERNAL,0": 0,
+              "RESOLVED,1": 3774,
+              "INFERRED,1": 0,
+              "UNRESOLVED_EXTERNAL,1": 0
+            },
+            "occurrencesPerRow": {
+              "p50": 1,
+              "p90": 6,
+              "p99": 40,
+              "max": 513,
+              "mean": 3.54
+            },
+            "largestRow": {
+              "source": "type:org.apache.commons.lang3.ArrayUtils",
+              "target": "type:org.apache.commons.lang3.ArrayUtils",
+              "type": "CALLS",
+              "occurrences": 513
+            }
+          },
+          "evidence": {
+            "rows": 14546,
+            "rowsAtCap": 139,
+            "uncapped": 19007,
+            "trimmedPercent": 23.47,
+            "withFromMethod": 11987,
+            "withoutLine": 0,
+            "byResolution": {
+              "RESOLVED": 14546,
+              "INFERRED": 0,
+              "UNRESOLVED_EXTERNAL": 0
+            }
+          },
+          "modules": {
+            "rows": 0,
+            "files": 0,
+            "declaringModules": 0,
+            "transitive": 0,
+            "isStatic": 0,
+            "withoutLine": 0
+          },
+          "edges": {
+            "edges": 3151,
+            "selfEdges": 235,
+            "toInternal": 723,
+            "toExternal": 2193,
+            "byResolution": {
+              "RESOLVED": 3151,
+              "INFERRED": 0,
+              "UNRESOLVED_EXTERNAL": 0
+            },
+            "byDistinctTypeCount": {
+              "1": 1636,
+              "2": 1013,
+              "3": 329,
+              "4": 151,
+              "5": 20,
+              "6": 2,
+              "7": 0,
+              "8": 0
+            },
+            "occurrenceTotal": 19007,
+            "weightTotal": 33622
+          },
+          "checks": {
+            "foreignKeyViolations": 0,
+            "danglingEndpoints": 0,
+            "sourcesNotInternalTypes": 0,
+            "targetsNotTypes": 0,
+            "moduleDependencyInDependency": 0,
+            "invalidResolutionPairs": 0,
+            "evidenceCountMismatches": 0,
+            "evidenceFileMismatches": 0,
+            "fromMethodOwnerMismatches": 0,
+            "evidenceWeakerThanRow": 0,
+            "toMethodsWritten": 0,
+            "weightMismatches": 0,
+            "externalRowsMalformed": 0,
+            "externalsWithoutDependency": 0,
+            "edgeTotalsMatchRows": true,
+            "baselineDifferences": [],
+            "flushRuleReproduced": true,
+            "elementOnlyAccepts": 0,
+            "writtenEqualsReadBack": true,
+            "censusPassSameOutcomes": true
+          },
+          "drops": {
+            "extractionByReason": {
+              "LOCAL_TARGET": 0,
+              "INVALID_NAME": 63,
+              "ID_TOO_LONG": 0,
+              "DEFAULT_PACKAGE_COLLISION": 0,
+              "CALL_WITHOUT_TARGET": 0
+            },
+            "extractionTotal": 63,
+            "unresolvedDeclaredTarget": 0,
+            "pendingPeakRows": 0
+          },
+          "extractionIssues": {
+            "SOURCE_PARSE_FAILED": 0,
+            "SOURCE_FILE_TOO_LARGE": 0,
+            "SOURCE_DUPLICATE_ELEMENT": 0,
+            "SOURCE_ELEMENT_ID_TOO_LONG": 0
+          },
+          "write": {
+            "beginMillis": 4,
+            "acceptCalls": 1,
+            "flushes": [],
+            "bufferingMillis": 0,
+            "end": {
+              "batches": 1,
+              "rows": 24676,
+              "elementRows": 4765,
+              "dependencyRows": 5365,
+              "evidenceRows": 14546,
+              "moduleRows": 0,
+              "fileElements": 259,
+              "millis": 94,
+              "externalRowsWritten": 251,
+              "dependencyRowsWritten": 5365,
+              "evidenceRowsWritten": 14546,
+              "moduleRowsWritten": 0,
+              "pendingAfter": 0,
+              "walBytes": 5042912
+            },
+            "sinkMillis": 98,
+            "walPeakBytes": 5042912,
+            "probeMillis": 1
+          },
+          "timing": {
+            "wallMillis": 2018,
+            "preParseMillis": 330,
+            "buildMillis": 1276,
+            "visitMillis": 283,
+            "extractionMillis": 278
+          },
+          "unitFunctions": {
+            "units": 259,
+            "elementMillis": 63,
+            "dependencyMillis": 153,
+            "totalMillis": 216,
+            "longestUnit": {
+              "path": "src/main/java/org/apache/commons/lang3/ArrayUtils.java",
+              "totalMicros": 18686,
+              "elementMicros": 6538,
+              "dependencyMicros": 12147
+            },
+            "slowestUnits": [
+              {
+                "path": "src/main/java/org/apache/commons/lang3/ArrayUtils.java",
+                "totalMicros": 18686,
+                "elementMicros": 6538,
+                "dependencyMicros": 12147
+              },
+              {
+                "path": "src/main/java/org/apache/commons/lang3/StringUtils.java",
+                "totalMicros": 12674,
+                "elementMicros": 3269,
+                "dependencyMicros": 9405
+              },
+              {
+                "path": "src/main/java/org/apache/commons/lang3/text/StrBuilder.java",
+                "totalMicros": 8048,
+                "elementMicros": 2567,
+                "dependencyMicros": 5480
+              },
+              {
+                "path": "src/main/java/org/apache/commons/lang3/builder/ToStringStyle.java",
+                "totalMicros": 7565,
+                "elementMicros": 1569,
+                "dependencyMicros": 5996
+              },
+              {
+                "path": "src/main/java/org/apache/commons/lang3/SystemProperties.java",
+                "totalMicros": 6366,
+                "elementMicros": 1768,
+                "dependencyMicros": 4597
+              }
+            ],
+            "censusWallMillis": 896
+          },
+          "models": {
+            "batches": 1,
+            "splitBatches": 0,
+            "quarantinedBatches": 0,
+            "builds": 1
+          },
+          "heap": {
+            "peakLiveBytes": 120311944,
+            "peakUsedBytes": 250182144,
+            "baselinePeakLiveBytes": 117771256,
+            "baselinePeakUsedBytes": 241110712
+          },
+          "cacheBytes": 4907008,
+          "baselineCacheBytes": 3166208,
+          "excludedConstructs": {
+            "basePairs": 2916,
+            "baseInternalPairs": 723,
+            "constructs": {
+              "METHOD_REFERENCE": {
+                "sites": 108,
+                "withoutTarget": 10,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 98,
+                "selfOccurrences": 9,
+                "pairs": 64,
+                "pairsAdded": 6,
+                "pairsAddedInternal": 1,
+                "addedInternalPercent": 0.14
+              },
+              "STATIC_FIELD": {
+                "sites": 2030,
+                "withoutTarget": 0,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 2030,
+                "selfOccurrences": 1068,
+                "pairs": 220,
+                "pairsAdded": 71,
+                "pairsAddedInternal": 28,
+                "addedInternalPercent": 3.87
+              },
+              "CLASS_LITERAL": {
+                "sites": 64,
+                "withoutTarget": 0,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 64,
+                "selfOccurrences": 7,
+                "pairs": 44,
+                "pairsAdded": 15,
+                "pairsAddedInternal": 5,
+                "addedInternalPercent": 0.69
+              }
+            },
+            "union": {
+              "pairsAdded": 84,
+              "pairsAddedInternal": 34,
+              "addedInternalPercent": 4.7
+            },
+            "staticFieldWrites": 6,
+            "scanDrops": {},
+            "scanCrashes": 0,
+            "scanMillis": 38
+          }
+        },
+        {
+          "selection": "ALL",
+          "roots": {
+            "MAIN": 1,
+            "GENERATED": 0,
+            "TEST": 1
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 527,
+            "analyzed": 527,
+            "tooLarge": 0,
+            "parseFailed": 0,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 0,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 20,
+            "types": 958,
+            "methods": 10555,
+            "files": 527,
+            "externalTypes": 375,
+            "sourceFiles": 527,
+            "sourceRoots": 2,
+            "sourceFileStatuses": {
+              "ANALYZED": 527,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 0
+            }
+          },
+          "dependencies": {
+            "rows": 12064,
+            "occurrences": 94835,
+            "rowsByType": {
+              "IMPORTS": 2949,
+              "EXTENDS": 409,
+              "IMPLEMENTS": 155,
+              "CALLS": 4481,
+              "FIELD_TYPE": 767,
+              "PARAMETER_TYPE": 1240,
+              "RETURN_TYPE": 834,
+              "ANNOTATION_REFERENCE": 1229
+            },
+            "occurrencesByType": {
+              "IMPORTS": 3537,
+              "EXTENDS": 409,
+              "IMPLEMENTS": 155,
+              "CALLS": 75459,
+              "FIELD_TYPE": 1540,
+              "PARAMETER_TYPE": 4539,
+              "RETURN_TYPE": 2612,
+              "ANNOTATION_REFERENCE": 6584
+            },
+            "selfRows": 562,
+            "selfOccurrences": 6738,
+            "rowsToExternal": 8466,
+            "occurrencesToExternal": 54612,
+            "resolutionPairs": {
+              "RESOLVED,0": 2767,
+              "INFERRED,0": 831,
+              "UNRESOLVED_EXTERNAL,0": 0,
+              "RESOLVED,1": 6879,
+              "INFERRED,1": 0,
+              "UNRESOLVED_EXTERNAL,1": 1587
+            },
+            "occurrencesPerRow": {
+              "p50": 1,
+              "p90": 9,
+              "p99": 120,
+              "max": 3370,
+              "mean": 7.86
+            },
+            "largestRow": {
+              "source": "type:org.apache.commons.lang3.ArrayUtilsTest",
+              "target": "type:org.junit.jupiter.api.Assertions",
+              "type": "CALLS",
+              "occurrences": 3370
+            }
+          },
+          "evidence": {
+            "rows": 39870,
+            "rowsAtCap": 621,
+            "uncapped": 94835,
+            "trimmedPercent": 57.96,
+            "withFromMethod": 33484,
+            "withoutLine": 0,
+            "byResolution": {
+              "RESOLVED": 26953,
+              "INFERRED": 5021,
+              "UNRESOLVED_EXTERNAL": 7896
+            }
+          },
+          "modules": {
+            "rows": 0,
+            "files": 0,
+            "declaringModules": 0,
+            "transitive": 0,
+            "isStatic": 0,
+            "withoutLine": 0
+          },
+          "edges": {
+            "edges": 7661,
+            "selfEdges": 372,
+            "toInternal": 2095,
+            "toExternal": 5194,
+            "byResolution": {
+              "RESOLVED": 6059,
+              "INFERRED": 665,
+              "UNRESOLVED_EXTERNAL": 937
+            },
+            "byDistinctTypeCount": {
+              "1": 4221,
+              "2": 2716,
+              "3": 511,
+              "4": 189,
+              "5": 22,
+              "6": 2,
+              "7": 0,
+              "8": 0
+            },
+            "occurrenceTotal": 94835,
+            "weightTotal": 177678
+          },
+          "checks": {
+            "foreignKeyViolations": 0,
+            "danglingEndpoints": 0,
+            "sourcesNotInternalTypes": 0,
+            "targetsNotTypes": 0,
+            "moduleDependencyInDependency": 0,
+            "invalidResolutionPairs": 0,
+            "evidenceCountMismatches": 0,
+            "evidenceFileMismatches": 0,
+            "fromMethodOwnerMismatches": 0,
+            "evidenceWeakerThanRow": 0,
+            "toMethodsWritten": 0,
+            "weightMismatches": 0,
+            "externalRowsMalformed": 0,
+            "externalsWithoutDependency": 0,
+            "edgeTotalsMatchRows": true,
+            "baselineDifferences": [],
+            "flushRuleReproduced": true,
+            "elementOnlyAccepts": 0,
+            "writtenEqualsReadBack": true,
+            "censusPassSameOutcomes": true
+          },
+          "drops": {
+            "extractionByReason": {
+              "LOCAL_TARGET": 6,
+              "INVALID_NAME": 491,
+              "ID_TOO_LONG": 0,
+              "DEFAULT_PACKAGE_COLLISION": 0,
+              "CALL_WITHOUT_TARGET": 2819
+            },
+            "extractionTotal": 3316,
+            "unresolvedDeclaredTarget": 11,
+            "pendingPeakRows": 11
+          },
+          "extractionIssues": {
+            "SOURCE_PARSE_FAILED": 0,
+            "SOURCE_FILE_TOO_LARGE": 0,
+            "SOURCE_DUPLICATE_ELEMENT": 0,
+            "SOURCE_ELEMENT_ID_TOO_LONG": 0
+          },
+          "write": {
+            "beginMillis": 1,
+            "acceptCalls": 2,
+            "flushes": [
+              {
+                "batches": 2,
+                "rows": 63497,
+                "elementRows": 11533,
+                "dependencyRows": 12075,
+                "evidenceRows": 39889,
+                "moduleRows": 0,
+                "millis": 196,
+                "externalRowsWritten": 375,
+                "dependencyRowsWritten": 12064,
+                "evidenceRowsWritten": 39870,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 11,
+                "walBytes": 11762632
+              }
+            ],
+            "bufferingMillis": 0,
+            "end": {
+              "batches": 0,
+              "rows": 0,
+              "elementRows": 0,
+              "dependencyRows": 0,
+              "evidenceRows": 0,
+              "moduleRows": 0,
+              "fileElements": 527,
+              "millis": 5,
+              "externalRowsWritten": 0,
+              "dependencyRowsWritten": 0,
+              "evidenceRowsWritten": 0,
+              "moduleRowsWritten": 0,
+              "pendingAfter": 11,
+              "walBytes": 11762632
+            },
+            "sinkMillis": 203,
+            "walPeakBytes": 11762632,
+            "probeMillis": 1
+          },
+          "timing": {
+            "wallMillis": 12673,
+            "preParseMillis": 156,
+            "buildMillis": 11495,
+            "visitMillis": 983,
+            "extractionMillis": 784
+          },
+          "unitFunctions": {
+            "units": 527,
+            "elementMillis": 185,
+            "dependencyMillis": 548,
+            "totalMillis": 734,
+            "longestUnit": {
+              "path": "src/test/java/org/apache/commons/lang3/ArrayUtilsTest.java",
+              "totalMicros": 47202,
+              "elementMicros": 11144,
+              "dependencyMicros": 36057
+            },
+            "slowestUnits": [
+              {
+                "path": "src/test/java/org/apache/commons/lang3/ArrayUtilsTest.java",
+                "totalMicros": 47202,
+                "elementMicros": 11144,
+                "dependencyMicros": 36057
+              },
+              {
+                "path": "src/test/java/org/apache/commons/lang3/StringUtilsTest.java",
+                "totalMicros": 21038,
+                "elementMicros": 4812,
+                "dependencyMicros": 16225
+              },
+              {
+                "path": "src/test/java/org/apache/commons/lang3/ValidateTest.java",
+                "totalMicros": 20097,
+                "elementMicros": 4613,
+                "dependencyMicros": 15484
+              },
+              {
+                "path": "src/test/java/org/apache/commons/lang3/SystemUtilsTest.java",
+                "totalMicros": 17658,
+                "elementMicros": 2971,
+                "dependencyMicros": 14686
+              },
+              {
+                "path": "src/main/java/org/apache/commons/lang3/ArrayUtils.java",
+                "totalMicros": 16350,
+                "elementMicros": 4289,
+                "dependencyMicros": 12061
+              }
+            ],
+            "censusWallMillis": 12326
+          },
+          "models": {
+            "batches": 2,
+            "splitBatches": 0,
+            "quarantinedBatches": 0,
+            "builds": 2
+          },
+          "heap": {
+            "peakLiveBytes": 299075208,
+            "peakUsedBytes": 608427544,
+            "baselinePeakLiveBytes": 250390944,
+            "baselinePeakUsedBytes": 577106352
+          },
+          "cacheBytes": 11878400,
+          "baselineCacheBytes": 7344128,
+          "excludedConstructs": {
+            "basePairs": 7289,
+            "baseInternalPairs": 2095,
+            "constructs": {
+              "METHOD_REFERENCE": {
+                "sites": 741,
+                "withoutTarget": 384,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 357,
+                "selfOccurrences": 21,
+                "pairs": 128,
+                "pairsAdded": 14,
+                "pairsAddedInternal": 4,
+                "addedInternalPercent": 0.19
+              },
+              "STATIC_FIELD": {
+                "sites": 10568,
+                "withoutTarget": 0,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 10568,
+                "selfOccurrences": 3411,
+                "pairs": 644,
+                "pairsAdded": 222,
+                "pairsAddedInternal": 97,
+                "addedInternalPercent": 4.63
+              },
+              "CLASS_LITERAL": {
+                "sites": 3153,
+                "withoutTarget": 247,
+                "droppedTarget": 26,
+                "outsideSurvivingSource": 0,
+                "occurrences": 2880,
+                "selfOccurrences": 41,
+                "pairs": 479,
+                "pairsAdded": 201,
+                "pairsAddedInternal": 67,
+                "addedInternalPercent": 3.2
+              }
+            },
+            "union": {
+              "pairsAdded": 402,
+              "pairsAddedInternal": 160,
+              "addedInternalPercent": 7.64
+            },
+            "staticFieldWrites": 40,
+            "scanDrops": {
+              "LOCAL_TARGET": 26
+            },
+            "scanCrashes": 0,
+            "scanMillis": 137
+          }
+        }
+      ]
+    },
+    {
+      "name": "broken-tree",
+      "origin": "derived",
+      "commitId": "961b02c3ce73d09e98efd9817e9639883c1e0dec",
+      "derivedFrom": "commons-lang",
+      "sourceRoots": {
+        "MAIN": 1,
+        "GENERATED": 0,
+        "TEST": 1
+      },
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "roots": {
+            "MAIN": 1,
+            "GENERATED": 0,
+            "TEST": 0
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 260,
+            "analyzed": 257,
+            "tooLarge": 0,
+            "parseFailed": 3,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 3,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 0,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 18,
+            "types": 362,
+            "methods": 4340,
+            "files": 260,
+            "externalTypes": 252,
+            "sourceFiles": 260,
+            "sourceRoots": 1,
+            "sourceFileStatuses": {
+              "ANALYZED": 257,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 3
+            }
+          },
+          "dependencies": {
+            "rows": 5293,
+            "occurrences": 18735,
+            "rowsByType": {
+              "IMPORTS": 1083,
+              "EXTENDS": 110,
+              "IMPLEMENTS": 104,
+              "CALLS": 1779,
+              "FIELD_TYPE": 389,
+              "PARAMETER_TYPE": 829,
+              "RETURN_TYPE": 579,
+              "ANNOTATION_REFERENCE": 420
+            },
+            "occurrencesByType": {
+              "IMPORTS": 1083,
+              "EXTENDS": 110,
+              "IMPLEMENTS": 104,
+              "CALLS": 9932,
+              "FIELD_TYPE": 879,
+              "PARAMETER_TYPE": 3416,
+              "RETURN_TYPE": 2080,
+              "ANNOTATION_REFERENCE": 1131
+            },
+            "selfRows": 410,
+            "selfOccurrences": 4212,
+            "rowsToExternal": 3727,
+            "occurrencesToExternal": 12054,
+            "resolutionPairs": {
+              "RESOLVED,0": 1566,
+              "INFERRED,0": 0,
+              "UNRESOLVED_EXTERNAL,0": 0,
+              "RESOLVED,1": 3723,
+              "INFERRED,1": 0,
+              "UNRESOLVED_EXTERNAL,1": 4
+            },
+            "occurrencesPerRow": {
+              "p50": 1,
+              "p90": 6,
+              "p99": 40,
+              "max": 513,
+              "mean": 3.54
+            },
+            "largestRow": {
+              "source": "type:org.apache.commons.lang3.ArrayUtils",
+              "target": "type:org.apache.commons.lang3.ArrayUtils",
+              "type": "CALLS",
+              "occurrences": 513
+            }
+          },
+          "evidence": {
+            "rows": 14301,
+            "rowsAtCap": 134,
+            "uncapped": 18735,
+            "trimmedPercent": 23.67,
+            "withFromMethod": 11769,
+            "withoutLine": 0,
+            "byResolution": {
+              "RESOLVED": 14295,
+              "INFERRED": 0,
+              "UNRESOLVED_EXTERNAL": 6
+            }
+          },
+          "modules": {
+            "rows": 0,
+            "files": 0,
+            "declaringModules": 0,
+            "transitive": 0,
+            "isStatic": 0,
+            "withoutLine": 0
+          },
+          "edges": {
+            "edges": 3106,
+            "selfEdges": 233,
+            "toInternal": 710,
+            "toExternal": 2163,
+            "byResolution": {
+              "RESOLVED": 3104,
+              "INFERRED": 0,
+              "UNRESOLVED_EXTERNAL": 2
+            },
+            "byDistinctTypeCount": {
+              "1": 1613,
+              "2": 996,
+              "3": 324,
+              "4": 151,
+              "5": 20,
+              "6": 2,
+              "7": 0,
+              "8": 0
+            },
+            "occurrenceTotal": 18735,
+            "weightTotal": 33147
+          },
+          "checks": {
+            "foreignKeyViolations": 0,
+            "danglingEndpoints": 0,
+            "sourcesNotInternalTypes": 0,
+            "targetsNotTypes": 0,
+            "moduleDependencyInDependency": 0,
+            "invalidResolutionPairs": 0,
+            "evidenceCountMismatches": 0,
+            "evidenceFileMismatches": 0,
+            "fromMethodOwnerMismatches": 0,
+            "evidenceWeakerThanRow": 0,
+            "toMethodsWritten": 0,
+            "weightMismatches": 0,
+            "externalRowsMalformed": 0,
+            "externalsWithoutDependency": 0,
+            "edgeTotalsMatchRows": true,
+            "baselineDifferences": [],
+            "flushRuleReproduced": true,
+            "elementOnlyAccepts": 0,
+            "writtenEqualsReadBack": true,
+            "censusPassSameOutcomes": true
+          },
+          "drops": {
+            "extractionByReason": {
+              "LOCAL_TARGET": 0,
+              "INVALID_NAME": 63,
+              "ID_TOO_LONG": 0,
+              "DEFAULT_PACKAGE_COLLISION": 0,
+              "CALL_WITHOUT_TARGET": 5
+            },
+            "extractionTotal": 68,
+            "unresolvedDeclaredTarget": 0,
+            "pendingPeakRows": 0
+          },
+          "extractionIssues": {
+            "SOURCE_PARSE_FAILED": 0,
+            "SOURCE_FILE_TOO_LARGE": 0,
+            "SOURCE_DUPLICATE_ELEMENT": 0,
+            "SOURCE_ELEMENT_ID_TOO_LONG": 0
+          },
+          "write": {
+            "beginMillis": 1,
+            "acceptCalls": 1,
+            "flushes": [],
+            "bufferingMillis": 0,
+            "end": {
+              "batches": 1,
+              "rows": 24314,
+              "elementRows": 4720,
+              "dependencyRows": 5293,
+              "evidenceRows": 14301,
+              "moduleRows": 0,
+              "fileElements": 260,
+              "millis": 91,
+              "externalRowsWritten": 252,
+              "dependencyRowsWritten": 5293,
+              "evidenceRowsWritten": 14301,
+              "moduleRowsWritten": 0,
+              "pendingAfter": 0,
+              "walBytes": 4985232
+            },
+            "sinkMillis": 92,
+            "walPeakBytes": 4985232,
+            "probeMillis": 1
+          },
+          "timing": {
+            "wallMillis": 830,
+            "preParseMillis": 118,
+            "buildMillis": 415,
+            "visitMillis": 187,
+            "extractionMillis": 185
+          },
+          "unitFunctions": {
+            "units": 257,
+            "elementMillis": 57,
+            "dependencyMillis": 132,
+            "totalMillis": 190,
+            "longestUnit": {
+              "path": "src/main/java/org/apache/commons/lang3/ArrayUtils.java",
+              "totalMicros": 14487,
+              "elementMicros": 4152,
+              "dependencyMicros": 10334
+            },
+            "slowestUnits": [
+              {
+                "path": "src/main/java/org/apache/commons/lang3/ArrayUtils.java",
+                "totalMicros": 14487,
+                "elementMicros": 4152,
+                "dependencyMicros": 10334
+              },
+              {
+                "path": "src/main/java/org/apache/commons/lang3/StringUtils.java",
+                "totalMicros": 12595,
+                "elementMicros": 3838,
+                "dependencyMicros": 8756
+              },
+              {
+                "path": "src/main/java/org/apache/commons/lang3/builder/ToStringStyle.java",
+                "totalMicros": 7368,
+                "elementMicros": 1838,
+                "dependencyMicros": 5529
+              },
+              {
+                "path": "src/main/java/org/apache/commons/lang3/text/StrBuilder.java",
+                "totalMicros": 6850,
+                "elementMicros": 2034,
+                "dependencyMicros": 4815
+              },
+              {
+                "path": "src/main/java/org/apache/commons/lang3/time/FastDatePrinter.java",
+                "totalMicros": 6191,
+                "elementMicros": 1715,
+                "dependencyMicros": 4475
+              }
+            ],
+            "censusWallMillis": 698
+          },
+          "models": {
+            "batches": 1,
+            "splitBatches": 0,
+            "quarantinedBatches": 0,
+            "builds": 1
+          },
+          "heap": {
+            "peakLiveBytes": 118583840,
+            "peakUsedBytes": 261190176,
+            "baselinePeakLiveBytes": 117567640,
+            "baselinePeakUsedBytes": 243015608
+          },
+          "cacheBytes": 4849664,
+          "baselineCacheBytes": 3133440,
+          "excludedConstructs": {
+            "basePairs": 2873,
+            "baseInternalPairs": 710,
+            "constructs": {
+              "METHOD_REFERENCE": {
+                "sites": 107,
+                "withoutTarget": 10,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 97,
+                "selfOccurrences": 9,
+                "pairs": 63,
+                "pairsAdded": 6,
+                "pairsAddedInternal": 1,
+                "addedInternalPercent": 0.14
+              },
+              "STATIC_FIELD": {
+                "sites": 2012,
+                "withoutTarget": 0,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 2012,
+                "selfOccurrences": 1067,
+                "pairs": 211,
+                "pairsAdded": 62,
+                "pairsAddedInternal": 27,
+                "addedInternalPercent": 3.8
+              },
+              "CLASS_LITERAL": {
+                "sites": 61,
+                "withoutTarget": 0,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 61,
+                "selfOccurrences": 7,
+                "pairs": 41,
+                "pairsAdded": 15,
+                "pairsAddedInternal": 5,
+                "addedInternalPercent": 0.7
+              }
+            },
+            "union": {
+              "pairsAdded": 75,
+              "pairsAddedInternal": 33,
+              "addedInternalPercent": 4.65
+            },
+            "staticFieldWrites": 6,
+            "scanDrops": {},
+            "scanCrashes": 0,
+            "scanMillis": 30
+          }
+        },
+        {
+          "selection": "ALL",
+          "roots": {
+            "MAIN": 1,
+            "GENERATED": 0,
+            "TEST": 1
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 528,
+            "analyzed": 525,
+            "tooLarge": 0,
+            "parseFailed": 3,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 3,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 0,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 20,
+            "types": 956,
+            "methods": 10512,
+            "files": 528,
+            "externalTypes": 378,
+            "sourceFiles": 528,
+            "sourceRoots": 2,
+            "sourceFileStatuses": {
+              "ANALYZED": 525,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 3
+            }
+          },
+          "dependencies": {
+            "rows": 11992,
+            "occurrences": 94563,
+            "rowsByType": {
+              "IMPORTS": 2935,
+              "EXTENDS": 409,
+              "IMPLEMENTS": 154,
+              "CALLS": 4442,
+              "FIELD_TYPE": 766,
+              "PARAMETER_TYPE": 1229,
+              "RETURN_TYPE": 831,
+              "ANNOTATION_REFERENCE": 1226
+            },
+            "occurrencesByType": {
+              "IMPORTS": 3523,
+              "EXTENDS": 409,
+              "IMPLEMENTS": 154,
+              "CALLS": 75285,
+              "FIELD_TYPE": 1539,
+              "PARAMETER_TYPE": 4485,
+              "RETURN_TYPE": 2588,
+              "ANNOTATION_REFERENCE": 6580
+            },
+            "selfRows": 558,
+            "selfOccurrences": 6665,
+            "rowsToExternal": 8421,
+            "occurrencesToExternal": 55096,
+            "resolutionPairs": {
+              "RESOLVED,0": 2742,
+              "INFERRED,0": 829,
+              "UNRESOLVED_EXTERNAL,0": 0,
+              "RESOLVED,1": 6828,
+              "INFERRED,1": 0,
+              "UNRESOLVED_EXTERNAL,1": 1593
+            },
+            "occurrencesPerRow": {
+              "p50": 1,
+              "p90": 9,
+              "p99": 120,
+              "max": 3370,
+              "mean": 7.89
+            },
+            "largestRow": {
+              "source": "type:org.apache.commons.lang3.ArrayUtilsTest",
+              "target": "type:org.junit.jupiter.api.Assertions",
+              "type": "CALLS",
+              "occurrences": 3370
+            }
+          },
+          "evidence": {
+            "rows": 39625,
+            "rowsAtCap": 616,
+            "uncapped": 94563,
+            "trimmedPercent": 58.1,
+            "withFromMethod": 33266,
+            "withoutLine": 0,
+            "byResolution": {
+              "RESOLVED": 26702,
+              "INFERRED": 4981,
+              "UNRESOLVED_EXTERNAL": 7942
+            }
+          },
+          "modules": {
+            "rows": 0,
+            "files": 0,
+            "declaringModules": 0,
+            "transitive": 0,
+            "isStatic": 0,
+            "withoutLine": 0
+          },
+          "edges": {
+            "edges": 7616,
+            "selfEdges": 370,
+            "toInternal": 2080,
+            "toExternal": 5166,
+            "byResolution": {
+              "RESOLVED": 6012,
+              "INFERRED": 663,
+              "UNRESOLVED_EXTERNAL": 941
+            },
+            "byDistinctTypeCount": {
+              "1": 4198,
+              "2": 2699,
+              "3": 506,
+              "4": 189,
+              "5": 22,
+              "6": 2,
+              "7": 0,
+              "8": 0
+            },
+            "occurrenceTotal": 94563,
+            "weightTotal": 177203
+          },
+          "checks": {
+            "foreignKeyViolations": 0,
+            "danglingEndpoints": 0,
+            "sourcesNotInternalTypes": 0,
+            "targetsNotTypes": 0,
+            "moduleDependencyInDependency": 0,
+            "invalidResolutionPairs": 0,
+            "evidenceCountMismatches": 0,
+            "evidenceFileMismatches": 0,
+            "fromMethodOwnerMismatches": 0,
+            "evidenceWeakerThanRow": 0,
+            "toMethodsWritten": 0,
+            "weightMismatches": 0,
+            "externalRowsMalformed": 0,
+            "externalsWithoutDependency": 0,
+            "edgeTotalsMatchRows": true,
+            "baselineDifferences": [],
+            "flushRuleReproduced": true,
+            "elementOnlyAccepts": 0,
+            "writtenEqualsReadBack": true,
+            "censusPassSameOutcomes": true
+          },
+          "drops": {
+            "extractionByReason": {
+              "LOCAL_TARGET": 6,
+              "INVALID_NAME": 491,
+              "ID_TOO_LONG": 0,
+              "DEFAULT_PACKAGE_COLLISION": 0,
+              "CALL_WITHOUT_TARGET": 2824
+            },
+            "extractionTotal": 3321,
+            "unresolvedDeclaredTarget": 11,
+            "pendingPeakRows": 11
+          },
+          "extractionIssues": {
+            "SOURCE_PARSE_FAILED": 0,
+            "SOURCE_FILE_TOO_LARGE": 0,
+            "SOURCE_DUPLICATE_ELEMENT": 0,
+            "SOURCE_ELEMENT_ID_TOO_LONG": 0
+          },
+          "write": {
+            "beginMillis": 1,
+            "acceptCalls": 2,
+            "flushes": [
+              {
+                "batches": 2,
+                "rows": 63135,
+                "elementRows": 11488,
+                "dependencyRows": 12003,
+                "evidenceRows": 39644,
+                "moduleRows": 0,
+                "millis": 188,
+                "externalRowsWritten": 378,
+                "dependencyRowsWritten": 11992,
+                "evidenceRowsWritten": 39625,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 11,
+                "walBytes": 11688472
+              }
+            ],
+            "bufferingMillis": 0,
+            "end": {
+              "batches": 0,
+              "rows": 0,
+              "elementRows": 0,
+              "dependencyRows": 0,
+              "evidenceRows": 0,
+              "moduleRows": 0,
+              "fileElements": 528,
+              "millis": 5,
+              "externalRowsWritten": 0,
+              "dependencyRowsWritten": 0,
+              "evidenceRowsWritten": 0,
+              "moduleRowsWritten": 0,
+              "pendingAfter": 11,
+              "walBytes": 11688472
+            },
+            "sinkMillis": 194,
+            "walPeakBytes": 11688472,
+            "probeMillis": 1
+          },
+          "timing": {
+            "wallMillis": 12222,
+            "preParseMillis": 144,
+            "buildMillis": 11137,
+            "visitMillis": 904,
+            "extractionMillis": 714
+          },
+          "unitFunctions": {
+            "units": 525,
+            "elementMillis": 182,
+            "dependencyMillis": 553,
+            "totalMillis": 735,
+            "longestUnit": {
+              "path": "src/test/java/org/apache/commons/lang3/ArrayUtilsTest.java",
+              "totalMicros": 44006,
+              "elementMicros": 10085,
+              "dependencyMicros": 33921
+            },
+            "slowestUnits": [
+              {
+                "path": "src/test/java/org/apache/commons/lang3/ArrayUtilsTest.java",
+                "totalMicros": 44006,
+                "elementMicros": 10085,
+                "dependencyMicros": 33921
+              },
+              {
+                "path": "src/test/java/org/apache/commons/lang3/StringUtilsTest.java",
+                "totalMicros": 21457,
+                "elementMicros": 4622,
+                "dependencyMicros": 16835
+              },
+              {
+                "path": "src/test/java/org/apache/commons/lang3/SystemUtilsTest.java",
+                "totalMicros": 21401,
+                "elementMicros": 3109,
+                "dependencyMicros": 18292
+              },
+              {
+                "path": "src/test/java/org/apache/commons/lang3/ValidateTest.java",
+                "totalMicros": 20862,
+                "elementMicros": 4810,
+                "dependencyMicros": 16052
+              },
+              {
+                "path": "src/test/java/org/apache/commons/lang3/function/FailableTest.java",
+                "totalMicros": 16613,
+                "elementMicros": 4025,
+                "dependencyMicros": 12587
+              }
+            ],
+            "censusWallMillis": 12831
+          },
+          "models": {
+            "batches": 2,
+            "splitBatches": 0,
+            "quarantinedBatches": 0,
+            "builds": 2
+          },
+          "heap": {
+            "peakLiveBytes": 246575392,
+            "peakUsedBytes": 550938384,
+            "baselinePeakLiveBytes": 254334808,
+            "baselinePeakUsedBytes": 609146864
+          },
+          "cacheBytes": 11804672,
+          "baselineCacheBytes": 7303168,
+          "excludedConstructs": {
+            "basePairs": 7246,
+            "baseInternalPairs": 2080,
+            "constructs": {
+              "METHOD_REFERENCE": {
+                "sites": 740,
+                "withoutTarget": 384,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 356,
+                "selfOccurrences": 21,
+                "pairs": 127,
+                "pairsAdded": 14,
+                "pairsAddedInternal": 4,
+                "addedInternalPercent": 0.19
+              },
+              "STATIC_FIELD": {
+                "sites": 10550,
+                "withoutTarget": 0,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 10550,
+                "selfOccurrences": 3410,
+                "pairs": 635,
+                "pairsAdded": 213,
+                "pairsAddedInternal": 96,
+                "addedInternalPercent": 4.62
+              },
+              "CLASS_LITERAL": {
+                "sites": 3150,
+                "withoutTarget": 247,
+                "droppedTarget": 26,
+                "outsideSurvivingSource": 0,
+                "occurrences": 2877,
+                "selfOccurrences": 41,
+                "pairs": 476,
+                "pairsAdded": 201,
+                "pairsAddedInternal": 67,
+                "addedInternalPercent": 3.22
+              }
+            },
+            "union": {
+              "pairsAdded": 393,
+              "pairsAddedInternal": 159,
+              "addedInternalPercent": 7.64
+            },
+            "staticFieldWrites": 40,
+            "scanDrops": {
+              "LOCAL_TARGET": 26
+            },
+            "scanCrashes": 0,
+            "scanMillis": 128
+          }
+        }
+      ]
+    },
+    {
+      "name": "junit5",
+      "origin": "clone",
+      "commitId": "f59f60d2cebdf2224235d81f781b1f310cbc8138",
+      "sourceRoots": {
+        "MAIN": 25,
+        "GENERATED": 0,
+        "TEST": 20
+      },
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "roots": {
+            "MAIN": 25,
+            "GENERATED": 0,
+            "TEST": 0
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 914,
+            "analyzed": 913,
+            "tooLarge": 0,
+            "parseFailed": 1,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 1,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 76,
+            "types": 1109,
+            "methods": 6458,
+            "files": 914,
+            "externalTypes": 642,
+            "sourceFiles": 914,
+            "sourceRoots": 25,
+            "sourceFileStatuses": {
+              "ANALYZED": 913,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 1
+            }
+          },
+          "dependencies": {
+            "rows": 23335,
+            "occurrences": 44870,
+            "rowsByType": {
+              "IMPORTS": 7510,
+              "EXTENDS": 220,
+              "IMPLEMENTS": 359,
+              "CALLS": 6034,
+              "FIELD_TYPE": 1530,
+              "PARAMETER_TYPE": 3232,
+              "RETURN_TYPE": 2332,
+              "ANNOTATION_REFERENCE": 2118
+            },
+            "occurrencesByType": {
+              "IMPORTS": 8035,
+              "EXTENDS": 220,
+              "IMPLEMENTS": 359,
+              "CALLS": 16987,
+              "FIELD_TYPE": 2085,
+              "PARAMETER_TYPE": 7936,
+              "RETURN_TYPE": 4228,
+              "ANNOTATION_REFERENCE": 5020
+            },
+            "selfRows": 719,
+            "selfOccurrences": 3713,
+            "rowsToExternal": 13393,
+            "occurrencesToExternal": 25885,
+            "resolutionPairs": {
+              "RESOLVED,0": 5368,
+              "INFERRED,0": 4574,
+              "UNRESOLVED_EXTERNAL,0": 0,
+              "RESOLVED,1": 10341,
+              "INFERRED,1": 0,
+              "UNRESOLVED_EXTERNAL,1": 3052
+            },
+            "occurrencesPerRow": {
+              "p50": 1,
+              "p90": 3,
+              "p99": 13,
+              "max": 313,
+              "mean": 1.92
+            },
+            "largestRow": {
+              "source": "type:org.junit.jupiter.api.Assertions",
+              "target": "type:org.jspecify.annotations.Nullable",
+              "type": "ANNOTATION_REFERENCE",
+              "occurrences": 313
+            }
+          },
+          "evidence": {
+            "rows": 42847,
+            "rowsAtCap": 108,
+            "uncapped": 44870,
+            "trimmedPercent": 4.51,
+            "withFromMethod": 29969,
+            "withoutLine": 0,
+            "byResolution": {
+              "RESOLVED": 30961,
+              "INFERRED": 6839,
+              "UNRESOLVED_EXTERNAL": 5047
+            }
+          },
+          "modules": {
+            "rows": 80,
+            "files": 16,
+            "declaringModules": 16,
+            "transitive": 48,
+            "isStatic": 33,
+            "withoutLine": 0
+          },
+          "edges": {
+            "edges": 13366,
+            "selfEdges": 533,
+            "toInternal": 4932,
+            "toExternal": 7901,
+            "byResolution": {
+              "RESOLVED": 8996,
+              "INFERRED": 2325,
+              "UNRESOLVED_EXTERNAL": 2045
+            },
+            "byDistinctTypeCount": {
+              "1": 6211,
+              "2": 5077,
+              "3": 1454,
+              "4": 516,
+              "5": 104,
+              "6": 4,
+              "7": 0,
+              "8": 0
+            },
+            "occurrenceTotal": 44870,
+            "weightTotal": 71992
+          },
+          "checks": {
+            "foreignKeyViolations": 0,
+            "danglingEndpoints": 0,
+            "sourcesNotInternalTypes": 0,
+            "targetsNotTypes": 0,
+            "moduleDependencyInDependency": 0,
+            "invalidResolutionPairs": 0,
+            "evidenceCountMismatches": 0,
+            "evidenceFileMismatches": 0,
+            "fromMethodOwnerMismatches": 0,
+            "evidenceWeakerThanRow": 0,
+            "toMethodsWritten": 0,
+            "weightMismatches": 0,
+            "externalRowsMalformed": 0,
+            "externalsWithoutDependency": 0,
+            "edgeTotalsMatchRows": true,
+            "baselineDifferences": [],
+            "flushRuleReproduced": true,
+            "elementOnlyAccepts": 0,
+            "writtenEqualsReadBack": true,
+            "censusPassSameOutcomes": true
+          },
+          "drops": {
+            "extractionByReason": {
+              "LOCAL_TARGET": 2,
+              "INVALID_NAME": 9,
+              "ID_TOO_LONG": 0,
+              "DEFAULT_PACKAGE_COLLISION": 0,
+              "CALL_WITHOUT_TARGET": 1224
+            },
+            "extractionTotal": 1235,
+            "unresolvedDeclaredTarget": 17,
+            "pendingPeakRows": 1306
+          },
+          "extractionIssues": {
+            "SOURCE_PARSE_FAILED": 0,
+            "SOURCE_FILE_TOO_LARGE": 0,
+            "SOURCE_DUPLICATE_ELEMENT": 1,
+            "SOURCE_ELEMENT_ID_TOO_LONG": 0
+          },
+          "write": {
+            "beginMillis": 2,
+            "acceptCalls": 39,
+            "flushes": [
+              {
+                "batches": 10,
+                "rows": 33009,
+                "elementRows": 3467,
+                "dependencyRows": 10790,
+                "evidenceRows": 18736,
+                "moduleRows": 16,
+                "millis": 92,
+                "externalRowsWritten": 342,
+                "dependencyRowsWritten": 9484,
+                "evidenceRowsWritten": 16756,
+                "moduleRowsWritten": 16,
+                "pendingAfter": 1306,
+                "walBytes": 5446672
+              },
+              {
+                "batches": 13,
+                "rows": 33478,
+                "elementRows": 3467,
+                "dependencyRows": 10214,
+                "evidenceRows": 19760,
+                "moduleRows": 37,
+                "millis": 110,
+                "externalRowsWritten": 210,
+                "dependencyRowsWritten": 11506,
+                "evidenceRowsWritten": 21707,
+                "moduleRowsWritten": 37,
+                "pendingAfter": 14,
+                "walBytes": 6699152
+              }
+            ],
+            "bufferingMillis": 0,
+            "end": {
+              "batches": 16,
+              "rows": 7471,
+              "elementRows": 709,
+              "dependencyRows": 2348,
+              "evidenceRows": 4387,
+              "moduleRows": 27,
+              "fileElements": 914,
+              "millis": 31,
+              "externalRowsWritten": 90,
+              "dependencyRowsWritten": 2345,
+              "evidenceRowsWritten": 4384,
+              "moduleRowsWritten": 27,
+              "pendingAfter": 17,
+              "walBytes": 6699152
+            },
+            "sinkMillis": 236,
+            "walPeakBytes": 6699152,
+            "probeMillis": 4
+          },
+          "timing": {
+            "wallMillis": 2469,
+            "preParseMillis": 208,
+            "buildMillis": 1631,
+            "visitMillis": 558,
+            "extractionMillis": 349
+          },
+          "unitFunctions": {
+            "units": 913,
+            "elementMillis": 90,
+            "dependencyMillis": 235,
+            "totalMillis": 326,
+            "longestUnit": {
+              "path": "junit-jupiter-api/src/main/java/org/junit/jupiter/api/Assertions.java",
+              "totalMicros": 13962,
+              "elementMicros": 5149,
+              "dependencyMicros": 8813
+            },
+            "slowestUnits": [
+              {
+                "path": "junit-jupiter-api/src/main/java/org/junit/jupiter/api/Assertions.java",
+                "totalMicros": 13962,
+                "elementMicros": 5149,
+                "dependencyMicros": 8813
+              },
+              {
+                "path": "junit-platform-commons/src/main/java/org/junit/platform/commons/util/ReflectionUtils.java",
+                "totalMicros": 8587,
+                "elementMicros": 2243,
+                "dependencyMicros": 6344
+              },
+              {
+                "path": "junit-platform-engine/src/main/java/org/junit/platform/engine/support/hierarchical/WorkerThreadPoolHierarchicalTestExecutorService.java",
+                "totalMicros": 6779,
+                "elementMicros": 1507,
+                "dependencyMicros": 5272
+              },
+              {
+                "path": "junit-jupiter-params/src/main/java/org/junit/jupiter/params/ResolverFacade.java",
+                "totalMicros": 4806,
+                "elementMicros": 1068,
+                "dependencyMicros": 3737
+              },
+              {
+                "path": "junit-platform-reporting/src/main/java/org/junit/platform/reporting/legacy/xml/XmlReportWriter.java",
+                "totalMicros": 4501,
+                "elementMicros": 890,
+                "dependencyMicros": 3610
+              }
+            ],
+            "censusWallMillis": 1988
+          },
+          "models": {
+            "batches": 39,
+            "splitBatches": 0,
+            "quarantinedBatches": 0,
+            "builds": 39
+          },
+          "heap": {
+            "peakLiveBytes": 118461048,
+            "peakUsedBytes": 295709928,
+            "baselinePeakLiveBytes": 132584624,
+            "baselinePeakUsedBytes": 315036848
+          },
+          "cacheBytes": 12300288,
+          "baselineCacheBytes": 6262784,
+          "excludedConstructs": {
+            "basePairs": 12833,
+            "baseInternalPairs": 4932,
+            "constructs": {
+              "METHOD_REFERENCE": {
+                "sites": 910,
+                "withoutTarget": 200,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 710,
+                "selfOccurrences": 159,
+                "pairs": 427,
+                "pairsAdded": 77,
+                "pairsAddedInternal": 32,
+                "addedInternalPercent": 0.65
+              },
+              "STATIC_FIELD": {
+                "sites": 2934,
+                "withoutTarget": 0,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 2934,
+                "selfOccurrences": 538,
+                "pairs": 1194,
+                "pairsAdded": 176,
+                "pairsAddedInternal": 84,
+                "addedInternalPercent": 1.7
+              },
+              "CLASS_LITERAL": {
+                "sites": 725,
+                "withoutTarget": 55,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 670,
+                "selfOccurrences": 78,
+                "pairs": 467,
+                "pairsAdded": 168,
+                "pairsAddedInternal": 135,
+                "addedInternalPercent": 2.74
+              }
+            },
+            "union": {
+              "pairsAdded": 391,
+              "pairsAddedInternal": 230,
+              "addedInternalPercent": 4.66
+            },
+            "staticFieldWrites": 9,
+            "scanDrops": {},
+            "scanCrashes": 0,
+            "scanMillis": 57
+          }
+        },
+        {
+          "selection": "ALL",
+          "roots": {
+            "MAIN": 25,
+            "GENERATED": 0,
+            "TEST": 20
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 1712,
+            "analyzed": 1711,
+            "tooLarge": 0,
+            "parseFailed": 1,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 1,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 114,
+            "types": 3750,
+            "methods": 17578,
+            "files": 1712,
+            "externalTypes": 896,
+            "sourceFiles": 1712,
+            "sourceRoots": 45,
+            "sourceFileStatuses": {
+              "ANALYZED": 1711,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 1
+            }
+          },
+          "dependencies": {
+            "rows": 49908,
+            "occurrences": 119790,
+            "rowsByType": {
+              "IMPORTS": 15333,
+              "EXTENDS": 667,
+              "IMPLEMENTS": 810,
+              "CALLS": 13901,
+              "FIELD_TYPE": 2542,
+              "PARAMETER_TYPE": 5130,
+              "RETURN_TYPE": 3534,
+              "ANNOTATION_REFERENCE": 7991
+            },
+            "occurrencesByType": {
+              "IMPORTS": 17200,
+              "EXTENDS": 667,
+              "IMPLEMENTS": 810,
+              "CALLS": 62482,
+              "FIELD_TYPE": 3409,
+              "PARAMETER_TYPE": 11731,
+              "RETURN_TYPE": 5913,
+              "ANNOTATION_REFERENCE": 17578
+            },
+            "selfRows": 1213,
+            "selfOccurrences": 8809,
+            "rowsToExternal": 24240,
+            "occurrencesToExternal": 53046,
+            "resolutionPairs": {
+              "RESOLVED,0": 7398,
+              "INFERRED,0": 18270,
+              "UNRESOLVED_EXTERNAL,0": 0,
+              "RESOLVED,1": 18459,
+              "INFERRED,1": 0,
+              "UNRESOLVED_EXTERNAL,1": 5781
+            },
+            "occurrencesPerRow": {
+              "p50": 1,
+              "p90": 4,
+              "p99": 22,
+              "max": 1131,
+              "mean": 2.4
+            },
+            "largestRow": {
+              "source": "type:org.junit.jupiter.engine.ClassTemplateInvocationTests",
+              "target": "type:org.junit.platform.testkit.engine.EventConditions",
+              "type": "CALLS",
+              "occurrences": 1131
+            }
+          },
+          "evidence": {
+            "rows": 103346,
+            "rowsAtCap": 597,
+            "uncapped": 119790,
+            "trimmedPercent": 13.73,
+            "withFromMethod": 75962,
+            "withoutLine": 0,
+            "byResolution": {
+              "RESOLVED": 53852,
+              "INFERRED": 37382,
+              "UNRESOLVED_EXTERNAL": 12112
+            }
+          },
+          "modules": {
+            "rows": 80,
+            "files": 16,
+            "declaringModules": 16,
+            "transitive": 48,
+            "isStatic": 33,
+            "withoutLine": 0
+          },
+          "edges": {
+            "edges": 32715,
+            "selfEdges": 1012,
+            "toInternal": 16028,
+            "toExternal": 15675,
+            "byResolution": {
+              "RESOLVED": 16647,
+              "INFERRED": 12128,
+              "UNRESOLVED_EXTERNAL": 3940
+            },
+            "byDistinctTypeCount": {
+              "1": 19296,
+              "2": 10480,
+              "3": 2225,
+              "4": 597,
+              "5": 113,
+              "6": 4,
+              "7": 0,
+              "8": 0
+            },
+            "occurrenceTotal": 119790,
+            "weightTotal": 199434
+          },
+          "checks": {
+            "foreignKeyViolations": 0,
+            "danglingEndpoints": 0,
+            "sourcesNotInternalTypes": 0,
+            "targetsNotTypes": 0,
+            "moduleDependencyInDependency": 0,
+            "invalidResolutionPairs": 0,
+            "evidenceCountMismatches": 0,
+            "evidenceFileMismatches": 0,
+            "fromMethodOwnerMismatches": 0,
+            "evidenceWeakerThanRow": 0,
+            "toMethodsWritten": 0,
+            "weightMismatches": 0,
+            "externalRowsMalformed": 0,
+            "externalsWithoutDependency": 0,
+            "edgeTotalsMatchRows": true,
+            "baselineDifferences": [],
+            "flushRuleReproduced": true,
+            "elementOnlyAccepts": 0,
+            "writtenEqualsReadBack": true,
+            "censusPassSameOutcomes": true
+          },
+          "drops": {
+            "extractionByReason": {
+              "LOCAL_TARGET": 3,
+              "INVALID_NAME": 62,
+              "ID_TOO_LONG": 0,
+              "DEFAULT_PACKAGE_COLLISION": 0,
+              "CALL_WITHOUT_TARGET": 11761
+            },
+            "extractionTotal": 11826,
+            "unresolvedDeclaredTarget": 34,
+            "pendingPeakRows": 1306
+          },
+          "extractionIssues": {
+            "SOURCE_PARSE_FAILED": 0,
+            "SOURCE_FILE_TOO_LARGE": 0,
+            "SOURCE_DUPLICATE_ELEMENT": 4,
+            "SOURCE_ELEMENT_ID_TOO_LONG": 0
+          },
+          "write": {
+            "beginMillis": 4,
+            "acceptCalls": 59,
+            "flushes": [
+              {
+                "batches": 10,
+                "rows": 33009,
+                "elementRows": 3467,
+                "dependencyRows": 10790,
+                "evidenceRows": 18736,
+                "moduleRows": 16,
+                "millis": 105,
+                "externalRowsWritten": 342,
+                "dependencyRowsWritten": 9484,
+                "evidenceRowsWritten": 16756,
+                "moduleRowsWritten": 16,
+                "pendingAfter": 1306,
+                "walBytes": 5652672
+              },
+              {
+                "batches": 13,
+                "rows": 33478,
+                "elementRows": 3467,
+                "dependencyRows": 10214,
+                "evidenceRows": 19760,
+                "moduleRows": 37,
+                "millis": 108,
+                "externalRowsWritten": 210,
+                "dependencyRowsWritten": 11506,
+                "evidenceRowsWritten": 21707,
+                "moduleRowsWritten": 37,
+                "pendingAfter": 14,
+                "walBytes": 6699152
+              },
+              {
+                "batches": 27,
+                "rows": 73088,
+                "elementRows": 10311,
+                "dependencyRows": 20176,
+                "evidenceRows": 42574,
+                "moduleRows": 27,
+                "millis": 251,
+                "externalRowsWritten": 240,
+                "dependencyRowsWritten": 20159,
+                "evidenceRowsWritten": 42543,
+                "moduleRowsWritten": 27,
+                "pendingAfter": 31,
+                "walBytes": 15227552
+              },
+              {
+                "batches": 9,
+                "rows": 35304,
+                "elementRows": 4197,
+                "dependencyRows": 8762,
+                "evidenceRows": 22345,
+                "moduleRows": 0,
+                "millis": 134,
+                "externalRowsWritten": 104,
+                "dependencyRowsWritten": 8759,
+                "evidenceRowsWritten": 22340,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 34,
+                "walBytes": 15227552
+              }
+            ],
+            "bufferingMillis": 0,
+            "end": {
+              "batches": 0,
+              "rows": 0,
+              "elementRows": 0,
+              "dependencyRows": 0,
+              "evidenceRows": 0,
+              "moduleRows": 0,
+              "fileElements": 1712,
+              "millis": 17,
+              "externalRowsWritten": 0,
+              "dependencyRowsWritten": 0,
+              "evidenceRowsWritten": 0,
+              "moduleRowsWritten": 0,
+              "pendingAfter": 34,
+              "walBytes": 15227552
+            },
+            "sinkMillis": 621,
+            "walPeakBytes": 15227552,
+            "probeMillis": 7
+          },
+          "timing": {
+            "wallMillis": 5776,
+            "preParseMillis": 324,
+            "buildMillis": 3680,
+            "visitMillis": 1683,
+            "extractionMillis": 1072
+          },
+          "unitFunctions": {
+            "units": 1711,
+            "elementMillis": 276,
+            "dependencyMillis": 924,
+            "totalMillis": 1200,
+            "longestUnit": {
+              "path": "junit-jupiter-engine/src/testFixtures/java/org/junit/jupiter/engine/discovery/JupiterUniqueIdBuilder.java",
+              "totalMicros": 56485,
+              "elementMicros": 3859,
+              "dependencyMicros": 52626
+            },
+            "slowestUnits": [
+              {
+                "path": "junit-jupiter-engine/src/testFixtures/java/org/junit/jupiter/engine/discovery/JupiterUniqueIdBuilder.java",
+                "totalMicros": 56485,
+                "elementMicros": 3859,
+                "dependencyMicros": 52626
+              },
+              {
+                "path": "jupiter-tests/src/test/java/org/junit/jupiter/params/ParameterizedTestIntegrationTests.java",
+                "totalMicros": 26867,
+                "elementMicros": 4738,
+                "dependencyMicros": 22129
+              },
+              {
+                "path": "jupiter-tests/src/test/java/org/junit/jupiter/params/ParameterizedClassIntegrationTests.java",
+                "totalMicros": 21203,
+                "elementMicros": 3729,
+                "dependencyMicros": 17473
+              },
+              {
+                "path": "platform-tests/src/test/java/org/junit/platform/commons/util/ReflectionUtilsTests.java",
+                "totalMicros": 20833,
+                "elementMicros": 4756,
+                "dependencyMicros": 16076
+              },
+              {
+                "path": "platform-tests/src/test/java/org/junit/platform/engine/discovery/DiscoverySelectorsTests.java",
+                "totalMicros": 17942,
+                "elementMicros": 2842,
+                "dependencyMicros": 15100
+              }
+            ],
+            "censusWallMillis": 5501
+          },
+          "models": {
+            "batches": 59,
+            "splitBatches": 0,
+            "quarantinedBatches": 0,
+            "builds": 59
+          },
+          "heap": {
+            "peakLiveBytes": 203341040,
+            "peakUsedBytes": 466405680,
+            "baselinePeakLiveBytes": 209139648,
+            "baselinePeakUsedBytes": 469995104
+          },
+          "cacheBytes": 31330304,
+          "baselineCacheBytes": 17051648,
+          "excludedConstructs": {
+            "basePairs": 31703,
+            "baseInternalPairs": 16028,
+            "constructs": {
+              "METHOD_REFERENCE": {
+                "sites": 1647,
+                "withoutTarget": 531,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 1116,
+                "selfOccurrences": 198,
+                "pairs": 611,
+                "pairsAdded": 123,
+                "pairsAddedInternal": 43,
+                "addedInternalPercent": 0.27
+              },
+              "STATIC_FIELD": {
+                "sites": 7445,
+                "withoutTarget": 0,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 1,
+                "occurrences": 7444,
+                "selfOccurrences": 2201,
+                "pairs": 2382,
+                "pairsAdded": 981,
+                "pairsAddedInternal": 585,
+                "addedInternalPercent": 3.65
+              },
+              "CLASS_LITERAL": {
+                "sites": 6504,
+                "withoutTarget": 516,
+                "droppedTarget": 76,
+                "outsideSurvivingSource": 0,
+                "occurrences": 5912,
+                "selfOccurrences": 182,
+                "pairs": 3136,
+                "pairsAdded": 2032,
+                "pairsAddedInternal": 1711,
+                "addedInternalPercent": 10.68
+              }
+            },
+            "union": {
+              "pairsAdded": 3056,
+              "pairsAddedInternal": 2269,
+              "addedInternalPercent": 14.16
+            },
+            "staticFieldWrites": 292,
+            "scanDrops": {
+              "LOCAL_TARGET": 76
+            },
+            "scanCrashes": 0,
+            "scanMillis": 200
+          }
+        }
+      ]
+    },
+    {
+      "name": "spring-framework",
+      "origin": "clone",
+      "commitId": "82a6b40b9366ec181ededdad282b307ee5381a52",
+      "sourceRoots": {
+        "MAIN": 30,
+        "GENERATED": 0,
+        "TEST": 30
+      },
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "roots": {
+            "MAIN": 30,
+            "GENERATED": 0,
+            "TEST": 0
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 5459,
+            "analyzed": 5458,
+            "tooLarge": 0,
+            "parseFailed": 1,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 1,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 571,
+            "types": 6916,
+            "methods": 49347,
+            "files": 5459,
+            "externalTypes": 2714,
+            "sourceFiles": 5459,
+            "sourceRoots": 30,
+            "sourceFileStatuses": {
+              "ANALYZED": 5458,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 1
+            }
+          },
+          "dependencies": {
+            "rows": 153660,
+            "occurrences": 314682,
+            "rowsByType": {
+              "IMPORTS": 44191,
+              "EXTENDS": 2657,
+              "IMPLEMENTS": 3127,
+              "CALLS": 43252,
+              "FIELD_TYPE": 11280,
+              "PARAMETER_TYPE": 23955,
+              "RETURN_TYPE": 14520,
+              "ANNOTATION_REFERENCE": 10678
+            },
+            "occurrencesByType": {
+              "IMPORTS": 44261,
+              "EXTENDS": 2657,
+              "IMPLEMENTS": 3127,
+              "CALLS": 135274,
+              "FIELD_TYPE": 15460,
+              "PARAMETER_TYPE": 52152,
+              "RETURN_TYPE": 26502,
+              "ANNOTATION_REFERENCE": 35249
+            },
+            "selfRows": 4351,
+            "selfOccurrences": 30567,
+            "rowsToExternal": 81991,
+            "occurrencesToExternal": 170703,
+            "resolutionPairs": {
+              "RESOLVED,0": 40066,
+              "INFERRED,0": 31603,
+              "UNRESOLVED_EXTERNAL,0": 0,
+              "RESOLVED,1": 57794,
+              "INFERRED,1": 0,
+              "UNRESOLVED_EXTERNAL,1": 24197
+            },
+            "occurrencesPerRow": {
+              "p50": 1,
+              "p90": 4,
+              "p99": 16,
+              "max": 410,
+              "mean": 2.05
+            },
+            "largestRow": {
+              "source": "type:org.springframework.asm.ClassReader",
+              "target": "type:org.springframework.asm.ClassReader",
+              "type": "CALLS",
+              "occurrences": 410
+            }
+          },
+          "evidence": {
+            "rows": 298970,
+            "rowsAtCap": 1062,
+            "uncapped": 314682,
+            "trimmedPercent": 4.99,
+            "withFromMethod": 224101,
+            "withoutLine": 0,
+            "byResolution": {
+              "RESOLVED": 204855,
+              "INFERRED": 47371,
+              "UNRESOLVED_EXTERNAL": 46744
+            }
+          },
+          "modules": {
+            "rows": 0,
+            "files": 0,
+            "declaringModules": 0,
+            "transitive": 0,
+            "isStatic": 0,
+            "withoutLine": 0
+          },
+          "edges": {
+            "edges": 86463,
+            "selfEdges": 3564,
+            "toInternal": 35795,
+            "toExternal": 47104,
+            "byResolution": {
+              "RESOLVED": 57742,
+              "INFERRED": 15786,
+              "UNRESOLVED_EXTERNAL": 12935
+            },
+            "byDistinctTypeCount": {
+              "1": 40121,
+              "2": 31389,
+              "3": 10128,
+              "4": 3784,
+              "5": 1005,
+              "6": 36,
+              "7": 0,
+              "8": 0
+            },
+            "occurrenceTotal": 314682,
+            "weightTotal": 524730
+          },
+          "checks": {
+            "foreignKeyViolations": 0,
+            "danglingEndpoints": 0,
+            "sourcesNotInternalTypes": 0,
+            "targetsNotTypes": 0,
+            "moduleDependencyInDependency": 0,
+            "invalidResolutionPairs": 0,
+            "evidenceCountMismatches": 0,
+            "evidenceFileMismatches": 0,
+            "fromMethodOwnerMismatches": 0,
+            "evidenceWeakerThanRow": 0,
+            "toMethodsWritten": 0,
+            "weightMismatches": 0,
+            "externalRowsMalformed": 0,
+            "externalsWithoutDependency": 0,
+            "edgeTotalsMatchRows": true,
+            "baselineDifferences": [],
+            "flushRuleReproduced": true,
+            "elementOnlyAccepts": 0,
+            "writtenEqualsReadBack": true,
+            "censusPassSameOutcomes": true
+          },
+          "drops": {
+            "extractionByReason": {
+              "LOCAL_TARGET": 5,
+              "INVALID_NAME": 68,
+              "ID_TOO_LONG": 0,
+              "DEFAULT_PACKAGE_COLLISION": 0,
+              "CALL_WITHOUT_TARGET": 4931
+            },
+            "extractionTotal": 5004,
+            "unresolvedDeclaredTarget": 9,
+            "pendingPeakRows": 5559
+          },
+          "extractionIssues": {
+            "SOURCE_PARSE_FAILED": 0,
+            "SOURCE_FILE_TOO_LARGE": 0,
+            "SOURCE_DUPLICATE_ELEMENT": 0,
+            "SOURCE_ELEMENT_ID_TOO_LONG": 0
+          },
+          "write": {
+            "beginMillis": 10,
+            "acceptCalls": 30,
+            "flushes": [
+              {
+                "batches": 6,
+                "rows": 57249,
+                "elementRows": 6633,
+                "dependencyRows": 17532,
+                "evidenceRows": 33084,
+                "moduleRows": 0,
+                "millis": 149,
+                "externalRowsWritten": 581,
+                "dependencyRowsWritten": 14133,
+                "evidenceRowsWritten": 28361,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 3399,
+                "walBytes": 10431872
+              },
+              {
+                "batches": 4,
+                "rows": 58627,
+                "elementRows": 6286,
+                "dependencyRows": 18625,
+                "evidenceRows": 33716,
+                "moduleRows": 0,
+                "millis": 178,
+                "externalRowsWritten": 401,
+                "dependencyRowsWritten": 16465,
+                "evidenceRowsWritten": 30425,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 5559,
+                "walBytes": 10431872
+              },
+              {
+                "batches": 3,
+                "rows": 71382,
+                "elementRows": 8921,
+                "dependencyRows": 19455,
+                "evidenceRows": 43006,
+                "moduleRows": 0,
+                "millis": 255,
+                "externalRowsWritten": 322,
+                "dependencyRowsWritten": 24102,
+                "evidenceRowsWritten": 49931,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 912,
+                "walBytes": 16401752
+              },
+              {
+                "batches": 5,
+                "rows": 42433,
+                "elementRows": 5103,
+                "dependencyRows": 11657,
+                "evidenceRows": 25673,
+                "moduleRows": 0,
+                "millis": 138,
+                "externalRowsWritten": 114,
+                "dependencyRowsWritten": 11412,
+                "evidenceRowsWritten": 25303,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 1157,
+                "walBytes": 16401752
+              },
+              {
+                "batches": 3,
+                "rows": 33496,
+                "elementRows": 3406,
+                "dependencyRows": 10336,
+                "evidenceRows": 19754,
+                "moduleRows": 0,
+                "millis": 113,
+                "externalRowsWritten": 241,
+                "dependencyRowsWritten": 10290,
+                "evidenceRowsWritten": 19628,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 1203,
+                "walBytes": 16401752
+              },
+              {
+                "batches": 3,
+                "rows": 50285,
+                "elementRows": 5648,
+                "dependencyRows": 15412,
+                "evidenceRows": 29225,
+                "moduleRows": 0,
+                "millis": 154,
+                "externalRowsWritten": 357,
+                "dependencyRowsWritten": 13940,
+                "evidenceRowsWritten": 27250,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 2675,
+                "walBytes": 16401752
+              },
+              {
+                "batches": 3,
+                "rows": 96114,
+                "elementRows": 10654,
+                "dependencyRows": 29314,
+                "evidenceRows": 56146,
+                "moduleRows": 0,
+                "millis": 313,
+                "externalRowsWritten": 438,
+                "dependencyRowsWritten": 31259,
+                "evidenceRowsWritten": 58855,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 730,
+                "walBytes": 21601192
+              },
+              {
+                "batches": 1,
+                "rows": 37393,
+                "elementRows": 3750,
+                "dependencyRows": 11936,
+                "evidenceRows": 21707,
+                "moduleRows": 0,
+                "millis": 133,
+                "externalRowsWritten": 154,
+                "dependencyRowsWritten": 12098,
+                "evidenceRowsWritten": 21903,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 568,
+                "walBytes": 21601192
+              },
+              {
+                "batches": 1,
+                "rows": 46592,
+                "elementRows": 4800,
+                "dependencyRows": 14269,
+                "evidenceRows": 27523,
+                "moduleRows": 0,
+                "millis": 170,
+                "externalRowsWritten": 63,
+                "dependencyRowsWritten": 14666,
+                "evidenceRowsWritten": 28000,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 171,
+                "walBytes": 21601192
+              }
+            ],
+            "bufferingMillis": 0,
+            "end": {
+              "batches": 1,
+              "rows": 15913,
+              "elementRows": 1633,
+              "dependencyRows": 5133,
+              "evidenceRows": 9147,
+              "moduleRows": 0,
+              "fileElements": 5459,
+              "millis": 154,
+              "externalRowsWritten": 43,
+              "dependencyRowsWritten": 5295,
+              "evidenceRowsWritten": 9314,
+              "moduleRowsWritten": 0,
+              "pendingAfter": 9,
+              "walBytes": 21601192
+            },
+            "sinkMillis": 1772,
+            "walPeakBytes": 21601192,
+            "probeMillis": 4
+          },
+          "timing": {
+            "wallMillis": 11430,
+            "preParseMillis": 1224,
+            "buildMillis": 5685,
+            "visitMillis": 4150,
+            "extractionMillis": 2527
+          },
+          "unitFunctions": {
+            "units": 5458,
+            "elementMillis": 635,
+            "dependencyMillis": 1804,
+            "totalMillis": 2440,
+            "longestUnit": {
+              "path": "spring-web/src/main/java/org/springframework/web/util/WhatWgUrlParser.java",
+              "totalMicros": 13121,
+              "elementMicros": 2990,
+              "dependencyMicros": 10130
+            },
+            "slowestUnits": [
+              {
+                "path": "spring-web/src/main/java/org/springframework/web/util/WhatWgUrlParser.java",
+                "totalMicros": 13121,
+                "elementMicros": 2990,
+                "dependencyMicros": 10130
+              },
+              {
+                "path": "spring-test/src/main/java/org/springframework/mock/web/MockHttpServletRequest.java",
+                "totalMicros": 12668,
+                "elementMicros": 8978,
+                "dependencyMicros": 3689
+              },
+              {
+                "path": "spring-beans/src/main/java/org/springframework/beans/factory/support/DefaultListableBeanFactory.java",
+                "totalMicros": 12188,
+                "elementMicros": 2803,
+                "dependencyMicros": 9385
+              },
+              {
+                "path": "spring-webmvc/src/main/java/org/springframework/web/servlet/function/support/RouterFunctionMapping.java",
+                "totalMicros": 9565,
+                "elementMicros": 190,
+                "dependencyMicros": 9374
+              },
+              {
+                "path": "spring-webflux/src/main/java/org/springframework/web/reactive/function/server/RequestPredicates.java",
+                "totalMicros": 8480,
+                "elementMicros": 1824,
+                "dependencyMicros": 6656
+              }
+            ],
+            "censusWallMillis": 8945
+          },
+          "models": {
+            "batches": 30,
+            "splitBatches": 0,
+            "quarantinedBatches": 0,
+            "builds": 30
+          },
+          "heap": {
+            "peakLiveBytes": 265645248,
+            "peakUsedBytes": 561098688,
+            "baselinePeakLiveBytes": 336492528,
+            "baselinePeakUsedBytes": 557355696
+          },
+          "cacheBytes": 88797184,
+          "baselineCacheBytes": 45240320,
+          "excludedConstructs": {
+            "basePairs": 82899,
+            "baseInternalPairs": 35795,
+            "constructs": {
+              "METHOD_REFERENCE": {
+                "sites": 1124,
+                "withoutTarget": 258,
+                "droppedTarget": 2,
+                "outsideSurvivingSource": 0,
+                "occurrences": 864,
+                "selfOccurrences": 226,
+                "pairs": 469,
+                "pairsAdded": 65,
+                "pairsAddedInternal": 38,
+                "addedInternalPercent": 0.11
+              },
+              "STATIC_FIELD": {
+                "sites": 16696,
+                "withoutTarget": 0,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 16696,
+                "selfOccurrences": 7143,
+                "pairs": 3537,
+                "pairsAdded": 823,
+                "pairsAddedInternal": 537,
+                "addedInternalPercent": 1.5
+              },
+              "CLASS_LITERAL": {
+                "sites": 4880,
+                "withoutTarget": 242,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 4638,
+                "selfOccurrences": 574,
+                "pairs": 2912,
+                "pairsAdded": 671,
+                "pairsAddedInternal": 372,
+                "addedInternalPercent": 1.04
+              }
+            },
+            "union": {
+              "pairsAdded": 1548,
+              "pairsAddedInternal": 938,
+              "addedInternalPercent": 2.62
+            },
+            "staticFieldWrites": 245,
+            "scanDrops": {
+              "LOCAL_TARGET": 2
+            },
+            "scanCrashes": 0,
+            "scanMillis": 318
+          }
+        },
+        {
+          "selection": "ALL",
+          "roots": {
+            "MAIN": 30,
+            "GENERATED": 0,
+            "TEST": 30
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 9202,
+            "analyzed": 9201,
+            "tooLarge": 0,
+            "parseFailed": 1,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 1,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 817,
+            "types": 18461,
+            "methods": 103831,
+            "files": 9202,
+            "externalTypes": 3724,
+            "sourceFiles": 9202,
+            "sourceRoots": 60,
+            "sourceFileStatuses": {
+              "ANALYZED": 9201,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 1
+            }
+          },
+          "dependencies": {
+            "rows": 281926,
+            "occurrences": 714836,
+            "rowsByType": {
+              "IMPORTS": 84963,
+              "EXTENDS": 4681,
+              "IMPLEMENTS": 4926,
+              "CALLS": 81169,
+              "FIELD_TYPE": 18593,
+              "PARAMETER_TYPE": 33746,
+              "RETURN_TYPE": 22667,
+              "ANNOTATION_REFERENCE": 31181
+            },
+            "occurrencesByType": {
+              "IMPORTS": 87672,
+              "EXTENDS": 4681,
+              "IMPLEMENTS": 4926,
+              "CALLS": 399271,
+              "FIELD_TYPE": 24830,
+              "PARAMETER_TYPE": 69609,
+              "RETURN_TYPE": 38231,
+              "ANNOTATION_REFERENCE": 85616
+            },
+            "selfRows": 6746,
+            "selfOccurrences": 55029,
+            "rowsToExternal": 146840,
+            "occurrencesToExternal": 368925,
+            "resolutionPairs": {
+              "RESOLVED,0": 53384,
+              "INFERRED,0": 81702,
+              "UNRESOLVED_EXTERNAL,0": 0,
+              "RESOLVED,1": 91801,
+              "INFERRED,1": 0,
+              "UNRESOLVED_EXTERNAL,1": 55039
+            },
+            "occurrencesPerRow": {
+              "p50": 1,
+              "p90": 4,
+              "p99": 25,
+              "max": 889,
+              "mean": 2.54
+            },
+            "largestRow": {
+              "source": "type:org.springframework.beans.factory.DefaultListableBeanFactoryTests",
+              "target": "type:org.springframework.beans.factory.support.DefaultListableBeanFactory",
+              "type": "CALLS",
+              "occurrences": 889
+            }
+          },
+          "evidence": {
+            "rows": 609261,
+            "rowsAtCap": 4120,
+            "uncapped": 714836,
+            "trimmedPercent": 14.77,
+            "withFromMethod": 464680,
+            "withoutLine": 0,
+            "byResolution": {
+              "RESOLVED": 307900,
+              "INFERRED": 161750,
+              "UNRESOLVED_EXTERNAL": 139611
+            }
+          },
+          "modules": {
+            "rows": 0,
+            "files": 0,
+            "declaringModules": 0,
+            "transitive": 0,
+            "isStatic": 0,
+            "withoutLine": 0
+          },
+          "edges": {
+            "edges": 173841,
+            "selfEdges": 5859,
+            "toInternal": 77759,
+            "toExternal": 90223,
+            "byResolution": {
+              "RESOLVED": 92337,
+              "INFERRED": 49496,
+              "UNRESOLVED_EXTERNAL": 32008
+            },
+            "byDistinctTypeCount": {
+              "1": 92880,
+              "2": 60502,
+              "3": 14932,
+              "4": 4425,
+              "5": 1066,
+              "6": 36,
+              "7": 0,
+              "8": 0
+            },
+            "occurrenceTotal": 714836,
+            "weightTotal": 1230819
+          },
+          "checks": {
+            "foreignKeyViolations": 0,
+            "danglingEndpoints": 0,
+            "sourcesNotInternalTypes": 0,
+            "targetsNotTypes": 0,
+            "moduleDependencyInDependency": 0,
+            "invalidResolutionPairs": 0,
+            "evidenceCountMismatches": 0,
+            "evidenceFileMismatches": 0,
+            "fromMethodOwnerMismatches": 0,
+            "evidenceWeakerThanRow": 0,
+            "toMethodsWritten": 0,
+            "weightMismatches": 0,
+            "externalRowsMalformed": 0,
+            "externalsWithoutDependency": 0,
+            "edgeTotalsMatchRows": true,
+            "baselineDifferences": [],
+            "flushRuleReproduced": true,
+            "elementOnlyAccepts": 0,
+            "writtenEqualsReadBack": true,
+            "censusPassSameOutcomes": true
+          },
+          "drops": {
+            "extractionByReason": {
+              "LOCAL_TARGET": 91,
+              "INVALID_NAME": 182,
+              "ID_TOO_LONG": 0,
+              "DEFAULT_PACKAGE_COLLISION": 0,
+              "CALL_WITHOUT_TARGET": 105030
+            },
+            "extractionTotal": 105303,
+            "unresolvedDeclaredTarget": 34,
+            "pendingPeakRows": 5576
+          },
+          "extractionIssues": {
+            "SOURCE_PARSE_FAILED": 0,
+            "SOURCE_FILE_TOO_LARGE": 0,
+            "SOURCE_DUPLICATE_ELEMENT": 7,
+            "SOURCE_ELEMENT_ID_TOO_LONG": 0
+          },
+          "write": {
+            "beginMillis": 17,
+            "acceptCalls": 60,
+            "flushes": [
+              {
+                "batches": 6,
+                "rows": 57249,
+                "elementRows": 6633,
+                "dependencyRows": 17532,
+                "evidenceRows": 33084,
+                "moduleRows": 0,
+                "millis": 145,
+                "externalRowsWritten": 577,
+                "dependencyRowsWritten": 14128,
+                "evidenceRowsWritten": 28356,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 3404,
+                "walBytes": 11412432
+              },
+              {
+                "batches": 4,
+                "rows": 58627,
+                "elementRows": 6286,
+                "dependencyRows": 18625,
+                "evidenceRows": 33716,
+                "moduleRows": 0,
+                "millis": 162,
+                "externalRowsWritten": 400,
+                "dependencyRowsWritten": 16453,
+                "evidenceRowsWritten": 30412,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 5576,
+                "walBytes": 11412432
+              },
+              {
+                "batches": 3,
+                "rows": 71382,
+                "elementRows": 8921,
+                "dependencyRows": 19455,
+                "evidenceRows": 43006,
+                "moduleRows": 0,
+                "millis": 253,
+                "externalRowsWritten": 322,
+                "dependencyRowsWritten": 24102,
+                "evidenceRowsWritten": 49931,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 929,
+                "walBytes": 16430592
+              },
+              {
+                "batches": 5,
+                "rows": 42433,
+                "elementRows": 5103,
+                "dependencyRows": 11657,
+                "evidenceRows": 25673,
+                "moduleRows": 0,
+                "millis": 143,
+                "externalRowsWritten": 113,
+                "dependencyRowsWritten": 11411,
+                "evidenceRowsWritten": 25302,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 1175,
+                "walBytes": 16430592
+              },
+              {
+                "batches": 3,
+                "rows": 33496,
+                "elementRows": 3406,
+                "dependencyRows": 10336,
+                "evidenceRows": 19754,
+                "moduleRows": 0,
+                "millis": 125,
+                "externalRowsWritten": 241,
+                "dependencyRowsWritten": 10290,
+                "evidenceRowsWritten": 19628,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 1221,
+                "walBytes": 16430592
+              },
+              {
+                "batches": 3,
+                "rows": 50285,
+                "elementRows": 5648,
+                "dependencyRows": 15412,
+                "evidenceRows": 29225,
+                "moduleRows": 0,
+                "millis": 160,
+                "externalRowsWritten": 357,
+                "dependencyRowsWritten": 13940,
+                "evidenceRowsWritten": 27250,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 2693,
+                "walBytes": 16430592
+              },
+              {
+                "batches": 3,
+                "rows": 96114,
+                "elementRows": 10654,
+                "dependencyRows": 29314,
+                "evidenceRows": 56146,
+                "moduleRows": 0,
+                "millis": 342,
+                "externalRowsWritten": 433,
+                "dependencyRowsWritten": 31244,
+                "evidenceRowsWritten": 58840,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 763,
+                "walBytes": 21580592
+              },
+              {
+                "batches": 1,
+                "rows": 37393,
+                "elementRows": 3750,
+                "dependencyRows": 11936,
+                "evidenceRows": 21707,
+                "moduleRows": 0,
+                "millis": 135,
+                "externalRowsWritten": 154,
+                "dependencyRowsWritten": 12098,
+                "evidenceRowsWritten": 21903,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 601,
+                "walBytes": 21580592
+              },
+              {
+                "batches": 1,
+                "rows": 46592,
+                "elementRows": 4800,
+                "dependencyRows": 14269,
+                "evidenceRows": 27523,
+                "moduleRows": 0,
+                "millis": 175,
+                "externalRowsWritten": 63,
+                "dependencyRowsWritten": 14666,
+                "evidenceRowsWritten": 28000,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 204,
+                "walBytes": 21580592
+              },
+              {
+                "batches": 7,
+                "rows": 59080,
+                "elementRows": 8011,
+                "dependencyRows": 15036,
+                "evidenceRows": 36033,
+                "moduleRows": 0,
+                "millis": 213,
+                "externalRowsWritten": 138,
+                "dependencyRowsWritten": 14308,
+                "evidenceRowsWritten": 34204,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 932,
+                "walBytes": 21580592
+              },
+              {
+                "batches": 5,
+                "rows": 81842,
+                "elementRows": 12360,
+                "dependencyRows": 21669,
+                "evidenceRows": 47813,
+                "moduleRows": 0,
+                "millis": 318,
+                "externalRowsWritten": 148,
+                "dependencyRowsWritten": 22189,
+                "evidenceRowsWritten": 49207,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 412,
+                "walBytes": 23319232
+              },
+              {
+                "batches": 3,
+                "rows": 53027,
+                "elementRows": 9419,
+                "dependencyRows": 11518,
+                "evidenceRows": 32090,
+                "moduleRows": 0,
+                "millis": 234,
+                "externalRowsWritten": 128,
+                "dependencyRowsWritten": 11611,
+                "evidenceRowsWritten": 32206,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 319,
+                "walBytes": 23319232
+              },
+              {
+                "batches": 4,
+                "rows": 41428,
+                "elementRows": 5152,
+                "dependencyRows": 8790,
+                "evidenceRows": 27486,
+                "moduleRows": 0,
+                "millis": 165,
+                "externalRowsWritten": 57,
+                "dependencyRowsWritten": 9065,
+                "evidenceRowsWritten": 27962,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 44,
+                "walBytes": 23319232
+              },
+              {
+                "batches": 5,
+                "rows": 112800,
+                "elementRows": 14593,
+                "dependencyRows": 33073,
+                "evidenceRows": 65134,
+                "moduleRows": 0,
+                "millis": 414,
+                "externalRowsWritten": 277,
+                "dependencyRowsWritten": 33017,
+                "evidenceRowsWritten": 65023,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 100,
+                "walBytes": 29556912
+              },
+              {
+                "batches": 3,
+                "rows": 65627,
+                "elementRows": 7296,
+                "dependencyRows": 15454,
+                "evidenceRows": 42877,
+                "moduleRows": 0,
+                "millis": 253,
+                "externalRowsWritten": 159,
+                "dependencyRowsWritten": 14702,
+                "evidenceRowsWritten": 40269,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 852,
+                "walBytes": 29556912
+              },
+              {
+                "batches": 2,
+                "rows": 43484,
+                "elementRows": 4486,
+                "dependencyRows": 11550,
+                "evidenceRows": 27448,
+                "moduleRows": 0,
+                "millis": 189,
+                "externalRowsWritten": 74,
+                "dependencyRowsWritten": 12368,
+                "evidenceRowsWritten": 30165,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 34,
+                "walBytes": 29556912
+              },
+              {
+                "batches": 1,
+                "rows": 51765,
+                "elementRows": 5490,
+                "dependencyRows": 13049,
+                "evidenceRows": 33226,
+                "moduleRows": 0,
+                "millis": 215,
+                "externalRowsWritten": 66,
+                "dependencyRowsWritten": 13049,
+                "evidenceRowsWritten": 33226,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 34,
+                "walBytes": 29556912
+              }
+            ],
+            "bufferingMillis": 0,
+            "end": {
+              "batches": 1,
+              "rows": 11763,
+              "elementRows": 1101,
+              "dependencyRows": 3285,
+              "evidenceRows": 7377,
+              "moduleRows": 0,
+              "fileElements": 9202,
+              "millis": 183,
+              "externalRowsWritten": 17,
+              "dependencyRowsWritten": 3285,
+              "evidenceRowsWritten": 7377,
+              "moduleRowsWritten": 0,
+              "pendingAfter": 34,
+              "walBytes": 29556912
+            },
+            "sinkMillis": 3850,
+            "walPeakBytes": 29556912,
+            "probeMillis": 8
+          },
+          "timing": {
+            "wallMillis": 25716,
+            "preParseMillis": 1332,
+            "buildMillis": 13751,
+            "visitMillis": 9791,
+            "extractionMillis": 6116
+          },
+          "unitFunctions": {
+            "units": 9201,
+            "elementMillis": 1437,
+            "dependencyMillis": 4461,
+            "totalMillis": 5898,
+            "longestUnit": {
+              "path": "spring-expression/src/test/java/org/springframework/expression/spel/SpelCompilationCoverageTests.java",
+              "totalMicros": 79821,
+              "elementMicros": 11644,
+              "dependencyMicros": 68177
+            },
+            "slowestUnits": [
+              {
+                "path": "spring-expression/src/test/java/org/springframework/expression/spel/SpelCompilationCoverageTests.java",
+                "totalMicros": 79821,
+                "elementMicros": 11644,
+                "dependencyMicros": 68177
+              },
+              {
+                "path": "spring-beans/src/test/java/org/springframework/beans/factory/annotation/AutowiredAnnotationBeanPostProcessorTests.java",
+                "totalMicros": 38267,
+                "elementMicros": 7811,
+                "dependencyMicros": 30456
+              },
+              {
+                "path": "spring-webmvc/src/test/java/org/springframework/web/servlet/mvc/method/annotation/ServletAnnotationControllerHandlerMethodTests.java",
+                "totalMicros": 33279,
+                "elementMicros": 6477,
+                "dependencyMicros": 26802
+              },
+              {
+                "path": "spring-beans/src/test/java/org/springframework/beans/factory/DefaultListableBeanFactoryTests.java",
+                "totalMicros": 25532,
+                "elementMicros": 5639,
+                "dependencyMicros": 19893
+              },
+              {
+                "path": "spring-core/src/test/java/org/springframework/core/annotation/MergedAnnotationsTests.java",
+                "totalMicros": 22502,
+                "elementMicros": 5974,
+                "dependencyMicros": 16528
+              }
+            ],
+            "censusWallMillis": 21799
+          },
+          "models": {
+            "batches": 60,
+            "splitBatches": 0,
+            "quarantinedBatches": 0,
+            "builds": 60
+          },
+          "heap": {
+            "peakLiveBytes": 306454672,
+            "peakUsedBytes": 607483632,
+            "baselinePeakLiveBytes": 311794024,
+            "baselinePeakUsedBytes": 597674776
+          },
+          "cacheBytes": 184889344,
+          "baselineCacheBytes": 98508800,
+          "excludedConstructs": {
+            "basePairs": 167982,
+            "baseInternalPairs": 77759,
+            "constructs": {
+              "METHOD_REFERENCE": {
+                "sites": 2978,
+                "withoutTarget": 881,
+                "droppedTarget": 3,
+                "outsideSurvivingSource": 0,
+                "occurrences": 2094,
+                "selfOccurrences": 351,
+                "pairs": 1013,
+                "pairsAdded": 173,
+                "pairsAddedInternal": 88,
+                "addedInternalPercent": 0.11
+              },
+              "STATIC_FIELD": {
+                "sites": 37048,
+                "withoutTarget": 0,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 37048,
+                "selfOccurrences": 12634,
+                "pairs": 8077,
+                "pairsAdded": 2985,
+                "pairsAddedInternal": 1524,
+                "addedInternalPercent": 1.96
+              },
+              "CLASS_LITERAL": {
+                "sites": 35965,
+                "withoutTarget": 807,
+                "droppedTarget": 97,
+                "outsideSurvivingSource": 0,
+                "occurrences": 35061,
+                "selfOccurrences": 789,
+                "pairs": 14820,
+                "pairsAdded": 7195,
+                "pairsAddedInternal": 5375,
+                "addedInternalPercent": 6.91
+              }
+            },
+            "union": {
+              "pairsAdded": 10258,
+              "pairsAddedInternal": 6904,
+              "addedInternalPercent": 8.88
+            },
+            "staticFieldWrites": 615,
+            "scanDrops": {
+              "LOCAL_TARGET": 100
+            },
+            "scanCrashes": 0,
+            "scanMillis": 829
+          }
+        }
+      ]
+    },
+    {
+      "name": "elasticsearch",
+      "origin": "clone",
+      "commitId": "b42549c72e6e040825b13e5d8ebf7ff63886b24d",
+      "sourceRoots": {
+        "MAIN": 292,
+        "GENERATED": 0,
+        "TEST": 235
+      },
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "roots": {
+            "MAIN": 292,
+            "GENERATED": 0,
+            "TEST": 0
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 16848,
+            "analyzed": 16795,
+            "tooLarge": 0,
+            "parseFailed": 53,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 1,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 52,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 2006,
+            "types": 26748,
+            "methods": 200936,
+            "files": 16848,
+            "externalTypes": 10652,
+            "sourceFiles": 16848,
+            "sourceRoots": 292,
+            "sourceFileStatuses": {
+              "ANALYZED": 16795,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 53
+            }
+          },
+          "dependencies": {
+            "rows": 751988,
+            "occurrences": 1555827,
+            "rowsByType": {
+              "IMPORTS": 219975,
+              "EXTENDS": 12699,
+              "IMPLEMENTS": 9360,
+              "CALLS": 230770,
+              "FIELD_TYPE": 60674,
+              "PARAMETER_TYPE": 125918,
+              "RETURN_TYPE": 65740,
+              "ANNOTATION_REFERENCE": 26852
+            },
+            "occurrencesByType": {
+              "IMPORTS": 225406,
+              "EXTENDS": 12699,
+              "IMPLEMENTS": 9360,
+              "CALLS": 791476,
+              "FIELD_TYPE": 89938,
+              "PARAMETER_TYPE": 233676,
+              "RETURN_TYPE": 103444,
+              "ANNOTATION_REFERENCE": 89828
+            },
+            "selfRows": 22646,
+            "selfOccurrences": 137952,
+            "rowsToExternal": 307329,
+            "occurrencesToExternal": 676951,
+            "resolutionPairs": {
+              "RESOLVED,0": 210006,
+              "INFERRED,0": 234653,
+              "UNRESOLVED_EXTERNAL,0": 0,
+              "RESOLVED,1": 219570,
+              "INFERRED,1": 0,
+              "UNRESOLVED_EXTERNAL,1": 87759
+            },
+            "occurrencesPerRow": {
+              "p50": 1,
+              "p90": 4,
+              "p99": 16,
+              "max": 2458,
+              "mean": 2.07
+            },
+            "largestRow": {
+              "source": "type:org.elasticsearch.xpack.esql.parser.EsqlBaseParser",
+              "target": "type:org.elasticsearch.xpack.esql.parser.EsqlBaseParser",
+              "type": "CALLS",
+              "occurrences": 2458
+            }
+          },
+          "evidence": {
+            "rows": 1449584,
+            "rowsAtCap": 5091,
+            "uncapped": 1555827,
+            "trimmedPercent": 6.83,
+            "withFromMethod": 1079479,
+            "withoutLine": 0,
+            "byResolution": {
+              "RESOLVED": 910626,
+              "INFERRED": 382919,
+              "UNRESOLVED_EXTERNAL": 156039
+            }
+          },
+          "modules": {
+            "rows": 778,
+            "files": 106,
+            "declaringModules": 102,
+            "transitive": 7,
+            "isStatic": 5,
+            "withoutLine": 0
+          },
+          "edges": {
+            "edges": 426407,
+            "selfEdges": 15946,
+            "toInternal": 221748,
+            "toExternal": 188713,
+            "byResolution": {
+              "RESOLVED": 250360,
+              "INFERRED": 120115,
+              "UNRESOLVED_EXTERNAL": 55932
+            },
+            "byDistinctTypeCount": {
+              "1": 207168,
+              "2": 138866,
+              "3": 58305,
+              "4": 18257,
+              "5": 3721,
+              "6": 90,
+              "7": 0,
+              "8": 0
+            },
+            "occurrenceTotal": 1555827,
+            "weightTotal": 2696800
+          },
+          "checks": {
+            "foreignKeyViolations": 0,
+            "danglingEndpoints": 0,
+            "sourcesNotInternalTypes": 0,
+            "targetsNotTypes": 0,
+            "moduleDependencyInDependency": 0,
+            "invalidResolutionPairs": 0,
+            "evidenceCountMismatches": 0,
+            "evidenceFileMismatches": 0,
+            "fromMethodOwnerMismatches": 0,
+            "evidenceWeakerThanRow": 0,
+            "toMethodsWritten": 0,
+            "weightMismatches": 0,
+            "externalRowsMalformed": 0,
+            "externalsWithoutDependency": 0,
+            "edgeTotalsMatchRows": true,
+            "baselineDifferences": [],
+            "flushRuleReproduced": true,
+            "elementOnlyAccepts": 0,
+            "writtenEqualsReadBack": true,
+            "censusPassSameOutcomes": true
+          },
+          "drops": {
+            "extractionByReason": {
+              "LOCAL_TARGET": 62,
+              "INVALID_NAME": 1626,
+              "ID_TOO_LONG": 0,
+              "DEFAULT_PACKAGE_COLLISION": 0,
+              "CALL_WITHOUT_TARGET": 47557
+            },
+            "extractionTotal": 49245,
+            "unresolvedDeclaredTarget": 6424,
+            "pendingPeakRows": 16123
+          },
+          "extractionIssues": {
+            "SOURCE_PARSE_FAILED": 0,
+            "SOURCE_FILE_TOO_LARGE": 0,
+            "SOURCE_DUPLICATE_ELEMENT": 1,
+            "SOURCE_ELEMENT_ID_TOO_LONG": 0
+          },
+          "write": {
+            "beginMillis": 43,
+            "acceptCalls": 410,
+            "flushes": [
+              {
+                "batches": 4,
+                "rows": 62480,
+                "elementRows": 4792,
+                "dependencyRows": 20944,
+                "evidenceRows": 36744,
+                "moduleRows": 0,
+                "millis": 160,
+                "externalRowsWritten": 1144,
+                "dependencyRowsWritten": 18192,
+                "evidenceRowsWritten": 32620,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 2752,
+                "walBytes": 8396592
+              },
+              {
+                "batches": 37,
+                "rows": 37615,
+                "elementRows": 4114,
+                "dependencyRows": 10786,
+                "evidenceRows": 22681,
+                "moduleRows": 34,
+                "millis": 111,
+                "externalRowsWritten": 476,
+                "dependencyRowsWritten": 10599,
+                "evidenceRowsWritten": 22386,
+                "moduleRowsWritten": 34,
+                "pendingAfter": 2939,
+                "walBytes": 8396592
+              },
+              {
+                "batches": 43,
+                "rows": 33549,
+                "elementRows": 4594,
+                "dependencyRows": 8509,
+                "evidenceRows": 20379,
+                "moduleRows": 67,
+                "millis": 103,
+                "externalRowsWritten": 222,
+                "dependencyRowsWritten": 8542,
+                "evidenceRowsWritten": 20454,
+                "moduleRowsWritten": 67,
+                "pendingAfter": 2906,
+                "walBytes": 8396592
+              },
+              {
+                "batches": 20,
+                "rows": 37486,
+                "elementRows": 3448,
+                "dependencyRows": 12567,
+                "evidenceRows": 21411,
+                "moduleRows": 60,
+                "millis": 89,
+                "externalRowsWritten": 486,
+                "dependencyRowsWritten": 7960,
+                "evidenceRowsWritten": 15483,
+                "moduleRowsWritten": 60,
+                "pendingAfter": 7513,
+                "walBytes": 8396592
+              },
+              {
+                "batches": 23,
+                "rows": 53371,
+                "elementRows": 5602,
+                "dependencyRows": 16269,
+                "evidenceRows": 31449,
+                "moduleRows": 51,
+                "millis": 139,
+                "externalRowsWritten": 254,
+                "dependencyRowsWritten": 13560,
+                "evidenceRowsWritten": 27721,
+                "moduleRowsWritten": 51,
+                "pendingAfter": 10222,
+                "walBytes": 9570792
+              },
+              {
+                "batches": 16,
+                "rows": 34446,
+                "elementRows": 2707,
+                "dependencyRows": 11025,
+                "evidenceRows": 20654,
+                "moduleRows": 60,
+                "millis": 81,
+                "externalRowsWritten": 389,
+                "dependencyRowsWritten": 7162,
+                "evidenceRowsWritten": 14630,
+                "moduleRowsWritten": 60,
+                "pendingAfter": 14085,
+                "walBytes": 9570792
+              },
+              {
+                "batches": 52,
+                "rows": 346842,
+                "elementRows": 33288,
+                "dependencyRows": 104631,
+                "evidenceRows": 208838,
+                "moduleRows": 85,
+                "millis": 988,
+                "externalRowsWritten": 1269,
+                "dependencyRowsWritten": 102593,
+                "evidenceRowsWritten": 205532,
+                "moduleRowsWritten": 85,
+                "pendingAfter": 16123,
+                "walBytes": 59196192
+              },
+              {
+                "batches": 1,
+                "rows": 310593,
+                "elementRows": 31206,
+                "dependencyRows": 94584,
+                "evidenceRows": 184803,
+                "moduleRows": 0,
+                "millis": 988,
+                "externalRowsWritten": 908,
+                "dependencyRowsWritten": 99337,
+                "evidenceRowsWritten": 191024,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 11370,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 1,
+                "rows": 128505,
+                "elementRows": 13105,
+                "dependencyRows": 40107,
+                "evidenceRows": 75293,
+                "moduleRows": 0,
+                "millis": 505,
+                "externalRowsWritten": 355,
+                "dependencyRowsWritten": 48908,
+                "evidenceRowsWritten": 87536,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 2569,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 26,
+                "rows": 95512,
+                "elementRows": 9079,
+                "dependencyRows": 27463,
+                "evidenceRows": 58923,
+                "moduleRows": 47,
+                "millis": 329,
+                "externalRowsWritten": 422,
+                "dependencyRowsWritten": 26917,
+                "evidenceRowsWritten": 56936,
+                "moduleRowsWritten": 47,
+                "pendingAfter": 3115,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 15,
+                "rows": 34784,
+                "elementRows": 3032,
+                "dependencyRows": 11214,
+                "evidenceRows": 20523,
+                "moduleRows": 15,
+                "millis": 145,
+                "externalRowsWritten": 124,
+                "dependencyRowsWritten": 10936,
+                "evidenceRowsWritten": 20100,
+                "moduleRowsWritten": 15,
+                "pendingAfter": 3393,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 5,
+                "rows": 225988,
+                "elementRows": 22602,
+                "dependencyRows": 70290,
+                "evidenceRows": 133085,
+                "moduleRows": 11,
+                "millis": 735,
+                "externalRowsWritten": 459,
+                "dependencyRowsWritten": 70147,
+                "evidenceRowsWritten": 132724,
+                "moduleRowsWritten": 11,
+                "pendingAfter": 3536,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 20,
+                "rows": 49631,
+                "elementRows": 4019,
+                "dependencyRows": 17343,
+                "evidenceRows": 28220,
+                "moduleRows": 49,
+                "millis": 193,
+                "externalRowsWritten": 121,
+                "dependencyRowsWritten": 17183,
+                "evidenceRowsWritten": 27964,
+                "moduleRowsWritten": 49,
+                "pendingAfter": 3696,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 14,
+                "rows": 33597,
+                "elementRows": 3780,
+                "dependencyRows": 10097,
+                "evidenceRows": 19703,
+                "moduleRows": 17,
+                "millis": 128,
+                "externalRowsWritten": 98,
+                "dependencyRowsWritten": 7971,
+                "evidenceRowsWritten": 16319,
+                "moduleRowsWritten": 17,
+                "pendingAfter": 5822,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 15,
+                "rows": 85773,
+                "elementRows": 9605,
+                "dependencyRows": 24044,
+                "evidenceRows": 52120,
+                "moduleRows": 4,
+                "millis": 305,
+                "externalRowsWritten": 452,
+                "dependencyRowsWritten": 23477,
+                "evidenceRowsWritten": 51105,
+                "moduleRowsWritten": 4,
+                "pendingAfter": 6389,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 5,
+                "rows": 33680,
+                "elementRows": 3039,
+                "dependencyRows": 8512,
+                "evidenceRows": 22109,
+                "moduleRows": 20,
+                "millis": 127,
+                "externalRowsWritten": 107,
+                "dependencyRowsWritten": 7461,
+                "evidenceRowsWritten": 19785,
+                "moduleRowsWritten": 20,
+                "pendingAfter": 7440,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 1,
+                "rows": 235778,
+                "elementRows": 21846,
+                "dependencyRows": 71785,
+                "evidenceRows": 142147,
+                "moduleRows": 0,
+                "millis": 740,
+                "externalRowsWritten": 818,
+                "dependencyRowsWritten": 72838,
+                "evidenceRowsWritten": 144243,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 6387,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 12,
+                "rows": 138100,
+                "elementRows": 11018,
+                "dependencyRows": 46886,
+                "evidenceRows": 80183,
+                "moduleRows": 13,
+                "millis": 454,
+                "externalRowsWritten": 472,
+                "dependencyRowsWritten": 46578,
+                "evidenceRowsWritten": 79678,
+                "moduleRowsWritten": 13,
+                "pendingAfter": 6695,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 18,
+                "rows": 127537,
+                "elementRows": 9234,
+                "dependencyRows": 41395,
+                "evidenceRows": 76853,
+                "moduleRows": 55,
+                "millis": 429,
+                "externalRowsWritten": 600,
+                "dependencyRowsWritten": 41076,
+                "evidenceRowsWritten": 76439,
+                "moduleRowsWritten": 55,
+                "pendingAfter": 7014,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 7,
+                "rows": 55105,
+                "elementRows": 5486,
+                "dependencyRows": 16595,
+                "evidenceRows": 33002,
+                "moduleRows": 22,
+                "millis": 228,
+                "externalRowsWritten": 147,
+                "dependencyRowsWritten": 18107,
+                "evidenceRowsWritten": 35351,
+                "moduleRowsWritten": 22,
+                "pendingAfter": 5502,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 26,
+                "rows": 93299,
+                "elementRows": 6005,
+                "dependencyRows": 30927,
+                "evidenceRows": 56316,
+                "moduleRows": 51,
+                "millis": 335,
+                "externalRowsWritten": 647,
+                "dependencyRowsWritten": 30396,
+                "evidenceRowsWritten": 55364,
+                "moduleRowsWritten": 51,
+                "pendingAfter": 6033,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 13,
+                "rows": 37391,
+                "elementRows": 3703,
+                "dependencyRows": 11260,
+                "evidenceRows": 22361,
+                "moduleRows": 67,
+                "millis": 175,
+                "externalRowsWritten": 148,
+                "dependencyRowsWritten": 11110,
+                "evidenceRowsWritten": 22118,
+                "moduleRowsWritten": 67,
+                "pendingAfter": 6183,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 5,
+                "rows": 57233,
+                "elementRows": 6496,
+                "dependencyRows": 18088,
+                "evidenceRows": 32649,
+                "moduleRows": 0,
+                "millis": 223,
+                "externalRowsWritten": 90,
+                "dependencyRowsWritten": 18175,
+                "evidenceRowsWritten": 32791,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 6096,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 10,
+                "rows": 41910,
+                "elementRows": 3591,
+                "dependencyRows": 13499,
+                "evidenceRows": 24802,
+                "moduleRows": 18,
+                "millis": 186,
+                "externalRowsWritten": 213,
+                "dependencyRowsWritten": 13353,
+                "evidenceRowsWritten": 24587,
+                "moduleRowsWritten": 18,
+                "pendingAfter": 6242,
+                "walBytes": 65602792
+              },
+              {
+                "batches": 8,
+                "rows": 56280,
+                "elementRows": 3917,
+                "dependencyRows": 18076,
+                "evidenceRows": 34262,
+                "moduleRows": 25,
+                "millis": 227,
+                "externalRowsWritten": 218,
+                "dependencyRowsWritten": 17911,
+                "evidenceRowsWritten": 34056,
+                "moduleRowsWritten": 25,
+                "pendingAfter": 6407,
+                "walBytes": 65602792
+              }
+            ],
+            "bufferingMillis": 0,
+            "end": {
+              "batches": 13,
+              "rows": 4571,
+              "elementRows": 382,
+              "dependencyRows": 1516,
+              "evidenceRows": 2666,
+              "moduleRows": 7,
+              "fileElements": 16848,
+              "millis": 254,
+              "externalRowsWritten": 13,
+              "dependencyRowsWritten": 1499,
+              "evidenceRowsWritten": 2638,
+              "moduleRowsWritten": 7,
+              "pendingAfter": 6424,
+              "walBytes": 65602792
+            },
+            "sinkMillis": 8434,
+            "walPeakBytes": 65602792,
+            "probeMillis": 30
+          },
+          "timing": {
+            "wallMillis": 76694,
+            "preParseMillis": 3463,
+            "buildMillis": 50158,
+            "visitMillis": 21008,
+            "extractionMillis": 12798
+          },
+          "unitFunctions": {
+            "units": 16795,
+            "elementMillis": 3156,
+            "dependencyMillis": 9472,
+            "totalMillis": 12628,
+            "longestUnit": {
+              "path": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/parser/EsqlBaseParser.java",
+              "totalMicros": 80152,
+              "elementMicros": 18931,
+              "dependencyMicros": 61220
+            },
+            "slowestUnits": [
+              {
+                "path": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/parser/EsqlBaseParser.java",
+                "totalMicros": 80152,
+                "elementMicros": 18931,
+                "dependencyMicros": 61220
+              },
+              {
+                "path": "x-pack/plugin/sql/src/main/java/org/elasticsearch/xpack/sql/parser/SqlBaseParser.java",
+                "totalMicros": 55036,
+                "elementMicros": 13655,
+                "dependencyMicros": 41381
+              },
+              {
+                "path": "modules/lang-painless/src/main/java/org/elasticsearch/painless/antlr/PainlessParser.java",
+                "totalMicros": 30786,
+                "elementMicros": 7953,
+                "dependencyMicros": 22832
+              },
+              {
+                "path": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/analysis/Analyzer.java",
+                "totalMicros": 30462,
+                "elementMicros": 5013,
+                "dependencyMicros": 25449
+              },
+              {
+                "path": "server/src/main/java/org/elasticsearch/index/mapper/vectors/DenseVectorFieldMapper.java",
+                "totalMicros": 25419,
+                "elementMicros": 5375,
+                "dependencyMicros": 20043
+              }
+            ],
+            "censusWallMillis": 68944
+          },
+          "models": {
+            "batches": 410,
+            "splitBatches": 2,
+            "quarantinedBatches": 1,
+            "builds": 444
+          },
+          "heap": {
+            "peakLiveBytes": 781978824,
+            "peakUsedBytes": 1229720776,
+            "baselinePeakLiveBytes": 812628928,
+            "baselinePeakUsedBytes": 1248836544
+          },
+          "cacheBytes": 401567744,
+          "baselineCacheBytes": 188628992,
+          "excludedConstructs": {
+            "basePairs": 410461,
+            "baseInternalPairs": 221748,
+            "constructs": {
+              "METHOD_REFERENCE": {
+                "sites": 20095,
+                "withoutTarget": 4686,
+                "droppedTarget": 23,
+                "outsideSurvivingSource": 0,
+                "occurrences": 15386,
+                "selfOccurrences": 3875,
+                "pairs": 7204,
+                "pairsAdded": 1290,
+                "pairsAddedInternal": 783,
+                "addedInternalPercent": 0.35
+              },
+              "STATIC_FIELD": {
+                "sites": 148050,
+                "withoutTarget": 0,
+                "droppedTarget": 48,
+                "outsideSurvivingSource": 6,
+                "occurrences": 147996,
+                "selfOccurrences": 55399,
+                "pairs": 37887,
+                "pairsAdded": 12707,
+                "pairsAddedInternal": 6038,
+                "addedInternalPercent": 2.72
+              },
+              "CLASS_LITERAL": {
+                "sites": 15551,
+                "withoutTarget": 1247,
+                "droppedTarget": 0,
+                "outsideSurvivingSource": 0,
+                "occurrences": 14304,
+                "selfOccurrences": 2552,
+                "pairs": 6698,
+                "pairsAdded": 1246,
+                "pairsAddedInternal": 759,
+                "addedInternalPercent": 0.34
+              }
+            },
+            "union": {
+              "pairsAdded": 14940,
+              "pairsAddedInternal": 7356,
+              "addedInternalPercent": 3.32
+            },
+            "staticFieldWrites": 640,
+            "scanDrops": {
+              "LOCAL_TARGET": 71
+            },
+            "scanCrashes": 0,
+            "scanMillis": 1977
+          }
+        },
+        {
+          "selection": "ALL",
+          "roots": {
+            "MAIN": 292,
+            "GENERATED": 0,
+            "TEST": 235
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 26782,
+            "analyzed": 26724,
+            "tooLarge": 0,
+            "parseFailed": 58,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 3,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 55,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 2129,
+            "types": 39224,
+            "methods": 326214,
+            "files": 26782,
+            "externalTypes": 14077,
+            "sourceFiles": 26782,
+            "sourceRoots": 527,
+            "sourceFileStatuses": {
+              "ANALYZED": 26724,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 58
+            }
+          },
+          "dependencies": {
+            "rows": 1165157,
+            "occurrences": 3346504,
+            "rowsByType": {
+              "IMPORTS": 379008,
+              "EXTENDS": 18818,
+              "IMPLEMENTS": 10344,
+              "CALLS": 394141,
+              "FIELD_TYPE": 72682,
+              "PARAMETER_TYPE": 159338,
+              "RETURN_TYPE": 92408,
+              "ANNOTATION_REFERENCE": 38418
+            },
+            "occurrencesByType": {
+              "IMPORTS": 401581,
+              "EXTENDS": 18818,
+              "IMPLEMENTS": 10344,
+              "CALLS": 2242964,
+              "FIELD_TYPE": 105807,
+              "PARAMETER_TYPE": 297146,
+              "RETURN_TYPE": 145147,
+              "ANNOTATION_REFERENCE": 124697
+            },
+            "selfRows": 33161,
+            "selfOccurrences": 587432,
+            "rowsToExternal": 487081,
+            "occurrencesToExternal": 1363755,
+            "resolutionPairs": {
+              "RESOLVED,0": 235005,
+              "INFERRED,0": 443071,
+              "UNRESOLVED_EXTERNAL,0": 0,
+              "RESOLVED,1": 330520,
+              "INFERRED,1": 0,
+              "UNRESOLVED_EXTERNAL,1": 156561
+            },
+            "occurrencesPerRow": {
+              "p50": 1,
+              "p90": 4,
+              "p99": 30,
+              "max": 3053,
+              "mean": 2.87
+            },
+            "largestRow": {
+              "source": "type:org.elasticsearch.index.engine.InternalEngineTests",
+              "target": "type:org.elasticsearch.index.engine.InternalEngineTests",
+              "type": "CALLS",
+              "occurrences": 3053
+            }
+          },
+          "evidence": {
+            "rows": 2623130,
+            "rowsAtCap": 19963,
+            "uncapped": 3346504,
+            "trimmedPercent": 21.62,
+            "withFromMethod": 2047767,
+            "withoutLine": 0,
+            "byResolution": {
+              "RESOLVED": 1379057,
+              "INFERRED": 866445,
+              "UNRESOLVED_EXTERNAL": 377628
+            }
+          },
+          "modules": {
+            "rows": 778,
+            "files": 106,
+            "declaringModules": 102,
+            "transitive": 7,
+            "isStatic": 5,
+            "withoutLine": 0
+          },
+          "edges": {
+            "edges": 677809,
+            "selfEdges": 26263,
+            "toInternal": 351532,
+            "toExternal": 300014,
+            "byResolution": {
+              "RESOLVED": 339500,
+              "INFERRED": 240623,
+              "UNRESOLVED_EXTERNAL": 97686
+            },
+            "byDistinctTypeCount": {
+              "1": 324552,
+              "2": 249183,
+              "3": 78175,
+              "4": 21872,
+              "5": 3936,
+              "6": 91,
+              "7": 0,
+              "8": 0
+            },
+            "occurrenceTotal": 3346504,
+            "weightTotal": 6033715
+          },
+          "checks": {
+            "foreignKeyViolations": 0,
+            "danglingEndpoints": 0,
+            "sourcesNotInternalTypes": 0,
+            "targetsNotTypes": 0,
+            "moduleDependencyInDependency": 0,
+            "invalidResolutionPairs": 0,
+            "evidenceCountMismatches": 0,
+            "evidenceFileMismatches": 0,
+            "fromMethodOwnerMismatches": 0,
+            "evidenceWeakerThanRow": 0,
+            "toMethodsWritten": 0,
+            "weightMismatches": 0,
+            "externalRowsMalformed": 0,
+            "externalsWithoutDependency": 0,
+            "edgeTotalsMatchRows": true,
+            "baselineDifferences": [],
+            "flushRuleReproduced": true,
+            "elementOnlyAccepts": 0,
+            "writtenEqualsReadBack": true,
+            "censusPassSameOutcomes": true
+          },
+          "drops": {
+            "extractionByReason": {
+              "LOCAL_TARGET": 453,
+              "INVALID_NAME": 3007,
+              "ID_TOO_LONG": 0,
+              "DEFAULT_PACKAGE_COLLISION": 0,
+              "CALL_WITHOUT_TARGET": 258007
+            },
+            "extractionTotal": 261467,
+            "unresolvedDeclaredTarget": 22176,
+            "pendingPeakRows": 22096
+          },
+          "extractionIssues": {
+            "SOURCE_PARSE_FAILED": 0,
+            "SOURCE_FILE_TOO_LARGE": 0,
+            "SOURCE_DUPLICATE_ELEMENT": 5,
+            "SOURCE_ELEMENT_ID_TOO_LONG": 0
+          },
+          "write": {
+            "beginMillis": 60,
+            "acceptCalls": 647,
+            "flushes": [
+              {
+                "batches": 4,
+                "rows": 62480,
+                "elementRows": 4792,
+                "dependencyRows": 20944,
+                "evidenceRows": 36744,
+                "moduleRows": 0,
+                "millis": 151,
+                "externalRowsWritten": 1142,
+                "dependencyRowsWritten": 18188,
+                "evidenceRowsWritten": 32614,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 2756,
+                "walBytes": 8400712
+              },
+              {
+                "batches": 37,
+                "rows": 37615,
+                "elementRows": 4114,
+                "dependencyRows": 10786,
+                "evidenceRows": 22681,
+                "moduleRows": 34,
+                "millis": 108,
+                "externalRowsWritten": 476,
+                "dependencyRowsWritten": 10599,
+                "evidenceRowsWritten": 22386,
+                "moduleRowsWritten": 34,
+                "pendingAfter": 2943,
+                "walBytes": 8400712
+              },
+              {
+                "batches": 43,
+                "rows": 33549,
+                "elementRows": 4594,
+                "dependencyRows": 8509,
+                "evidenceRows": 20379,
+                "moduleRows": 67,
+                "millis": 101,
+                "externalRowsWritten": 222,
+                "dependencyRowsWritten": 8542,
+                "evidenceRowsWritten": 20454,
+                "moduleRowsWritten": 67,
+                "pendingAfter": 2910,
+                "walBytes": 8400712
+              },
+              {
+                "batches": 20,
+                "rows": 37486,
+                "elementRows": 3448,
+                "dependencyRows": 12567,
+                "evidenceRows": 21411,
+                "moduleRows": 60,
+                "millis": 89,
+                "externalRowsWritten": 486,
+                "dependencyRowsWritten": 7960,
+                "evidenceRowsWritten": 15483,
+                "moduleRowsWritten": 60,
+                "pendingAfter": 7517,
+                "walBytes": 8400712
+              },
+              {
+                "batches": 23,
+                "rows": 53371,
+                "elementRows": 5602,
+                "dependencyRows": 16269,
+                "evidenceRows": 31449,
+                "moduleRows": 51,
+                "millis": 141,
+                "externalRowsWritten": 254,
+                "dependencyRowsWritten": 13560,
+                "evidenceRowsWritten": 27721,
+                "moduleRowsWritten": 51,
+                "pendingAfter": 10226,
+                "walBytes": 9554312
+              },
+              {
+                "batches": 16,
+                "rows": 34446,
+                "elementRows": 2707,
+                "dependencyRows": 11025,
+                "evidenceRows": 20654,
+                "moduleRows": 60,
+                "millis": 82,
+                "externalRowsWritten": 389,
+                "dependencyRowsWritten": 7162,
+                "evidenceRowsWritten": 14630,
+                "moduleRowsWritten": 60,
+                "pendingAfter": 14089,
+                "walBytes": 9554312
+              },
+              {
+                "batches": 52,
+                "rows": 346842,
+                "elementRows": 33288,
+                "dependencyRows": 104631,
+                "evidenceRows": 208838,
+                "moduleRows": 85,
+                "millis": 998,
+                "externalRowsWritten": 1269,
+                "dependencyRowsWritten": 102593,
+                "evidenceRowsWritten": 205532,
+                "moduleRowsWritten": 85,
+                "pendingAfter": 16127,
+                "walBytes": 59270352
+              },
+              {
+                "batches": 1,
+                "rows": 310593,
+                "elementRows": 31206,
+                "dependencyRows": 94584,
+                "evidenceRows": 184803,
+                "moduleRows": 0,
+                "millis": 982,
+                "externalRowsWritten": 908,
+                "dependencyRowsWritten": 99337,
+                "evidenceRowsWritten": 191024,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 11374,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 1,
+                "rows": 128505,
+                "elementRows": 13105,
+                "dependencyRows": 40107,
+                "evidenceRows": 75293,
+                "moduleRows": 0,
+                "millis": 514,
+                "externalRowsWritten": 355,
+                "dependencyRowsWritten": 48908,
+                "evidenceRowsWritten": 87536,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 2573,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 26,
+                "rows": 95512,
+                "elementRows": 9079,
+                "dependencyRows": 27463,
+                "evidenceRows": 58923,
+                "moduleRows": 47,
+                "millis": 328,
+                "externalRowsWritten": 422,
+                "dependencyRowsWritten": 26917,
+                "evidenceRowsWritten": 56936,
+                "moduleRowsWritten": 47,
+                "pendingAfter": 3119,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 15,
+                "rows": 34784,
+                "elementRows": 3032,
+                "dependencyRows": 11214,
+                "evidenceRows": 20523,
+                "moduleRows": 15,
+                "millis": 143,
+                "externalRowsWritten": 124,
+                "dependencyRowsWritten": 10936,
+                "evidenceRowsWritten": 20100,
+                "moduleRowsWritten": 15,
+                "pendingAfter": 3397,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 5,
+                "rows": 225988,
+                "elementRows": 22602,
+                "dependencyRows": 70290,
+                "evidenceRows": 133085,
+                "moduleRows": 11,
+                "millis": 716,
+                "externalRowsWritten": 459,
+                "dependencyRowsWritten": 70147,
+                "evidenceRowsWritten": 132724,
+                "moduleRowsWritten": 11,
+                "pendingAfter": 3540,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 20,
+                "rows": 49631,
+                "elementRows": 4019,
+                "dependencyRows": 17343,
+                "evidenceRows": 28220,
+                "moduleRows": 49,
+                "millis": 185,
+                "externalRowsWritten": 121,
+                "dependencyRowsWritten": 17183,
+                "evidenceRowsWritten": 27964,
+                "moduleRowsWritten": 49,
+                "pendingAfter": 3700,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 14,
+                "rows": 33597,
+                "elementRows": 3780,
+                "dependencyRows": 10097,
+                "evidenceRows": 19703,
+                "moduleRows": 17,
+                "millis": 128,
+                "externalRowsWritten": 98,
+                "dependencyRowsWritten": 7971,
+                "evidenceRowsWritten": 16319,
+                "moduleRowsWritten": 17,
+                "pendingAfter": 5826,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 15,
+                "rows": 85773,
+                "elementRows": 9605,
+                "dependencyRows": 24044,
+                "evidenceRows": 52120,
+                "moduleRows": 4,
+                "millis": 297,
+                "externalRowsWritten": 452,
+                "dependencyRowsWritten": 23477,
+                "evidenceRowsWritten": 51105,
+                "moduleRowsWritten": 4,
+                "pendingAfter": 6393,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 5,
+                "rows": 33680,
+                "elementRows": 3039,
+                "dependencyRows": 8512,
+                "evidenceRows": 22109,
+                "moduleRows": 20,
+                "millis": 126,
+                "externalRowsWritten": 107,
+                "dependencyRowsWritten": 7461,
+                "evidenceRowsWritten": 19785,
+                "moduleRowsWritten": 20,
+                "pendingAfter": 7444,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 1,
+                "rows": 235778,
+                "elementRows": 21846,
+                "dependencyRows": 71785,
+                "evidenceRows": 142147,
+                "moduleRows": 0,
+                "millis": 737,
+                "externalRowsWritten": 818,
+                "dependencyRowsWritten": 72838,
+                "evidenceRowsWritten": 144243,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 6391,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 12,
+                "rows": 138100,
+                "elementRows": 11018,
+                "dependencyRows": 46886,
+                "evidenceRows": 80183,
+                "moduleRows": 13,
+                "millis": 453,
+                "externalRowsWritten": 472,
+                "dependencyRowsWritten": 46578,
+                "evidenceRowsWritten": 79678,
+                "moduleRowsWritten": 13,
+                "pendingAfter": 6699,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 18,
+                "rows": 127537,
+                "elementRows": 9234,
+                "dependencyRows": 41395,
+                "evidenceRows": 76853,
+                "moduleRows": 55,
+                "millis": 419,
+                "externalRowsWritten": 600,
+                "dependencyRowsWritten": 41076,
+                "evidenceRowsWritten": 76439,
+                "moduleRowsWritten": 55,
+                "pendingAfter": 7018,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 7,
+                "rows": 55105,
+                "elementRows": 5486,
+                "dependencyRows": 16595,
+                "evidenceRows": 33002,
+                "moduleRows": 22,
+                "millis": 226,
+                "externalRowsWritten": 147,
+                "dependencyRowsWritten": 18107,
+                "evidenceRowsWritten": 35351,
+                "moduleRowsWritten": 22,
+                "pendingAfter": 5506,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 26,
+                "rows": 93299,
+                "elementRows": 6005,
+                "dependencyRows": 30927,
+                "evidenceRows": 56316,
+                "moduleRows": 51,
+                "millis": 340,
+                "externalRowsWritten": 647,
+                "dependencyRowsWritten": 30396,
+                "evidenceRowsWritten": 55364,
+                "moduleRowsWritten": 51,
+                "pendingAfter": 6037,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 13,
+                "rows": 37391,
+                "elementRows": 3703,
+                "dependencyRows": 11260,
+                "evidenceRows": 22361,
+                "moduleRows": 67,
+                "millis": 165,
+                "externalRowsWritten": 148,
+                "dependencyRowsWritten": 11110,
+                "evidenceRowsWritten": 22118,
+                "moduleRowsWritten": 67,
+                "pendingAfter": 6187,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 5,
+                "rows": 57233,
+                "elementRows": 6496,
+                "dependencyRows": 18088,
+                "evidenceRows": 32649,
+                "moduleRows": 0,
+                "millis": 220,
+                "externalRowsWritten": 90,
+                "dependencyRowsWritten": 18175,
+                "evidenceRowsWritten": 32791,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 6100,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 10,
+                "rows": 41910,
+                "elementRows": 3591,
+                "dependencyRows": 13499,
+                "evidenceRows": 24802,
+                "moduleRows": 18,
+                "millis": 182,
+                "externalRowsWritten": 213,
+                "dependencyRowsWritten": 13353,
+                "evidenceRowsWritten": 24587,
+                "moduleRowsWritten": 18,
+                "pendingAfter": 6246,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 8,
+                "rows": 56280,
+                "elementRows": 3917,
+                "dependencyRows": 18076,
+                "evidenceRows": 34262,
+                "moduleRows": 25,
+                "millis": 223,
+                "externalRowsWritten": 218,
+                "dependencyRowsWritten": 17911,
+                "evidenceRowsWritten": 34056,
+                "moduleRowsWritten": 25,
+                "pendingAfter": 6411,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 34,
+                "rows": 33763,
+                "elementRows": 3186,
+                "dependencyRows": 8227,
+                "evidenceRows": 22343,
+                "moduleRows": 7,
+                "millis": 151,
+                "externalRowsWritten": 107,
+                "dependencyRowsWritten": 8019,
+                "evidenceRowsWritten": 22107,
+                "moduleRowsWritten": 7,
+                "pendingAfter": 6619,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 21,
+                "rows": 32807,
+                "elementRows": 3199,
+                "dependencyRows": 7489,
+                "evidenceRows": 22119,
+                "moduleRows": 0,
+                "millis": 139,
+                "externalRowsWritten": 84,
+                "dependencyRowsWritten": 7223,
+                "evidenceRowsWritten": 21768,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 6885,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 11,
+                "rows": 33703,
+                "elementRows": 2548,
+                "dependencyRows": 7475,
+                "evidenceRows": 23680,
+                "moduleRows": 0,
+                "millis": 132,
+                "externalRowsWritten": 66,
+                "dependencyRowsWritten": 7091,
+                "evidenceRowsWritten": 23055,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 7269,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 9,
+                "rows": 43096,
+                "elementRows": 4297,
+                "dependencyRows": 10040,
+                "evidenceRows": 28759,
+                "moduleRows": 0,
+                "millis": 175,
+                "externalRowsWritten": 86,
+                "dependencyRowsWritten": 9827,
+                "evidenceRowsWritten": 28515,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 7482,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 35,
+                "rows": 40690,
+                "elementRows": 3003,
+                "dependencyRows": 10755,
+                "evidenceRows": 26932,
+                "moduleRows": 0,
+                "millis": 171,
+                "externalRowsWritten": 439,
+                "dependencyRowsWritten": 10378,
+                "evidenceRowsWritten": 26474,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 7859,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 6,
+                "rows": 252457,
+                "elementRows": 17257,
+                "dependencyRows": 58833,
+                "evidenceRows": 176367,
+                "moduleRows": 0,
+                "millis": 757,
+                "externalRowsWritten": 470,
+                "dependencyRowsWritten": 56089,
+                "evidenceRowsWritten": 171626,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 10603,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 1,
+                "rows": 250519,
+                "elementRows": 19948,
+                "dependencyRows": 59528,
+                "evidenceRows": 171043,
+                "moduleRows": 0,
+                "millis": 791,
+                "externalRowsWritten": 462,
+                "dependencyRowsWritten": 57812,
+                "evidenceRowsWritten": 168474,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 12319,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 1,
+                "rows": 44147,
+                "elementRows": 2966,
+                "dependencyRows": 10825,
+                "evidenceRows": 30356,
+                "moduleRows": 0,
+                "millis": 195,
+                "externalRowsWritten": 69,
+                "dependencyRowsWritten": 10522,
+                "evidenceRowsWritten": 29972,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 12622,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 22,
+                "rows": 37437,
+                "elementRows": 2783,
+                "dependencyRows": 9209,
+                "evidenceRows": 25445,
+                "moduleRows": 0,
+                "millis": 169,
+                "externalRowsWritten": 79,
+                "dependencyRowsWritten": 8930,
+                "evidenceRowsWritten": 25022,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 12901,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 3,
+                "rows": 134606,
+                "elementRows": 10734,
+                "dependencyRows": 32457,
+                "evidenceRows": 91415,
+                "moduleRows": 0,
+                "millis": 474,
+                "externalRowsWritten": 190,
+                "dependencyRowsWritten": 31447,
+                "evidenceRowsWritten": 89520,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 13911,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 8,
+                "rows": 37192,
+                "elementRows": 2964,
+                "dependencyRows": 9913,
+                "evidenceRows": 24315,
+                "moduleRows": 0,
+                "millis": 166,
+                "externalRowsWritten": 64,
+                "dependencyRowsWritten": 9485,
+                "evidenceRowsWritten": 23652,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 14339,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 19,
+                "rows": 48732,
+                "elementRows": 5897,
+                "dependencyRows": 10826,
+                "evidenceRows": 32009,
+                "moduleRows": 0,
+                "millis": 212,
+                "externalRowsWritten": 80,
+                "dependencyRowsWritten": 10213,
+                "evidenceRowsWritten": 31184,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 14952,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 5,
+                "rows": 72610,
+                "elementRows": 6056,
+                "dependencyRows": 19409,
+                "evidenceRows": 47145,
+                "moduleRows": 0,
+                "millis": 274,
+                "externalRowsWritten": 234,
+                "dependencyRowsWritten": 19153,
+                "evidenceRowsWritten": 46846,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 15208,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 4,
+                "rows": 197752,
+                "elementRows": 18853,
+                "dependencyRows": 50936,
+                "evidenceRows": 127963,
+                "moduleRows": 0,
+                "millis": 665,
+                "externalRowsWritten": 235,
+                "dependencyRowsWritten": 48774,
+                "evidenceRowsWritten": 124767,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 17370,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 8,
+                "rows": 139178,
+                "elementRows": 10333,
+                "dependencyRows": 33546,
+                "evidenceRows": 95299,
+                "moduleRows": 0,
+                "millis": 477,
+                "externalRowsWritten": 98,
+                "dependencyRowsWritten": 31981,
+                "evidenceRowsWritten": 92573,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 18935,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 14,
+                "rows": 86462,
+                "elementRows": 5799,
+                "dependencyRows": 20393,
+                "evidenceRows": 60270,
+                "moduleRows": 0,
+                "millis": 331,
+                "externalRowsWritten": 98,
+                "dependencyRowsWritten": 19591,
+                "evidenceRowsWritten": 59291,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 19737,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 6,
+                "rows": 33826,
+                "elementRows": 2785,
+                "dependencyRows": 8438,
+                "evidenceRows": 22603,
+                "moduleRows": 0,
+                "millis": 167,
+                "externalRowsWritten": 56,
+                "dependencyRowsWritten": 8193,
+                "evidenceRowsWritten": 22430,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 19982,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 11,
+                "rows": 106568,
+                "elementRows": 5770,
+                "dependencyRows": 25817,
+                "evidenceRows": 74981,
+                "moduleRows": 0,
+                "millis": 379,
+                "externalRowsWritten": 223,
+                "dependencyRowsWritten": 24815,
+                "evidenceRowsWritten": 73375,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 20984,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 12,
+                "rows": 48315,
+                "elementRows": 4081,
+                "dependencyRows": 11861,
+                "evidenceRows": 32373,
+                "moduleRows": 0,
+                "millis": 214,
+                "externalRowsWritten": 51,
+                "dependencyRowsWritten": 11536,
+                "evidenceRowsWritten": 31948,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 21309,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 5,
+                "rows": 36039,
+                "elementRows": 2132,
+                "dependencyRows": 9596,
+                "evidenceRows": 24311,
+                "moduleRows": 0,
+                "millis": 194,
+                "externalRowsWritten": 136,
+                "dependencyRowsWritten": 9204,
+                "evidenceRowsWritten": 23732,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 21701,
+                "walBytes": 65606912
+              },
+              {
+                "batches": 6,
+                "rows": 47320,
+                "elementRows": 2829,
+                "dependencyRows": 11747,
+                "evidenceRows": 32744,
+                "moduleRows": 0,
+                "millis": 214,
+                "externalRowsWritten": 86,
+                "dependencyRowsWritten": 11352,
+                "evidenceRowsWritten": 32276,
+                "moduleRowsWritten": 0,
+                "pendingAfter": 22096,
+                "walBytes": 65606912
+              }
+            ],
+            "bufferingMillis": 0,
+            "end": {
+              "batches": 9,
+              "rows": 11680,
+              "elementRows": 839,
+              "dependencyRows": 3117,
+              "evidenceRows": 7724,
+              "moduleRows": 0,
+              "fileElements": 26782,
+              "millis": 437,
+              "externalRowsWritten": 27,
+              "dependencyRowsWritten": 3037,
+              "evidenceRowsWritten": 7583,
+              "moduleRowsWritten": 0,
+              "pendingAfter": 22176,
+              "walBytes": 65606912
+            },
+            "sinkMillis": 15019,
+            "walPeakBytes": 65606912,
+            "probeMillis": 50
+          },
+          "timing": {
+            "wallMillis": 177118,
+            "preParseMillis": 5788,
+            "buildMillis": 127655,
+            "visitMillis": 39867,
+            "extractionMillis": 25235
+          },
+          "unitFunctions": {
+            "units": 26724,
+            "elementMillis": 5878,
+            "dependencyMillis": 19361,
+            "totalMillis": 25240,
+            "longestUnit": {
+              "path": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/parser/EsqlBaseParser.java",
+              "totalMicros": 79243,
+              "elementMicros": 18658,
+              "dependencyMicros": 60585
+            },
+            "slowestUnits": [
+              {
+                "path": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/parser/EsqlBaseParser.java",
+                "totalMicros": 79243,
+                "elementMicros": 18658,
+                "dependencyMicros": 60585
+              },
+              {
+                "path": "x-pack/plugin/esql/src/test/java/org/elasticsearch/xpack/esql/optimizer/LogicalPlanOptimizerTests.java",
+                "totalMicros": 70296,
+                "elementMicros": 11992,
+                "dependencyMicros": 58304
+              },
+              {
+                "path": "x-pack/plugin/esql/src/test/java/org/elasticsearch/xpack/esql/optimizer/PhysicalPlanOptimizerTests.java",
+                "totalMicros": 67796,
+                "elementMicros": 12944,
+                "dependencyMicros": 54852
+              },
+              {
+                "path": "x-pack/plugin/sql/src/main/java/org/elasticsearch/xpack/sql/parser/SqlBaseParser.java",
+                "totalMicros": 56255,
+                "elementMicros": 13834,
+                "dependencyMicros": 42421
+              },
+              {
+                "path": "x-pack/plugin/core/src/test/java/org/elasticsearch/xpack/core/security/authz/store/ReservedRolesStoreTests.java",
+                "totalMicros": 50077,
+                "elementMicros": 6211,
+                "dependencyMicros": 43865
+              }
+            ],
+            "censusWallMillis": 168138
+          },
+          "models": {
+            "batches": 647,
+            "splitBatches": 4,
+            "quarantinedBatches": 1,
+            "builds": 713
+          },
+          "heap": {
+            "peakLiveBytes": 954565640,
+            "peakUsedBytes": 1563237960,
+            "baselinePeakLiveBytes": 934093624,
+            "baselinePeakUsedBytes": 1384970176
+          },
+          "cacheBytes": 668250112,
+          "baselineCacheBytes": 305917952,
+          "excludedConstructs": {
+            "basePairs": 651546,
+            "baseInternalPairs": 351532,
+            "constructs": {
+              "METHOD_REFERENCE": {
+                "sites": 33809,
+                "withoutTarget": 10870,
+                "droppedTarget": 117,
+                "outsideSurvivingSource": 2,
+                "occurrences": 22820,
+                "selfOccurrences": 5581,
+                "pairs": 9800,
+                "pairsAdded": 1755,
+                "pairsAddedInternal": 883,
+                "addedInternalPercent": 0.25
+              },
+              "STATIC_FIELD": {
+                "sites": 310763,
+                "withoutTarget": 0,
+                "droppedTarget": 56,
+                "outsideSurvivingSource": 41,
+                "occurrences": 310666,
+                "selfOccurrences": 86578,
+                "pairs": 68768,
+                "pairsAdded": 21284,
+                "pairsAddedInternal": 8926,
+                "addedInternalPercent": 2.54
+              },
+              "CLASS_LITERAL": {
+                "sites": 65816,
+                "withoutTarget": 1461,
+                "droppedTarget": 33,
+                "outsideSurvivingSource": 2,
+                "occurrences": 64320,
+                "selfOccurrences": 2828,
+                "pairs": 22814,
+                "pairsAdded": 4267,
+                "pairsAddedInternal": 2015,
+                "addedInternalPercent": 0.57
+              }
+            },
+            "union": {
+              "pairsAdded": 26851,
+              "pairsAddedInternal": 11492,
+              "addedInternalPercent": 3.27
+            },
+            "staticFieldWrites": 1375,
+            "scanDrops": {
+              "LOCAL_TARGET": 205,
+              "INVALID_NAME": 1
+            },
+            "scanCrashes": 0,
+            "scanMillis": 4070
+          }
+        }
+      ]
+    }
+  ]
+}
