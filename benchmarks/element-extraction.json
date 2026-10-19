@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "measuredAt": "2026-10-19T02:58:38Z",
-  "baseCommit": "9b9f177",
+  "measuredAt": "2026-10-19T03:53:49Z",
+  "baseCommit": "fb12a9a",
   "measure": "The analysis pipeline, wired by hand: RepositoryValidator, the selected roots in MAIN, GENERATED, TEST order, a fresh cache, one RUNNING analysis, then SpoonModelBuilder.analyze with a CodeElementExtractor over an ElementWriter; every row is read back from code_element, source_file and source_root after end(), and the writes are timed by an ElementSink that wraps the ElementWriter",
   "settings": {
     "spoonVersion": "11.5.0",
@@ -99,7 +99,7 @@
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "write": {
-            "beginMillis": 3,
+            "beginMillis": 2,
             "acceptCalls": 1,
             "flushes": [],
             "bufferingMillis": 0,
@@ -107,16 +107,16 @@
               "batches": 1,
               "rows": 4765,
               "fileElements": 259,
-              "millis": 35
+              "millis": 33
             },
-            "sinkMillis": 38
+            "sinkMillis": 36
           },
           "timing": {
-            "wallMillis": 1710,
-            "preParseMillis": 343,
-            "buildMillis": 1217,
-            "visitMillis": 84,
-            "extractionMillis": 81
+            "wallMillis": 1658,
+            "preParseMillis": 314,
+            "buildMillis": 1190,
+            "visitMillis": 90,
+            "extractionMillis": 88
           },
           "models": {
             "batches": 1,
@@ -126,8 +126,8 @@
           },
           "cacheBytes": 3166208,
           "heap": {
-            "peakLiveBytes": 116827216,
-            "peakUsedBytes": 244505976
+            "peakLiveBytes": 117771256,
+            "peakUsedBytes": 241110712
           },
           "parseFailures": [],
           "duplicates": []
@@ -196,16 +196,16 @@
               "batches": 2,
               "rows": 11533,
               "fileElements": 527,
-              "millis": 85
+              "millis": 80
             },
-            "sinkMillis": 87
+            "sinkMillis": 81
           },
           "timing": {
-            "wallMillis": 11819,
-            "preParseMillis": 157,
-            "buildMillis": 11383,
-            "visitMillis": 160,
-            "extractionMillis": 159
+            "wallMillis": 11720,
+            "preParseMillis": 156,
+            "buildMillis": 11285,
+            "visitMillis": 164,
+            "extractionMillis": 163
           },
           "models": {
             "batches": 2,
@@ -215,8 +215,8 @@
           },
           "cacheBytes": 7344128,
           "heap": {
-            "peakLiveBytes": 251358224,
-            "peakUsedBytes": 595496784
+            "peakLiveBytes": 250390944,
+            "peakUsedBytes": 577106352
           },
           "parseFailures": [],
           "duplicates": []
@@ -298,14 +298,14 @@
               "batches": 1,
               "rows": 4720,
               "fileElements": 260,
-              "millis": 30
+              "millis": 28
             },
-            "sinkMillis": 31
+            "sinkMillis": 29
           },
           "timing": {
-            "wallMillis": 876,
-            "preParseMillis": 201,
-            "buildMillis": 591,
+            "wallMillis": 891,
+            "preParseMillis": 196,
+            "buildMillis": 612,
             "visitMillis": 37,
             "extractionMillis": 36
           },
@@ -317,8 +317,8 @@
           },
           "cacheBytes": 3133440,
           "heap": {
-            "peakLiveBytes": 116998304,
-            "peakUsedBytes": 248070304
+            "peakLiveBytes": 117567640,
+            "peakUsedBytes": 243015608
           },
           "parseFailures": [
             {
@@ -403,16 +403,16 @@
               "batches": 2,
               "rows": 11488,
               "fileElements": 528,
-              "millis": 89
+              "millis": 74
             },
-            "sinkMillis": 91
+            "sinkMillis": 76
           },
           "timing": {
-            "wallMillis": 11335,
-            "preParseMillis": 159,
-            "buildMillis": 10915,
-            "visitMillis": 141,
-            "extractionMillis": 140
+            "wallMillis": 11288,
+            "preParseMillis": 158,
+            "buildMillis": 10881,
+            "visitMillis": 143,
+            "extractionMillis": 142
           },
           "models": {
             "batches": 2,
@@ -422,8 +422,8 @@
           },
           "cacheBytes": 7303168,
           "heap": {
-            "peakLiveBytes": 250964400,
-            "peakUsedBytes": 571512552
+            "peakLiveBytes": 254334808,
+            "peakUsedBytes": 609146864
           },
           "parseFailures": [
             {
@@ -522,14 +522,14 @@
               "fileElements": 914,
               "millis": 58
             },
-            "sinkMillis": 61
+            "sinkMillis": 60
           },
           "timing": {
-            "wallMillis": 1959,
-            "preParseMillis": 211,
-            "buildMillis": 1578,
-            "visitMillis": 73,
-            "extractionMillis": 71
+            "wallMillis": 1995,
+            "preParseMillis": 203,
+            "buildMillis": 1615,
+            "visitMillis": 82,
+            "extractionMillis": 80
           },
           "models": {
             "batches": 39,
@@ -539,8 +539,8 @@
           },
           "cacheBytes": 6262784,
           "heap": {
-            "peakLiveBytes": 126521448,
-            "peakUsedBytes": 362345840
+            "peakLiveBytes": 132584624,
+            "peakUsedBytes": 315036848
           },
           "parseFailures": [
             {
@@ -612,7 +612,7 @@
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "write": {
-            "beginMillis": 3,
+            "beginMillis": 4,
             "acceptCalls": 59,
             "flushes": [],
             "bufferingMillis": 0,
@@ -620,16 +620,16 @@
               "batches": 59,
               "rows": 21442,
               "fileElements": 1712,
-              "millis": 185
+              "millis": 152
             },
-            "sinkMillis": 189
+            "sinkMillis": 156
           },
           "timing": {
-            "wallMillis": 4038,
-            "preParseMillis": 245,
-            "buildMillis": 3355,
-            "visitMillis": 182,
-            "extractionMillis": 179
+            "wallMillis": 4103,
+            "preParseMillis": 240,
+            "buildMillis": 3460,
+            "visitMillis": 185,
+            "extractionMillis": 181
           },
           "models": {
             "batches": 59,
@@ -639,8 +639,8 @@
           },
           "cacheBytes": 17051648,
           "heap": {
-            "peakLiveBytes": 204002800,
-            "peakUsedBytes": 466977768
+            "peakLiveBytes": 209139648,
+            "peakUsedBytes": 469995104
           },
           "parseFailures": [
             {
@@ -742,7 +742,7 @@
               {
                 "batches": 24,
                 "rows": 35997,
-                "millis": 235
+                "millis": 229
               }
             ],
             "bufferingMillis": 0,
@@ -750,16 +750,16 @@
               "batches": 6,
               "rows": 20837,
               "fileElements": 5459,
-              "millis": 221
+              "millis": 206
             },
-            "sinkMillis": 467
+            "sinkMillis": 446
           },
           "timing": {
-            "wallMillis": 7746,
-            "preParseMillis": 1054,
-            "buildMillis": 5560,
-            "visitMillis": 721,
-            "extractionMillis": 475
+            "wallMillis": 7703,
+            "preParseMillis": 937,
+            "buildMillis": 5627,
+            "visitMillis": 748,
+            "extractionMillis": 509
           },
           "models": {
             "batches": 30,
@@ -767,10 +767,10 @@
             "quarantinedBatches": 0,
             "builds": 30
           },
-          "cacheBytes": 45244416,
+          "cacheBytes": 45240320,
           "heap": {
-            "peakLiveBytes": 290514120,
-            "peakUsedBytes": 556804288
+            "peakLiveBytes": 336492528,
+            "peakUsedBytes": 557355696
           },
           "parseFailures": [
             {
@@ -843,17 +843,17 @@
               {
                 "batches": 24,
                 "rows": 35997,
-                "millis": 264
+                "millis": 225
               },
               {
                 "batches": 17,
                 "rows": 39575,
-                "millis": 318
+                "millis": 289
               },
               {
                 "batches": 15,
                 "rows": 36460,
-                "millis": 346
+                "millis": 306
               }
             ],
             "bufferingMillis": 0,
@@ -863,14 +863,14 @@
               "fileElements": 9202,
               "millis": 227
             },
-            "sinkMillis": 1173
+            "sinkMillis": 1066
           },
           "timing": {
-            "wallMillis": 17675,
-            "preParseMillis": 1313,
-            "buildMillis": 13616,
-            "visitMillis": 2018,
-            "extractionMillis": 1072
+            "wallMillis": 17127,
+            "preParseMillis": 1294,
+            "buildMillis": 13181,
+            "visitMillis": 1936,
+            "extractionMillis": 1098
           },
           "models": {
             "batches": 60,
@@ -878,10 +878,10 @@
             "quarantinedBatches": 0,
             "builds": 60
           },
-          "cacheBytes": 98484224,
+          "cacheBytes": 98508800,
           "heap": {
-            "peakLiveBytes": 328737792,
-            "peakUsedBytes": 682107904
+            "peakLiveBytes": 311794024,
+            "peakUsedBytes": 597674776
           },
           "parseFailures": [
             {
@@ -959,7 +959,7 @@
           "rows": {
             "packages": 2006,
             "types": 26748,
-            "methods": 200937,
+            "methods": 200936,
             "files": 16848,
             "sourceFiles": 16848,
             "sourceRoots": 292,
@@ -989,33 +989,33 @@
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "write": {
-            "beginMillis": 36,
+            "beginMillis": 34,
             "acceptCalls": 410,
             "flushes": [
               {
                 "batches": 195,
-                "rows": 58546,
-                "millis": 399
+                "rows": 58545,
+                "millis": 406
               },
               {
                 "batches": 2,
                 "rows": 44311,
-                "millis": 330
+                "millis": 320
               },
               {
                 "batches": 46,
                 "rows": 34713,
-                "millis": 284
+                "millis": 272
               },
               {
                 "batches": 55,
                 "rows": 42289,
-                "millis": 350
+                "millis": 333
               },
               {
                 "batches": 72,
                 "rows": 33868,
-                "millis": 291
+                "millis": 276
               }
             ],
             "bufferingMillis": 0,
@@ -1023,16 +1023,16 @@
               "batches": 40,
               "rows": 15964,
               "fileElements": 16848,
-              "millis": 357
+              "millis": 336
             },
-            "sinkMillis": 2049
+            "sinkMillis": 1980
           },
           "timing": {
-            "wallMillis": 58653,
-            "preParseMillis": 3476,
-            "buildMillis": 49099,
-            "visitMillis": 4113,
-            "extractionMillis": 2421
+            "wallMillis": 57219,
+            "preParseMillis": 3379,
+            "buildMillis": 47833,
+            "visitMillis": 4104,
+            "extractionMillis": 2461
           },
           "models": {
             "batches": 410,
@@ -1042,8 +1042,8 @@
           },
           "cacheBytes": 188628992,
           "heap": {
-            "peakLiveBytes": 814213520,
-            "peakUsedBytes": 1249372560
+            "peakLiveBytes": 812628928,
+            "peakUsedBytes": 1248836544
           },
           "parseFailures": [
             {
@@ -1345,7 +1345,7 @@
           "rows": {
             "packages": 2129,
             "types": 39224,
-            "methods": 326217,
+            "methods": 326214,
             "files": 26782,
             "sourceFiles": 26782,
             "sourceRoots": 527,
@@ -1375,23 +1375,23 @@
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "write": {
-            "beginMillis": 63,
+            "beginMillis": 57,
             "acceptCalls": 647,
             "flushes": [
               {
                 "batches": 195,
-                "rows": 58546,
-                "millis": 442
+                "rows": 58545,
+                "millis": 392
               },
               {
                 "batches": 2,
                 "rows": 44311,
-                "millis": 348
+                "millis": 317
               },
               {
                 "batches": 46,
                 "rows": 34713,
-                "millis": 311
+                "millis": 283
               },
               {
                 "batches": 55,
@@ -1401,27 +1401,27 @@
               {
                 "batches": 72,
                 "rows": 33868,
-                "millis": 288
+                "millis": 275
               },
               {
                 "batches": 143,
                 "rows": 49072,
-                "millis": 431
+                "millis": 427
               },
               {
                 "batches": 27,
-                "rows": 36432,
-                "millis": 363
+                "rows": 36431,
+                "millis": 356
               },
               {
                 "batches": 36,
                 "rows": 33770,
-                "millis": 351
+                "millis": 319
               },
               {
                 "batches": 62,
-                "rows": 33730,
-                "millis": 363
+                "rows": 33729,
+                "millis": 344
               }
             ],
             "bufferingMillis": 0,
@@ -1429,16 +1429,16 @@
               "batches": 9,
               "rows": 839,
               "fileElements": 26782,
-              "millis": 384
+              "millis": 352
             },
-            "sinkMillis": 3688
+            "sinkMillis": 3463
           },
           "timing": {
-            "wallMillis": 142848,
-            "preParseMillis": 5810,
-            "buildMillis": 125440,
-            "visitMillis": 8031,
-            "extractionMillis": 4728
+            "wallMillis": 138114,
+            "preParseMillis": 4892,
+            "buildMillis": 122048,
+            "visitMillis": 7964,
+            "extractionMillis": 4854
           },
           "models": {
             "batches": 647,
@@ -1446,10 +1446,10 @@
             "quarantinedBatches": 1,
             "builds": 713
           },
-          "cacheBytes": 305795072,
+          "cacheBytes": 305917952,
           "heap": {
-            "peakLiveBytes": 1140212808,
-            "peakUsedBytes": 1668170824
+            "peakLiveBytes": 934093624,
+            "peakUsedBytes": 1384970176
           },
           "parseFailures": [
             {
