@@ -126,8 +126,15 @@ final class CachePathAbsenceTest {
     final Map<String, byte[]> conteudo = new TreeMap<>();
     try (Stream<Path> entradas = Files.list(pasta)) {
       for (final Path entrada : entradas.toList()) {
-        if (Files.isRegularFile(entrada, LinkOption.NOFOLLOW_LINKS)) {
-          conteudo.put(entrada.getFileName().toString(), Files.readAllBytes(entrada));
+        if (!Files.isRegularFile(entrada, LinkOption.NOFOLLOW_LINKS)) {
+          continue;
+        }
+        final String nome = entrada.getFileName().toString();
+        if (nome.equals(CacheLock.FILE_NAME)) {
+          assertThat(Files.size(entrada)).as("o lock nunca recebe um byte").isZero();
+          conteudo.put(nome, new byte[0]);
+        } else {
+          conteudo.put(nome, Files.readAllBytes(entrada));
         }
       }
     }
