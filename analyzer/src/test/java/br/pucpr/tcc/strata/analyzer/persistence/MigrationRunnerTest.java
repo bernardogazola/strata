@@ -69,8 +69,8 @@ final class MigrationRunnerTest {
               TestCaches.column(
                   writer, "SELECT version || '|' || name || '|' || checksum FROM schema_migration"))
           .containsExactly("1|initial_schema|" + TestCaches.sha256(arquivo));
-      assertThat(TestCaches.userTables(writer)).hasSize(28);
-      assertThat(TestCaches.strictTables(writer)).isEqualTo(28);
+      assertThat(TestCaches.userTables(writer)).hasSize(29);
+      assertThat(TestCaches.strictTables(writer)).isEqualTo(29);
       assertThat(TestCaches.scalar(writer, "PRAGMA auto_vacuum")).isEqualTo("2");
       assertThat(writer.getAutoCommit()).as("o executor devolve a conexão em autocommit").isTrue();
     }
@@ -130,7 +130,7 @@ final class MigrationRunnerTest {
       assertThat(TestCaches.scalar(writer, "PRAGMA user_version"))
           .as("nada foi rebaixado nem apagado: quem decide é a reconstrução")
           .isEqualTo("99");
-      assertThat(TestCaches.userTables(writer)).hasSize(28);
+      assertThat(TestCaches.userTables(writer)).hasSize(29);
     }
   }
 

@@ -205,7 +205,7 @@ final class MigrationsResourceTest {
       assertThat(Migrations.bundled().migrate(writer, clock)).isEqualTo(1);
 
       assertThat(TestCaches.scalar(writer, "PRAGMA user_version")).isEqualTo("1");
-      assertThat(TestCaches.userTables(writer)).hasSize(28);
+      assertThat(TestCaches.userTables(writer)).hasSize(29);
     }
   }
 
@@ -280,7 +280,7 @@ final class MigrationsResourceTest {
       assertThat(migrations.migrate(writer, clock)).isEqualTo(1);
 
       assertThat(TestCaches.scalar(writer, "PRAGMA user_version")).isEqualTo("1");
-      assertThat(TestCaches.userTables(writer)).hasSize(28);
+      assertThat(TestCaches.userTables(writer)).hasSize(29);
     } finally {
       Locale.setDefault(anterior);
     }

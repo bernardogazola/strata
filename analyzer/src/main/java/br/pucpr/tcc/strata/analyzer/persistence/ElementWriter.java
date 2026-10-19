@@ -1,6 +1,7 @@
 package br.pucpr.tcc.strata.analyzer.persistence;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
+import br.pucpr.tcc.strata.analyzer.bootstrap.Log;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.ElementDao;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.ElementRow;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.SourceFileDao;
@@ -10,6 +11,7 @@ import br.pucpr.tcc.strata.analyzer.persistence.dao.SourceRootRow;
 import br.pucpr.tcc.strata.analyzer.repository.JavaSource;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRoot;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootId;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.BatchDependencies;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.BatchElements;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.BatchStructure;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
@@ -42,6 +44,7 @@ public final class ElementWriter implements ElementSink, StructureSink {
   private final long analysisPk;
   private final List<SourceRoot> roots;
   private final List<JavaSource> sources;
+  private final int flushRows;
 
   private final Map<SourceRootId, Long> rootPks = new HashMap<>();
 
@@ -49,8 +52,13 @@ public final class ElementWriter implements ElementSink, StructureSink {
 
   private final Map<CodeElementId, Long> index = new HashMap<>();
 
-  private final List<BatchElements> buffered = new ArrayList<>();
+  private final Map<CodeElementId, Long> externals = new HashMap<>();
+
+  private List<DependencyDraft> pending = List.of();
+
+  private final List<BatchStructure> buffered = new ArrayList<>();
   private int bufferedRows;
+  private int droppedDependencies;
   private Stage stage = Stage.CREATED;
 
   public ElementWriter(
@@ -58,10 +66,23 @@ public final class ElementWriter implements ElementSink, StructureSink {
       long analysisPk,
       List<SourceRoot> roots,
       List<JavaSource> sources) {
+    this(connections, analysisPk, roots, sources, AnalysisConstants.ELEMENT_FLUSH_ROWS);
+  }
+
+  ElementWriter(
+      SqliteConnections connections,
+      long analysisPk,
+      List<SourceRoot> roots,
+      List<JavaSource> sources,
+      int flushRows) {
+    if (flushRows < 1) {
+      throw new IllegalArgumentException("um flush tem pelo menos uma linha: " + flushRows);
+    }
     this.connections = Objects.requireNonNull(connections, "connections");
     this.analysisPk = analysisPk;
     this.roots = List.copyOf(Objects.requireNonNull(roots, "roots"));
     this.sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
+    this.flushRows = flushRows;
   }
 
   @Override
@@ -85,36 +106,43 @@ public final class ElementWriter implements ElementSink, StructureSink {
 
   @Override
   public void accept(BatchElements elements) {
-    requireStage(Stage.BEGUN);
-    buffered.add(Objects.requireNonNull(elements, "elements"));
-    bufferedRows += elements.size();
-    if (bufferedRows >= AnalysisConstants.ELEMENT_FLUSH_ROWS) {
-      final Map<CodeElementId, Long> committed = write(this::insertBuffered);
-      learn(committed);
-    }
+    accept(new BatchStructure(elements, BatchDependencies.NONE));
   }
 
   @Override
   public void accept(BatchStructure batch) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    requireStage(Stage.BEGUN);
+    buffered.add(Objects.requireNonNull(batch, "batch"));
+    bufferedRows += batch.size();
+    if (bufferedRows >= flushRows) {
+      learn(write(this::flush));
+    }
   }
 
   @Override
   public void end(List<SourceFile> files, List<FileElement> fileElements) {
     requireStage(Stage.BEGUN);
     final List<SourceFileRow> changed = changedStatuses(files);
-    final Map<CodeElementId, Long> committed =
+    final Flushed last =
         write(
             connection -> {
-              final Map<CodeElementId, Long> numbered = insertBuffered(connection);
+              final Flushed flushed = flush(connection);
               for (final SourceFileRow file : changed) {
                 SourceFileDao.updateStatus(connection, file.pk(), file.status());
               }
-              insertFileElements(connection, fileElements, numbered);
+              insertFileElements(connection, fileElements, flushed.types());
               ElementDao.markTestPackages(connection, analysisPk);
-              return numbered;
+              return flushed;
             });
-    learn(committed);
+    learn(last);
+    droppedDependencies = pending.size();
+    pending = List.of();
+    if (droppedDependencies > 0) {
+      Log.warn(
+          "UNRESOLVED_DECLARED_TARGET: descartou "
+              + droppedDependencies
+              + " linhas de dependência cujo alvo declarado nunca virou elemento");
+    }
     changed.forEach(row -> fileRows.put(row.relativePath(), row));
     stage = Stage.ENDED;
   }
@@ -122,6 +150,10 @@ public final class ElementWriter implements ElementSink, StructureSink {
   public OptionalLong pkOf(CodeElementId id) {
     final Long pk = index.get(id);
     return pk == null ? OptionalLong.empty() : OptionalLong.of(pk);
+  }
+
+  public int droppedDependencies() {
+    return droppedDependencies;
   }
 
   private Begun writeRootsAndFiles(
@@ -151,25 +183,37 @@ public final class ElementWriter implements ElementSink, StructureSink {
     return new Begun(rootRows, rows);
   }
 
-  private Map<CodeElementId, Long> insertBuffered(Connection connection) throws SQLException {
-    final Map<CodeElementId, Long> numbered = new HashMap<>();
+  private Flushed flush(Connection connection) throws SQLException {
+    final Numbered numbered = insertBuffered(connection);
+    final DependencyFlush.Outcome outcome =
+        new DependencyFlush(
+                analysisPk, numbered.types(), numbered.methods(), index, externals, this::filePk)
+            .write(connection, pending, buffered);
+    return new Flushed(numbered.types(), outcome.newExternals(), outcome.stillPending());
+  }
+
+  private Numbered insertBuffered(Connection connection) throws SQLException {
+    final Map<CodeElementId, Long> types = new HashMap<>();
+    final Map<CodeElementId, Long> methods = new HashMap<>();
     final List<ElementRow> rows = new ArrayList<>(bufferedRows);
     long next = ElementDao.nextId(connection);
-    for (final BatchElements batch : buffered) {
-      for (final PackageElement element : batch.packages()) {
-        numbered.put(element.id(), next);
+    for (final BatchStructure batch : buffered) {
+      final BatchElements elements = batch.elements();
+      for (final PackageElement element : elements.packages()) {
+        types.put(element.id(), next);
         rows.add(packageRow(next++, element));
       }
-      for (final TypeElement element : batch.types()) {
-        numbered.put(element.id(), next);
-        rows.add(typeRow(next++, element, parentPk(element.packageId(), numbered)));
+      for (final TypeElement element : elements.types()) {
+        types.put(element.id(), next);
+        rows.add(typeRow(next++, element, parentPk(element.packageId(), types)));
       }
-      for (final MethodElement element : batch.methods()) {
-        rows.add(methodRow(next++, element, parentPk(element.declaringTypeId(), numbered)));
+      for (final MethodElement element : elements.methods()) {
+        methods.put(element.id(), next);
+        rows.add(methodRow(next++, element, parentPk(element.declaringTypeId(), types)));
       }
     }
     ElementDao.insert(connection, analysisPk, rows);
-    return numbered;
+    return new Numbered(types, methods);
   }
 
   private void insertFileElements(
@@ -314,8 +358,10 @@ public final class ElementWriter implements ElementSink, StructureSink {
     return lines.available() ? lines.end() : null;
   }
 
-  private void learn(Map<CodeElementId, Long> committed) {
-    index.putAll(committed);
+  private void learn(Flushed committed) {
+    index.putAll(committed.types());
+    externals.putAll(committed.externals());
+    pending = List.copyOf(committed.stillPending());
     buffered.clear();
     bufferedRows = 0;
   }
@@ -342,6 +388,13 @@ public final class ElementWriter implements ElementSink, StructureSink {
   }
 
   private record Begun(List<SourceRootRow> roots, List<SourceFileRow> files) {}
+
+  private record Numbered(Map<CodeElementId, Long> types, Map<CodeElementId, Long> methods) {}
+
+  private record Flushed(
+      Map<CodeElementId, Long> types,
+      Map<CodeElementId, Long> externals,
+      List<DependencyDraft> stillPending) {}
 
   public static final class WriteFailedException extends RuntimeException {
 
