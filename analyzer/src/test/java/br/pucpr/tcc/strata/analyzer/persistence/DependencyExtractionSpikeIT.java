@@ -12,6 +12,7 @@ import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Envir
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Flush;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Heap;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.RepositoryResult;
+import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Resolution;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.SelectionResult;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Settings;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Timing;
@@ -30,12 +31,14 @@ import br.pucpr.tcc.strata.analyzer.repository.SourceRootKind;
 import br.pucpr.tcc.strata.analyzer.repository.ValidatedRepository;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.HeapPeakMeter;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.ParseFailureCause;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.ResolutionCounts;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SourceAnalysis;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SourceFile;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SourceIssue;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SpoonModelBuilder;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.StructureExtractor;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.UnitCensusPass;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -77,6 +80,10 @@ final class DependencyExtractionSpikeIT {
   private static final String DERIVED = "broken-tree";
   private static final String DERIVED_FROM = "commons-lang";
 
+  private static final long CANCELLATION_DEADLINE_MICROS = 2_000_000;
+
+  private static final double RATE_SCALE = 10_000.0;
+
   private static final List<String> REPOSITORIES =
       List.of("commons-lang", DERIVED, "junit5", "spring-framework", "elasticsearch");
 
@@ -96,7 +103,9 @@ final class DependencyExtractionSpikeIT {
           + " over the rows read back, and the writes are observed by a StructureSink that wraps"
           + " the ElementWriter and reads each table's max(id) after every accept. A second,"
           + " untimed pass over the same batches times the two per-unit functions and counts the"
-          + " excluded constructs";
+          + " excluded constructs. It also records StructureExtractor.resolutionCounts() checked"
+          + " against the rows, the ambiguous rows, to_method_pk, the external rows split by"
+          + " ExternalPackages and fanOutExternal with and without the denylist, all read back";
 
   private enum Selection {
     DEFAULT(
@@ -187,7 +196,7 @@ final class DependencyExtractionSpikeIT {
                     optionalLong(expected, "heap", "peakLiveBytes"),
                     optionalLong(expected, "heap", "peakUsedBytes")));
       }
-      readBack = DependencyReadBack.read(connections, analysisPk);
+      readBack = DependencyReadBack.read(connections, analysisPk, writer.unnumberedCallees());
     }
     final long cacheBytes = Files.size(database);
     TestCaches.deleteTree(data);
@@ -227,6 +236,7 @@ final class DependencyExtractionSpikeIT {
     final FileOutcomes files = files(analysis);
     final Write write = sink.write();
     final Drops drops = drops(run, write, census);
+    final Resolution resolution = resolution(run.extractor().resolutionCounts(), readBack, drops);
     return new SelectionResult(
         selection.name(),
         rootsByKind(roots),
@@ -237,7 +247,12 @@ final class DependencyExtractionSpikeIT {
         readBack.evidence(),
         readBack.modules(),
         readBack.edges(),
-        checks(readBack, sink, files, census, expected, write, drops),
+        resolution,
+        readBack.ambiguity(),
+        readBack.toMethod(),
+        readBack.externals(),
+        readBack.fanOutExternal(),
+        checks(readBack, sink, files, census, expected, write, drops, resolution),
         drops,
         census(
             SourceIssue.Code.values(),
@@ -277,6 +292,11 @@ final class DependencyExtractionSpikeIT {
         null,
         null,
         null,
+        null,
+        null,
+        null,
+        null,
+        null,
         new Timing(wallMillis, 0, 0, 0, 0),
         null,
         null,
@@ -284,6 +304,23 @@ final class DependencyExtractionSpikeIT {
         null,
         null,
         null);
+  }
+
+  private static Resolution resolution(
+      ResolutionCounts counts, DependencyReadBack.Result readBack, Drops drops) {
+    final Map<String, Long> rows = new LinkedHashMap<>(readBack.rowOccurrences());
+    final long ambiguousRows = rows.remove("ambiguous");
+    return new Resolution(
+        counts.resolved(),
+        counts.inferred(),
+        counts.unresolved(),
+        counts.ambiguous(),
+        counts.rate().isPresent()
+            ? Math.round(counts.rate().getAsDouble() * RATE_SCALE) / RATE_SCALE
+            : null,
+        rows,
+        ambiguousRows,
+        drops.writer() == null ? null : drops.writer().occurrences());
   }
 
   private static Drops drops(Measured run, Write write, Census census) {
@@ -312,8 +349,10 @@ final class DependencyExtractionSpikeIT {
       Census census,
       JsonNode expected,
       Write write,
-      Drops drops) {
+      Drops drops,
+      Resolution resolution) {
     final DependencyReadBack.Integrity integrity = readBack.integrity();
+    final Map<String, Long> rows = resolution.rowOccurrences();
     return new Checks(
         integrity.foreignKeyViolations(),
         integrity.danglingEndpoints(),
@@ -325,11 +364,21 @@ final class DependencyExtractionSpikeIT {
         integrity.evidenceFileMismatches(),
         integrity.fromMethodOwnerMismatches(),
         integrity.evidenceWeakerThanRow(),
-        integrity.toMethodsWritten(),
+        integrity.toMethodOnNonCalls(),
+        integrity.toMethodNotInternalMethod(),
         integrity.weightMismatches(),
         integrity.externalRowsMalformed(),
         integrity.externalsWithoutDependency(),
+        integrity.ambiguousMalformed(),
+        integrity.externalQualityMismatches(),
         integrity.edgeTotalsMatchRows(),
+        resolution.unresolved() == rows.get(ResolutionQuality.UNRESOLVED_EXTERNAL.name()),
+        resolution.writerDroppedOccurrences() != null
+            && resolution.resolved() + resolution.inferred()
+                == rows.get(ResolutionQuality.RESOLVED.name())
+                    + rows.get(ResolutionQuality.INFERRED.name())
+                    + resolution.writerDroppedOccurrences(),
+        resolution.ambiguous() == resolution.ambiguousRowOccurrences(),
         baselineDifferences(readBack.elements(), files, expected),
         sink.flushRuleReproduced(),
         sink.elementOnlyAccepts(),
@@ -452,10 +501,13 @@ final class DependencyExtractionSpikeIT {
                     checks.evidenceFileMismatches(),
                     checks.fromMethodOwnerMismatches(),
                     checks.evidenceWeakerThanRow(),
-                    checks.toMethodsWritten(),
+                    checks.toMethodOnNonCalls(),
+                    checks.toMethodNotInternalMethod(),
                     checks.weightMismatches(),
                     checks.externalRowsMalformed(),
-                    checks.externalsWithoutDependency()))
+                    checks.externalsWithoutDependency(),
+                    checks.ambiguousMalformed(),
+                    checks.externalQualityMismatches()))
             .as(where + "cada contagem de violação, na ordem de Checks")
             .containsOnly(0L);
         softly
@@ -463,6 +515,23 @@ final class DependencyExtractionSpikeIT {
             .as(where + "só os quatro pares (qualidade, is_external) válidos")
             .containsEntry("INFERRED,1", 0L)
             .containsEntry("UNRESOLVED_EXTERNAL,0", 0L);
+        softly
+            .assertThat(measured.dependencies().resolutionPairOccurrences())
+            .as(where + "só os quatro pares válidos, por ocorrência")
+            .containsEntry("INFERRED,1", 0L)
+            .containsEntry("UNRESOLVED_EXTERNAL,0", 0L);
+        softly
+            .assertThat(
+                List.of(
+                    checks.unresolvedCountMatchesRows(),
+                    checks.classifiedCountMatchesRows(),
+                    checks.ambiguousCountMatchesRows()))
+            .as(where + "os contadores por ocorrência da extração fecham com as linhas")
+            .containsOnly(true);
+        softly
+            .assertThat(measured.files().parseFailedByCause())
+            .as(where + "nenhuma perda de modelo: a guarda do SpoonLaunchers a impede")
+            .containsEntry(ParseFailureCause.EXTRACTION_CRASH.name(), 0);
         softly
             .assertThat(checks.baselineDifferences())
             .as(where + "os elementos e os desfechos de element-extraction.json")
@@ -492,6 +561,12 @@ final class DependencyExtractionSpikeIT {
             .assertThat(measured.extractionIssues())
             .as(where + "nenhum id acima de " + AnalysisConstants.MAX_ELEMENT_ID_BYTES + " bytes")
             .containsEntry(SourceIssue.Code.SOURCE_ELEMENT_ID_TOO_LONG.name(), 0);
+        if (measured.unitFunctions() != null && measured.unitFunctions().longestUnit() != null) {
+          softly
+              .assertThat(measured.unitFunctions().longestUnit().totalMicros())
+              .as(where + "a unidade mais lenta cabe no prazo de cancelamento")
+              .isLessThan(CANCELLATION_DEADLINE_MICROS);
+        }
         if (measured.excludedConstructs() != null) {
           softly
               .assertThat(measured.edges().toInternal())

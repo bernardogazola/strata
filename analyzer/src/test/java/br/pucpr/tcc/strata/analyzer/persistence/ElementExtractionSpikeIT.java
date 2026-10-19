@@ -306,6 +306,10 @@ final class ElementExtractionSpikeIT {
             .as(where + "os desfechos gravados são os finais da análise")
             .isEqualTo(statuses(measured.files()));
         softly
+            .assertThat(measured.files().parseFailedByCause())
+            .as(where + "nenhuma perda de modelo: a guarda do SpoonLaunchers a impede")
+            .containsEntry(ParseFailureCause.EXTRACTION_CRASH.name(), 0);
+        softly
             .assertThat(rows.packages() + rows.types() + rows.methods())
             .as(where + "as descargas contadas somam as linhas PACKAGE, TYPE e METHOD gravadas")
             .isEqualTo(writtenRows(measured.write()));

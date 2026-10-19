@@ -1,21 +1,27 @@
 package br.pucpr.tcc.strata.analyzer.persistence;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
+import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Ambiguity;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Construct;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Dependencies;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Edges;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Elements;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Evidence;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.ExcludedConstructs;
+import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Externals;
+import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.FanOutExternal;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.LargestRow;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Modules;
+import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.NamedCount;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.ParseFailedFile;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Share;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Spread;
+import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.ToMethod;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Union;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.WriterDrops;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.DependencyAggregator;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.ExternalPackages;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SourceFileStatus;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.UnitCensusPass;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.Dependency;
@@ -28,6 +34,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -46,6 +53,10 @@ final class DependencyReadBack {
   private static final double P99 = 0.99;
   private static final int PK_BITS = Integer.SIZE;
   private static final int TOP_FILES = 5;
+  private static final int SAMPLE = 10;
+  private static final String JAVA_PREFIX = "java.";
+  private static final String JAVAX_PREFIX = "javax.";
+  private static final ExternalPackages PACKAGES = ExternalPackages.load();
 
   private static final String ELEMENTS_BY_KIND =
       """
@@ -68,7 +79,7 @@ final class DependencyReadBack {
 
   private static final String ROWS =
       """
-      SELECT source_pk, target_pk, type, resolution, occurrences, weight
+      SELECT source_pk, target_pk, type, resolution, occurrences, weight, ambiguous
         FROM dependency WHERE analysis_pk = ?""";
 
   private static final String ENDPOINTS =
@@ -110,6 +121,22 @@ final class DependencyReadBack {
          AND (SELECT count(*) FROM dependency_evidence e WHERE e.dependency_pk = d.id)
              <> min(d.occurrences, ?)""";
 
+  private static final String TO_METHOD =
+      """
+      SELECT count(e.to_method_pk),
+             count(DISTINCT e.to_method_pk),
+             coalesce(sum(d.type = 'CALLS'), 0),
+             coalesce(sum(d.type = 'CALLS' AND e.to_method_pk IS NULL), 0),
+             coalesce(sum(e.to_method_pk IS NOT NULL AND d.type <> 'CALLS'), 0),
+             coalesce(sum(e.to_method_pk IS NOT NULL
+                          AND (m.id IS NULL OR m.kind <> 'METHOD' OR m.is_external <> 0
+                               OR m.analysis_pk IS NOT d.analysis_pk)), 0),
+             coalesce(sum(m.id IS NOT NULL AND m.parent_pk IS NOT d.target_pk), 0)
+        FROM dependency_evidence e
+        JOIN dependency d ON d.id = e.dependency_pk
+        LEFT JOIN code_element m ON m.id = e.to_method_pk
+       WHERE d.analysis_pk = ?""";
+
   private static final String EXTERNALS =
       """
       SELECT coalesce(sum(kind <> 'TYPE' OR parent_pk IS NOT NULL OR type_kind IS NOT NULL
@@ -131,7 +158,8 @@ final class DependencyReadBack {
 
   private DependencyReadBack() {}
 
-  static Result read(SqliteConnections connections, long analysisPk) throws SQLException {
+  static Result read(SqliteConnections connections, long analysisPk, int unnumberedCallees)
+      throws SQLException {
     return connections.read(
         c -> {
           final Elements elements = elements(c, analysisPk);
@@ -139,6 +167,7 @@ final class DependencyReadBack {
           final RowScan scan = scanRows(c, analysisPk, types);
           final long[] endpoints = longs(c, ENDPOINTS, analysisPk, 4);
           final long[] evidence = longs(c, EVIDENCE, analysisPk, 10);
+          final long[] callees = longs(c, TO_METHOD, analysisPk, 7);
           final long[] externals = longs(c, EXTERNALS, analysisPk, 2);
           final Integrity integrity =
               new Integrity(
@@ -152,10 +181,13 @@ final class DependencyReadBack {
                   evidence[4],
                   evidence[5],
                   evidence[6],
-                  evidence[3],
+                  callees[4],
+                  callees[5],
                   scan.weightMismatches(),
                   externals[0],
                   externals[1],
+                  scan.ambiguousMalformed(),
+                  scan.externalQualityMismatches(),
                   scan.edgeTotalsMatchRows());
           return new Result(
               elements,
@@ -163,6 +195,12 @@ final class DependencyReadBack {
               evidence(evidence, scan),
               modules(c, analysisPk),
               scan.edges(),
+              scan.rowOccurrences(),
+              scan.ambiguity(),
+              new ToMethod(
+                  callees[0], callees[1], callees[2], callees[3], unnumberedCallees, callees[6]),
+              externals(types, scan.externalTargets()),
+              scan.fanOutExternal(),
               integrity,
               census(types, scan.basePairs()));
         });
@@ -243,14 +281,15 @@ final class DependencyReadBack {
                   DependencyType.valueOf(found.getString(3)),
                   ResolutionQuality.valueOf(found.getString(4)),
                   found.getInt(5));
-          tally.add(row, source, target, found.getLong(6));
+          tally.add(row, source, target, found.getLong(6), found.getInt(7) == 1);
           rows.add(row);
         }
       }
     }
     final Map<String, TypeRow> byId = new HashMap<>();
     types.values().forEach(type -> byId.put(type.id().value(), type));
-    final Edges edges = edges(DependencyAggregator.aggregate(rows), byId);
+    final List<DependencyEdge> aggregated = DependencyAggregator.aggregate(rows);
+    final Edges edges = edges(aggregated, byId);
     return new RowScan(
         tally.dependencies(),
         tally.invalidResolutionPairs(),
@@ -258,7 +297,127 @@ final class DependencyReadBack {
         edges,
         edges.occurrenceTotal() == tally.occurrences && edges.weightTotal() == tally.weightTotal,
         tally.basePairs(),
-        tally.rowsAtCap);
+        tally.rowsAtCap,
+        tally.rowOccurrences(),
+        tally.ambiguity(),
+        tally.ambiguousMalformed,
+        tally.externalQualityMismatches,
+        tally.externalTargets,
+        fanOutExternal(aggregated, types, byId));
+  }
+
+  private static FanOutExternal fanOutExternal(
+      List<DependencyEdge> edges, Map<Long, TypeRow> types, Map<String, TypeRow> byId) {
+    final Map<String, int[]> perSource = new HashMap<>();
+    long pairs = 0;
+    long kept = 0;
+    for (final DependencyEdge edge : edges) {
+      if (edge.source().equals(edge.target()) || !byId.get(edge.target().value()).external()) {
+        continue;
+      }
+      final int[] fanOut = perSource.computeIfAbsent(edge.source().value(), _ -> new int[2]);
+      fanOut[0]++;
+      pairs++;
+      if (!PACKAGES.isDenylisted(edge.target())) {
+        fanOut[1]++;
+        kept++;
+      }
+    }
+    final List<int[]> internal = new ArrayList<>();
+    for (final TypeRow type : types.values()) {
+      if (!type.external()) {
+        internal.add(perSource.getOrDefault(type.id().value(), new int[2]));
+      }
+    }
+    final int[] all = internal.stream().mapToInt(fanOut -> fanOut[0]).toArray();
+    final int[] withoutDenylisted = internal.stream().mapToInt(fanOut -> fanOut[1]).toArray();
+    return new FanOutExternal(
+        internal.size(), spread(all, pairs), spread(withoutDenylisted, kept), pairs, kept);
+  }
+
+  private static Spread spread(int[] values, long total) {
+    if (values.length == 0) {
+      return new Spread(0, 0, 0, 0, 0);
+    }
+    final int[] sorted = values.clone();
+    Arrays.sort(sorted);
+    return new Spread(
+        rank(sorted, P50),
+        rank(sorted, P90),
+        rank(sorted, P99),
+        sorted[sorted.length - 1],
+        hundredths((double) total / sorted.length));
+  }
+
+  private static int rank(int[] sorted, double fraction) {
+    return sorted[Math.max(0, (int) Math.ceil(fraction * sorted.length) - 1)];
+  }
+
+  private static Externals externals(Map<Long, TypeRow> types, Map<Long, long[]> targets) {
+    final long[] all = new long[2];
+    final long[] jdk = new long[2];
+    final long[] denylisted = new long[2];
+    final long[] beyondJava = new long[2];
+    final long[] notJdk = new long[2];
+    final long[] javax = new long[2];
+    final long[] bare = new long[2];
+    final long[] lowerCase = new long[2];
+    final List<NamedCount> lowerCaseNames = new ArrayList<>();
+    for (final TypeRow type : types.values()) {
+      if (!type.external()) {
+        continue;
+      }
+      final long[] used = targets.getOrDefault(type.pk(), new long[2]);
+      final String name = type.id().sortKey();
+      add(all, used);
+      if (PACKAGES.isJdk(name)) {
+        add(jdk, used);
+        if (PACKAGES.isDenylisted(type.id())) {
+          add(denylisted, used);
+        }
+        if (!name.startsWith(JAVA_PREFIX)) {
+          add(beyondJava, used);
+        }
+      } else {
+        add(notJdk, used);
+        if (name.startsWith(JAVAX_PREFIX)) {
+          add(javax, used);
+        }
+      }
+      if (name.indexOf('.') < 0) {
+        add(bare, used);
+        if (Character.isLowerCase(name.codePointAt(0))) {
+          add(lowerCase, used);
+          lowerCaseNames.add(new NamedCount(type.id().value(), used[0], used[1]));
+        }
+      }
+    }
+    return new Externals(
+        share(all),
+        share(jdk),
+        share(denylisted),
+        share(beyondJava),
+        share(notJdk),
+        share(javax),
+        share(bare),
+        share(lowerCase),
+        sample(lowerCaseNames, Comparator.comparingLong(NamedCount::occurrences)));
+  }
+
+  private static void add(long[] share, long[] used) {
+    share[0]++;
+    share[1] += used[1];
+  }
+
+  private static Share share(long[] counts) {
+    return new Share(counts[0], counts[1]);
+  }
+
+  private static List<NamedCount> sample(List<NamedCount> names, Comparator<NamedCount> key) {
+    return names.stream()
+        .sorted(key.reversed().thenComparing(NamedCount::target, CodeElementId::compareCodePoints))
+        .limit(SAMPLE)
+        .toList();
   }
 
   private static Edges edges(List<DependencyEdge> edges, Map<String, TypeRow> byId) {
@@ -436,10 +595,13 @@ final class DependencyReadBack {
       long evidenceFileMismatches,
       long fromMethodOwnerMismatches,
       long evidenceWeakerThanRow,
-      long toMethodsWritten,
+      long toMethodOnNonCalls,
+      long toMethodNotInternalMethod,
       long weightMismatches,
       long externalRowsMalformed,
       long externalsWithoutDependency,
+      long ambiguousMalformed,
+      long externalQualityMismatches,
       boolean edgeTotalsMatchRows) {}
 
   record CensusBase(Map<String, TypeRow> types, long[] basePairs, long baseInternalPairs) {
@@ -456,6 +618,11 @@ final class DependencyReadBack {
       Evidence evidence,
       Modules modules,
       Edges edges,
+      Map<String, Long> rowOccurrences,
+      Ambiguity ambiguity,
+      ToMethod toMethod,
+      Externals externals,
+      FanOutExternal fanOutExternal,
       Integrity integrity,
       CensusBase census) {}
 
@@ -466,13 +633,25 @@ final class DependencyReadBack {
       Edges edges,
       boolean edgeTotalsMatchRows,
       long[] basePairs,
-      long rowsAtCap) {}
+      long rowsAtCap,
+      Map<String, Long> rowOccurrences,
+      Ambiguity ambiguity,
+      long ambiguousMalformed,
+      long externalQualityMismatches,
+      Map<Long, long[]> externalTargets,
+      FanOutExternal fanOutExternal) {}
 
   private static final class RowTally {
 
     private final Map<DependencyType, Long> rowsByType = new EnumMap<>(DependencyType.class);
     private final Map<DependencyType, Long> occurrencesByType = new EnumMap<>(DependencyType.class);
     private final Map<String, Long> resolutionPairs = new LinkedHashMap<>();
+    private final Map<String, Long> resolutionPairOccurrences = new LinkedHashMap<>();
+    private final Map<DependencyType, Long> ambiguousByType = new EnumMap<>(DependencyType.class);
+    private final Map<String, long[]> ambiguousTargets = new HashMap<>();
+
+    private final Map<Long, long[]> externalTargets = new HashMap<>();
+
     private final int[] perRow;
     private final long[] pairs;
     private int rows;
@@ -485,6 +664,10 @@ final class DependencyReadBack {
     private long rowsToExternal;
     private long occurrencesToExternal;
     private long rowsAtCap;
+    private long ambiguousRows;
+    private long ambiguousOccurrences;
+    private long ambiguousMalformed;
+    private long externalQualityMismatches;
     private Dependency largest;
 
     private RowTally(int capacity) {
@@ -494,16 +677,20 @@ final class DependencyReadBack {
         if (type.isTypeEdge()) {
           rowsByType.put(type, 0L);
           occurrencesByType.put(type, 0L);
+          ambiguousByType.put(type, 0L);
         }
       }
       for (final int external : new int[] {0, 1}) {
         for (final ResolutionQuality quality : ResolutionQuality.values()) {
           resolutionPairs.put(key(quality, external == 1), 0L);
+          resolutionPairOccurrences.put(key(quality, external == 1), 0L);
         }
       }
     }
 
-    private void add(Dependency row, TypeRow source, TypeRow target, long weight) {
+    private void add(
+        Dependency row, TypeRow source, TypeRow target, long weight, boolean ambiguous) {
+      p25(row, target, ambiguous);
       final int occurrencesOfRow = row.occurrences();
       perRow[rows++] = occurrencesOfRow;
       occurrences += occurrencesOfRow;
@@ -530,6 +717,61 @@ final class DependencyReadBack {
       if (largest == null || occurrencesOfRow > largest.occurrences()) {
         largest = row;
       }
+    }
+
+    private void p25(Dependency row, TypeRow target, boolean ambiguous) {
+      final long occurrencesOfRow = row.occurrences();
+      resolutionPairOccurrences.merge(
+          key(row.resolution(), target.external()), occurrencesOfRow, Long::sum);
+      if (target.external()) {
+        final long[] used = externalTargets.computeIfAbsent(target.pk(), _ -> new long[2]);
+        used[0]++;
+        used[1] += occurrencesOfRow;
+        final boolean resolved = row.resolution() == ResolutionQuality.RESOLVED;
+        if (resolved != PACKAGES.isJdk(target.id().sortKey())) {
+          externalQualityMismatches++;
+        }
+      }
+      if (!ambiguous) {
+        return;
+      }
+      ambiguousRows++;
+      ambiguousOccurrences += occurrencesOfRow;
+      ambiguousByType.merge(row.type(), 1L, Long::sum);
+      final long[] named = ambiguousTargets.computeIfAbsent(target.id().value(), _ -> new long[2]);
+      named[0]++;
+      named[1] += occurrencesOfRow;
+      if (row.resolution() != ResolutionQuality.UNRESOLVED_EXTERNAL
+          || !target.external()
+          || target.id().sortKey().indexOf('.') >= 0) {
+        ambiguousMalformed++;
+      }
+    }
+
+    private Map<String, Long> rowOccurrences() {
+      final Map<String, Long> byQuality = new LinkedHashMap<>();
+      for (final ResolutionQuality quality : ResolutionQuality.values()) {
+        byQuality.put(
+            quality.name(),
+            resolutionPairOccurrences.get(key(quality, false))
+                + resolutionPairOccurrences.get(key(quality, true)));
+      }
+      byQuality.put("ambiguous", ambiguousOccurrences);
+      return byQuality;
+    }
+
+    private Ambiguity ambiguity() {
+      final Map<String, Long> byType = new LinkedHashMap<>();
+      ambiguousByType.forEach((type, count) -> byType.put(type.name(), count));
+      final List<NamedCount> named = new ArrayList<>();
+      ambiguousTargets.forEach(
+          (target, counts) -> named.add(new NamedCount(target, counts[0], counts[1])));
+      return new Ambiguity(
+          ambiguousRows,
+          ambiguousOccurrences,
+          ambiguousTargets.size(),
+          byType,
+          sample(named, Comparator.comparingLong(NamedCount::rows)));
     }
 
     private static String key(ResolutionQuality quality, boolean external) {
@@ -562,6 +804,7 @@ final class DependencyReadBack {
           rowsToExternal,
           occurrencesToExternal,
           resolutionPairs,
+          resolutionPairOccurrences,
           spread(),
           largest == null
               ? null
@@ -584,10 +827,6 @@ final class DependencyReadBack {
           rank(sorted, P99),
           sorted[rows - 1],
           hundredths((double) occurrences / rows));
-    }
-
-    private static int rank(int[] sorted, double fraction) {
-      return sorted[Math.max(0, (int) Math.ceil(fraction * sorted.length) - 1)];
     }
   }
 
