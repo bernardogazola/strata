@@ -11,9 +11,11 @@ import br.pucpr.tcc.strata.analyzer.repository.JavaSource;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRoot;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.BatchElements;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.BatchStructure;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.ElementSink;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SourceFile;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.StructureSink;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.FileElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.MethodElement;
@@ -34,7 +36,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public final class ElementWriter implements ElementSink {
+public final class ElementWriter implements ElementSink, StructureSink {
 
   private final SqliteConnections connections;
   private final long analysisPk;
@@ -90,6 +92,11 @@ public final class ElementWriter implements ElementSink {
       final Map<CodeElementId, Long> committed = write(this::insertBuffered);
       learn(committed);
     }
+  }
+
+  @Override
+  public void accept(BatchStructure batch) {
+    throw new UnsupportedOperationException("ainda não implementado");
   }
 
   @Override
