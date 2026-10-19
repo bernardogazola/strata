@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.bootstrap.Handlers;
+import br.pucpr.tcc.strata.analyzer.persistence.CacheInvalidation;
+import br.pucpr.tcc.strata.analyzer.persistence.CacheInvalidationReason;
 import br.pucpr.tcc.strata.analyzer.repository.TestRepositories;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,6 +39,9 @@ final class ProtocolFixtureTest {
 
   private static final Set<String> DIRIGIDOS =
       Set.of(
+          "cache.invalidated.corrupt.jsonl",
+          "cache.invalidated.head-changed.jsonl",
+          "cache.invalidated.schema-version.jsonl",
           "protocol.ready.mvp.jsonl",
           "protocol.discarded-frame.jsonl",
           "protocol.unknown-method.jsonl",
@@ -59,7 +64,6 @@ final class ProtocolFixtureTest {
     m.put("analysis.cancelled.ok.jsonl", "ainda não implementado");
     m.put("analysis.failed.no-java.jsonl", "ainda não implementado");
     m.put("analysis.warning.parse-failed.jsonl", "ainda não implementado");
-    m.put("cache.invalidated.head-changed.jsonl", "ainda não implementado");
     m.put("graph.search.hit.jsonl", "ainda não implementado");
     m.put("graph.slice.package.jsonl", "ainda não implementado");
     m.put("graph.slice.type.jsonl", "ainda não implementado");
@@ -97,7 +101,7 @@ final class ProtocolFixtureTest {
   @Test
   void aPastaDeFixturesExisteEFoiLida() throws IOException {
     assertThat(FIXTURES).isDirectory();
-    assertThat(arquivos()).contains("protocol.ready.mvp.jsonl").hasSize(23);
+    assertThat(arquivos()).contains("protocol.ready.mvp.jsonl").hasSize(25);
   }
 
   @Test
@@ -198,6 +202,60 @@ final class ProtocolFixtureTest {
 
     assertThat(despacharEmRepositorio("repository.describe.no-java.jsonl", repositorio))
         .isEqualTo(linhas("repository.describe.no-java.jsonl").get(1));
+  }
+
+  private static String unicaLinha(String arquivo) throws IOException {
+    final List<String> l = linhas(arquivo);
+    assertThat(l).as(arquivo + ": um evento, nenhuma requisição").hasSize(1);
+    return l.get(0);
+  }
+
+  @Test
+  void cacheInvalidatedCorruptBateByteAByte() throws IOException {
+    final String esperado = unicaLinha("cache.invalidated.corrupt.jsonl");
+
+    final String emitido = emitido(Envelope.cacheInvalidated(new CacheInvalidation.Corrupt()));
+
+    assertThat(emitido).isEqualTo(esperado);
+  }
+
+  @Test
+  void cacheInvalidatedSchemaVersionBateByteAByte() throws IOException {
+    final String esperado = unicaLinha("cache.invalidated.schema-version.jsonl");
+
+    final String emitido =
+        emitido(Envelope.cacheInvalidated(new CacheInvalidation.SchemaVersion(2, 1)));
+
+    assertThat(emitido).isEqualTo(esperado);
+  }
+
+  @Test
+  void cacheInvalidatedHeadChangedBateByteAByte() throws IOException {
+    final String esperado = unicaLinha("cache.invalidated.head-changed.jsonl");
+
+    final String emitido =
+        emitido(
+            Envelope.cacheInvalidated(
+                new CacheInvalidation.Outdated(CacheInvalidationReason.HEAD_CHANGED)));
+
+    assertThat(emitido).isEqualTo(esperado);
+  }
+
+  @Test
+  void todoMotivoDePoliticaSaiComErroNulo() throws IOException {
+    for (final CacheInvalidationReason motivo :
+        List.of(
+            CacheInvalidationReason.WORKTREE_DIRTY,
+            CacheInvalidationReason.CONFIG_CHANGED,
+            CacheInvalidationReason.HEAD_CHANGED)) {
+      final JsonNode payload =
+          inbound
+              .readTree(emitido(Envelope.cacheInvalidated(new CacheInvalidation.Outdated(motivo))))
+              .get("payload");
+
+      assertThat(payload.get("reason").asText()).as(motivo.name()).isEqualTo(motivo.name());
+      assertThat(payload.get("error").isNull()).as(motivo.name()).isTrue();
+    }
   }
 
   @Test

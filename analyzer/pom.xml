@@ -241,7 +241,7 @@
                         <strata.protocol.fixtures>${project.basedir}/../protocol/fixtures</strata.protocol.fixtures>
                         <strata.repository.fixtures>${project.basedir}/../fixtures/repositories</strata.repository.fixtures>
                     </systemPropertyVariables>
-                    <argLine>-Duser.language=en -Duser.country=US -Dfile.encoding=UTF-8</argLine>
+                    <argLine>-Duser.language=en -Duser.country=US -Dfile.encoding=UTF-8 --enable-native-access=ALL-UNNAMED</argLine>
                 </configuration>
             </plugin>
 
@@ -317,7 +317,7 @@
                                 <include>**/*SpikeIT.java</include>
                             </includes>
                             <enableAssertions>false</enableAssertions>
-                            <argLine>-Xmx2g -Xss2m -XX:-HeapDumpOnOutOfMemoryError -Duser.language=en -Duser.country=US -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8</argLine>
+                            <argLine>-Xmx2g -Xss2m -XX:-HeapDumpOnOutOfMemoryError -Duser.language=en -Duser.country=US -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 --enable-native-access=ALL-UNNAMED</argLine>
                             <systemPropertyVariables>
                                 <strata.spike>true</strata.spike>
                                 <strata.root>${project.basedir}/..</strata.root>

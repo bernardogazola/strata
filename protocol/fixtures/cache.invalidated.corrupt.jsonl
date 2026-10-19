@@ -1,0 +1,1 @@
+{"event":"cache.invalidated","kind":"event","payload":{"error":{"code":"CACHE_CORRUPT","detail":"o cache da análise não pôde ser lido e foi reconstruído vazio","origin":"analyzer","params":{}},"reason":"CORRUPT"},"protocol":1}

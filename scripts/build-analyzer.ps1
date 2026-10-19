@@ -195,6 +195,7 @@ function Test-StagedRuntime([string[]]$Modules) {
   try {
     $classPath = (Join-Path $Stage 'analyzer.jar') + ';' + (Join-Path $Stage 'lib\*')
     $run = Invoke-WithClosedStdin $java @('-Xss2m', '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8',
+      '--enable-native-access=ALL-UNNAMED',
       '-cp', $classPath, $MainClass, "--data-dir=$(Join-Path $scratch.FullName 'data')")
     if ($run.ExitCode -ne 0) {
       [Console]::Error.Write($run.Stderr)

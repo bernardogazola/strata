@@ -11,6 +11,8 @@ public final class ErrorCodes {
   public static final String PROTO_INVALID_PAYLOAD = "PROTO_INVALID_PAYLOAD";
   public static final String PROTO_MESSAGE_TOO_LARGE = "PROTO_MESSAGE_TOO_LARGE";
   public static final String INTERNAL_UNEXPECTED = "INTERNAL_UNEXPECTED";
+  public static final String CACHE_CORRUPT = "CACHE_CORRUPT";
+  public static final String CACHE_MIGRATION_FAILED = "CACHE_MIGRATION_FAILED";
 
   public static final String ORIGIN_ANALYZER = "analyzer";
 
@@ -48,6 +50,22 @@ public final class ErrorCodes {
         clamp(detail, AnalysisConstants.MAX_ERROR_DETAIL_CHARS),
         ORIGIN_ANALYZER,
         Map.of());
+  }
+
+  public static ProtocolError cacheCorrupt() {
+    return new ProtocolError(
+        CACHE_CORRUPT,
+        "o cache da análise não pôde ser lido e foi reconstruído vazio",
+        ORIGIN_ANALYZER,
+        Map.of());
+  }
+
+  public static ProtocolError cacheMigrationFailed(int fromVersion, int toVersion) {
+    return new ProtocolError(
+        CACHE_MIGRATION_FAILED,
+        "o cache da análise não pôde ser migrado para esta versão do schema e foi reconstruído vazio",
+        ORIGIN_ANALYZER,
+        Map.of("fromVersion", fromVersion, "toVersion", toVersion));
   }
 
   public static ProtocolError repository(RepositoryIssue issue) {

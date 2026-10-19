@@ -1,6 +1,8 @@
 package br.pucpr.tcc.strata.analyzer.protocol;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
+import br.pucpr.tcc.strata.analyzer.persistence.CacheInvalidation;
+import br.pucpr.tcc.strata.analyzer.persistence.CacheInvalidationReason;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Map;
@@ -38,4 +40,20 @@ public sealed interface Envelope {
             AnalysisConstants.PROTOCOL_VERSION),
         AnalysisConstants.PROTOCOL_VERSION);
   }
+
+  static Event cacheInvalidated(CacheInvalidation invalidation) {
+    final ProtocolError error =
+        switch (invalidation) {
+          case CacheInvalidation.Corrupt _ -> ErrorCodes.cacheCorrupt();
+          case CacheInvalidation.SchemaVersion(int fromVersion, int toVersion) ->
+              ErrorCodes.cacheMigrationFailed(fromVersion, toVersion);
+          case CacheInvalidation.Outdated _ -> null;
+        };
+    return new Event(
+        "cache.invalidated",
+        new CacheInvalidatedPayload(error, invalidation.reason()),
+        AnalysisConstants.PROTOCOL_VERSION);
+  }
+
+  record CacheInvalidatedPayload(ProtocolError error, CacheInvalidationReason reason) {}
 }

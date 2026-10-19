@@ -1,1 +1,1 @@
-{"event":"cache.invalidated","kind":"event","payload":{"reason":"HEAD_CHANGED"},"protocol":1}
+{"event":"cache.invalidated","kind":"event","payload":{"error":null,"reason":"HEAD_CHANGED"},"protocol":1}
