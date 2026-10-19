@@ -26,7 +26,7 @@ public record TypeElement(
     Objects.requireNonNull(packageId, "packageId");
     Objects.requireNonNull(filePath, "filePath");
     Objects.requireNonNull(rootId, "rootId");
-    modifiers = Set.copyOf(Objects.requireNonNull(modifiers, "modifiers"));
+    modifiers = Modifier.canonical(Objects.requireNonNull(modifiers, "modifiers"));
     Objects.requireNonNull(lines, "lines");
     if (id.kind() != ElementKind.TYPE || packageId.kind() != ElementKind.PACKAGE) {
       throw new IllegalArgumentException("não é um tipo em um pacote: " + id + " / " + packageId);

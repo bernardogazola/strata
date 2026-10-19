@@ -24,7 +24,7 @@ public record MethodElement(
     Objects.requireNonNull(declaringTypeId, "declaringTypeId");
     Objects.requireNonNull(filePath, "filePath");
     Objects.requireNonNull(rootId, "rootId");
-    modifiers = Set.copyOf(Objects.requireNonNull(modifiers, "modifiers"));
+    modifiers = Modifier.canonical(Objects.requireNonNull(modifiers, "modifiers"));
     Objects.requireNonNull(lines, "lines");
     if (id.kind() != ElementKind.METHOD || declaringTypeId.kind() != ElementKind.TYPE) {
       throw new IllegalArgumentException(

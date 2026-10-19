@@ -21,8 +21,8 @@ public record CodeElementId(String value) implements Comparable<CodeElementId> {
     if (kind == ElementKind.METHOD && !isMethodBody(body)) {
       throw new IllegalArgumentException("um id de método pede Owner#name(...)");
     }
-    if (kind == ElementKind.FILE && (body.startsWith("/") || body.indexOf('\\') >= 0)) {
-      throw new IllegalArgumentException("um id de arquivo é relativo à raiz e POSIX");
+    if (kind == ElementKind.FILE && body.startsWith("/")) {
+      throw new IllegalArgumentException("um id de arquivo é relativo à raiz");
     }
   }
 
