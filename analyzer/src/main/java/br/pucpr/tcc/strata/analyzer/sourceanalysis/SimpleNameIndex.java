@@ -1,5 +1,6 @@
 package br.pucpr.tcc.strata.analyzer.sourceanalysis;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,10 @@ final class SimpleNameIndex {
   }
 
   static SimpleNameIndex of(List<SourceFile> files) {
+    return new SimpleNameIndex(topLevelTypes(files));
+  }
+
+  static Set<String> topLevelTypes(Collection<SourceFile> files) {
     final Set<String> types = new HashSet<>();
     for (final SourceFile file : files) {
       final SourceFile.Declarations declarations = file.declarations();
@@ -26,7 +31,23 @@ final class SimpleNameIndex {
         }
       }
     }
-    return new SimpleNameIndex(types);
+    return types;
+  }
+
+  Optional<String> declaredTopLevel(String idName) {
+    if (topLevelTypes.contains(idName)) {
+      return Optional.of(idName);
+    }
+    final int lastDot = idName.lastIndexOf('.');
+    for (int dollar = idName.lastIndexOf('$');
+        dollar > lastDot + 1;
+        dollar = idName.lastIndexOf('$', dollar - 1)) {
+      final String prefix = idName.substring(0, dollar);
+      if (topLevelTypes.contains(prefix)) {
+        return Optional.of(prefix);
+      }
+    }
+    return Optional.empty();
   }
 
   Scope scope(
@@ -37,10 +58,18 @@ final class SimpleNameIndex {
     return (name, writtenSimple) ->
         writtenSimple
             ? canonicalizeSimple(name, ownPackage, imported, single)
-            : canonicalize(name, ownPackage, imported);
+            : canonicalize(name, ownPackage, imported, single);
   }
 
   String canonicalize(String name, String ownPackage, Set<String> onDemandPackages) {
+    return canonicalize(name, ownPackage, onDemandPackages, Map.of());
+  }
+
+  String canonicalize(
+      String name,
+      String ownPackage,
+      Set<String> onDemandPackages,
+      Map<String, String> singleTypeImports) {
     if (name.indexOf('.') < 0) {
       return resolveBare(name, simple -> inScope(simple, ownPackage, onDemandPackages))
           .orElse(name);
@@ -57,7 +86,10 @@ final class SimpleNameIndex {
     }
     final int firstDot = name.indexOf('.');
     return resolveBare(
-            name.substring(0, firstDot), simple -> inScope(simple, ownPackage, onDemandPackages))
+            name.substring(0, firstDot),
+            simple ->
+                singleTypeImport(simple, singleTypeImports)
+                    .or(() -> inScope(simple, ownPackage, onDemandPackages)))
         .map(type -> type + "$" + name.substring(firstDot + 1).replace('.', '$'))
         .orElse(name);
   }
@@ -91,6 +123,14 @@ final class SimpleNameIndex {
       return whole;
     }
     return resolver.apply(top).map(resolved -> resolved + name.substring(top.length()));
+  }
+
+  private Optional<String> singleTypeImport(
+      String simpleName, Map<String, String> singleTypeImports) {
+    final String imported = singleTypeImports.get(simpleName);
+    return imported == null
+        ? Optional.empty()
+        : Optional.of(longestInternalPrefix(imported).orElse(imported));
   }
 
   private Optional<String> inScope(

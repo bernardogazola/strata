@@ -111,6 +111,30 @@ final class Rule7RegressionTest {
   }
 
   @Test
+  void umNomeComPontosResolveOPrimeiroSegmentoPeloImportDeTipoUnico() throws Exception {
+    assertSameMethodIds(
+        Map.of("a/Api.java", API_IN_A),
+        "b/User.java",
+        """
+        package b;
+
+        import a.Api;
+
+        public class User {
+          void p(Api.Inner inner) {}
+
+          <T extends Api.Inner> void q(T t) {}
+        }
+        """,
+        List.of(
+            "method:a.Api#<init>()",
+            "method:a.Api$Inner#<init>()",
+            "method:b.User#<init>()",
+            "method:b.User#p(a.Api$Inner)",
+            "method:b.User#q(a.Api$Inner)"));
+  }
+
+  @Test
   void umImportDeTipoUnicoDeUmTipoInternoVenceJavaLang() throws Exception {
     assertSameMethodIds(
         Map.of("a/Record.java", "package a;\n\npublic class Record {}\n"),

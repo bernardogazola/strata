@@ -4,6 +4,7 @@ import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRoot;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootId;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootKind;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.CodeElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.FileElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.MethodElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.PackageElement;
@@ -79,6 +80,10 @@ public final class CodeElementExtractor implements BatchVisitor {
   }
 
   public void collect(ModeledBatch batch, List<UnitElements> units) {
+    sink.accept(dedupe(units));
+  }
+
+  public BatchElements dedupe(List<UnitElements> units) {
     final List<PackageElement> packages = new ArrayList<>();
     final List<TypeElement> types = new ArrayList<>();
     final List<MethodElement> methods = new ArrayList<>();
@@ -90,7 +95,11 @@ public final class CodeElementExtractor implements BatchVisitor {
         collect(unit.relativePath(), declared, unitPackages, collected);
       }
     }
-    sink.accept(new BatchElements(packages, types, methods));
+    return new BatchElements(packages, types, methods);
+  }
+
+  SimpleNameIndex index() {
+    return index;
   }
 
   public List<SourceIssue> issues() {
@@ -163,7 +172,7 @@ public final class CodeElementExtractor implements BatchVisitor {
     final String normalized = id.sortKey();
     return new FileElement(
         id,
-        ElementIds.label(normalized.substring(normalized.lastIndexOf('/') + 1)),
+        CodeElement.label(normalized.substring(normalized.lastIndexOf('/') + 1)),
         normalized,
         file.relativePath(),
         file.rootId(),

@@ -82,6 +82,8 @@ public final class AnalysisConstants {
 
   public static final int ROWS_PER_INSERT = 500;
 
+  public static final int DEPENDENCY_EVIDENCE_CAP = 20;
+
   private AnalysisConstants() {}
 
   public static Map<String, Object> asMetadata() {

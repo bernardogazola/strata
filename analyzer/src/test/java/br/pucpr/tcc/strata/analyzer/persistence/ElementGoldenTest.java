@@ -13,8 +13,8 @@ import br.pucpr.tcc.strata.analyzer.repository.SourceRoot;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootKind;
 import br.pucpr.tcc.strata.analyzer.repository.TestRepositories;
 import br.pucpr.tcc.strata.analyzer.repository.ValidatedRepository;
-import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementExtractor;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SpoonModelBuilder;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.StructureExtractor;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -189,7 +189,7 @@ final class ElementGoldenTest {
         new ElementWriter(
             connections, analysisPk, raizes, repository.snapshot().inventory().javaSources());
     new SpoonModelBuilder()
-        .analyze(repository, raizes, new CodeElementExtractor(raizes, writer), () -> false);
+        .analyze(repository, raizes, new StructureExtractor(raizes, writer), () -> false);
     return analysisPk;
   }
 
@@ -340,8 +340,11 @@ final class ElementGoldenTest {
       assertThat(
               TestCaches.column(
                   raw,
-                  "select kind || '|' || count(*) from code_element group by kind order by kind"))
-          .as("as contagens por tipo: 5 files, 15 methods, 3 packages e 5 types do golden")
+                  "select kind || '|' || count(*) from code_element where is_external = 0"
+                      + " group by kind order by kind"))
+          .as(
+              "as contagens por tipo: 5 files, 15 methods, 3 packages e 5 types do golden,"
+                  + " sem os alvos externos que as dependências criam")
           .containsExactly("FILE|5", "METHOD|15", "PACKAGE|3", "TYPE|5");
     }
   }

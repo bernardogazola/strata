@@ -12,7 +12,9 @@ import br.pucpr.tcc.strata.analyzer.persistence.dao.DaoTestDatabase;
 import br.pucpr.tcc.strata.analyzer.repository.BuildSystem;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootKind;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SourceFileStatus;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.TypeKind;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -53,6 +55,7 @@ final class SchemaTest {
           "hotspot_evidence",
           "hotspot_metric",
           "hotspot_profile",
+          "module_dependency",
           "path_lineage",
           "path_rename",
           "provider_metadata",
@@ -63,7 +66,7 @@ final class SchemaTest {
           "tour_step",
           "tour_step_reason");
 
-  private static final int FOREIGN_KEYS = 46;
+  private static final int FOREIGN_KEYS = 48;
 
   private static final String FOREIGN_KEY_CHILDREN =
       """
@@ -147,6 +150,26 @@ final class SchemaTest {
                 + " sort_key, type_kind) VALUES (1, 'type:Probe', 'TYPE', 'Probe', 'Probe', 'Probe',"
                 + " ?)"),
         new EnumColumn(
+            "dependency",
+            "type",
+            Arrays.stream(DependencyType.values())
+                .filter(DependencyType::isTypeEdge)
+                .map(Enum::name)
+                .toList(),
+            "INSERT INTO dependency (analysis_pk, source_pk, target_pk, type, resolution)"
+                + " VALUES (1, 2, 1, ?, 'RESOLVED')"),
+        new EnumColumn(
+            "dependency",
+            "resolution",
+            names(ResolutionQuality.values()),
+            "INSERT INTO dependency (analysis_pk, source_pk, target_pk, type, resolution)"
+                + " VALUES (1, 2, 1, 'CALLS', ?)"),
+        new EnumColumn(
+            "dependency_evidence",
+            "resolution",
+            names(ResolutionQuality.values()),
+            "INSERT INTO dependency_evidence (dependency_pk, resolution) VALUES (1, ?)"),
+        new EnumColumn(
             "repository",
             "build_system",
             names(BuildSystem.values()),
@@ -157,13 +180,22 @@ final class SchemaTest {
                 + "', ?, 0, 0)"));
   }
 
-  private static void analisePai(Connection banco) throws SQLException {
+  private static void pais(Connection banco) throws SQLException {
     DaoTestDatabase.execute(
         banco,
         "INSERT INTO analysis (id, analysis_id, status, started_at, analyzer_version,"
             + " schema_version, protocol_version, config_hash, config_json, include_tests,"
             + " history_scope) VALUES (1, 'an_parent', 'RUNNING', 0, '0.1.0', 1, 1, 'h', '{}',"
             + " 0, 'ALL')");
+    final String tipo =
+        "INSERT INTO code_element (id, analysis_pk, element_id, kind, simple_name, qualified_name,"
+            + " sort_key) VALUES (?, 1, ?, 'TYPE', ?, ?, ?)";
+    DaoTestDatabase.execute(banco, tipo, 1, "type:a.Source", "Source", "a.Source", "a.Source");
+    DaoTestDatabase.execute(banco, tipo, 2, "type:a.Target", "Target", "a.Target", "a.Target");
+    DaoTestDatabase.execute(
+        banco,
+        "INSERT INTO dependency (id, analysis_pk, source_pk, target_pk, type, resolution)"
+            + " VALUES (1, 1, 1, 2, 'CALLS', 'RESOLVED')");
   }
 
   private static void inserirEDesfazer(Connection banco, EnumColumn coluna, String valor)
@@ -178,7 +210,7 @@ final class SchemaTest {
   }
 
   @Test
-  void temExatamenteAs28TabelasDoMvp() throws Exception {
+  void temExatamenteAs29TabelasDoMvp() throws Exception {
     try (Connection banco = DaoTestDatabase.create(temp)) {
       assertThat(TestCaches.userTables(banco)).isEqualTo(TABLES);
     }
@@ -235,7 +267,7 @@ final class SchemaTest {
   @MethodSource("colunasDeEnum")
   void todoMembroDoEnumPassaPeloCheck(EnumColumn coluna) throws Exception {
     try (Connection banco = DaoTestDatabase.create(temp)) {
-      analisePai(banco);
+      pais(banco);
 
       for (final String membro : coluna.members()) {
         assertThatCode(() -> inserirEDesfazer(banco, coluna, membro))
@@ -252,7 +284,7 @@ final class SchemaTest {
         List.of("BOGUS", "", coluna.members().getFirst().toLowerCase(Locale.ROOT));
 
     try (Connection banco = DaoTestDatabase.create(temp)) {
-      analisePai(banco);
+      pais(banco);
 
       for (final String invalido : invalidos) {
         assertThatThrownBy(() -> inserirEDesfazer(banco, coluna, invalido))

@@ -145,6 +145,25 @@ final class SimpleNameIndexTest {
   }
 
   @Test
+  void oPrimeiroSegmentoDeUmNomeComPontosCedeAntesAoImportDeTipoUnico() {
+    assertThat(INDEX.scope("x", Set.of(), Map.of("Api", "a.Api")).canonical("Api.Inner", false))
+        .isEqualTo("a.Api$Inner");
+    assertThat(INDEX.scope("c", Set.of(), Map.of("Api", "a.Api")).canonical("Api.Inner", false))
+        .as("vence o c.Api do próprio pacote")
+        .isEqualTo("a.Api$Inner");
+    assertThat(INDEX.scope("x", Set.of("c"), Map.of("Api", "a.Api")).canonical("Api.Inner", false))
+        .as("vence o c.Api do import sob demanda")
+        .isEqualTo("a.Api$Inner");
+    assertThat(INDEX.scope("x", Set.of(), Map.of("Api", "org.x.Api")).canonical("Api.Inner", false))
+        .isEqualTo("org.x.Api$Inner");
+    assertThat(
+            INDEX
+                .scope("x", Set.of(), Map.of("Inner", "a.Api.Inner"))
+                .canonical("Inner.Deep", false))
+        .isEqualTo("a.Api$Inner$Deep");
+  }
+
+  @Test
   void oEscopoDeUmaUnidadeAplicaAMesmaRegra() {
     assertThat(INDEX.scope("x", Set.of("c"), Map.of()).canonical("Other", false))
         .isEqualTo("c.Other");

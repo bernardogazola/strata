@@ -132,7 +132,7 @@ CREATE TABLE dependency (
   target_pk   INTEGER NOT NULL REFERENCES code_element(id) ON DELETE CASCADE,
   type        TEXT NOT NULL CHECK (type IN
                 ('IMPORTS','EXTENDS','IMPLEMENTS','CALLS','FIELD_TYPE',
-                 'PARAMETER_TYPE','RETURN_TYPE','ANNOTATION_REFERENCE','MODULE_DEPENDENCY')),
+                 'PARAMETER_TYPE','RETURN_TYPE','ANNOTATION_REFERENCE')),
   resolution  TEXT NOT NULL CHECK (resolution IN
                 ('RESOLVED','INFERRED','UNRESOLVED_EXTERNAL')),
   occurrences INTEGER NOT NULL DEFAULT 1,
@@ -156,6 +156,19 @@ CREATE INDEX idx_dep_evidence           ON dependency_evidence(dependency_pk, li
 CREATE INDEX idx_fk_evidence_from       ON dependency_evidence(from_method_pk);
 CREATE INDEX idx_fk_evidence_to         ON dependency_evidence(to_method_pk);
 CREATE INDEX idx_fk_evidence_file       ON dependency_evidence(file_pk);
+
+CREATE TABLE module_dependency (
+  id            INTEGER PRIMARY KEY,
+  analysis_pk   INTEGER NOT NULL REFERENCES analysis(id) ON DELETE CASCADE,
+  file_pk       INTEGER NOT NULL REFERENCES source_file(id) ON DELETE CASCADE,
+  module_name   TEXT    NOT NULL,
+  required_name TEXT    NOT NULL,
+  is_transitive INTEGER NOT NULL DEFAULT 0 CHECK (is_transitive IN (0,1)),
+  is_static     INTEGER NOT NULL DEFAULT 0 CHECK (is_static IN (0,1)),
+  line          INTEGER,
+  UNIQUE (file_pk, required_name)
+) STRICT;
+CREATE INDEX idx_module_dep_analysis ON module_dependency(analysis_pk, module_name, required_name);
 
 CREATE TABLE code_metric (
   element_pk    INTEGER PRIMARY KEY REFERENCES code_element(id) ON DELETE CASCADE,

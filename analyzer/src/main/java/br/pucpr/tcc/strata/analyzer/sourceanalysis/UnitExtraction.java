@@ -5,6 +5,7 @@ import br.pucpr.tcc.strata.analyzer.repository.SourceRoot;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootKind;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementExtractor.DeclaredType;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementExtractor.UnitElements;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.CodeElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.MethodElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.PackageElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.TypeElement;
@@ -17,7 +18,6 @@ import java.util.Optional;
 import java.util.Set;
 import spoon.reflect.declaration.CtCompilationUnit;
 import spoon.reflect.declaration.CtExecutable;
-import spoon.reflect.declaration.CtMethod;
 import spoon.reflect.declaration.CtModifiable;
 import spoon.reflect.declaration.CtParameter;
 import spoon.reflect.declaration.CtType;
@@ -81,28 +81,21 @@ final class UnitExtraction {
       Map<CtType<?>, TypeBuilder> builders,
       SimpleNameIndex.Scope scope) {
     final Optional<String> name = ElementIds.methodName(executable);
-    if (name.isEmpty()) {
+    final CtType<?> owner = ElementIds.methodOwner(executable);
+    if (name.isEmpty() || owner == null) {
       return;
     }
-    final CtType<?> declaring = executable.getParent(CtType.class);
-    final TypeBuilder own = builders.get(declaring);
-    if (own != null) {
-      own.offer(methodElement(executable, name.get(), own.type(), scope), true);
-      return;
-    }
-    if (executable.isImplicit() || !(executable instanceof CtMethod<?>)) {
-      return;
-    }
-    final TypeBuilder owner = builders.get(ElementIds.nearestElementType(declaring));
-    if (owner != null) {
-      owner.offer(methodElement(executable, name.get(), owner.type(), scope), false);
+    final TypeBuilder builder = builders.get(owner);
+    if (builder != null) {
+      final boolean own = owner == executable.getParent(CtType.class);
+      builder.offer(methodElement(executable, name.get(), builder.type(), scope), own);
     }
   }
 
   private TypeElement typeElement(CtType<?> type) {
     return new TypeElement(
         CodeElementId.ofType(ElementIds.idName(type)),
-        ElementIds.label(type.getSimpleName()),
+        CodeElement.label(type.getSimpleName()),
         ElementIds.canonicalName(type),
         ElementIds.typeKind(type),
         CodeElementId.ofPackage(ElementIds.packageName(type)),
@@ -115,7 +108,6 @@ final class UnitExtraction {
 
   private MethodElement methodElement(
       CtExecutable<?> executable, String name, TypeElement owner, SimpleNameIndex.Scope scope) {
-    final List<String> parameters = new ArrayList<>();
     for (final CtParameter<?> parameter : executable.getParameters()) {
       if (parameter.getType() == null) {
         Log.warn(
@@ -127,11 +119,10 @@ final class UnitExtraction {
                 + " não tem tipo no modelo; o id dele usa "
                 + ElementIds.OBJECT);
       }
-      parameters.add(ElementIds.erase(parameter.getType(), scope));
     }
     return new MethodElement(
-        CodeElementId.ofMethod(owner.id().sortKey(), name, parameters),
-        ElementIds.label(name),
+        ElementIds.methodId(owner.id().sortKey(), name, executable, scope),
+        CodeElement.label(name),
         owner.qualifiedName() + "#" + name,
         owner.id(),
         relativePath,
@@ -144,7 +135,7 @@ final class UnitExtraction {
   private static PackageElement packageElement(String qualifiedName) {
     return new PackageElement(
         CodeElementId.ofPackage(qualifiedName),
-        ElementIds.label(qualifiedName.substring(qualifiedName.lastIndexOf('.') + 1)),
+        CodeElement.label(qualifiedName.substring(qualifiedName.lastIndexOf('.') + 1)),
         qualifiedName);
   }
 
