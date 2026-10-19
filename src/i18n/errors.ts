@@ -333,6 +333,36 @@ const errorRegistry: ErrorRegistry = {
     retryable: false,
     severity: "warning",
   },
+  SOURCE_DUPLICATE_ELEMENT: {
+    format: (p) => ({
+      body: [
+        t("O arquivo "),
+        u(p.filePath),
+        t(" declara um elemento que "),
+        u(p.firstFilePath),
+        t(
+          " já declara, e só a primeira declaração entrou na análise estrutural."
+        ),
+      ],
+      title: "Declaração repetida",
+    }),
+    retryable: false,
+    severity: "warning",
+  },
+  SOURCE_ELEMENT_ID_TOO_LONG: {
+    format: (p) => ({
+      body: [
+        t("Um elemento declarado em "),
+        u(p.filePath),
+        t(
+          ` tem um identificador acima de ${formatInteger(p.limitBytes)} bytes e ficou de fora da análise estrutural.`
+        ),
+      ],
+      title: "Elemento ignorado",
+    }),
+    retryable: false,
+    severity: "warning",
+  },
   SOURCE_FILE_TOO_LARGE: {
     format: (p) => ({
       body: [

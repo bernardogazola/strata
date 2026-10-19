@@ -9,7 +9,9 @@ public record SourceIssue(Code code, Map<String, Object> params) {
 
   public enum Code {
     SOURCE_PARSE_FAILED,
-    SOURCE_FILE_TOO_LARGE
+    SOURCE_FILE_TOO_LARGE,
+    SOURCE_DUPLICATE_ELEMENT,
+    SOURCE_ELEMENT_ID_TOO_LONG
   }
 
   public SourceIssue {
@@ -24,6 +26,18 @@ public record SourceIssue(Code code, Map<String, Object> params) {
   public static SourceIssue fileTooLarge(String relativePath, int limitBytes) {
     return new SourceIssue(
         Code.SOURCE_FILE_TOO_LARGE,
+        Map.of("filePath", wirePath(relativePath), "limitBytes", limitBytes));
+  }
+
+  public static SourceIssue duplicateElement(String relativePath, String firstRelativePath) {
+    return new SourceIssue(
+        Code.SOURCE_DUPLICATE_ELEMENT,
+        Map.of("filePath", wirePath(relativePath), "firstFilePath", wirePath(firstRelativePath)));
+  }
+
+  public static SourceIssue elementIdTooLong(String relativePath, int limitBytes) {
+    return new SourceIssue(
+        Code.SOURCE_ELEMENT_ID_TOO_LONG,
         Map.of("filePath", wirePath(relativePath), "limitBytes", limitBytes));
   }
 

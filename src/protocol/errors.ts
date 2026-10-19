@@ -31,6 +31,8 @@ export interface ErrorParamsByCode {
   REPO_ROOT_UNREADABLE: Record<string, never>;
   REPO_TOO_MANY_FILES: { limit: number; found: number };
   REPO_UNREADABLE: { filePath: string };
+  SOURCE_DUPLICATE_ELEMENT: { filePath: string; firstFilePath: string };
+  SOURCE_ELEMENT_ID_TOO_LONG: { filePath: string; limitBytes: number };
   SOURCE_FILE_TOO_LARGE: { filePath: string; limitBytes: number };
   SOURCE_PARSE_FAILED: { filePath: string };
 }
@@ -80,6 +82,14 @@ export const errorParamsSchemaByCode = {
     limit: z.number().int().positive(),
   }),
   REPO_UNREADABLE: z.object({ filePath: z.string().max(1024) }),
+  SOURCE_DUPLICATE_ELEMENT: z.object({
+    filePath: z.string().max(1024),
+    firstFilePath: z.string().max(1024),
+  }),
+  SOURCE_ELEMENT_ID_TOO_LONG: z.object({
+    filePath: z.string().max(1024),
+    limitBytes: z.number().int().positive(),
+  }),
   SOURCE_FILE_TOO_LARGE: z.object({
     filePath: z.string().max(1024),
     limitBytes: z.number().int().positive(),
