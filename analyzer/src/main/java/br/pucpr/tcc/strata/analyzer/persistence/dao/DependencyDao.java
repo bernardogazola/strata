@@ -14,16 +14,16 @@ public final class DependencyDao {
   private static final String INSERT_HEAD =
       """
       INSERT INTO dependency (id, analysis_pk, source_pk, target_pk, type, resolution,
-                              occurrences, weight)
+                              occurrences, weight, ambiguous)
       VALUES""";
 
-  private static final int COLUMNS = 8;
+  private static final int COLUMNS = 9;
 
   private static final String NEXT_ID = "SELECT coalesce(max(id), 0) + 1 FROM dependency";
 
   private static final String LIST =
       """
-      SELECT id, source_pk, target_pk, type, resolution, occurrences, weight
+      SELECT id, source_pk, target_pk, type, resolution, occurrences, weight, ambiguous
         FROM dependency
        WHERE analysis_pk = ?
        ORDER BY id""";
@@ -50,6 +50,7 @@ public final class DependencyDao {
           statement.setString(first + 5, row.resolution().name());
           statement.setInt(first + 6, row.occurrences());
           statement.setInt(first + 7, row.weight());
+          statement.setInt(first + 8, row.ambiguous() ? 1 : 0);
         });
   }
 
@@ -68,7 +69,8 @@ public final class DependencyDao {
                   DependencyType.valueOf(rows.getString("type")),
                   ResolutionQuality.valueOf(rows.getString("resolution")),
                   rows.getInt("occurrences"),
-                  rows.getInt("weight")));
+                  rows.getInt("weight"),
+                  rows.getInt("ambiguous") == 1));
         }
       }
     }

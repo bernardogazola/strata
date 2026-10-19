@@ -9,16 +9,19 @@ record DependencyDraft(
     long sourcePk,
     CodeElementId target,
     boolean targetDeclared,
+    boolean ambiguous,
     DependencyType type,
     ResolutionQuality resolution,
     int occurrences,
     int weight,
     long filePk,
-    List<EvidenceDraft> evidence) {
+    List<EvidenceDraft> evidence,
+    int unnumberedCallees) {
 
   DependencyDraft {
     evidence = List.copyOf(evidence);
   }
 
-  record EvidenceDraft(Long fromMethodPk, Integer line, ResolutionQuality resolution) {}
+  record EvidenceDraft(
+      Long fromMethodPk, Long toMethodPk, Integer line, ResolutionQuality resolution) {}
 }

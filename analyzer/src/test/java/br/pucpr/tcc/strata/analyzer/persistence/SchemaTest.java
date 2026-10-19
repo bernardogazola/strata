@@ -198,11 +198,11 @@ final class SchemaTest {
             + " VALUES (1, 1, 1, 2, 'CALLS', 'RESOLVED')");
   }
 
-  private static void inserirEDesfazer(Connection banco, EnumColumn coluna, String valor)
+  private static void inserirEDesfazer(Connection banco, String insercao, Object... valores)
       throws SQLException {
     banco.setAutoCommit(false);
     try {
-      DaoTestDatabase.execute(banco, coluna.insert(), valor);
+      DaoTestDatabase.execute(banco, insercao, valores);
     } finally {
       banco.rollback();
       banco.setAutoCommit(true);
@@ -270,7 +270,7 @@ final class SchemaTest {
       pais(banco);
 
       for (final String membro : coluna.members()) {
-        assertThatCode(() -> inserirEDesfazer(banco, coluna, membro))
+        assertThatCode(() -> inserirEDesfazer(banco, coluna.insert(), membro))
             .as(coluna + " = " + membro)
             .doesNotThrowAnyException();
       }
@@ -287,7 +287,7 @@ final class SchemaTest {
       pais(banco);
 
       for (final String invalido : invalidos) {
-        assertThatThrownBy(() -> inserirEDesfazer(banco, coluna, invalido))
+        assertThatThrownBy(() -> inserirEDesfazer(banco, coluna.insert(), invalido))
             .as(coluna + " = '" + invalido + "'")
             .satisfies(
                 failure ->
@@ -320,6 +320,38 @@ final class SchemaTest {
       }
       assertThat(literais).containsExactlyInAnyOrderElementsOf(coluna.members());
       assertThat(lista.find()).as("um CHECK só para " + coluna).isFalse();
+    }
+  }
+
+  @Test
+  void oCheckSoAdmiteUmaDependenciaAmbiguaUnresolvedExternal() throws Exception {
+    final String dependencia =
+        "INSERT INTO dependency (analysis_pk, source_pk, target_pk, type, resolution, ambiguous)"
+            + " VALUES (1, 2, 1, 'CALLS', ?, ?)";
+
+    try (Connection banco = DaoTestDatabase.create(temp)) {
+      pais(banco);
+
+      for (final String qualidade : List.of("RESOLVED", "INFERRED")) {
+        assertThatThrownBy(() -> inserirEDesfazer(banco, dependencia, qualidade, 1))
+            .as("ambígua e " + qualidade)
+            .satisfies(
+                failure ->
+                    assertThat(DaoTestDatabase.resultCode(failure))
+                        .isEqualTo(SQLiteErrorCode.SQLITE_CONSTRAINT_CHECK));
+      }
+      assertThatThrownBy(() -> inserirEDesfazer(banco, dependencia, "UNRESOLVED_EXTERNAL", 2))
+          .as("ambiguous = 2")
+          .satisfies(
+              failure ->
+                  assertThat(DaoTestDatabase.resultCode(failure))
+                      .isEqualTo(SQLiteErrorCode.SQLITE_CONSTRAINT_CHECK));
+      assertThatCode(() -> inserirEDesfazer(banco, dependencia, "UNRESOLVED_EXTERNAL", 1))
+          .doesNotThrowAnyException();
+      assertThatCode(() -> inserirEDesfazer(banco, dependencia, "RESOLVED", 0))
+          .doesNotThrowAnyException();
+      assertThat(DaoTestDatabase.scalar(banco, "SELECT ambiguous FROM dependency WHERE id = 1"))
+          .isEqualTo("0");
     }
   }
 }

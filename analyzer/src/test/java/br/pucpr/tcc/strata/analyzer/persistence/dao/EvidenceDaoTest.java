@@ -44,7 +44,14 @@ final class EvidenceDaoTest {
         analise,
         List.of(
             new DependencyRow(
-                linha, tipo, tipo + 1, DependencyType.CALLS, ResolutionQuality.RESOLVED, 1, 2)));
+                linha,
+                tipo,
+                tipo + 1,
+                DependencyType.CALLS,
+                ResolutionQuality.RESOLVED,
+                1,
+                2,
+                false)));
     return linha;
   }
 
