@@ -9,8 +9,11 @@ import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Evide
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.ExcludedConstructs;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.LargestRow;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Modules;
+import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.ParseFailedFile;
+import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Share;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Spread;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Union;
+import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.WriterDrops;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.DependencyAggregator;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SourceFileStatus;
@@ -42,6 +45,7 @@ final class DependencyReadBack {
   private static final double P90 = 0.90;
   private static final double P99 = 0.99;
   private static final int PK_BITS = Integer.SIZE;
+  private static final int TOP_FILES = 5;
 
   private static final String ELEMENTS_BY_KIND =
       """
@@ -340,6 +344,45 @@ final class DependencyReadBack {
     return Math.round(value * HUNDREDTHS) / HUNDREDTHS;
   }
 
+  static WriterDrops writerDrops(UnitCensusPass.WriterDrops census) {
+    final Map<String, Long> rows = new LinkedHashMap<>();
+    final Map<String, Long> occurrences = new LinkedHashMap<>();
+    for (final DependencyType type : DependencyType.values()) {
+      if (type.isTypeEdge()) {
+        final long[] counts = census.byType().getOrDefault(type, new long[2]);
+        rows.put(type.name(), counts[0]);
+        occurrences.put(type.name(), counts[1]);
+      }
+    }
+    final List<ParseFailedFile> files =
+        census.parseFailedFiles().stream()
+            .limit(TOP_FILES)
+            .map(
+                file ->
+                    new ParseFailedFile(
+                        file.path(),
+                        file.cause().name(),
+                        file.rows(),
+                        file.occurrences(),
+                        file.extendsRows(),
+                        file.topLevelTypes()))
+            .toList();
+    return new WriterDrops(
+        census.rows(),
+        census.occurrences(),
+        rows,
+        occurrences,
+        share(census.intoParseFailedFile()),
+        census.parseFailedFiles().size(),
+        share(census.nestedOfWrittenType()),
+        share(census.rest()),
+        files);
+  }
+
+  private static Share share(UnitCensusPass.DropShare share) {
+    return new Share(share.rows(), share.occurrences());
+  }
+
   private static Map<String, Long> grouped(Connection connection, String sql, long analysisPk)
       throws SQLException {
     final Map<String, Long> counts = new HashMap<>();
@@ -399,7 +442,13 @@ final class DependencyReadBack {
       long externalsWithoutDependency,
       boolean edgeTotalsMatchRows) {}
 
-  record CensusBase(Map<String, TypeRow> types, long[] basePairs, long baseInternalPairs) {}
+  record CensusBase(Map<String, TypeRow> types, long[] basePairs, long baseInternalPairs) {
+
+    String internalTypeFile(CodeElementId id) {
+      final TypeRow type = types.get(id.value());
+      return type == null || type.external() ? null : type.filePath();
+    }
+  }
 
   record Result(
       Elements elements,

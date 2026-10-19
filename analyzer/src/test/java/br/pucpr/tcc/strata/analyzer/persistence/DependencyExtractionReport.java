@@ -1,9 +1,12 @@
 package br.pucpr.tcc.strata.analyzer.persistence;
 
-import br.pucpr.tcc.strata.analyzer.persistence.ElementExtractionReport.Environment;
 import br.pucpr.tcc.strata.analyzer.persistence.ElementExtractionReport.FileOutcomes;
 import br.pucpr.tcc.strata.analyzer.persistence.ElementExtractionReport.Models;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import com.sun.management.OperatingSystemMXBean;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
 import java.util.List;
 import java.util.Map;
 
@@ -29,6 +32,43 @@ record DependencyExtractionReport(
       Baseline baseline) {}
 
   record Baseline(String file, String measuredAt, String baseCommit) {}
+
+  record Environment(
+      @JsonUnwrapped ElementExtractionReport.Environment host, boolean assertionsEnabled) {
+
+    static Environment ofThisJvm() {
+      final OperatingSystemMXBean system =
+          ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
+      final List<String> flags =
+          ManagementFactory.getRuntimeMXBean().getInputArguments().stream()
+              .filter(argument -> argument.startsWith("-X"))
+              .toList();
+      return new Environment(
+          new ElementExtractionReport.Environment(
+              System.getProperty("os.name") + " " + System.getProperty("os.version"),
+              System.getProperty("os.arch"),
+              System.getProperty("strata.host.cpu", "not recorded: pass -Dstrata.host.cpu"),
+              Runtime.getRuntime().availableProcessors(),
+              system.getTotalMemorySize(),
+              System.getProperty("strata.host.storage", "not recorded: pass -Dstrata.host.storage"),
+              "full JDK under Maven Surefire, not the jlink image the application ships",
+              System.getProperty("java.vm.vendor")
+                  + " "
+                  + System.getProperty("java.runtime.version"),
+              flags,
+              Runtime.getRuntime().maxMemory(),
+              ManagementFactory.getGarbageCollectorMXBeans().stream()
+                  .map(GarbageCollectorMXBean::getName)
+                  .toList()),
+          assertsRun());
+    }
+
+    private static boolean assertsRun() {
+      boolean enabled = false;
+      assert enabled = true;
+      return enabled;
+    }
+  }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   record RepositoryResult(
@@ -136,13 +176,37 @@ record DependencyExtractionReport(
       boolean flushRuleReproduced,
       int elementOnlyAccepts,
       boolean writtenEqualsReadBack,
-      boolean censusPassSameOutcomes) {}
+      boolean censusPassSameOutcomes,
+      boolean writerDropsReproduced) {}
 
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   record Drops(
       Map<String, Long> extractionByReason,
       long extractionTotal,
       int unresolvedDeclaredTarget,
-      long pendingPeakRows) {}
+      long pendingPeakRows,
+      WriterDrops writer) {}
+
+  record WriterDrops(
+      long rows,
+      long occurrences,
+      Map<String, Long> rowsByType,
+      Map<String, Long> occurrencesByType,
+      Share intoParseFailedFile,
+      int parseFailedFiles,
+      Share nestedOfWrittenType,
+      Share rest,
+      List<ParseFailedFile> topParseFailedFiles) {}
+
+  record Share(long rows, long occurrences) {}
+
+  record ParseFailedFile(
+      String path,
+      String cause,
+      long rows,
+      long occurrences,
+      long extendsRows,
+      int topLevelTypes) {}
 
   record Write(
       long beginMillis,

@@ -8,6 +8,7 @@ import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Basel
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Checks;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Drops;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Elements;
+import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Environment;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Flush;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Heap;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.RepositoryResult;
@@ -17,7 +18,6 @@ import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Timin
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Unit;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.UnitFunctions;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Write;
-import br.pucpr.tcc.strata.analyzer.persistence.ElementExtractionReport.Environment;
 import br.pucpr.tcc.strata.analyzer.persistence.ElementExtractionReport.FileOutcomes;
 import br.pucpr.tcc.strata.analyzer.persistence.ElementExtractionReport.Models;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.AnalysisDao;
@@ -39,11 +39,8 @@ import br.pucpr.tcc.strata.analyzer.sourceanalysis.UnitCensusPass;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.sun.management.OperatingSystemMXBean;
 import java.io.File;
 import java.io.IOException;
-import java.lang.management.GarbageCollectorMXBean;
-import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -202,7 +199,8 @@ final class DependencyExtractionSpikeIT {
       ValidatedRepository repository, List<SourceRoot> roots, DependencyReadBack.Result readBack) {
     final DependencyReadBack.ExcludedPairs pairs =
         new DependencyReadBack.ExcludedPairs(readBack.census());
-    final UnitCensusPass pass = new UnitCensusPass(roots, pairs);
+    final UnitCensusPass pass =
+        new UnitCensusPass(roots, pairs, readBack.census()::internalTypeFile);
     final long started = System.nanoTime();
     final SourceAnalysis analysis;
     try {
@@ -228,7 +226,7 @@ final class DependencyExtractionSpikeIT {
     final MeasuringStructureSink sink = run.sink();
     final FileOutcomes files = files(analysis);
     final Write write = sink.write();
-    final Drops drops = drops(run, write);
+    final Drops drops = drops(run, write, census);
     return new SelectionResult(
         selection.name(),
         rootsByKind(roots),
@@ -288,7 +286,7 @@ final class DependencyExtractionSpikeIT {
         null);
   }
 
-  private static Drops drops(Measured run, Write write) {
+  private static Drops drops(Measured run, Write write, Census census) {
     final Map<String, Long> byReason = new LinkedHashMap<>();
     run.extractor()
         .droppedOccurrences()
@@ -301,7 +299,10 @@ final class DependencyExtractionSpikeIT {
         byReason,
         byReason.values().stream().mapToLong(Long::longValue).sum(),
         run.writer().droppedDependencies(),
-        pendingPeak);
+        pendingPeak,
+        census.result() == null
+            ? null
+            : DependencyReadBack.writerDrops(census.result().writerDrops()));
   }
 
   private static Checks checks(
@@ -333,7 +334,15 @@ final class DependencyExtractionSpikeIT {
         sink.flushRuleReproduced(),
         sink.elementOnlyAccepts(),
         writtenEqualsReadBack(readBack, write, drops),
-        census.analysis() != null && files.equals(files(census.analysis())));
+        census.analysis() != null && files.equals(files(census.analysis())),
+        census.result() != null && writerDropsReproduced(census.result(), readBack, drops));
+  }
+
+  private static boolean writerDropsReproduced(
+      UnitCensusPass.Result census, DependencyReadBack.Result readBack, Drops drops) {
+    final UnitCensusPass.WriterDrops replayed = census.writerDrops();
+    return replayed.rows() == drops.unresolvedDeclaredTarget()
+        && replayed.survivingRows() - replayed.rows() == readBack.dependencies().rows();
   }
 
   private static boolean writtenEqualsReadBack(
@@ -476,6 +485,10 @@ final class DependencyExtractionSpikeIT {
             .as(where + "a passada do censo viu os mesmos desfechos")
             .isTrue();
         softly
+            .assertThat(checks.writerDropsReproduced())
+            .as(where + "a passada do censo refaz o descarte do gravador")
+            .isTrue();
+        softly
             .assertThat(measured.extractionIssues())
             .as(where + "nenhum id acima de " + AnalysisConstants.MAX_ELEMENT_ID_BYTES + " bytes")
             .containsEntry(SourceIssue.Code.SOURCE_ELEMENT_ID_TOO_LONG.name(), 0);
@@ -614,7 +627,7 @@ final class DependencyExtractionSpikeIT {
                 BASELINE,
                 baseline.path("measuredAt").asText(),
                 baseline.path("baseCommit").asText())),
-        environment(),
+        Environment.ofThisJvm(),
         List.copyOf(repositories));
   }
 
@@ -638,29 +651,6 @@ final class DependencyExtractionSpikeIT {
       current = current.path(field);
     }
     return current.isNumber() ? current.asLong() : null;
-  }
-
-  private static Environment environment() {
-    final OperatingSystemMXBean system =
-        ManagementFactory.getPlatformMXBean(OperatingSystemMXBean.class);
-    final List<String> flags =
-        ManagementFactory.getRuntimeMXBean().getInputArguments().stream()
-            .filter(argument -> argument.startsWith("-X"))
-            .toList();
-    return new Environment(
-        System.getProperty("os.name") + " " + System.getProperty("os.version"),
-        System.getProperty("os.arch"),
-        System.getProperty("strata.host.cpu", "not recorded: pass -Dstrata.host.cpu"),
-        Runtime.getRuntime().availableProcessors(),
-        system.getTotalMemorySize(),
-        System.getProperty("strata.host.storage", "not recorded: pass -Dstrata.host.storage"),
-        "full JDK under Maven Surefire, not the jlink image the application ships",
-        System.getProperty("java.vm.vendor") + " " + System.getProperty("java.runtime.version"),
-        flags,
-        Runtime.getRuntime().maxMemory(),
-        ManagementFactory.getGarbageCollectorMXBeans().stream()
-            .map(GarbageCollectorMXBean::getName)
-            .toList());
   }
 
   private static Path corpusDirectory() throws IOException {
