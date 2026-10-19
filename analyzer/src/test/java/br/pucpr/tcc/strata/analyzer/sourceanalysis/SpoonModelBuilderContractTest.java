@@ -178,6 +178,91 @@ final class SpoonModelBuilderContractTest {
     assertThat(leaked).hasSameSizeAs(models);
   }
 
+  @Test
+  void oCicloEhBeginUmaVezCadaLoteEEndUmaVezComODesfechoDevolvido() throws Exception {
+    final ValidatedRepository repository =
+        SourceTrees.fixture("multi-module", temp.toRealPath().resolve("multi-module"));
+    final List<String> events = new ArrayList<>();
+    final List<SourceFile> begun = new ArrayList<>();
+    final List<SourceAnalysis> ended = new ArrayList<>();
+
+    final SourceAnalysis analysis =
+        new SpoonModelBuilder()
+            .analyze(
+                repository,
+                repository.layout().sourceRoots(),
+                new BatchVisitor() {
+                  @Override
+                  public void begin(List<SourceFile> files) {
+                    events.add("begin");
+                    begun.addAll(files);
+                  }
+
+                  @Override
+                  public void visit(ModeledBatch batch) {
+                    events.add("visit");
+                  }
+
+                  @Override
+                  public void end(SourceAnalysis result) {
+                    events.add("end");
+                    ended.add(result);
+                  }
+                },
+                SourceTrees.NEVER);
+
+    assertThat(events).first().isEqualTo("begin");
+    assertThat(events).last().isEqualTo("end");
+    assertThat(events).filteredOn("visit"::equals).isNotEmpty();
+    assertThat(events).filteredOn(event -> !"visit".equals(event)).hasSize(2);
+    assertThat(begun)
+        .extracting(SourceFile::relativePath)
+        .containsExactlyElementsOf(
+            analysis.files().stream().map(SourceFile::relativePath).toList());
+    assertThat(ended).singleElement().isSameAs(analysis);
+  }
+
+  @Test
+  void beginEEndRodamMesmoSemModeloNenhum() throws Exception {
+    final Path directory = temp.toRealPath().resolve("no-model");
+    TestRepositories.write(directory, "src/p/Vazio.java", "// nada a modelar\n");
+    final SourceRoot only =
+        new SourceRoot(SourceRootId.derive("src"), "src", SourceRootKind.MAIN, 1);
+    final ValidatedRepository repository =
+        new ValidatedRepository(
+            new RepositorySnapshot(
+                directory,
+                "no-model",
+                new HeadState(null, "main", false),
+                TestRepositories.inventoryOf(directory)),
+            new ProjectLayout(BuildSystem.NONE, List.of(), List.of(only)));
+    final List<String> events = new ArrayList<>();
+
+    new SpoonModelBuilder()
+        .analyze(
+            repository,
+            List.of(only),
+            new BatchVisitor() {
+              @Override
+              public void begin(List<SourceFile> files) {
+                events.add("begin " + files.size());
+              }
+
+              @Override
+              public void visit(ModeledBatch batch) {
+                events.add("visit");
+              }
+
+              @Override
+              public void end(SourceAnalysis result) {
+                events.add("end " + result.totalFiles());
+              }
+            },
+            SourceTrees.NEVER);
+
+    assertThat(events).containsExactly("begin 1", "end 1");
+  }
+
   private ValidatedRepository nested(int outerCount) throws Exception {
     final Path directory = temp.toRealPath().resolve("nested");
     TestRepositories.write(directory, "src/p/Outer.java", "package p;\n\nclass Outer {}\n");

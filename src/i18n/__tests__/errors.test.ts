@@ -6,6 +6,7 @@ const EVERY_PARAM = {
   exitCode: 1,
   expected: 1,
   filePath: "src/main/java/Exemplo.java",
+  firstFilePath: "src/main/java/Primeiro.java",
   found: 10,
   fromVersion: 3,
   limit: 5,
@@ -22,6 +23,8 @@ const UNTRUSTED_SENTINEL = "SENTINELA-DO-REPOSITORIO/Estranho.java";
 const CODES_RENDERING_A_PATH = [
   "REPO_PATH_ESCAPES_ROOT",
   "REPO_UNREADABLE",
+  "SOURCE_DUPLICATE_ELEMENT",
+  "SOURCE_ELEMENT_ID_TOO_LONG",
   "SOURCE_FILE_TOO_LARGE",
   "SOURCE_PARSE_FAILED",
 ];

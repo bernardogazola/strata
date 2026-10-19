@@ -46,6 +46,10 @@ public final class AnalysisConstants {
 
   public static final int MAX_PATH_BYTES = 1_024;
 
+  public static final int MAX_ELEMENT_ID_BYTES = 4_096;
+
+  public static final int MAX_LABEL_CHARS = 512;
+
   public static final int MAX_DISPLAY_NAME_CHARS = 255;
 
   public static final int MAX_BRANCH_NAME_CHARS = 255;
@@ -73,6 +77,10 @@ public final class AnalysisConstants {
   public static final int MAX_CACHE_BACKUPS = 2;
 
   public static final int CACHE_LOCK_WAIT_MILLIS = 3_500;
+
+  public static final int ELEMENT_FLUSH_ROWS = 32_768;
+
+  public static final int ROWS_PER_INSERT = 500;
 
   private AnalysisConstants() {}
 

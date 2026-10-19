@@ -12,6 +12,8 @@ import br.pucpr.tcc.strata.analyzer.persistence.dao.DaoTestDatabase;
 import br.pucpr.tcc.strata.analyzer.repository.BuildSystem;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootKind;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SourceFileStatus;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.TypeKind;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -131,6 +133,19 @@ final class SchemaTest {
             names(SourceRootKind.values()),
             "INSERT INTO source_root (analysis_pk, source_root_id, relative_path, kind)"
                 + " VALUES (1, 'sr_00000000', 'src', ?)"),
+        new EnumColumn(
+            "code_element",
+            "kind",
+            names(ElementKind.values()),
+            "INSERT INTO code_element (analysis_pk, element_id, kind, simple_name, qualified_name,"
+                + " sort_key) VALUES (1, 'probe', ?, 'p', 'p', 'p')"),
+        new EnumColumn(
+            "code_element",
+            "type_kind",
+            names(TypeKind.values()),
+            "INSERT INTO code_element (analysis_pk, element_id, kind, simple_name, qualified_name,"
+                + " sort_key, type_kind) VALUES (1, 'type:Probe', 'TYPE', 'Probe', 'Probe', 'Probe',"
+                + " ?)"),
         new EnumColumn(
             "repository",
             "build_system",

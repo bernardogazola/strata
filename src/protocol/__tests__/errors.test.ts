@@ -15,7 +15,7 @@ describe("isKnownErrorCode", () => {
 });
 
 describe("ERROR_CODES", () => {
-  test("o catálogo tem os 29 códigos", () => {
-    expect(ERROR_CODES).toHaveLength(29);
+  test("o catálogo tem os 31 códigos", () => {
+    expect(ERROR_CODES).toHaveLength(31);
   });
 });

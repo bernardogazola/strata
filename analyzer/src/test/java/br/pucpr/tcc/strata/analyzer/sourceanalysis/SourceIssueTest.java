@@ -69,4 +69,26 @@ final class SourceIssueTest {
     assertThat(issue.code()).isEqualTo(SourceIssue.Code.SOURCE_PARSE_FAILED);
     assertThat(issue.params()).containsOnly(entry("filePath", "src/main/java/p/Broken.java"));
   }
+
+  @Test
+  void oAvisoDeElementoRepetidoLevaOsDoisCaminhosEmNfc() {
+    final SourceIssue issue =
+        SourceIssue.duplicateElement(
+            "mod2/src/main/java/a/Caf" + E_ACUTE_NFD + ".java", "mod1/src/main/java/a/Y.java");
+
+    assertThat(issue.code()).isEqualTo(SourceIssue.Code.SOURCE_DUPLICATE_ELEMENT);
+    assertThat(issue.params())
+        .containsOnly(
+            entry("filePath", "mod2/src/main/java/a/Caf" + E_ACUTE_NFC + ".java"),
+            entry("firstFilePath", "mod1/src/main/java/a/Y.java"));
+  }
+
+  @Test
+  void oAvisoDeIdLongoDemaisLevaOCaminhoEOTeto() {
+    final SourceIssue issue = SourceIssue.elementIdTooLong("src/main/java/p/Gen.java", 4_096);
+
+    assertThat(issue.code()).isEqualTo(SourceIssue.Code.SOURCE_ELEMENT_ID_TOO_LONG);
+    assertThat(issue.params())
+        .containsOnly(entry("filePath", "src/main/java/p/Gen.java"), entry("limitBytes", 4_096));
+  }
 }

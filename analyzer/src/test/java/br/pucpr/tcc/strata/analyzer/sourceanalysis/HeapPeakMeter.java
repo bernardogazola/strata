@@ -21,7 +21,7 @@ import javax.management.NotificationEmitter;
 import javax.management.NotificationListener;
 import javax.management.openmbean.CompositeData;
 
-final class HeapPeakMeter implements AutoCloseable {
+public final class HeapPeakMeter implements AutoCloseable {
 
   private static final String EXPLICIT_GC = "System.gc()";
 
@@ -37,7 +37,7 @@ final class HeapPeakMeter implements AutoCloseable {
   private final NotificationListener listener = this::onNotification;
   private volatile Drain pendingDrain = new Drain(Map.of(), new CountDownLatch(1));
 
-  HeapPeakMeter() {
+  public HeapPeakMeter() {
     heapPools =
         ManagementFactory.getMemoryPoolMXBeans().stream()
             .filter(pool -> pool.getType() == MemoryType.HEAP)
@@ -51,7 +51,7 @@ final class HeapPeakMeter implements AutoCloseable {
     }
   }
 
-  void drain() throws InterruptedException {
+  public void drain() throws InterruptedException {
     final Drain drain = new Drain(collectionCounts(), new CountDownLatch(1));
     pendingDrain = drain;
     System.gc();
@@ -61,11 +61,11 @@ final class HeapPeakMeter implements AutoCloseable {
     }
   }
 
-  long peakLiveBytes() {
+  public long peakLiveBytes() {
     return peakLive.get();
   }
 
-  long peakUsedBytes() {
+  public long peakUsedBytes() {
     return peakUsed.get();
   }
 
