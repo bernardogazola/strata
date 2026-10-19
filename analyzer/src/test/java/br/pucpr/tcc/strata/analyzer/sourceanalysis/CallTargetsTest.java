@@ -334,15 +334,17 @@ final class CallTargetsTest {
     assertThat(twoRoots.sink().tuples())
         .containsExactly(
             "p.User -> java.lang.Override ANNOTATION_REFERENCE x1 RESOLVED external",
-            "p.User -> java.lang.Runnable CALLS x1 RESOLVED external",
+            "p.User -> java.lang.Runnable CALLS x3 RESOLVED external",
             "p.User -> java.lang.Runnable FIELD_TYPE x1 RESOLVED external",
             "p.User -> q.Late IMPORTS x1 INFERRED",
+            "p.User -> q.Late$Inner CALLS x1 INFERRED",
+            "p.User$In -> java.lang.Runnable CALLS x1 RESOLVED external",
             "q.Late -> java.lang.Runnable FIELD_TYPE x1 RESOLVED external");
-    assertThat(twoRoots.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 4L);
+    assertThat(twoRoots.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 0L);
   }
 
   @Test
-  void umCampoEstaticoDoTipoDeQuemChamaDeclaradoNoutroTipoCaiNasDuasRaizes() throws Exception {
+  void umCampoEstaticoDoTipoDeQuemChamaDeclaradoNoutroTipoDaALinhaNasDuasRaizes() throws Exception {
     final String account =
         """
         package p;
@@ -391,16 +393,18 @@ final class CallTargetsTest {
 
     assertThat(oneRoot.sink().tuples())
         .containsExactly(
+            "p.Account -> p.Account CALLS x1 RESOLVED",
             "p.Account -> q.Registry IMPORTS x1 RESOLVED",
             "q.Registry -> p.Account IMPORTS x1 RESOLVED",
             "q.Registry -> p.Account FIELD_TYPE x1 RESOLVED");
     assertThat(twoRoots.sink().tuples())
         .containsExactly(
+            "p.Account -> p.Account CALLS x1 INFERRED",
             "p.Account -> q.Registry IMPORTS x1 INFERRED",
             "q.Registry -> p.Account IMPORTS x1 INFERRED",
             "q.Registry -> p.Account FIELD_TYPE x1 INFERRED");
-    assertThat(oneRoot.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 1L);
-    assertThat(twoRoots.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 1L);
+    assertThat(oneRoot.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 0L);
+    assertThat(twoRoots.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 0L);
   }
 
   @Test

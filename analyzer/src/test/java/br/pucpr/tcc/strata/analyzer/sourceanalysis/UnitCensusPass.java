@@ -278,18 +278,16 @@ public final class UnitCensusPass implements BatchVisitor {
       return;
     }
     try {
-      final Set<String> onDemand = ElementIds.onDemandPackages(unit);
-      final Map<String, String> singleTypeImports = ElementIds.singleTypeImports(unit);
       final SimpleNameIndex index = elements.index();
       for (final CtType<?> top : unit.getDeclaredTypes()) {
         if (!ElementIds.isElementType(top)) {
           continue;
         }
-        final String ownPackage = ElementIds.packageName(top);
-        final SimpleNameIndex.Scope scope = index.scope(ownPackage, onDemand, singleTypeImports);
+        final UnitHomes.Home home = new UnitHomes(index).of(unit, ElementIds.packageName(top));
         final TargetNames names =
-            new TargetNames(index, Set.of(), ownPackage, singleTypeImports, scope, scanDrops);
-        final SiteAttribution attribution = new SiteAttribution(scope);
+            new TargetNames(
+                TargetNames.Rules.of(index, Set.of(), new JavaLangTypes()), home, scanDrops);
+        final SiteAttribution attribution = new SiteAttribution(home.scope());
         for (final CtElement element : top.getElements(new TypeFilter<>(CtElement.class))) {
           site(path, element, names, attribution);
         }

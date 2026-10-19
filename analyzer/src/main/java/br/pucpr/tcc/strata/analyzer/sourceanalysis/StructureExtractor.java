@@ -21,6 +21,9 @@ public final class StructureExtractor implements BatchVisitor {
   private final StructureSink sink;
   private final CodeElementExtractor elements;
   private final Map<DropReason, Long> drops = new EnumMap<>(DropReason.class);
+  private final JavaLangTypes javaLang = new JavaLangTypes();
+  private ResolutionCounts counts = ResolutionCounts.NONE;
+  private long dottedConflicts;
   private Map<String, SourceFile> filesByPath = Map.of();
 
   public StructureExtractor(List<SourceRoot> roots, StructureSink sink) {
@@ -45,7 +48,7 @@ public final class StructureExtractor implements BatchVisitor {
   @Override
   public void visit(ModeledBatch batch) {
     final DependencyExtractor dependencies =
-        new DependencyExtractor(batch.index(), batchTopLevelTypes(batch));
+        new DependencyExtractor(batch.index(), batchTopLevelTypes(batch), javaLang);
     final List<UnitFacts> units =
         batch.perCompilationUnit(
             (path, unit) ->
@@ -67,6 +70,17 @@ public final class StructureExtractor implements BatchVisitor {
     if (total > 0) {
       Log.warn("a extração de dependências descartou " + total + " ocorrências: " + drops);
     }
+    Log.info(
+        "resolução de dependências por ocorrência: resolvidas "
+            + counts.resolved()
+            + ", inferidas "
+            + counts.inferred()
+            + ", não resolvidas "
+            + counts.unresolved()
+            + " ("
+            + counts.ambiguous()
+            + " ambíguas); nomes com ponto e duas leituras: "
+            + dottedConflicts);
   }
 
   public List<SourceIssue> issues() {
@@ -74,7 +88,7 @@ public final class StructureExtractor implements BatchVisitor {
   }
 
   public ResolutionCounts resolutionCounts() {
-    throw new UnsupportedOperationException("ainda não implementado: resolutionCounts");
+    return counts;
   }
 
   public Map<DropReason, Long> droppedOccurrences() {
@@ -124,7 +138,23 @@ public final class StructureExtractor implements BatchVisitor {
                   reasons.forEach((reason, count) -> drops.merge(reason, (long) count, Long::sum));
                 }
               });
+      unit.counts()
+          .forEach(
+              (source, occurrences) -> {
+                if (unit.relativePath().equals(declaredIn.get(source))) {
+                  counts = sum(counts, occurrences);
+                }
+              });
+      dottedConflicts += unit.dottedConflicts();
     }
+  }
+
+  private static ResolutionCounts sum(ResolutionCounts left, ResolutionCounts right) {
+    return new ResolutionCounts(
+        left.resolved() + right.resolved(),
+        left.inferred() + right.inferred(),
+        left.unresolved() + right.unresolved(),
+        left.ambiguous() + right.ambiguous());
   }
 
   public enum DropReason {

@@ -132,6 +132,12 @@ final class SimpleNameIndex {
     return new UnitScope(this, ImportScope.of(unit, ownPackage, retained));
   }
 
+  List<String> retainedStatics(CtCompilationUnit unit) {
+    return unit.getFile() == null
+        ? List.of()
+        : retainedStatics.getOrDefault(unit.getFile().toPath(), List.of());
+  }
+
   List<String> topLevelCandidates(String simpleName, String fromPackage) {
     final List<String> candidates = new ArrayList<>();
     for (final String id : topLevelBySimpleName.getOrDefault(simpleName, NO_NAMES)) {

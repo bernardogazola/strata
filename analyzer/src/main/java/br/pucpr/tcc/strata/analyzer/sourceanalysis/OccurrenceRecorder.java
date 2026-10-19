@@ -6,6 +6,7 @@ import br.pucpr.tcc.strata.analyzer.sourceanalysis.TargetNames.Target;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import spoon.reflect.code.CtAbstractInvocation;
 import spoon.reflect.code.CtInvocation;
 import spoon.reflect.declaration.CtElement;
 import spoon.reflect.reference.CtTypeReference;
@@ -15,11 +16,17 @@ final class OccurrenceRecorder {
   private final EvidenceCollector collector;
   private final SiteAttribution attribution;
   private final TargetNames names;
+  private final CalleeIds callees;
 
-  OccurrenceRecorder(EvidenceCollector collector, SiteAttribution attribution, TargetNames names) {
+  OccurrenceRecorder(
+      EvidenceCollector collector,
+      SiteAttribution attribution,
+      TargetNames names,
+      CalleeIds callees) {
     this.collector = collector;
     this.attribution = attribution;
     this.names = names;
+    this.callees = callees;
   }
 
   TargetNames names() {
@@ -47,7 +54,7 @@ final class OccurrenceRecorder {
     }
     final CodeElementId fromMethod = attribution.fromMethod(site);
     for (final Anchored anchored : targets.values()) {
-      add(source, anchored.target(), kind, anchored.anchor(), fromMethod);
+      add(source, anchored.target(), kind, anchored.anchor(), fromMethod, null);
     }
   }
 
@@ -58,23 +65,36 @@ final class OccurrenceRecorder {
     }
     final Target target = names.reference(reference);
     if (target != null) {
-      add(source, target, kind, SiteAttribution.nearest(reference), attribution.fromMethod(site));
+      add(
+          source,
+          target,
+          kind,
+          SiteAttribution.nearest(reference),
+          attribution.fromMethod(site),
+          null);
     }
   }
 
-  void call(CtElement site, CodeElementId source, Target target) {
+  void call(CtAbstractInvocation<?> site, CodeElementId source, Target target) {
     if (target != null) {
       final Anchor anchor =
           site instanceof CtInvocation<?> invocation
               ? SiteAttribution.call(invocation)
               : SiteAttribution.at(site);
-      add(source, target, DependencyType.CALLS, anchor, attribution.fromMethod(site));
+      add(
+          source,
+          target,
+          DependencyType.CALLS,
+          anchor,
+          attribution.fromMethod(site),
+          callees.of(site));
     }
   }
 
   void imported(CtElement statement, CodeElementId owner, Target target) {
     if (target != null) {
-      add(owner, target, DependencyType.IMPORTS, SiteAttribution.at(statement), null);
+      final Anchor anchor = statement == null ? Anchor.NONE : SiteAttribution.at(statement);
+      add(owner, target, DependencyType.IMPORTS, anchor, null, null);
     }
   }
 
@@ -83,7 +103,8 @@ final class OccurrenceRecorder {
       Target target,
       DependencyType kind,
       Anchor anchor,
-      CodeElementId fromMethod) {
+      CodeElementId fromMethod,
+      CodeElementId toMethod) {
     collector.add(
         new Occurrence(
             source,
@@ -91,10 +112,11 @@ final class OccurrenceRecorder {
             kind,
             target.quality(),
             target.declared(),
+            target.ambiguous(),
             anchor.line(),
             anchor.offset(),
             fromMethod,
-            null));
+            toMethod));
   }
 
   private record Anchored(Target target, Anchor anchor) {}
