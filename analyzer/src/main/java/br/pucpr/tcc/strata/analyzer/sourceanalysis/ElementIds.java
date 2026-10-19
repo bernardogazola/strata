@@ -5,12 +5,14 @@ import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.Modifier;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.SourceLines;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.TypeKind;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -35,6 +37,7 @@ import spoon.reflect.declaration.CtInterface;
 import spoon.reflect.declaration.CtMethod;
 import spoon.reflect.declaration.CtModifiable;
 import spoon.reflect.declaration.CtPackage;
+import spoon.reflect.declaration.CtParameter;
 import spoon.reflect.declaration.CtRecord;
 import spoon.reflect.declaration.CtType;
 import spoon.reflect.declaration.CtTypeParameter;
@@ -90,6 +93,29 @@ final class ElementIds {
     };
   }
 
+  static CtType<?> methodOwner(CtExecutable<?> executable) {
+    if (methodName(executable).isEmpty()) {
+      return null;
+    }
+    final CtType<?> declaring = executable.getParent(CtType.class);
+    if (declaring == null || isElementType(declaring)) {
+      return declaring;
+    }
+    if (executable.isImplicit() || !(executable instanceof CtMethod<?>)) {
+      return null;
+    }
+    return nearestElementType(declaring);
+  }
+
+  static CodeElementId methodId(
+      String ownerIdName, String name, CtExecutable<?> executable, SimpleNameIndex.Scope scope) {
+    final List<String> parameters = new ArrayList<>();
+    for (final CtParameter<?> parameter : executable.getParameters()) {
+      parameters.add(erase(parameter.getType(), scope));
+    }
+    return CodeElementId.ofMethod(ownerIdName, name, parameters);
+  }
+
   static String erase(CtTypeReference<?> reference, SimpleNameIndex.Scope scope) {
     return erase(reference, scope, null);
   }
@@ -118,7 +144,7 @@ final class ElementIds {
     };
   }
 
-  private static boolean isWrittenSimple(CtTypeReference<?> reference) {
+  static boolean isWrittenSimple(CtTypeReference<?> reference) {
     final CtPackageReference completed = reference.getPackage();
     return reference.getDeclaringType() == null && completed != null && completed.isImplicit();
   }
@@ -137,13 +163,17 @@ final class ElementIds {
     return erase(declaration.getSuperclass(), scope, path);
   }
 
-  private static boolean hasLocalSegment(String name) {
+  static boolean hasLocalSegment(String name) {
+    return localSegmentStart(name) >= 0;
+  }
+
+  static int localSegmentStart(String name) {
     for (int dollar = name.indexOf('$'); dollar >= 0; dollar = name.indexOf('$', dollar + 1)) {
       if (dollar + 1 < name.length() && Character.isDigit(name.charAt(dollar + 1))) {
-        return true;
+        return dollar;
       }
     }
-    return false;
+    return -1;
   }
 
   private static String stripLeadingDigits(String simpleName) {

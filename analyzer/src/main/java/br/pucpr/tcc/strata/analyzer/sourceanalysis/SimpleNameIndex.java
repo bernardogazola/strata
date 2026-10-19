@@ -1,5 +1,6 @@
 package br.pucpr.tcc.strata.analyzer.sourceanalysis;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,10 @@ final class SimpleNameIndex {
   }
 
   static SimpleNameIndex of(List<SourceFile> files) {
+    return new SimpleNameIndex(topLevelTypes(files));
+  }
+
+  static Set<String> topLevelTypes(Collection<SourceFile> files) {
     final Set<String> types = new HashSet<>();
     for (final SourceFile file : files) {
       final SourceFile.Declarations declarations = file.declarations();
@@ -26,7 +31,23 @@ final class SimpleNameIndex {
         }
       }
     }
-    return new SimpleNameIndex(types);
+    return types;
+  }
+
+  Optional<String> declaredTopLevel(String idName) {
+    if (topLevelTypes.contains(idName)) {
+      return Optional.of(idName);
+    }
+    final int lastDot = idName.lastIndexOf('.');
+    for (int dollar = idName.lastIndexOf('$');
+        dollar > lastDot + 1;
+        dollar = idName.lastIndexOf('$', dollar - 1)) {
+      final String prefix = idName.substring(0, dollar);
+      if (topLevelTypes.contains(prefix)) {
+        return Optional.of(prefix);
+      }
+    }
+    return Optional.empty();
   }
 
   Scope scope(

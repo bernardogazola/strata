@@ -79,6 +79,10 @@ public final class CodeElementExtractor implements BatchVisitor {
   }
 
   public void collect(ModeledBatch batch, List<UnitElements> units) {
+    sink.accept(dedupe(units));
+  }
+
+  public BatchElements dedupe(List<UnitElements> units) {
     final List<PackageElement> packages = new ArrayList<>();
     final List<TypeElement> types = new ArrayList<>();
     final List<MethodElement> methods = new ArrayList<>();
@@ -90,7 +94,11 @@ public final class CodeElementExtractor implements BatchVisitor {
         collect(unit.relativePath(), declared, unitPackages, collected);
       }
     }
-    sink.accept(new BatchElements(packages, types, methods));
+    return new BatchElements(packages, types, methods);
+  }
+
+  SimpleNameIndex index() {
+    return index;
   }
 
   public List<SourceIssue> issues() {
