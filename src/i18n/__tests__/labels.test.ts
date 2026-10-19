@@ -4,7 +4,12 @@ import {
   hotspotEvidenceCodeSchema,
   tourReasonTagSchema,
 } from "@/protocol/enums";
-import { hotspotEvidenceCodeLabels, tourReasonTagLabels } from "../labels";
+import {
+  hotspotEvidenceCodeLabels,
+  relationshipConfidenceLabels,
+  resolutionQualityLabels,
+  tourReasonTagLabels,
+} from "../labels";
 
 const UNRENDERED_SCHEMAS = new Set([
   "errorOriginSchema",
@@ -15,6 +20,8 @@ const UNRENDERED_SCHEMAS = new Set([
 const SCHEMA_SUFFIX = /Schema$/;
 
 const TEMPLATE_PLACEHOLDER = /\{[a-zA-Z][a-zA-Z0-9]*\}/;
+
+const INFER = /infer/i;
 
 const protocolModules = import.meta.glob<Record<string, unknown>>(
   ["../../protocol/**/*.ts", "!../../protocol/**/__tests__/**"],
@@ -147,5 +154,18 @@ describe("tags de motivo e códigos de evidência", () => {
     expect(hotspotEvidenceCodeLabels.HIGH_FAN_IN.explanation).not.toBe(
       tourReasonTagLabels.HIGH_FAN_IN.explanation
     );
+  });
+});
+
+describe("os dois eixos de confiança", () => {
+  test("a qualidade de resolução nunca diz 'infer'; a confiança de relação diz", () => {
+    const resolution = Object.values(resolutionQualityLabels);
+    expect(resolution).toHaveLength(3);
+    expect(resolution.filter((label) => INFER.test(label))).toStrictEqual([]);
+    expect(
+      Object.values(relationshipConfidenceLabels).some((label) =>
+        INFER.test(label)
+      )
+    ).toBe(true);
   });
 });

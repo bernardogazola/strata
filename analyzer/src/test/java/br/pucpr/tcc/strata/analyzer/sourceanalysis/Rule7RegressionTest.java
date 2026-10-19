@@ -239,6 +239,136 @@ final class Rule7RegressionTest {
             "method:p.User$List#<init>()"));
   }
 
+  @Test
+  void umTipoMembroHerdadoComoTipoDeParametro() throws Exception {
+    assertSameMethodIds(
+        Map.of("a/Base.java", BASE_IN_A),
+        "b/Sub.java",
+        """
+        package b;
+
+        public class Sub extends a.Base {
+          void m(Inner inner) {}
+        }
+        """,
+        List.of(
+            "method:a.Base#<init>()",
+            "method:a.Base$Inner#<init>()",
+            "method:b.Sub#<init>()",
+            "method:b.Sub#m(a.Base$Inner)"));
+  }
+
+  @Test
+  void umTipoMembroTrazidoPorImportSobDemandaDeTipo() throws Exception {
+    assertSameMethodIds(
+        Map.of("a/Api.java", API_IN_A),
+        "b/User.java",
+        """
+        package b;
+
+        import a.Api.*;
+
+        public class User {
+          void m(Inner inner) {}
+        }
+        """,
+        List.of(
+            "method:a.Api#<init>()",
+            "method:a.Api$Inner#<init>()",
+            "method:b.User#<init>()",
+            "method:b.User#m(a.Api$Inner)"));
+  }
+
+  @Test
+  void umTipoMembroTrazidoPorImportEstaticoSobDemanda() throws Exception {
+    assertSameMethodIds(
+        Map.of("a/Api.java", API_IN_A),
+        "b/User.java",
+        """
+        package b;
+
+        import static a.Api.*;
+
+        public class User {
+          void m(Inner inner) {}
+        }
+        """,
+        List.of(
+            "method:a.Api#<init>()",
+            "method:a.Api$Inner#<init>()",
+            "method:b.User#<init>()",
+            "method:b.User#m(a.Api$Inner)"));
+  }
+
+  @Test
+  void oPrefixoComPontosVemDoImportAntesDoProprioPacote() throws Exception {
+    assertSameMethodIds(
+        Map.of(
+            "m/Metadata.java",
+            """
+            package m;
+
+            public class Metadata {
+              public interface ProjectCustom {}
+            }
+            """),
+        Map.of(
+            "s/Metadata.java",
+            "package s;\n\npublic class Metadata {}\n",
+            "s/Script.java",
+            """
+            package s;
+
+            import m.Metadata;
+
+            public class Script {
+              void m(Metadata.ProjectCustom custom) {}
+            }
+            """),
+        List.of(
+            "method:m.Metadata#<init>()",
+            "method:s.Metadata#<init>()",
+            "method:s.Script#<init>()",
+            "method:s.Script#m(m.Metadata$ProjectCustom)"));
+  }
+
+  @Test
+  void umTipoMembroDoProprioTipoQueEnvolve() throws Exception {
+    assertSameMethodIds(
+        Map.of(
+            "a/Source.java",
+            """
+            package a;
+
+            public class Source {
+              public void each(java.util.function.Consumer<Object> action) {}
+            }
+            """),
+        "b/Top.java",
+        """
+        package b;
+
+        public class Top {
+          static class Inner {}
+
+          void f(a.Source source) {
+            source.each(
+                value ->
+                    new Object() {
+                      void take(Inner inner) {}
+                    });
+          }
+        }
+        """,
+        List.of(
+            "method:a.Source#<init>()",
+            "method:a.Source#each(java.util.function.Consumer)",
+            "method:b.Top#<init>()",
+            "method:b.Top#f(a.Source)",
+            "method:b.Top#take(b.Top$Inner)",
+            "method:b.Top$Inner#<init>()"));
+  }
+
   private static final String API_IN_A =
       """
       package a;
@@ -248,8 +378,23 @@ final class Rule7RegressionTest {
       }
       """;
 
+  private static final String BASE_IN_A =
+      """
+      package a;
+
+      public class Base {
+        public static class Inner {}
+      }
+      """;
+
   private void assertSameMethodIds(
       Map<String, String> declarations, String userPath, String user, List<String> expected)
+      throws Exception {
+    assertSameMethodIds(declarations, Map.of(userPath, user), expected);
+  }
+
+  private void assertSameMethodIds(
+      Map<String, String> declarations, Map<String, String> users, List<String> expected)
       throws Exception {
     final Map<String, String> oneRoot = new LinkedHashMap<>();
     final Map<String, String> twoRoots = new LinkedHashMap<>();
@@ -258,8 +403,11 @@ final class Rule7RegressionTest {
           oneRoot.put(MAIN + path, source);
           twoRoots.put(MAIN + path, source);
         });
-    oneRoot.put(MAIN + userPath, user);
-    twoRoots.put(TEST + userPath, user);
+    users.forEach(
+        (path, source) -> {
+          oneRoot.put(MAIN + path, source);
+          twoRoots.put(TEST + path, source);
+        });
 
     final List<String> inOneRoot = methodIds(temp.resolve("one-root"), oneRoot, 1);
     final List<String> inTwoRoots = methodIds(temp.resolve("two-roots"), twoRoots, 2);

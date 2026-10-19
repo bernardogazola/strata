@@ -112,13 +112,14 @@ final class DependencyExtractorTest {
   }
 
   @ParameterizedTest(name = "{0}")
-  @ValueSource(strings = {"broken-source", "cyclic", "inheritance", "method-calls"})
+  @ValueSource(
+      strings = {"broken-source", "cyclic", "inheritance", "method-calls", "missing-classpath"})
   void osQuatroGoldensSaoReproduzidosLinhaALinha(String fixture) throws Exception {
     final Extraction run =
         extract(SourceTrees.fixture(fixture, temp.toRealPath().resolve("fixture")));
 
     assertThat(run.sink().tuples())
-        .as(fixture + ": (from, to, type, occurrences, resolution, external), exaustivo")
+        .as(fixture + ": (from, to, type, occurrences, resolution, external, ambiguous), exaustivo")
         .containsExactlyElementsOf(goldenTuples(golden(fixture)));
   }
 
@@ -146,7 +147,8 @@ final class DependencyExtractorTest {
               + " L"
               + row.get("line").asInt()
               + " "
-              + (row.has("fromMethod") ? row.get("fromMethod").asText() : "-"));
+              + (row.has("fromMethod") ? row.get("fromMethod").asText() : "-")
+              + (row.has("toMethod") ? " toMethod=" + row.get("toMethod").asText() : ""));
     }
 
     assertThat(esperadas).as("o golden mesmo tem as 15 linhas").hasSize(15);
@@ -1795,7 +1797,8 @@ final class DependencyExtractorTest {
               + row.get("occurrences").asInt()
               + " "
               + row.get("resolution").asText()
-              + (row.path("external").asBoolean(false) ? " external" : ""));
+              + (row.path("external").asBoolean(false) ? " external" : "")
+              + (row.path("ambiguous").asBoolean(false) ? " ambiguous" : ""));
     }
     return List.copyOf(tuples);
   }

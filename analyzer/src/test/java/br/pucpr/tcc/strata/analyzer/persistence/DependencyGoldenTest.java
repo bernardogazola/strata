@@ -47,9 +47,7 @@ final class DependencyGoldenTest {
   private static final ObjectMapper JSON = new ObjectMapper();
 
   private static final List<String> SERVIDAS =
-      List.of("broken-source", "cyclic", "inheritance", "method-calls");
-
-  private static final String SEM_CLASSPATH = "missing-classpath";
+      List.of("broken-source", "cyclic", "inheritance", "method-calls", "missing-classpath");
 
   private static final List<SourceRootKind> ORDEM_DE_VISITA =
       List.of(SourceRootKind.MAIN, SourceRootKind.GENERATED, SourceRootKind.TEST);
@@ -64,7 +62,7 @@ final class DependencyGoldenTest {
   private static final String LINHAS_GRAVADAS =
       """
       SELECT s.element_id, t.element_id, d.type, d.occurrences, d.resolution, t.is_external,
-             d.weight,
+             d.ambiguous, d.weight,
              (SELECT count(*) FROM dependency_evidence e WHERE e.dependency_pk = d.id)
         FROM dependency d
         JOIN code_element s ON s.id = d.source_pk
@@ -74,13 +72,14 @@ final class DependencyGoldenTest {
   private static final String EVIDENCIAS_GRAVADAS =
       """
       SELECT s.element_id, t.element_id, d.type, f.relative_path, e.line, m.element_id,
-             e.to_method_pk IS NULL, e.resolution
+             tm.element_id, e.resolution
         FROM dependency_evidence e
         JOIN dependency d ON d.id = e.dependency_pk
         JOIN code_element s ON s.id = d.source_pk
         JOIN code_element t ON t.id = d.target_pk
         LEFT JOIN source_file f ON f.id = e.file_pk
         LEFT JOIN code_element m ON m.id = e.from_method_pk
+        LEFT JOIN code_element tm ON tm.id = e.to_method_pk
        WHERE d.analysis_pk = ?""";
 
   private static final String PESO_POR_PAR =
@@ -106,6 +105,7 @@ final class DependencyGoldenTest {
       int occurrences,
       ResolutionQuality resolution,
       boolean external,
+      boolean ambiguous,
       int weight,
       int evidence) {
 
@@ -119,7 +119,8 @@ final class DependencyGoldenTest {
           + occurrences
           + " "
           + resolution
-          + (external ? " external" : "");
+          + (external ? " external" : "")
+          + (ambiguous ? " ambiguous" : "");
     }
 
     Dependency dependency() {
@@ -134,7 +135,7 @@ final class DependencyGoldenTest {
       String file,
       int line,
       String fromMethod,
-      boolean toMethodNull,
+      String toMethod,
       ResolutionQuality resolution) {
 
     String text() {
@@ -148,7 +149,8 @@ final class DependencyGoldenTest {
           + " L"
           + line
           + " "
-          + (fromMethod == null ? "-" : fromMethod);
+          + (fromMethod == null ? "-" : fromMethod)
+          + (toMethod == null ? "" : " toMethod=" + toMethod);
     }
   }
 
@@ -162,19 +164,16 @@ final class DependencyGoldenTest {
   }
 
   @Test
-  void cincoGoldensReivindicamDependenciasEQuatroSaoDestaFase() throws IOException {
+  void cincoGoldensReivindicamDependenciasEOsCincoSaoServidos() throws IOException {
     final List<String> todas = fixturesComGolden();
     final List<String> comDependencias =
         todas.stream().filter(fixture -> reivindica(fixture, "dependencies")).toList();
 
     assertThat(todas).hasSize(12);
     assertThat(comDependencias)
-        .containsExactly("broken-source", "cyclic", "inheritance", "method-calls", SEM_CLASSPATH);
-    assertThat(comDependencias)
-        .as("fora daqui só o golden do missing-classpath, nomeado")
-        .filteredOn(fixture -> !SERVIDAS.contains(fixture))
-        .containsExactly(SEM_CLASSPATH);
-    assertThat(SERVIDAS).hasSize(4).doesNotContain(SEM_CLASSPATH);
+        .containsExactly(
+            "broken-source", "cyclic", "inheritance", "method-calls", "missing-classpath");
+    assertThat(SERVIDAS).as("todo golden de dependências é servido").isEqualTo(comDependencias);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -198,12 +197,23 @@ final class DependencyGoldenTest {
 
     assertThat(linhas)
         .extracting(Linha::tuple)
-        .as(fixture + ": dependencies (from, to, type, occurrences, resolution, external), exato")
+        .as(
+            fixture
+                + ": dependencies (from, to, type, occurrences, resolution, external, ambiguous),"
+                + " exato")
         .containsExactlyElementsOf(tuplasDoGolden(golden));
     assertThat(linhas)
         .extracting(linha -> linha.resolution() + " " + (linha.external() ? 1 : 0))
         .as(fixture + ": todo par (resolution, is_external) é um dos quatro válidos")
         .allMatch(PARES_VALIDOS::contains);
+    assertThat(linhas)
+        .filteredOn(Linha::ambiguous)
+        .as(fixture + ": ambígua só com UNRESOLVED_EXTERNAL, externa e de nome nu")
+        .allMatch(
+            linha ->
+                linha.resolution() == ResolutionQuality.UNRESOLVED_EXTERNAL
+                    && linha.external()
+                    && linha.to().sortKey().indexOf('.') < 0);
     assertThat(linhasDeModulo)
         .as(fixture + ": MODULE_DEPENDENCY nunca entra em dependency")
         .isZero();
@@ -230,11 +240,17 @@ final class DependencyGoldenTest {
           .containsExactlyElementsOf(arestasDoGolden(golden));
     }
 
-    assertThat(evidencias).as(fixture + ": o toMethod fica nulo").allMatch(Evidencia::toMethodNull);
+    assertThat(evidencias)
+        .filteredOn(evidencia -> evidencia.toMethod() != null)
+        .as(fixture + ": toMethod só em uma chamada, e é um método")
+        .allMatch(
+            evidencia ->
+                evidencia.type() == DependencyType.CALLS
+                    && evidencia.toMethod().startsWith("method:"));
     if (reivindica(golden, "evidence")) {
       assertThat(evidencias)
           .extracting(Evidencia::text)
-          .as(fixture + ": evidence (file, line, fromMethod), exata")
+          .as(fixture + ": evidence (file, line, fromMethod, toMethod), exata")
           .containsExactlyElementsOf(evidenciasDoGolden(golden));
     }
   }
@@ -291,7 +307,8 @@ final class DependencyGoldenTest {
               + row.get("occurrences").asInt()
               + " "
               + row.get("resolution").asText()
-              + (row.path("external").asBoolean(false) ? " external" : ""));
+              + (row.path("external").asBoolean(false) ? " external" : "")
+              + (row.path("ambiguous").asBoolean(false) ? " ambiguous" : ""));
     }
     return List.copyOf(tuplas);
   }
@@ -335,7 +352,8 @@ final class DependencyGoldenTest {
               + " L"
               + row.get("line").asInt()
               + " "
-              + (row.has("fromMethod") ? row.get("fromMethod").asText() : "-"));
+              + (row.has("fromMethod") ? row.get("fromMethod").asText() : "-")
+              + (row.has("toMethod") ? " toMethod=" + row.get("toMethod").asText() : ""));
     }
     return List.copyOf(evidencias);
   }
@@ -435,8 +453,9 @@ final class DependencyGoldenTest {
                                 rows.getInt(4),
                                 ResolutionQuality.valueOf(rows.getString(5)),
                                 rows.getInt(6) == 1,
-                                rows.getInt(7),
-                                rows.getInt(8)));
+                                rows.getInt(7) == 1,
+                                rows.getInt(8),
+                                rows.getInt(9)));
                       }
                     }
                   }
@@ -468,7 +487,7 @@ final class DependencyGoldenTest {
                                 rows.getString(4),
                                 rows.getInt(5),
                                 rows.getString(6),
-                                rows.getInt(7) == 1,
+                                rows.getString(7),
                                 ResolutionQuality.valueOf(rows.getString(8))));
                       }
                     }

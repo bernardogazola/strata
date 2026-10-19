@@ -171,6 +171,11 @@ const declaringTypeOf = (methodId: string): null | string => {
   return match ? `type:${match[1]}` : null;
 };
 
+const simpleNameOf = (typeId: string): string => {
+  const body = typeId.slice("type:".length);
+  return body.slice(Math.max(body.lastIndexOf("."), body.lastIndexOf("$")) + 1);
+};
+
 const packageOf = (typeId: string): string => {
   const qualified = typeId.slice("type:".length).split("$")[0] ?? "";
   const dot = qualified.lastIndexOf(".");
@@ -468,6 +473,59 @@ describe("as dependências", () => {
         new Set(keys).size,
       ]);
     }
+  });
+
+  test("uma linha ambígua é externa, não resolvida, de nome nu, e o nome é de dois tipos", () => {
+    let checked = 0;
+    for (const fixture of corpus) {
+      const simpleNames = (fixture.value.types ?? []).map((row) =>
+        simpleNameOf(row.id)
+      );
+      for (const row of fixture.value.dependencies ?? []) {
+        if (row.ambiguous !== true) {
+          continue;
+        }
+        checked += 1;
+        const body = row.to.slice("type:".length);
+        expect([
+          fixture.name,
+          row.to,
+          row.external === true,
+          row.resolution,
+          body.includes("."),
+          simpleNames.filter((name) => name === body).length >= 2,
+        ]).toStrictEqual([
+          fixture.name,
+          row.to,
+          true,
+          "UNRESOLVED_EXTERNAL",
+          false,
+          true,
+        ]);
+      }
+    }
+    expect(checked).toBe(1);
+  });
+
+  test("toMethod só em uma evidência CALLS, e é um método de um tipo do golden", () => {
+    let checked = 0;
+    for (const fixture of corpus) {
+      const types = new Set((fixture.value.types ?? []).map((row) => row.id));
+      for (const row of fixture.value.evidence ?? []) {
+        if (row.toMethod === undefined) {
+          continue;
+        }
+        checked += 1;
+        const owner = declaringTypeOf(row.toMethod);
+        expect([
+          fixture.name,
+          row.line,
+          row.type,
+          owner !== null && types.has(owner),
+        ]).toStrictEqual([fixture.name, row.line, "CALLS", true]);
+      }
+    }
+    expect(checked).toBe(5);
   });
 
   test("edges é o que as linhas produzem, e o peso é aritmética conferida", () => {
