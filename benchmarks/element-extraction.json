@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "measuredAt": "2026-10-20T01:17:21Z",
-  "baseCommit": "7f9f450",
+  "measuredAt": "2026-10-20T03:12:25Z",
+  "baseCommit": "ecec563",
   "measure": "The analysis pipeline, wired by hand: RepositoryValidator, the selected roots in MAIN, GENERATED, TEST order, a fresh cache, one RUNNING analysis, then SpoonModelBuilder.analyze with a CodeElementExtractor over an ElementWriter; every row is read back from code_element, source_file and source_root after end(), and the writes are timed by an ElementSink that wraps the ElementWriter",
   "settings": {
     "spoonVersion": "11.5.0",
@@ -99,7 +99,7 @@
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "write": {
-            "beginMillis": 3,
+            "beginMillis": 8,
             "acceptCalls": 1,
             "flushes": [],
             "bufferingMillis": 0,
@@ -107,16 +107,16 @@
               "batches": 1,
               "rows": 4765,
               "fileElements": 259,
-              "millis": 37
+              "millis": 40
             },
-            "sinkMillis": 42
+            "sinkMillis": 49
           },
           "timing": {
-            "wallMillis": 1821,
-            "preParseMillis": 364,
-            "buildMillis": 1276,
-            "visitMillis": 110,
-            "extractionMillis": 106
+            "wallMillis": 2013,
+            "preParseMillis": 464,
+            "buildMillis": 1348,
+            "visitMillis": 125,
+            "extractionMillis": 117
           },
           "models": {
             "batches": 1,
@@ -126,8 +126,8 @@
           },
           "cacheBytes": 3182592,
           "heap": {
-            "peakLiveBytes": 116111000,
-            "peakUsedBytes": 232777408
+            "peakLiveBytes": 118172696,
+            "peakUsedBytes": 245216928
           },
           "parseFailures": [],
           "duplicates": []
@@ -196,16 +196,16 @@
               "batches": 2,
               "rows": 11533,
               "fileElements": 527,
-              "millis": 91
+              "millis": 101
             },
-            "sinkMillis": 92
+            "sinkMillis": 103
           },
           "timing": {
-            "wallMillis": 11953,
-            "preParseMillis": 175,
-            "buildMillis": 11437,
-            "visitMillis": 205,
-            "extractionMillis": 204
+            "wallMillis": 12390,
+            "preParseMillis": 192,
+            "buildMillis": 11835,
+            "visitMillis": 221,
+            "extractionMillis": 220
           },
           "models": {
             "batches": 2,
@@ -215,8 +215,8 @@
           },
           "cacheBytes": 7360512,
           "heap": {
-            "peakLiveBytes": 250038848,
-            "peakUsedBytes": 591127208
+            "peakLiveBytes": 245058840,
+            "peakUsedBytes": 658722072
           },
           "parseFailures": [],
           "duplicates": []
@@ -298,16 +298,16 @@
               "batches": 1,
               "rows": 4720,
               "fileElements": 260,
-              "millis": 32
+              "millis": 34
             },
-            "sinkMillis": 33
+            "sinkMillis": 35
           },
           "timing": {
-            "wallMillis": 691,
-            "preParseMillis": 119,
-            "buildMillis": 468,
-            "visitMillis": 56,
-            "extractionMillis": 55
+            "wallMillis": 723,
+            "preParseMillis": 142,
+            "buildMillis": 467,
+            "visitMillis": 64,
+            "extractionMillis": 63
           },
           "models": {
             "batches": 1,
@@ -317,8 +317,8 @@
           },
           "cacheBytes": 3149824,
           "heap": {
-            "peakLiveBytes": 119244624,
-            "peakUsedBytes": 243805840
+            "peakLiveBytes": 118494888,
+            "peakUsedBytes": 242367272
           },
           "parseFailures": [
             {
@@ -403,14 +403,14 @@
               "batches": 2,
               "rows": 11488,
               "fileElements": 528,
-              "millis": 79
+              "millis": 83
             },
-            "sinkMillis": 81
+            "sinkMillis": 85
           },
           "timing": {
-            "wallMillis": 11443,
-            "preParseMillis": 162,
-            "buildMillis": 10979,
+            "wallMillis": 11928,
+            "preParseMillis": 163,
+            "buildMillis": 11462,
             "visitMillis": 187,
             "extractionMillis": 186
           },
@@ -422,8 +422,8 @@
           },
           "cacheBytes": 7319552,
           "heap": {
-            "peakLiveBytes": 249872808,
-            "peakUsedBytes": 588885976
+            "peakLiveBytes": 246784312,
+            "peakUsedBytes": 556000160
           },
           "parseFailures": [
             {
@@ -520,16 +520,16 @@
               "batches": 39,
               "rows": 7647,
               "fileElements": 914,
-              "millis": 60
+              "millis": 69
             },
-            "sinkMillis": 62
+            "sinkMillis": 71
           },
           "timing": {
-            "wallMillis": 2075,
-            "preParseMillis": 222,
-            "buildMillis": 1653,
-            "visitMillis": 104,
-            "extractionMillis": 102
+            "wallMillis": 2130,
+            "preParseMillis": 229,
+            "buildMillis": 1674,
+            "visitMillis": 119,
+            "extractionMillis": 117
           },
           "models": {
             "batches": 39,
@@ -539,8 +539,8 @@
           },
           "cacheBytes": 6275072,
           "heap": {
-            "peakLiveBytes": 116477816,
-            "peakUsedBytes": 289050936
+            "peakLiveBytes": 135113264,
+            "peakUsedBytes": 396497992
           },
           "parseFailures": [],
           "duplicates": [
@@ -606,7 +606,7 @@
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "write": {
-            "beginMillis": 3,
+            "beginMillis": 4,
             "acceptCalls": 59,
             "flushes": [],
             "bufferingMillis": 0,
@@ -614,16 +614,16 @@
               "batches": 59,
               "rows": 21446,
               "fileElements": 1712,
-              "millis": 164
+              "millis": 187
             },
-            "sinkMillis": 168
+            "sinkMillis": 191
           },
           "timing": {
-            "wallMillis": 4261,
-            "preParseMillis": 269,
-            "buildMillis": 3488,
-            "visitMillis": 275,
-            "extractionMillis": 271
+            "wallMillis": 4351,
+            "preParseMillis": 288,
+            "buildMillis": 3527,
+            "visitMillis": 282,
+            "extractionMillis": 278
           },
           "models": {
             "batches": 59,
@@ -633,8 +633,8 @@
           },
           "cacheBytes": 17100800,
           "heap": {
-            "peakLiveBytes": 204252144,
-            "peakUsedBytes": 459626928
+            "peakLiveBytes": 208098264,
+            "peakUsedBytes": 491175168
           },
           "parseFailures": [],
           "duplicates": [
@@ -724,13 +724,13 @@
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "write": {
-            "beginMillis": 10,
+            "beginMillis": 11,
             "acceptCalls": 30,
             "flushes": [
               {
                 "batches": 24,
                 "rows": 35997,
-                "millis": 242
+                "millis": 255
               }
             ],
             "bufferingMillis": 0,
@@ -738,16 +738,16 @@
               "batches": 6,
               "rows": 20877,
               "fileElements": 5459,
-              "millis": 217
+              "millis": 218
             },
-            "sinkMillis": 470
+            "sinkMillis": 485
           },
           "timing": {
-            "wallMillis": 8107,
-            "preParseMillis": 1079,
-            "buildMillis": 5653,
-            "visitMillis": 950,
-            "extractionMillis": 697
+            "wallMillis": 8181,
+            "preParseMillis": 1118,
+            "buildMillis": 5666,
+            "visitMillis": 970,
+            "extractionMillis": 704
           },
           "models": {
             "batches": 30,
@@ -757,8 +757,8 @@
           },
           "cacheBytes": 45281280,
           "heap": {
-            "peakLiveBytes": 316152312,
-            "peakUsedBytes": 545362888
+            "peakLiveBytes": 327341672,
+            "peakUsedBytes": 558686888
           },
           "parseFailures": [],
           "duplicates": []
@@ -825,17 +825,17 @@
               {
                 "batches": 24,
                 "rows": 35997,
-                "millis": 268
+                "millis": 264
               },
               {
                 "batches": 17,
                 "rows": 39615,
-                "millis": 329
+                "millis": 320
               },
               {
                 "batches": 15,
                 "rows": 36460,
-                "millis": 337
+                "millis": 328
               }
             ],
             "bufferingMillis": 0,
@@ -843,16 +843,16 @@
               "batches": 4,
               "rows": 11077,
               "fileElements": 9202,
-              "millis": 238
+              "millis": 227
             },
-            "sinkMillis": 1191
+            "sinkMillis": 1159
           },
           "timing": {
-            "wallMillis": 18156,
-            "preParseMillis": 1476,
-            "buildMillis": 13408,
-            "visitMillis": 2522,
-            "extractionMillis": 1569
+            "wallMillis": 17595,
+            "preParseMillis": 1433,
+            "buildMillis": 13071,
+            "visitMillis": 2495,
+            "extractionMillis": 1564
           },
           "models": {
             "batches": 60,
@@ -862,8 +862,8 @@
           },
           "cacheBytes": 98512896,
           "heap": {
-            "peakLiveBytes": 332380176,
-            "peakUsedBytes": 647471136
+            "peakLiveBytes": 379126632,
+            "peakUsedBytes": 717844632
           },
           "parseFailures": [],
           "duplicates": [
@@ -965,33 +965,33 @@
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "write": {
-            "beginMillis": 38,
+            "beginMillis": 41,
             "acceptCalls": 410,
             "flushes": [
               {
                 "batches": 195,
                 "rows": 58940,
-                "millis": 423
+                "millis": 422
               },
               {
                 "batches": 2,
                 "rows": 44727,
-                "millis": 338
+                "millis": 343
               },
               {
                 "batches": 46,
                 "rows": 35137,
-                "millis": 290
+                "millis": 302
               },
               {
                 "batches": 55,
                 "rows": 42453,
-                "millis": 344
+                "millis": 347
               },
               {
                 "batches": 70,
                 "rows": 33030,
-                "millis": 297
+                "millis": 304
               }
             ],
             "bufferingMillis": 1,
@@ -999,16 +999,16 @@
               "batches": 42,
               "rows": 17293,
               "fileElements": 16848,
-              "millis": 381
+              "millis": 377
             },
-            "sinkMillis": 2114
+            "sinkMillis": 2141
           },
           "timing": {
-            "wallMillis": 60363,
-            "preParseMillis": 3980,
-            "buildMillis": 49248,
-            "visitMillis": 5127,
-            "extractionMillis": 3394
+            "wallMillis": 62285,
+            "preParseMillis": 4362,
+            "buildMillis": 50360,
+            "visitMillis": 5234,
+            "extractionMillis": 3471
           },
           "models": {
             "batches": 410,
@@ -1018,8 +1018,8 @@
           },
           "cacheBytes": 190111744,
           "heap": {
-            "peakLiveBytes": 844015856,
-            "peakUsedBytes": 1300146416
+            "peakLiveBytes": 841578576,
+            "peakUsedBytes": 1308302000
           },
           "parseFailures": [
             {
@@ -1095,53 +1095,53 @@
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "write": {
-            "beginMillis": 58,
+            "beginMillis": 64,
             "acceptCalls": 647,
             "flushes": [
               {
                 "batches": 195,
                 "rows": 58940,
-                "millis": 412
+                "millis": 430
               },
               {
                 "batches": 2,
                 "rows": 44727,
-                "millis": 333
+                "millis": 348
               },
               {
                 "batches": 46,
                 "rows": 35137,
-                "millis": 315
+                "millis": 311
               },
               {
                 "batches": 55,
                 "rows": 42453,
-                "millis": 353
+                "millis": 358
               },
               {
                 "batches": 70,
                 "rows": 33030,
-                "millis": 294
+                "millis": 312
               },
               {
                 "batches": 139,
                 "rows": 33144,
-                "millis": 312
+                "millis": 316
               },
               {
                 "batches": 7,
                 "rows": 37201,
-                "millis": 390
+                "millis": 384
               },
               {
                 "batches": 62,
                 "rows": 50252,
-                "millis": 507
+                "millis": 513
               },
               {
                 "batches": 62,
                 "rows": 33792,
-                "millis": 362
+                "millis": 366
               }
             ],
             "bufferingMillis": 0,
@@ -1149,16 +1149,16 @@
               "batches": 9,
               "rows": 839,
               "fileElements": 26782,
-              "millis": 376
+              "millis": 385
             },
-            "sinkMillis": 3718
+            "sinkMillis": 3792
           },
           "timing": {
-            "wallMillis": 145008,
-            "preParseMillis": 6423,
-            "buildMillis": 125336,
-            "visitMillis": 9618,
-            "extractionMillis": 6277
+            "wallMillis": 148230,
+            "preParseMillis": 7257,
+            "buildMillis": 127051,
+            "visitMillis": 9780,
+            "extractionMillis": 6373
           },
           "models": {
             "batches": 647,
@@ -1168,8 +1168,8 @@
           },
           "cacheBytes": 307249152,
           "heap": {
-            "peakLiveBytes": 1174244480,
-            "peakUsedBytes": 1992133760
+            "peakLiveBytes": 1170136192,
+            "peakUsedBytes": 1745156640
           },
           "parseFailures": [
             {
