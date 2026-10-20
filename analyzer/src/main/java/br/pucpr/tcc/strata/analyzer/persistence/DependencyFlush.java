@@ -62,6 +62,7 @@ final class DependencyFlush {
         drafts.add(draft(extracted));
       }
     }
+    drafts.forEach(DependencyFlush::requireUnresolvedExternalIfAmbiguous);
     final Map<CodeElementId, Long> newExternals =
         insertExternals(connection, missingExternals(drafts));
     final List<DependencyDraft> resolvable = new ArrayList<>(drafts.size());
@@ -76,9 +77,9 @@ final class DependencyFlush {
         targets.add(target);
       }
     }
-    insertDependencies(connection, resolvable, targets);
+    final int unnumberedCallees = insertDependencies(connection, resolvable, targets);
     insertModules(connection, batches);
-    return new Outcome(newExternals, stillPending);
+    return new Outcome(newExternals, stillPending, unnumberedCallees);
   }
 
   private DependencyDraft draft(ExtractedDependency extracted) {
@@ -86,25 +87,28 @@ final class DependencyFlush {
     requireValidPair(row, extracted.targetDeclared());
     final long filePk = filePks.applyAsLong(extracted.filePath());
     final List<EvidenceDraft> evidence = new ArrayList<>(extracted.evidence().size());
+    int unnumberedCallees = 0;
     for (final DependencyEvidence occurrence : extracted.evidence()) {
-      if (occurrence.toMethod() != null) {
-        throw new IllegalStateException(
-            "to_method_pk ainda não foi gravado: " + occurrence.toMethod());
-      }
       final Long fromMethodPk = fromMethodPk(occurrence.fromMethod());
+      final Long toMethodPk = toMethodPk(occurrence.toMethod());
+      if (occurrence.toMethod() != null && toMethodPk == null) {
+        unnumberedCallees++;
+      }
       final Integer line = occurrence.line() == 0 ? null : occurrence.line();
-      evidence.add(new EvidenceDraft(fromMethodPk, line, occurrence.resolution()));
+      evidence.add(new EvidenceDraft(fromMethodPk, toMethodPk, line, occurrence.resolution()));
     }
     return new DependencyDraft(
         sourcePk(row.source()),
         row.target(),
         extracted.targetDeclared(),
+        extracted.ambiguous(),
         row.type(),
         row.resolution(),
         row.occurrences(),
         DependencyAggregator.rowWeight(row),
         filePk,
-        evidence);
+        evidence,
+        unnumberedCallees);
   }
 
   private Long fromMethodPk(CodeElementId fromMethod) {
@@ -116,6 +120,27 @@ final class DependencyFlush {
       throw new IllegalStateException("um from-method que este flush nunca numerou: " + fromMethod);
     }
     return pk;
+  }
+
+  private Long toMethodPk(CodeElementId toMethod) {
+    return toMethod == null ? null : methods.get(toMethod);
+  }
+
+  private static void requireUnresolvedExternalIfAmbiguous(DependencyDraft draft) {
+    if (draft.ambiguous()
+        && (draft.targetDeclared()
+            || draft.resolution() != ResolutionQuality.UNRESOLVED_EXTERNAL)) {
+      throw new IllegalStateException(
+          "uma linha ambígua nunca é "
+              + draft.resolution()
+              + (draft.targetDeclared() ? " em um alvo declarado" : "")
+              + ": source pk "
+              + draft.sourcePk()
+              + " -> "
+              + draft.target()
+              + " "
+              + draft.type());
+    }
   }
 
   private static void requireValidPair(Dependency row, boolean targetDeclared) {
@@ -196,13 +221,14 @@ final class DependencyFlush {
     return externals.getOrDefault(target, newExternals.get(target));
   }
 
-  private void insertDependencies(
+  private int insertDependencies(
       Connection connection, List<DependencyDraft> drafts, List<Long> targets) throws SQLException {
     if (drafts.isEmpty()) {
-      return;
+      return 0;
     }
     final List<DependencyRow> rows = new ArrayList<>(drafts.size());
     final List<EvidenceRow> evidence = new ArrayList<>();
+    int unnumberedCallees = 0;
     long next = DependencyDao.nextId(connection);
     for (int i = 0; i < drafts.size(); i++) {
       final DependencyDraft draft = drafts.get(i);
@@ -215,20 +241,23 @@ final class DependencyFlush {
               draft.type(),
               draft.resolution(),
               draft.occurrences(),
-              draft.weight()));
+              draft.weight(),
+              draft.ambiguous()));
       for (final EvidenceDraft occurrence : draft.evidence()) {
         evidence.add(
             new EvidenceRow(
                 pk,
                 occurrence.fromMethodPk(),
-                null,
+                occurrence.toMethodPk(),
                 draft.filePk(),
                 occurrence.line(),
                 occurrence.resolution()));
       }
+      unnumberedCallees += draft.unnumberedCallees();
     }
     DependencyDao.insert(connection, analysisPk, rows);
     EvidenceDao.insert(connection, evidence);
+    return unnumberedCallees;
   }
 
   private void insertModules(Connection connection, List<BatchStructure> batches)
@@ -260,7 +289,10 @@ final class DependencyFlush {
     ModuleDependencyDao.insert(connection, analysisPk, rows);
   }
 
-  record Outcome(Map<CodeElementId, Long> newExternals, List<DependencyDraft> stillPending) {}
+  record Outcome(
+      Map<CodeElementId, Long> newExternals,
+      List<DependencyDraft> stillPending,
+      int unnumberedCallees) {}
 
   private record ModuleKey(long filePk, String requiredName) {}
 }

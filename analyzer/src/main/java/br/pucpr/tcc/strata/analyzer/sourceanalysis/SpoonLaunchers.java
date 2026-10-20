@@ -6,6 +6,10 @@ import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
 import spoon.Launcher;
 import spoon.compiler.Environment;
+import spoon.reflect.factory.ClassFactory;
+import spoon.reflect.factory.Factory;
+import spoon.reflect.factory.FactoryImpl;
+import spoon.support.DefaultCoreFactory;
 import spoon.support.compiler.SpoonProgress;
 
 final class SpoonLaunchers {
@@ -17,7 +21,7 @@ final class SpoonLaunchers {
   static Launcher configured(Path emptyClasspath, BooleanSupplier cancelled) {
     Objects.requireNonNull(emptyClasspath, "emptyClasspath");
     Objects.requireNonNull(cancelled, "cancelled");
-    final Launcher launcher = new Launcher();
+    final Launcher launcher = new GuardedLauncher();
     final Environment environment = launcher.getEnvironment();
     environment.setNoClasspath(true);
     environment.setIgnoreSyntaxErrors(true);
@@ -30,6 +34,31 @@ final class SpoonLaunchers {
     environment.setEncodingProvider((file, content) -> SourceCharsets.detect(content));
     environment.setSpoonProgress(new CancellationCheckpoint(cancelled));
     return launcher;
+  }
+
+  private static final class GuardedLauncher extends Launcher {
+
+    @Override
+    public Factory createFactory() {
+      return new GuardedFactory(createEnvironment());
+    }
+  }
+
+  @SuppressWarnings("overrides")
+  private static final class GuardedFactory extends FactoryImpl {
+
+    private static final long serialVersionUID = 1L;
+
+    private final transient ClassFactory classes = new GuardedClassFactory(this);
+
+    private GuardedFactory(Environment environment) {
+      super(new DefaultCoreFactory(), environment);
+    }
+
+    @Override
+    public ClassFactory Class() {
+      return classes;
+    }
   }
 
   private static final class PlatformOnlyClassLoader extends ClassLoader {

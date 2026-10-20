@@ -29,7 +29,8 @@ record DependencyExtractionReport(
       int maxModelSourceBytes,
       String rootOrder,
       Map<String, String> selections,
-      Baseline baseline) {}
+      Baseline baseline,
+      List<String> runtimeImageModules) {}
 
   record Baseline(String file, String measuredAt, String baseCommit) {}
 
@@ -90,6 +91,12 @@ record DependencyExtractionReport(
       Evidence evidence,
       Modules modules,
       Edges edges,
+      Resolution resolution,
+      Ambiguity ambiguous,
+      ToMethod toMethod,
+      Externals externals,
+      OwnPackageExternals ownPackageExternals,
+      FanOutExternal fanOutExternal,
       Checks checks,
       Drops drops,
       Map<String, Integer> extractionIssues,
@@ -122,6 +129,7 @@ record DependencyExtractionReport(
       long rowsToExternal,
       long occurrencesToExternal,
       Map<String, Long> resolutionPairs,
+      Map<String, Long> resolutionPairOccurrences,
       Spread occurrencesPerRow,
       LargestRow largestRow) {}
 
@@ -156,6 +164,59 @@ record DependencyExtractionReport(
       long occurrenceTotal,
       long weightTotal) {}
 
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  record Resolution(
+      long resolved,
+      long inferred,
+      long unresolved,
+      long ambiguous,
+      Double rate,
+      Map<String, Long> rowOccurrences,
+      long ambiguousRowOccurrences,
+      Long writerDroppedOccurrences) {}
+
+  record Ambiguity(
+      long rows,
+      long occurrences,
+      long distinctTargets,
+      Map<String, Long> rowsByType,
+      List<NamedCount> sample) {}
+
+  record NamedCount(String target, long rows, long occurrences) {}
+
+  record ToMethod(
+      long evidenceWithCallee,
+      long distinctCallees,
+      long callsEvidence,
+      long callsEvidenceWithoutCallee,
+      int unnumberedCallees,
+      long calleeOutsideTarget) {}
+
+  record Externals(
+      Share all,
+      Share jdk,
+      Share jdkDenylisted,
+      Share jdkBeyondJava,
+      Share notJdk,
+      Share notJdkJavax,
+      Share bare,
+      Share bareLowerCase,
+      List<NamedCount> bareLowerCaseSample,
+      Share bareAllCaps,
+      List<NamedCount> bareAllCapsSample,
+      Share jdkOutsideImage,
+      Map<String, Share> jdkOutsideImageByModule) {}
+
+  record OwnPackageExternals(
+      long rows,
+      long occurrences,
+      long distinctTargets,
+      Map<String, Long> rowsByType,
+      List<NamedCount> sample) {}
+
+  record FanOutExternal(
+      long types, Spread all, Spread withoutDenylisted, long pairs, long pairsWithoutDenylisted) {}
+
   record Checks(
       long foreignKeyViolations,
       long danglingEndpoints,
@@ -167,11 +228,17 @@ record DependencyExtractionReport(
       long evidenceFileMismatches,
       long fromMethodOwnerMismatches,
       long evidenceWeakerThanRow,
-      long toMethodsWritten,
+      long toMethodOnNonCalls,
+      long toMethodNotInternalMethod,
       long weightMismatches,
       long externalRowsMalformed,
       long externalsWithoutDependency,
+      long ambiguousMalformed,
+      long externalQualityMismatches,
       boolean edgeTotalsMatchRows,
+      boolean unresolvedCountMatchesRows,
+      boolean classifiedCountMatchesRows,
+      boolean ambiguousCountMatchesRows,
       List<String> baselineDifferences,
       boolean flushRuleReproduced,
       int elementOnlyAccepts,

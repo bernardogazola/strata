@@ -1,9 +1,10 @@
 package br.pucpr.tcc.strata.analyzer.sourceanalysis;
 
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.TargetNames.Target;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import spoon.experimental.CtUnresolvedImport;
 import spoon.reflect.cu.SourcePosition;
 import spoon.reflect.declaration.CtCompilationUnit;
@@ -51,27 +52,24 @@ final class ImportSites {
     }
   }
 
-  static Map<String, String> staticMembers(List<CtImport> imports, TargetNames names) {
-    final Map<String, String> members = new HashMap<>();
+  static void recordRetained(
+      List<String> retained, List<CtImport> imports, CtType<?> owner, OccurrenceRecorder recorder) {
+    if (retained.isEmpty()) {
+      return;
+    }
+    final Set<String> kept = new HashSet<>();
     for (final CtImport declaration : imports) {
-      if (declaration instanceof CtUnresolvedImport unresolved) {
-        final String text = unresolved.getUnresolvedReference();
-        final int lastDot = text == null ? -1 : text.lastIndexOf('.');
-        if (unresolved.isStatic() && lastDot > 0 && !text.endsWith(ON_DEMAND_SUFFIX)) {
-          members.merge(
-              text.substring(lastDot + 1),
-              names.canonical(text.substring(0, lastDot)),
-              ImportSites::smaller);
-        }
-      } else if (memberDeclaringType(declaration.getReference())
-          instanceof CtTypeReference<?> type) {
-        members.merge(
-            declaration.getReference().getSimpleName(),
-            names.canonical(type.getQualifiedName()),
-            ImportSites::smaller);
+      if (declaration instanceof CtUnresolvedImport unresolved && unresolved.isStatic()) {
+        kept.add(unresolved.getUnresolvedReference());
       }
     }
-    return members;
+    final CodeElementId source = CodeElementId.ofType(ElementIds.idName(owner));
+    for (final String text : new TreeSet<>(retained)) {
+      final int lastDot = text.lastIndexOf('.');
+      if (lastDot > 0 && !kept.contains(text)) {
+        recorder.imported(null, source, recorder.names().imported(text.substring(0, lastDot)));
+      }
+    }
   }
 
   private static Target target(CtImport declaration, TargetNames names) {
@@ -89,7 +87,7 @@ final class ImportSites {
                   : null;
           case ALL_TYPES, UNRESOLVED, MODULE -> null;
         };
-    return type == null ? null : names.written(type.getQualifiedName());
+    return type == null ? null : names.imported(type.getQualifiedName());
   }
 
   private static Target unresolved(CtUnresolvedImport unresolved, TargetNames names) {
@@ -99,12 +97,12 @@ final class ImportSites {
     }
     if (unresolved.isStatic()) {
       final int lastDot = text.lastIndexOf('.');
-      return lastDot > 0 ? names.written(text.substring(0, lastDot)) : null;
+      return lastDot > 0 ? names.imported(text.substring(0, lastDot)) : null;
     }
     if (text.endsWith(ON_DEMAND_SUFFIX)) {
       return names.typeOnDemand(text.substring(0, text.length() - ON_DEMAND_SUFFIX.length()));
     }
-    return names.written(text);
+    return names.imported(text);
   }
 
   private static CtTypeReference<?> memberDeclaringType(CtReference reference) {
@@ -113,10 +111,6 @@ final class ImportSites {
       case CtFieldReference<?> field -> field.getDeclaringType();
       case null, default -> null;
     };
-  }
-
-  private static String smaller(String first, String second) {
-    return CodeElementId.compareCodePoints(first, second) <= 0 ? first : second;
   }
 
   private static int start(CtElement element) {

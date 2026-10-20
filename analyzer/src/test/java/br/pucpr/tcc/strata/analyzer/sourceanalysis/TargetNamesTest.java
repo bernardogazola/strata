@@ -77,15 +77,46 @@ final class TargetNamesTest {
   }
 
   @Test
-  void aQualidadeEProvisoriaPorTextoEPorLote() {
+  void aQualidadeEDoTextoDoLoteEDaRegraQueNomeou() {
     final TargetNames names = names("b", new EnumMap<>(DropReason.class));
 
-    assertThat(names.quality("b.Peer")).isEqualTo(ResolutionQuality.RESOLVED);
-    assertThat(names.quality("a.Api$Inner")).isEqualTo(ResolutionQuality.INFERRED);
-    assertThat(names.quality("java.util.Map$Entry")).isEqualTo(ResolutionQuality.RESOLVED);
-    assertThat(names.quality("javax.inject.Inject"))
+    assertThat(names.exact("b.Peer").quality()).isEqualTo(ResolutionQuality.RESOLVED);
+    assertThat(names.recovered("b.Peer").quality()).isEqualTo(ResolutionQuality.INFERRED);
+    assertThat(names.exact("a.Api$Inner").quality()).isEqualTo(ResolutionQuality.INFERRED);
+    assertThat(names.exact("java.util.Map$Entry"))
+        .isEqualTo(
+            new Target(
+                CodeElementId.ofType("java.util.Map$Entry"),
+                false,
+                ResolutionQuality.RESOLVED,
+                false));
+    assertThat(names.exact("javax.inject.Inject").quality())
         .isEqualTo(ResolutionQuality.UNRESOLVED_EXTERNAL);
-    assertThat(names.quality("Ghost")).isEqualTo(ResolutionQuality.UNRESOLVED_EXTERNAL);
+    assertThat(names.exact("Ghost").quality()).isEqualTo(ResolutionQuality.UNRESOLVED_EXTERNAL);
+  }
+
+  @Test
+  void oTipoDeCampoRecuperadoSoVaiAoJavaLangQuandoOJavaBaseOTem() {
+    final Map<DropReason, Integer> drops = new EnumMap<>(DropReason.class);
+    final TargetNames names = names("b", drops);
+
+    assertThat(names.recovered("Runnable"))
+        .isEqualTo(
+            new Target(
+                CodeElementId.ofType("java.lang.Runnable"),
+                false,
+                ResolutionQuality.RESOLVED,
+                false));
+    assertThat(names.recovered("Ghost"))
+        .isEqualTo(
+            new Target(
+                CodeElementId.ofType("Ghost"),
+                false,
+                ResolutionQuality.UNRESOLVED_EXTERNAL,
+                false));
+    assertThat(names.recovered(null)).isNull();
+    assertThat(names.recovered("int")).isNull();
+    assertThat(drops).containsExactly(Map.entry(DropReason.CALL_WITHOUT_TARGET, 2));
   }
 
   @Test
@@ -93,22 +124,32 @@ final class TargetNamesTest {
     final Map<DropReason, Integer> drops = new EnumMap<>(DropReason.class);
     final TargetNames names = names("b", drops);
 
-    assertThat(names.named("Root")).as("nu, de um pacote com nome: JLS §7.5").isNull();
-    assertThat(names.named("p.HashMap<>")).isNull();
-    assertThat(names.named("p." + "X".repeat(5_000))).isNull();
+    assertThat(names.exact("Root")).as("nu, de um pacote com nome: JLS §7.5").isNull();
+    assertThat(names.exact("p.HashMap<>")).isNull();
+    assertThat(names.exact("p..")).isNull();
+    assertThat(names.exact("p." + "X".repeat(5_000))).isNull();
     assertThat(names.callWithoutTarget()).isNull();
-    assertThat(names.named("a.Api"))
-        .isEqualTo(new Target(CodeElementId.ofType("a.Api"), true, ResolutionQuality.INFERRED));
-    assertThat(names.named("com.acme.Missing"))
+    assertThat(names.exact("a.Api"))
+        .isEqualTo(
+            new Target(CodeElementId.ofType("a.Api"), true, ResolutionQuality.INFERRED, false));
+    assertThat(names.exact("com.acme.Missing"))
         .isEqualTo(
             new Target(
                 CodeElementId.ofType("com.acme.Missing"),
                 false,
-                ResolutionQuality.UNRESOLVED_EXTERNAL));
+                ResolutionQuality.UNRESOLVED_EXTERNAL,
+                false));
+    assertThat(names.exact("jdk.internal.misc..Unsafe"))
+        .isEqualTo(
+            new Target(
+                CodeElementId.ofType("jdk.internal.misc.Unsafe"),
+                false,
+                ResolutionQuality.UNRESOLVED_EXTERNAL,
+                false));
 
     assertThat(drops)
         .containsExactly(
-            Map.entry(DropReason.INVALID_NAME, 1),
+            Map.entry(DropReason.INVALID_NAME, 2),
             Map.entry(DropReason.ID_TOO_LONG, 1),
             Map.entry(DropReason.DEFAULT_PACKAGE_COLLISION, 1),
             Map.entry(DropReason.CALL_WITHOUT_TARGET, 1));
@@ -118,14 +159,20 @@ final class TargetNamesTest {
   void doPacotePadraoONomeNuDoPacotePadraoFica() {
     final Map<DropReason, Integer> drops = new EnumMap<>(DropReason.class);
 
-    assertThat(names("", drops).named("Root"))
-        .isEqualTo(new Target(CodeElementId.ofType("Root"), true, ResolutionQuality.INFERRED));
+    assertThat(names("", drops).exact("Root"))
+        .isEqualTo(
+            new Target(CodeElementId.ofType("Root"), true, ResolutionQuality.INFERRED, false));
     assertThat(drops).isEmpty();
   }
 
   private static TargetNames names(String ownPackage, Map<DropReason, Integer> drops) {
-    final SimpleNameIndex.Scope scope = INDEX.scope(ownPackage, Set.of(), Map.of());
-    return new TargetNames(INDEX, THIS_BATCH, ownPackage, Map.of(), scope, drops);
+    final UnitHomes.Home home =
+        new UnitHomes.Home(
+            ownPackage,
+            INDEX.scope(ownPackage, Set.of(), Map.of()),
+            ImportScope.of(ownPackage, Set.of(), Map.of()));
+    return new TargetNames(
+        TargetNames.Rules.of(INDEX, THIS_BATCH, new JavaLangTypes()), home, drops);
   }
 
   private static SourceFile analyzed(String path, String packageName, String... types) {

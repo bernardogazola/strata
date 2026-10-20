@@ -59,6 +59,7 @@ public final class ElementWriter implements ElementSink, StructureSink {
   private final List<BatchStructure> buffered = new ArrayList<>();
   private int bufferedRows;
   private int droppedDependencies;
+  private int unnumberedCallees;
   private Stage stage = Stage.CREATED;
 
   public ElementWriter(
@@ -143,6 +144,12 @@ public final class ElementWriter implements ElementSink, StructureSink {
               + droppedDependencies
               + " linhas de dependência cujo alvo declarado nunca virou elemento");
     }
+    if (unnumberedCallees > 0) {
+      Log.warn(
+          "UNNUMBERED_CALLEE: gravou "
+              + unnumberedCallees
+              + " linhas de evidência com to_method_pk NULL, cujo método chamado o flush nunca numerou");
+    }
     changed.forEach(row -> fileRows.put(row.relativePath(), row));
     stage = Stage.ENDED;
   }
@@ -154,6 +161,10 @@ public final class ElementWriter implements ElementSink, StructureSink {
 
   public int droppedDependencies() {
     return droppedDependencies;
+  }
+
+  public int unnumberedCallees() {
+    return unnumberedCallees;
   }
 
   private Begun writeRootsAndFiles(
@@ -189,7 +200,11 @@ public final class ElementWriter implements ElementSink, StructureSink {
         new DependencyFlush(
                 analysisPk, numbered.types(), numbered.methods(), index, externals, this::filePk)
             .write(connection, pending, buffered);
-    return new Flushed(numbered.types(), outcome.newExternals(), outcome.stillPending());
+    return new Flushed(
+        numbered.types(),
+        outcome.newExternals(),
+        outcome.stillPending(),
+        outcome.unnumberedCallees());
   }
 
   private Numbered insertBuffered(Connection connection) throws SQLException {
@@ -362,6 +377,7 @@ public final class ElementWriter implements ElementSink, StructureSink {
     index.putAll(committed.types());
     externals.putAll(committed.externals());
     pending = List.copyOf(committed.stillPending());
+    unnumberedCallees += committed.unnumberedCallees();
     buffered.clear();
     bufferedRows = 0;
   }
@@ -394,7 +410,8 @@ public final class ElementWriter implements ElementSink, StructureSink {
   private record Flushed(
       Map<CodeElementId, Long> types,
       Map<CodeElementId, Long> externals,
-      List<DependencyDraft> stillPending) {}
+      List<DependencyDraft> stillPending,
+      int unnumberedCallees) {}
 
   public static final class WriteFailedException extends RuntimeException {
 

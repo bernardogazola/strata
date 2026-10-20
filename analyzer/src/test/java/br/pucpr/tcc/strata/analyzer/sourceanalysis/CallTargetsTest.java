@@ -334,15 +334,17 @@ final class CallTargetsTest {
     assertThat(twoRoots.sink().tuples())
         .containsExactly(
             "p.User -> java.lang.Override ANNOTATION_REFERENCE x1 RESOLVED external",
-            "p.User -> java.lang.Runnable CALLS x1 RESOLVED external",
+            "p.User -> java.lang.Runnable CALLS x3 RESOLVED external",
             "p.User -> java.lang.Runnable FIELD_TYPE x1 RESOLVED external",
             "p.User -> q.Late IMPORTS x1 INFERRED",
+            "p.User -> q.Late$Inner CALLS x1 INFERRED",
+            "p.User$In -> java.lang.Runnable CALLS x1 RESOLVED external",
             "q.Late -> java.lang.Runnable FIELD_TYPE x1 RESOLVED external");
-    assertThat(twoRoots.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 4L);
+    assertThat(twoRoots.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 0L);
   }
 
   @Test
-  void umCampoEstaticoDoTipoDeQuemChamaDeclaradoNoutroTipoCaiNasDuasRaizes() throws Exception {
+  void umCampoEstaticoDoTipoDeQuemChamaDeclaradoNoutroTipoDaALinhaNasDuasRaizes() throws Exception {
     final String account =
         """
         package p;
@@ -391,16 +393,18 @@ final class CallTargetsTest {
 
     assertThat(oneRoot.sink().tuples())
         .containsExactly(
+            "p.Account -> p.Account CALLS x1 RESOLVED",
             "p.Account -> q.Registry IMPORTS x1 RESOLVED",
             "q.Registry -> p.Account IMPORTS x1 RESOLVED",
             "q.Registry -> p.Account FIELD_TYPE x1 RESOLVED");
     assertThat(twoRoots.sink().tuples())
         .containsExactly(
+            "p.Account -> p.Account CALLS x1 INFERRED",
             "p.Account -> q.Registry IMPORTS x1 INFERRED",
             "q.Registry -> p.Account IMPORTS x1 INFERRED",
             "q.Registry -> p.Account FIELD_TYPE x1 INFERRED");
-    assertThat(oneRoot.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 1L);
-    assertThat(twoRoots.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 1L);
+    assertThat(oneRoot.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 0L);
+    assertThat(twoRoots.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 0L);
   }
 
   @Test
@@ -516,6 +520,127 @@ final class CallTargetsTest {
     assertThat(dropped).hasSize(1);
     assertThat(dropped.getFirst()).contains("LOCAL_TARGET=2").doesNotContain(".java");
     assertThat(clean).isEmpty();
+  }
+
+  @Test
+  void oReceptorQueOSpoonFazDeTipoEAVariavelAVistaPeloEscopoDaJls() throws Exception {
+    final String scopes =
+        """
+        package p;
+
+        public class Scopes {
+          void m(org.ext.Missing missing) {
+            missing.run(
+                () -> {
+                  Object o = missing.get();
+                  if (o instanceof Integer i && i.intValue() > 0) {}
+                  if (!(o instanceof Long l)) {
+                  } else {
+                    l.longValue();
+                  }
+                  if (!(o instanceof Short sh)) {
+                    return;
+                  }
+                  sh.shortValue();
+                  double value = o instanceof Double d ? d.doubleValue() : 0;
+                  if (!(o instanceof Float f) || f.isNaN()) {}
+                  switch (o) {
+                    case Byte b -> b.byteValue();
+                    default -> {}
+                  }
+                  try {
+                    missing.call();
+                  } catch (IllegalStateException e) {
+                    new Object() {
+                      Runnable e = null;
+
+                      void g() {
+                        e.run();
+                      }
+                    };
+                  }
+                  if (o instanceof Character c) {}
+                  c.charValue();
+                });
+          }
+        }
+        """;
+
+    final Run run = extract(Map.of("src/main/java/p/Scopes.java", scopes));
+
+    assertThat(run.sink().tuples())
+        .containsExactly(
+            "p.Scopes -> c CALLS x1 UNRESOLVED_EXTERNAL external",
+            "p.Scopes -> java.lang.Byte CALLS x1 RESOLVED external",
+            "p.Scopes -> java.lang.Double CALLS x1 RESOLVED external",
+            "p.Scopes -> java.lang.Float CALLS x1 RESOLVED external",
+            "p.Scopes -> java.lang.Integer CALLS x1 RESOLVED external",
+            "p.Scopes -> java.lang.Long CALLS x1 RESOLVED external",
+            "p.Scopes -> java.lang.Object CALLS x1 RESOLVED external",
+            "p.Scopes -> java.lang.Runnable CALLS x1 RESOLVED external",
+            "p.Scopes -> java.lang.Runnable FIELD_TYPE x1 RESOLVED external",
+            "p.Scopes -> java.lang.Short CALLS x1 RESOLVED external",
+            "p.Scopes -> org.ext.Missing CALLS x3 UNRESOLVED_EXTERNAL external",
+            "p.Scopes -> org.ext.Missing PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external");
+    assertThat(run.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 0L);
+  }
+
+  @Test
+  void oReceptorComCastSeQualificaPeloCastEmTodaForma() throws Exception {
+    final Run run =
+        extract(
+            Map.of(
+                "src/main/java/p/Caster.java",
+                """
+                package p;
+
+                import com.thirdparty.Client;
+                import java.util.function.Supplier;
+
+                public class Caster<T extends Base> {
+
+                  private Object held;
+
+                  public Caster() {}
+
+                  public void run(Client client, Supplier<Object> supplier, Object[] all, Object any) {
+                    ((Sub) this.held).only();
+                    ((Sub) supplier.get()).only();
+                    ((Sub) all[0]).only();
+                    client.onEvent(event -> ((Sub) event).only());
+                    ((Hook) this).hook();
+                    ((T) any).hook();
+                    ((Outer.Inner) any).deep();
+                  }
+                }
+                """,
+                "src/main/java/p/Base.java",
+                "package p;\n\npublic class Base {\n\n  public Base() {}\n\n  public void hook() {}\n}\n",
+                "src/main/java/p/Sub.java",
+                "package p;\n\npublic class Sub extends Base {\n\n  public Sub() {}\n\n"
+                    + "  public void only() {}\n}\n",
+                "src/main/java/p/Hook.java",
+                "package p;\n\npublic interface Hook {\n  void hook();\n}\n",
+                "src/main/java/p/Outer.java",
+                "package p;\n\npublic class Outer {\n\n  public static class Inner {\n\n"
+                    + "    public void deep() {}\n  }\n}\n"));
+
+    assertThat(run.sink().tuples())
+        .containsExactly(
+            "p.Caster -> com.thirdparty.Client IMPORTS x1 UNRESOLVED_EXTERNAL external",
+            "p.Caster -> com.thirdparty.Client CALLS x1 UNRESOLVED_EXTERNAL external",
+            "p.Caster -> com.thirdparty.Client PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external",
+            "p.Caster -> java.lang.Object FIELD_TYPE x1 RESOLVED external",
+            "p.Caster -> java.lang.Object PARAMETER_TYPE x3 RESOLVED external",
+            "p.Caster -> java.util.function.Supplier IMPORTS x1 RESOLVED external",
+            "p.Caster -> java.util.function.Supplier CALLS x1 RESOLVED external",
+            "p.Caster -> java.util.function.Supplier PARAMETER_TYPE x1 RESOLVED external",
+            "p.Caster -> p.Base CALLS x1 RESOLVED",
+            "p.Caster -> p.Hook CALLS x1 RESOLVED",
+            "p.Caster -> p.Outer$Inner CALLS x1 RESOLVED",
+            "p.Caster -> p.Sub CALLS x4 RESOLVED",
+            "p.Sub -> p.Base EXTENDS x1 RESOLVED");
+    assertThat(run.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 0L);
   }
 
   private record Run(StructureExtractor extractor, RecordingStructureSink sink) {

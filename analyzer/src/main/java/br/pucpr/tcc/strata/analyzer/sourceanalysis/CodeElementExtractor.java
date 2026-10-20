@@ -32,7 +32,7 @@ public final class CodeElementExtractor implements BatchVisitor {
   private final Map<String, List<SourceIssue>> issuesByFile = new LinkedHashMap<>();
   private final Set<DuplicatePair> reportedDuplicates = new HashSet<>();
   private final Set<String> filesWithTooLongIds = new HashSet<>();
-  private SimpleNameIndex index = SimpleNameIndex.of(List.of());
+  private SimpleNameIndex index;
   private List<String> fileOrder = List.of();
 
   public CodeElementExtractor(List<SourceRoot> roots, ElementSink sink) {
@@ -44,13 +44,13 @@ public final class CodeElementExtractor implements BatchVisitor {
 
   @Override
   public void begin(List<SourceFile> files) {
-    index = SimpleNameIndex.of(files);
     fileOrder = files.stream().map(SourceFile::relativePath).toList();
     sink.begin(files);
   }
 
   @Override
   public void visit(ModeledBatch batch) {
+    index = batch.index();
     collect(batch, batch.perCompilationUnit((path, unit) -> extract(batch, path, unit)));
   }
 
@@ -76,6 +76,7 @@ public final class CodeElementExtractor implements BatchVisitor {
   }
 
   public UnitElements extract(ModeledBatch batch, String relativePath, CtCompilationUnit unit) {
+    index = batch.index();
     return new UnitExtraction(batch.root(), relativePath, index).extract(unit);
   }
 
@@ -99,6 +100,9 @@ public final class CodeElementExtractor implements BatchVisitor {
   }
 
   SimpleNameIndex index() {
+    if (index == null) {
+      throw new IllegalStateException("nenhum lote foi visitado ainda: use ModeledBatch.index()");
+    }
     return index;
   }
 

@@ -811,7 +811,7 @@ final class CodeElementExtractorTest {
   }
 
   @Test
-  void umTipoQueOSpoonTrocaPorUmVazioFazOArquivoFalharEmVezDeVirarNoVazio() throws Exception {
+  void oGatilhoDaPerdaDeModeloNaoTrocaMaisOTipoEOArquivoEAnalisado() throws Exception {
     final Map<String, String> files =
         Map.of(
             "src/main/java/q/Mode.java",
@@ -841,15 +841,16 @@ final class CodeElementExtractorTest {
     final Extraction run = extract(repository);
 
     assertThat(declaredTypesOf(repository, "src/main/java/q/Mode.java"))
-        .containsExactly("CtClassImpl valid=false members=0");
+        .singleElement()
+        .asString()
+        .startsWith("CtEnumImpl valid=true");
     assertThat(run.analysis().files())
         .extracting(file -> file.relativePath() + " " + file.status() + " " + file.cause())
         .containsExactly(
-            "src/main/java/q/Mode.java PARSE_FAILED EXTRACTION_CRASH",
+            "src/main/java/q/Mode.java ANALYZED null",
             "src/main/java/q/Printer.java ANALYZED null");
-    assertThat(run.analysis().issues())
-        .containsExactly(SourceIssue.parseFailed("src/main/java/q/Mode.java"));
-    assertThat(ids(run.sink().types())).containsExactly("type:q.Printer");
+    assertThat(run.analysis().issues()).isEmpty();
+    assertThat(ids(run.sink().types())).containsExactly("type:q.Mode", "type:q.Printer");
     assertThat(ids(run.sink().fileElements()))
         .containsExactly("file:src/main/java/q/Mode.java", "file:src/main/java/q/Printer.java");
   }

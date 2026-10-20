@@ -10,6 +10,7 @@ import java.util.Comparator;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,7 @@ import spoon.reflect.declaration.CtRecord;
 import spoon.reflect.declaration.CtType;
 import spoon.reflect.declaration.CtTypeParameter;
 import spoon.reflect.declaration.ModifierKind;
+import spoon.reflect.path.CtRole;
 import spoon.reflect.reference.CtArrayTypeReference;
 import spoon.reflect.reference.CtIntersectionTypeReference;
 import spoon.reflect.reference.CtPackageReference;
@@ -53,9 +55,21 @@ final class ElementIds {
 
   static final String OBJECT = "java.lang.Object";
 
+  static final Set<String> PRIMITIVES =
+      Set.of("boolean", "byte", "char", "short", "int", "long", "float", "double", "void");
+
   private static final String CONSTRUCTOR = "<init>";
   private static final String STATIC_INITIALIZER = "<clinit>";
   private static final String ON_DEMAND_SUFFIX = ".*";
+
+  private static final Set<CtRole> HEADER_ROLES =
+      EnumSet.of(
+          CtRole.SUPER_TYPE,
+          CtRole.INTERFACE,
+          CtRole.TYPE_PARAMETER,
+          CtRole.ANNOTATION,
+          CtRole.PERMITTED_TYPE);
+
   private static final BinaryOperator<String> SMALLER =
       BinaryOperator.minBy(Comparator.naturalOrder());
 
@@ -133,14 +147,174 @@ final class ElementIds {
               ? OBJECT
               : erase(intersection.getBounds().getFirst(), scope, seen);
       case CtWildcardReference _ -> OBJECT;
-      case CtTypeParameterReference variable -> eraseVariable(variable, scope, seen);
+      case CtTypeParameterReference variable ->
+          eraseVariable(variable.getDeclaration(), scope, seen);
       default -> {
-        final String name = reference.getQualifiedName();
-        yield hasLocalSegment(name)
-            ? stripLeadingDigits(reference.getSimpleName())
-            : scope.canonical(name, isWrittenSimple(reference));
+        final SimpleNameIndex.NameResolution leaf = resolveLeaf(reference, scope);
+        yield leaf.outcome() == SimpleNameIndex.Outcome.TYPE_VARIABLE
+            ? eraseVariable(typeParameter(reference, leaf.name()), scope, seen)
+            : leaf.name();
       }
     };
+  }
+
+  static SimpleNameIndex.NameContext context(CtElement element) {
+    final Site site = site(element);
+    final SimpleNameIndex.NameContext base =
+        site.owner() == null ? SimpleNameIndex.NameContext.NONE : contextOf(site.owner());
+    return site.declarer() == null ? base : withTypeVariables(base, site);
+  }
+
+  static SimpleNameIndex.NameContext contextOf(CtType<?> start) {
+    final List<String> chain = new ArrayList<>();
+    final Map<String, List<SimpleNameIndex.WrittenName>> locals = new HashMap<>();
+    final List<Set<String>> variables = new ArrayList<>();
+    variables.add(Set.of());
+    boolean anyVariable = false;
+    CtType<?> type = start;
+    while (type != null) {
+      if (isElementType(type)) {
+        chain.add(idName(type));
+      } else {
+        final String key = type.getQualifiedName();
+        chain.add(key);
+        locals.put(key, writtenSupertypes(type));
+      }
+      final CtType<?> outer = type.getParent(CtType.class);
+      final Set<String> after = new HashSet<>();
+      addTypeVariables(type, after);
+      if (outer != null) {
+        for (CtElement between = type.getParent();
+            between != outer;
+            between = between.getParent()) {
+          if (between instanceof CtExecutable<?>) {
+            addTypeVariables(between, after);
+          }
+        }
+      }
+      anyVariable |= !after.isEmpty();
+      variables.add(Set.copyOf(after));
+      type = outer;
+    }
+    if (chain.isEmpty()) {
+      return SimpleNameIndex.NameContext.NONE;
+    }
+    return new SimpleNameIndex.NameContext(chain, locals, anyVariable ? variables : List.of());
+  }
+
+  static Site site(CtElement element) {
+    if (element instanceof CtType<?> type && !(element instanceof CtTypeParameter)) {
+      return new Site(type, null);
+    }
+    CtElement declarer = null;
+    CtElement child = element;
+    while (child.isParentInitialized()) {
+      final CtElement parent = child.getParent();
+      if (parent == null) {
+        break;
+      }
+      if (parent instanceof CtType<?> type && !(parent instanceof CtTypeParameter)) {
+        if (!isHeader(child)) {
+          return new Site(type, declarer);
+        }
+        if (declarer == null && declaresTypeVariables(type)) {
+          declarer = type;
+        }
+        if (type.isTopLevel()) {
+          break;
+        }
+      } else if (declarer == null
+          && parent instanceof CtExecutable<?>
+          && declaresTypeVariables(parent)) {
+        declarer = parent;
+      }
+      child = parent;
+    }
+    return new Site(null, declarer);
+  }
+
+  static SimpleNameIndex.NameContext withTypeVariables(
+      SimpleNameIndex.NameContext base, Site site) {
+    final Set<String> inner = new HashSet<>();
+    for (CtElement current = site.declarer();
+        current != null && current != site.owner() && !(current instanceof CtPackage);
+        current = current.isParentInitialized() ? current.getParent() : null) {
+      if (current instanceof CtExecutable<?>
+          || current instanceof CtType<?> && !(current instanceof CtTypeParameter)) {
+        addTypeVariables(current, inner);
+      }
+    }
+    return base.withInnerTypeVariables(inner);
+  }
+
+  static CtTypeParameter typeParameter(CtElement from, String name) {
+    for (CtElement current = from;
+        current != null && !(current instanceof CtPackage);
+        current = current.isParentInitialized() ? current.getParent() : null) {
+      if (current instanceof CtFormalTypeDeclarer declarer
+          && !(current instanceof CtTypeParameter)) {
+        for (final CtTypeParameter parameter : declarer.getFormalCtTypeParameters()) {
+          if (name.equals(parameter.getSimpleName())) {
+            return parameter;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  private static boolean declaresTypeVariables(CtElement element) {
+    return element instanceof CtFormalTypeDeclarer declarer
+        && !declarer.getFormalCtTypeParameters().isEmpty();
+  }
+
+  private static void addTypeVariables(CtElement element, Set<String> names) {
+    if (element instanceof CtFormalTypeDeclarer declarer) {
+      for (final CtTypeParameter parameter : declarer.getFormalCtTypeParameters()) {
+        names.add(parameter.getSimpleName());
+      }
+    }
+  }
+
+  static SimpleNameIndex.NameResolution resolveLeaf(
+      CtTypeReference<?> leaf, SimpleNameIndex.Scope scope) {
+    final String name = leaf.getQualifiedName();
+    if (hasLocalSegment(name)) {
+      return new SimpleNameIndex.NameResolution(
+          stripLeadingDigits(leaf.getSimpleName()), SimpleNameIndex.Outcome.UNCHANGED_INCOMPLETE);
+    }
+    return scope.resolve(name, isWrittenSimple(leaf), scope.context(leaf));
+  }
+
+  static CtType<?> bodyOwner(CtElement element) {
+    return site(element).owner();
+  }
+
+  record Site(CtType<?> owner, CtElement declarer) {}
+
+  private static boolean isHeader(CtElement child) {
+    final boolean candidate =
+        child instanceof CtTypeReference<?>
+            || child instanceof CtTypeParameter
+            || child instanceof CtAnnotation<?>;
+    return candidate && HEADER_ROLES.contains(child.getRoleInParent());
+  }
+
+  private static List<SimpleNameIndex.WrittenName> writtenSupertypes(CtType<?> type) {
+    final List<SimpleNameIndex.WrittenName> supertypes = new ArrayList<>();
+    final CtTypeReference<?> superclass = type.getSuperclass();
+    if (superclass != null) {
+      supertypes.add(written(superclass));
+    }
+    for (final CtTypeReference<?> superinterface : type.getSuperInterfaces()) {
+      supertypes.add(written(superinterface));
+    }
+    return supertypes;
+  }
+
+  private static SimpleNameIndex.WrittenName written(CtTypeReference<?> reference) {
+    return new SimpleNameIndex.WrittenName(
+        reference.getQualifiedName(), isWrittenSimple(reference));
   }
 
   static boolean isWrittenSimple(CtTypeReference<?> reference) {
@@ -149,8 +323,7 @@ final class ElementIds {
   }
 
   private static String eraseVariable(
-      CtTypeParameterReference variable, SimpleNameIndex.Scope scope, Set<CtTypeParameter> seen) {
-    final CtTypeParameter declaration = variable.getDeclaration();
+      CtTypeParameter declaration, SimpleNameIndex.Scope scope, Set<CtTypeParameter> seen) {
     if (declaration == null || declaration.getSuperclass() == null) {
       return OBJECT;
     }

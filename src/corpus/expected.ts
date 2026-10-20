@@ -64,6 +64,7 @@ const evidenceRowSchema = z.strictObject({
   fromMethod: elementIdSchema.optional(),
   line: positiveCount,
   to: elementIdSchema,
+  toMethod: elementIdSchema.optional(),
   type: dependencyTypeSchema,
 });
 

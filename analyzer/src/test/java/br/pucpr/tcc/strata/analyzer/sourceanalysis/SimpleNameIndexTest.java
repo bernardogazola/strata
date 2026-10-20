@@ -28,77 +28,74 @@ final class SimpleNameIndexTest {
 
   @Test
   void umNomeNuDoProprioPacoteGanhaOPacote() {
-    assertThat(INDEX.canonicalize("Helper", "b", Set.of())).isEqualTo("b.Helper");
+    assertThat(canonical("Helper", "b", Set.of())).isEqualTo("b.Helper");
   }
 
   @Test
   void umNomeNuDeUmUnicoImportSobDemandaGanhaOPacoteImportado() {
-    assertThat(INDEX.canonicalize("Other", "x", Set.of("c"))).isEqualTo("c.Other");
+    assertThat(canonical("Other", "x", Set.of("c"))).isEqualTo("c.Other");
   }
 
   @Test
   void umNomeQueDoisImportsSobDemandaOferecemFicaComoEsta() {
-    assertThat(INDEX.canonicalize("Api", "x", Set.of("a", "c"))).isEqualTo("Api");
+    assertThat(canonical("Api", "x", Set.of("a", "c"))).isEqualTo("Api");
   }
 
   @Test
   void oProprioPacoteVenceUmImportSobDemanda() {
-    assertThat(INDEX.canonicalize("Api", "a", Set.of("c"))).isEqualTo("a.Api");
+    assertThat(canonical("Api", "a", Set.of("c"))).isEqualTo("a.Api");
   }
 
   @Test
   void umNomeExternoFicaComoEsta() {
-    assertThat(INDEX.canonicalize("ParseTreeListener", "x", Set.of("a", "org.antlr")))
+    assertThat(canonical("ParseTreeListener", "x", Set.of("a", "org.antlr")))
         .isEqualTo("ParseTreeListener");
-    assertThat(INDEX.canonicalize("org.antlr.Lexer", "x", Set.of("a")))
-        .isEqualTo("org.antlr.Lexer");
+    assertThat(canonical("org.antlr.Lexer", "x", Set.of("a"))).isEqualTo("org.antlr.Lexer");
   }
 
   @Test
   void umTipoDoPacotePadraoNaoEVisivelDeUmPacoteComNome() {
-    assertThat(INDEX.canonicalize("Root", "x", Set.of())).isEqualTo("Root");
-    assertThat(INDEX.canonicalize("Root", "", Set.of())).isEqualTo("Root");
-    assertThat(INDEX.canonicalize("Root.Inner", "x", Set.of())).isEqualTo("Root.Inner");
-    assertThat(INDEX.canonicalize("Root.Inner", "", Set.of())).isEqualTo("Root$Inner");
+    assertThat(canonical("Root", "x", Set.of())).isEqualTo("Root");
+    assertThat(canonical("Root", "", Set.of())).isEqualTo("Root");
+    assertThat(canonical("Root.Inner", "x", Set.of())).isEqualTo("Root.Inner");
+    assertThat(canonical("Root.Inner", "", Set.of())).isEqualTo("Root$Inner");
   }
 
   @Test
   void umArquivoSemDeclaracoesNaoEntraNoIndice() {
-    assertThat(INDEX.canonicalize("Big", "d", Set.of())).isEqualTo("Big");
+    assertThat(canonical("Big", "d", Set.of())).isEqualTo("Big");
   }
 
   @Test
   void umNomeNuAninhadoResolveOTopoEMantemOResto() {
-    assertThat(INDEX.canonicalize("Other$Inner$Deep", "x", Set.of("c")))
-        .isEqualTo("c.Other$Inner$Deep");
+    assertThat(canonical("Other$Inner$Deep", "x", Set.of("c"))).isEqualTo("c.Other$Inner$Deep");
   }
 
   @Test
   void umNomeComPontosGanhaDolarDepoisDoMaiorPrefixoInterno() {
-    assertThat(INDEX.canonicalize("a.Api.Inner.Deep", "x", Set.of())).isEqualTo("a.Api$Inner$Deep");
-    assertThat(INDEX.canonicalize("c.Other.Inner", "x", Set.of())).isEqualTo("c.Other$Inner");
+    assertThat(canonical("a.Api.Inner.Deep", "x", Set.of())).isEqualTo("a.Api$Inner$Deep");
+    assertThat(canonical("c.Other.Inner", "x", Set.of())).isEqualTo("c.Other$Inner");
   }
 
   @Test
   void umNomeComPontosSemPrefixoInternoResolveOPrimeiroSegmentoComoNomeNu() {
-    assertThat(INDEX.canonicalize("Other.Inner", "x", Set.of("c"))).isEqualTo("c.Other$Inner");
-    assertThat(INDEX.canonicalize("Helper.Inner.Deep", "b", Set.of()))
-        .isEqualTo("b.Helper$Inner$Deep");
-    assertThat(INDEX.canonicalize("Api.Inner", "a", Set.of("c"))).isEqualTo("a.Api$Inner");
+    assertThat(canonical("Other.Inner", "x", Set.of("c"))).isEqualTo("c.Other$Inner");
+    assertThat(canonical("Helper.Inner.Deep", "b", Set.of())).isEqualTo("b.Helper$Inner$Deep");
+    assertThat(canonical("Api.Inner", "a", Set.of("c"))).isEqualTo("a.Api$Inner");
   }
 
   @Test
   void umPrimeiroSegmentoAmbiguoOuSemTipoInternoFicaComoEsta() {
-    assertThat(INDEX.canonicalize("Api.Inner", "x", Set.of("a", "c"))).isEqualTo("Api.Inner");
-    assertThat(INDEX.canonicalize("Missing.Inner", "x", Set.of("c"))).isEqualTo("Missing.Inner");
+    assertThat(canonical("Api.Inner", "x", Set.of("a", "c"))).isEqualTo("Api.Inner");
+    assertThat(canonical("Missing.Inner", "x", Set.of("c"))).isEqualTo("Missing.Inner");
   }
 
   @Test
   void oPalpiteDoProprioPacoteCedeAUmImportSobDemanda() {
-    assertThat(INDEX.canonicalize("x.Other", "x", Set.of("c"))).isEqualTo("c.Other");
-    assertThat(INDEX.canonicalize("x.Other$Inner", "x", Set.of("c"))).isEqualTo("c.Other$Inner");
-    assertThat(INDEX.canonicalize("x.Missing", "x", Set.of("c"))).isEqualTo("x.Missing");
-    assertThat(INDEX.canonicalize("x.Api", "x", Set.of("a", "c"))).isEqualTo("x.Api");
+    assertThat(canonical("x.Other", "x", Set.of("c"))).isEqualTo("c.Other");
+    assertThat(canonical("x.Other$Inner", "x", Set.of("c"))).isEqualTo("c.Other$Inner");
+    assertThat(canonical("x.Missing", "x", Set.of("c"))).isEqualTo("x.Missing");
+    assertThat(canonical("x.Api", "x", Set.of("a", "c"))).isEqualTo("x.Api");
   }
 
   @Test
@@ -113,11 +110,9 @@ final class SimpleNameIndexTest {
             "c.Other$Inner",
             "a.b.Single",
             "int")) {
-      assertThat(INDEX.canonicalize(resolved, "b", Set.of("a", "c")))
-          .as(resolved)
-          .isEqualTo(resolved);
+      assertThat(canonical(resolved, "b", Set.of("a", "c"))).as(resolved).isEqualTo(resolved);
     }
-    assertThat(INDEX.canonicalize("b.Helper$Inner", "b", Set.of("c"))).isEqualTo("b.Helper$Inner");
+    assertThat(canonical("b.Helper$Inner", "b", Set.of("c"))).isEqualTo("b.Helper$Inner");
   }
 
   @Test
@@ -140,8 +135,8 @@ final class SimpleNameIndexTest {
     assertThat(internal.canonical("java.lang.Api", true)).isEqualTo("c.Api");
     assertThat(internal.canonical("c.Api", true)).isEqualTo("c.Api");
     assertThat(external.canonical("org.x.Api", true)).isEqualTo("org.x.Api");
-    assertThat(external.canonical("java.lang.Api", true)).isEqualTo("java.lang.Api");
-    assertThat(nested.canonical("java.lang.Api", true)).isEqualTo("java.lang.Api");
+    assertThat(external.canonical("java.lang.Api", true)).isEqualTo("org.x.Api");
+    assertThat(nested.canonical("java.lang.Api", true)).isEqualTo("c.Other$Api");
   }
 
   @Test
@@ -171,6 +166,33 @@ final class SimpleNameIndexTest {
         .isEqualTo("c.Other");
   }
 
+  @Test
+  void oNomeDeUmImportSaiDoMaiorPrefixoInternoOuDoPacoteDoJdk() {
+    assertThat(INDEX.importedTypeName("a.Api.Inner.Deep")).isEqualTo("a.Api$Inner$Deep");
+    assertThat(INDEX.importedTypeName("a.Api$Inner")).isEqualTo("a.Api$Inner");
+    assertThat(INDEX.importedTypeName("java.util.Map.Entry")).isEqualTo("java.util.Map$Entry");
+    assertThat(INDEX.importedTypeName("java.util.Map$Entry")).isEqualTo("java.util.Map$Entry");
+    assertThat(INDEX.importedTypeName("java.net.http.HttpClient.Version"))
+        .isEqualTo("java.net.http.HttpClient$Version");
+    assertThat(INDEX.importedTypeName("javax.servlet.http.HttpServlet"))
+        .as("javax.servlet não é do JDK")
+        .isEqualTo("javax.servlet.http.HttpServlet");
+    assertThat(INDEX.importedTypeName("org.x.Api.Inner")).isEqualTo("org.x.Api.Inner");
+  }
+
+  @Test
+  void umIndiceSoDeDeclaracoesNaoSabeOsMembros() {
+    assertThat(INDEX.hasMethod("a.Api", "run")).isEqualTo(SimpleNameIndex.MemberAnswer.UNKNOWN);
+    assertThat(INDEX.field("a.Api", "value").answer())
+        .isEqualTo(SimpleNameIndex.MemberAnswer.UNKNOWN);
+    assertThat(INDEX.memberType("a.Api", "Inner").answer())
+        .isEqualTo(SimpleNameIndex.MemberAnswer.UNKNOWN);
+    assertThat(INDEX.hasMethod("org.x.Missing", "run"))
+        .as("um tipo que o índice não tem")
+        .isEqualTo(SimpleNameIndex.MemberAnswer.UNKNOWN);
+    assertThat(INDEX.topLevelCandidates("Api", "x")).containsExactly("a.Api", "c.Api");
+  }
+
   private static SourceFile analyzed(String path, String packageName, String... types) {
     return new SourceFile(
         path,
@@ -178,5 +200,9 @@ final class SimpleNameIndexTest {
         SourceFileStatus.ANALYZED,
         null,
         new SourceFile.Declarations(packageName, List.of(types)));
+  }
+
+  private static String canonical(String name, String ownPackage, Set<String> onDemandPackages) {
+    return INDEX.scope(ownPackage, onDemandPackages, Map.of()).canonical(name, false);
   }
 }

@@ -59,15 +59,18 @@ final class DependencyDaoTest {
     for (int i = 0; i < quantas; i++) {
       final DependencyType aresta = ARESTAS.get(i % ARESTAS.size());
       final int par = i / ARESTAS.size();
+      final ResolutionQuality qualidade =
+          ResolutionQuality.values()[i % ResolutionQuality.values().length];
       linhas.add(
           new DependencyRow(
               primeiraChave + i,
               tipo + par / TIPOS,
               tipo + par % TIPOS,
               aresta,
-              ResolutionQuality.values()[i % ResolutionQuality.values().length],
+              qualidade,
               1 + i % 7,
-              2 * (1 + i % 7)));
+              2 * (1 + i % 7),
+              qualidade == ResolutionQuality.UNRESOLVED_EXTERNAL && i % 2 == 0));
     }
     return linhas;
   }
@@ -82,22 +85,27 @@ final class DependencyDaoTest {
   @Test
   void gravaELeTodasAsColunasComOsEnumsPeloNome() throws Exception {
     final DependencyRow chamada =
-        new DependencyRow(1, 1, 2, DependencyType.CALLS, ResolutionQuality.INFERRED, 3, 6);
+        new DependencyRow(1, 1, 2, DependencyType.CALLS, ResolutionQuality.INFERRED, 3, 6, false);
     final DependencyRow propria =
         new DependencyRow(
-            2, 1, 1, DependencyType.ANNOTATION_REFERENCE, ResolutionQuality.RESOLVED, 1, 1);
+            2, 1, 1, DependencyType.ANNOTATION_REFERENCE, ResolutionQuality.RESOLVED, 1, 1, false);
+    final DependencyRow ambigua =
+        new DependencyRow(
+            3, 1, 3, DependencyType.FIELD_TYPE, ResolutionQuality.UNRESOLVED_EXTERNAL, 2, 6, true);
 
     try (Connection banco = DaoTestDatabase.create(temp)) {
       final long analise = analiseComTipos(banco, "an_01");
 
-      DependencyDao.insert(banco, analise, List.of(chamada, propria));
+      DependencyDao.insert(banco, analise, List.of(chamada, propria, ambigua));
 
-      assertThat(DependencyDao.list(banco, analise)).containsExactly(chamada, propria);
+      assertThat(DependencyDao.list(banco, analise)).containsExactly(chamada, propria, ambigua);
       assertThat(
               DaoTestDatabase.scalar(
                   banco,
-                  "SELECT group_concat(type || ':' || resolution, ' ' ORDER BY id) FROM dependency"))
-          .isEqualTo("CALLS:INFERRED ANNOTATION_REFERENCE:RESOLVED");
+                  "SELECT group_concat(type || ':' || resolution || ':' || ambiguous, ' '"
+                      + " ORDER BY id) FROM dependency"))
+          .isEqualTo(
+              "CALLS:INFERRED:0 ANNOTATION_REFERENCE:RESOLVED:0 FIELD_TYPE:UNRESOLVED_EXTERNAL:1");
     }
   }
 
@@ -136,9 +144,9 @@ final class DependencyDaoTest {
   @Test
   void umaLinhaRepetidaFalhaNoUniqueENaoEntra() throws Exception {
     final DependencyRow primeira =
-        new DependencyRow(1, 1, 2, DependencyType.CALLS, ResolutionQuality.RESOLVED, 1, 2);
+        new DependencyRow(1, 1, 2, DependencyType.CALLS, ResolutionQuality.RESOLVED, 1, 2, false);
     final DependencyRow repetida =
-        new DependencyRow(2, 1, 2, DependencyType.CALLS, ResolutionQuality.RESOLVED, 4, 8);
+        new DependencyRow(2, 1, 2, DependencyType.CALLS, ResolutionQuality.RESOLVED, 4, 8, false);
 
     try (Connection banco = DaoTestDatabase.create(temp)) {
       final long analise = analiseComTipos(banco, "an_01");
@@ -156,7 +164,8 @@ final class DependencyDaoTest {
   @Test
   void umExtremoQueNaoExisteERecusadoPelaChaveEstrangeira() throws Exception {
     final DependencyRow orfa =
-        new DependencyRow(1, 1, 999, DependencyType.EXTENDS, ResolutionQuality.RESOLVED, 1, 4);
+        new DependencyRow(
+            1, 1, 999, DependencyType.EXTENDS, ResolutionQuality.RESOLVED, 1, 4, false);
 
     try (Connection banco = DaoTestDatabase.create(temp)) {
       final long analise = analiseComTipos(banco, "an_01");
@@ -169,17 +178,45 @@ final class DependencyDaoTest {
     }
   }
 
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"RESOLVED", "INFERRED"})
+  void umaLinhaAmbiguaQueNaoEUnresolvedExternalFalhaNoCheckENaoEntra(String qualidade)
+      throws Exception {
+    final DependencyRow ambigua =
+        new DependencyRow(
+            1, 1, 2, DependencyType.CALLS, ResolutionQuality.valueOf(qualidade), 1, 2, true);
+
+    try (Connection banco = DaoTestDatabase.create(temp)) {
+      final long analise = analiseComTipos(banco, "an_01");
+
+      assertThatThrownBy(() -> DependencyDao.insert(banco, analise, List.of(ambigua)))
+          .satisfies(
+              failure ->
+                  assertThat(DaoTestDatabase.resultCode(failure))
+                      .isEqualTo(SQLiteErrorCode.SQLITE_CONSTRAINT_CHECK));
+      assertThat(DependencyDao.list(banco, analise)).isEmpty();
+    }
+  }
+
   @Test
   void umaLinhaDeModuloOuSemOcorrenciaNaoChegaASerConstruida() {
     assertThatThrownBy(
             () ->
                 new DependencyRow(
-                    1, 1, 2, DependencyType.MODULE_DEPENDENCY, ResolutionQuality.RESOLVED, 1, 1))
+                    1,
+                    1,
+                    2,
+                    DependencyType.MODULE_DEPENDENCY,
+                    ResolutionQuality.RESOLVED,
+                    1,
+                    1,
+                    false))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("MODULE_DEPENDENCY");
     assertThatThrownBy(
             () ->
-                new DependencyRow(1, 1, 2, DependencyType.CALLS, ResolutionQuality.RESOLVED, 0, 0))
+                new DependencyRow(
+                    1, 1, 2, DependencyType.CALLS, ResolutionQuality.RESOLVED, 0, 0, false))
         .isInstanceOf(IllegalArgumentException.class);
   }
 }

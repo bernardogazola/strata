@@ -9,6 +9,8 @@ import br.pucpr.tcc.strata.analyzer.repository.SourceRootKind;
 import br.pucpr.tcc.strata.analyzer.repository.TestRepositories;
 import br.pucpr.tcc.strata.analyzer.repository.ValidatedRepository;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyEvidence;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ExtractedDependency;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -112,13 +114,14 @@ final class DependencyExtractorTest {
   }
 
   @ParameterizedTest(name = "{0}")
-  @ValueSource(strings = {"broken-source", "cyclic", "inheritance", "method-calls"})
+  @ValueSource(
+      strings = {"broken-source", "cyclic", "inheritance", "method-calls", "missing-classpath"})
   void osQuatroGoldensSaoReproduzidosLinhaALinha(String fixture) throws Exception {
     final Extraction run =
         extract(SourceTrees.fixture(fixture, temp.toRealPath().resolve("fixture")));
 
     assertThat(run.sink().tuples())
-        .as(fixture + ": (from, to, type, occurrences, resolution, external), exaustivo")
+        .as(fixture + ": (from, to, type, occurrences, resolution, external, ambiguous), exaustivo")
         .containsExactlyElementsOf(goldenTuples(golden(fixture)));
   }
 
@@ -146,7 +149,8 @@ final class DependencyExtractorTest {
               + " L"
               + row.get("line").asInt()
               + " "
-              + (row.has("fromMethod") ? row.get("fromMethod").asText() : "-"));
+              + (row.has("fromMethod") ? row.get("fromMethod").asText() : "-")
+              + (row.has("toMethod") ? " toMethod=" + row.get("toMethod").asText() : ""));
     }
 
     assertThat(esperadas).as("o golden mesmo tem as 15 linhas").hasSize(15);
@@ -211,7 +215,7 @@ final class DependencyExtractorTest {
             "p.Client -> q.Util IMPORTS x1 RESOLVED", "p.Client -> q.Util CALLS x1 RESOLVED");
     assertThat(evidence(run.sink().row("p.Client", "q.Util", "IMPORTS"))).containsExactly("L3 -");
     assertThat(evidence(run.sink().row("p.Client", "q.Util", "CALLS")))
-        .containsExactly("L10 method:p.Client#run()");
+        .containsExactly("L10 method:p.Client#run() toMethod=method:q.Util#helper()");
   }
 
   @Test
@@ -785,7 +789,9 @@ final class DependencyExtractorTest {
             "p.Color -> p.Palette CALLS x2 RESOLVED",
             "p.Color -> p.Shade IMPLEMENTS x1 RESOLVED");
     assertThat(evidence(run.sink().row("p.Color", "p.Palette", "CALLS")))
-        .containsExactly("L4 -", "L8 method:p.Color#tone()");
+        .containsExactly(
+            "L4 - toMethod=method:p.Palette#code()",
+            "L8 method:p.Color#tone() toMethod=method:p.Palette#code()");
   }
 
   @Test
@@ -1028,11 +1034,13 @@ final class DependencyExtractorTest {
             "p.Host$Part -> p.Engine CALLS x1 RESOLVED",
             "p.Host$Part -> p.Engine PARAMETER_TYPE x1 RESOLVED");
     assertThat(evidence(run.sink().row("p.Host", "p.Engine", "CALLS")))
-        .containsExactly("L12 method:p.Host#viaLambda()", "L19 method:p.Host#run()");
+        .containsExactly(
+            "L12 method:p.Host#viaLambda() toMethod=method:p.Engine#start()",
+            "L19 method:p.Host#run() toMethod=method:p.Engine#stop()");
     assertThat(evidence(run.sink().row("p.Host", "java.lang.Runnable", "CALLS")))
         .containsExactly("L16 method:p.Host#viaAnonymous()");
     assertThat(evidence(run.sink().row("p.Host$Part", "p.Engine", "CALLS")))
-        .containsExactly("L29 method:p.Host$Part#spin(p.Engine)");
+        .containsExactly("L29 method:p.Host$Part#spin(p.Engine) toMethod=method:p.Engine#start()");
   }
 
   @Test
@@ -1098,8 +1106,11 @@ final class DependencyExtractorTest {
             "p.Wiring -> p.Factory CALLS x3 RESOLVED");
     assertThat(evidence(run.sink().row("p.Wiring", "p.Factory", "CALLS")))
         .containsExactly(
-            "L8 method:p.Wiring#<clinit>()", "L14 -", "L22 method:p.Wiring#anonymous()");
-    assertThat(evidence(run.sink().row("p.Wiring", "p.Engine", "CALLS"))).containsExactly("L11 -");
+            "L8 method:p.Wiring#<clinit>() toMethod=method:p.Factory#create()",
+            "L14 - toMethod=method:p.Factory#touch()",
+            "L22 method:p.Wiring#anonymous() toMethod=method:p.Factory#touch()");
+    assertThat(evidence(run.sink().row("p.Wiring", "p.Engine", "CALLS")))
+        .containsExactly("L11 - toMethod=method:p.Engine#<init>()");
     assertThat(evidence(run.sink().row("p.Wiring", "java.lang.Object", "CALLS")))
         .containsExactly("L20 method:p.Wiring#anonymous()");
   }
@@ -1153,9 +1164,12 @@ final class DependencyExtractorTest {
             "p.Derived -> p.Base CALLS x2 RESOLVED",
             "p.Derived -> p.Derived CALLS x1 RESOLVED");
     assertThat(evidence(run.sink().row("p.Derived", "p.Base", "CALLS")))
-        .containsExactly("L8 method:p.Derived#<init>(int)", "L17 method:p.Derived#hook()");
+        .containsExactly(
+            "L8 method:p.Derived#<init>(int) toMethod=method:p.Base#<init>(int)",
+            "L17 method:p.Derived#hook() toMethod=method:p.Base#hook()");
     assertThat(evidence(run.sink().row("p.Derived", "p.Derived", "CALLS")))
-        .containsExactly("L12 method:p.Derived#<init>(java.lang.String)");
+        .containsExactly(
+            "L12 method:p.Derived#<init>(java.lang.String) toMethod=method:p.Derived#<init>()");
   }
 
   @Test
@@ -1233,7 +1247,9 @@ final class DependencyExtractorTest {
             "p.Sub -> p.Mid CALLS x1 RESOLVED",
             "p.Sub -> p.Sub CALLS x2 RESOLVED");
     assertThat(evidence(run.sink().row("p.Sub", "p.Sub", "CALLS")))
-        .containsExactly("L8 method:p.Sub#own()", "L19 method:p.Sub#run()");
+        .containsExactly(
+            "L8 method:p.Sub#own() toMethod=method:p.Base#inherited()",
+            "L19 method:p.Sub#run() toMethod=method:p.Sub#own()");
   }
 
   @Test
@@ -1406,7 +1422,9 @@ final class DependencyExtractorTest {
             "p.Report -> p.Repo PARAMETER_TYPE x1 RESOLVED");
     assertThat(evidence(run.sink().row("p.Report", "p.Order", "CALLS")))
         .containsExactly(
-            "L12 method:p.Report#sum()", "L12 method:p.Report#sum()", "L12 method:p.Report#sum()");
+            "L12 method:p.Report#sum() toMethod=method:p.Order#<init>()",
+            "L12 method:p.Report#sum() toMethod=method:p.Order#total()",
+            "L12 method:p.Report#sum() toMethod=method:p.Order#total()");
   }
 
   @Test
@@ -1712,8 +1730,166 @@ final class DependencyExtractorTest {
     assertThat(evidence(run.sink().row("p.Chatty", "p.Engine", "CALLS")))
         .containsExactlyElementsOf(
             IntStream.rangeClosed(12, 31)
-                .mapToObj(line -> "L" + line + " method:p.Chatty#burst()")
+                .mapToObj(
+                    line ->
+                        "L" + line + " method:p.Chatty#burst() toMethod=method:p.Engine#start()")
                 .toList());
+  }
+
+  @Test
+  void umNomeCopiadoDeOutraUnidadeELidoNaUnidadeQueOEscreveu() throws Exception {
+    final String repo =
+        """
+        package a;
+
+        public class Repo {
+
+          public Repo() {}
+
+          public Item find() {
+            return null;
+          }
+        }
+        """;
+    final String item =
+        """
+        package a;
+
+        public class Item {
+
+          public Item() {}
+
+          public void touch() {}
+        }
+        """;
+    final String holder =
+        """
+        package a;
+
+        public class Holder {
+
+          public Item item;
+
+          public Holder() {}
+        }
+        """;
+    final String user =
+        """
+        package b;
+
+        import a.Holder;
+        import a.Repo;
+
+        public class User {
+
+          static class Item {}
+
+          public User() {}
+
+          public void f(Repo repo, Holder holder) {
+            repo.find().touch();
+            holder.item.touch();
+          }
+        }
+        """;
+
+    final Extraction oneRoot =
+        extract(
+            "uma",
+            Map.of(
+                "src/main/java/a/Repo.java", repo,
+                "src/main/java/a/Item.java", item,
+                "src/main/java/a/Holder.java", holder,
+                "src/main/java/b/User.java", user));
+    final Extraction twoRoots =
+        extract(
+            "duas",
+            Map.of(
+                "core/src/main/java/a/Repo.java", repo,
+                "core/src/main/java/a/Item.java", item,
+                "core/src/main/java/a/Holder.java", holder,
+                "app/src/main/java/b/User.java", user));
+
+    assertThat(oneRoot.sink().tuples())
+        .containsExactly(
+            "a.Holder -> a.Item FIELD_TYPE x1 RESOLVED",
+            "a.Repo -> a.Item RETURN_TYPE x1 RESOLVED",
+            "b.User -> a.Holder IMPORTS x1 RESOLVED",
+            "b.User -> a.Holder PARAMETER_TYPE x1 RESOLVED",
+            "b.User -> a.Item CALLS x2 RESOLVED",
+            "b.User -> a.Repo IMPORTS x1 RESOLVED",
+            "b.User -> a.Repo CALLS x1 RESOLVED",
+            "b.User -> a.Repo PARAMETER_TYPE x1 RESOLVED");
+    assertThat(evidence(oneRoot.sink().row("b.User", "a.Item", "CALLS")))
+        .containsExactly(
+            "L13 method:b.User#f(a.Repo,a.Holder) toMethod=method:a.Item#touch()",
+            "L14 method:b.User#f(a.Repo,a.Holder) toMethod=method:a.Item#touch()");
+    assertThat(twoRoots.roots()).hasSize(2);
+    assertThat(twoRoots.sink().tuples())
+        .containsExactly(
+            "a.Holder -> a.Item FIELD_TYPE x1 RESOLVED",
+            "a.Repo -> a.Item RETURN_TYPE x1 RESOLVED",
+            "b.User -> a.Holder IMPORTS x1 INFERRED",
+            "b.User -> a.Holder PARAMETER_TYPE x1 INFERRED",
+            "b.User -> a.Item CALLS x1 INFERRED",
+            "b.User -> a.Repo IMPORTS x1 INFERRED",
+            "b.User -> a.Repo CALLS x1 INFERRED",
+            "b.User -> a.Repo PARAMETER_TYPE x1 INFERRED");
+    assertThat(evidence(twoRoots.sink().row("b.User", "a.Item", "CALLS")))
+        .containsExactly("L14 method:b.User#f(a.Repo,a.Holder)");
+  }
+
+  @Test
+  void oImportEstaticoQueOSpoonDescartaNoLoteDaAMesmaLinhaNasDuasRaizes() throws Exception {
+    final String base =
+        "package a;\n\npublic class UBase {\n\n  public static void stBase() {}\n}\n";
+    final String util = "package a;\n\npublic class Util extends UBase {}\n";
+    final String user =
+        """
+        package b;
+
+        import static a.Util.stBase;
+
+        public class User {
+
+          void f() {
+            stBase();
+          }
+        }
+        """;
+
+    final Extraction oneRoot =
+        extract(
+            "uma",
+            Map.of(
+                "src/main/java/a/UBase.java", base,
+                "src/main/java/a/Util.java", util,
+                "src/main/java/b/User.java", user));
+    final Extraction twoRoots =
+        extract(
+            "duas",
+            Map.of(
+                "core/src/main/java/a/UBase.java", base,
+                "core/src/main/java/a/Util.java", util,
+                "app/src/main/java/b/User.java", user));
+
+    assertThat(oneRoot.sink().tuples())
+        .containsExactly(
+            "a.Util -> a.UBase EXTENDS x1 RESOLVED",
+            "b.User -> a.Util IMPORTS x1 RESOLVED",
+            "b.User -> a.Util CALLS x1 RESOLVED");
+    assertThat(evidence(oneRoot.sink().row("b.User", "a.Util", "IMPORTS"))).containsExactly("L0 -");
+    assertThat(evidence(oneRoot.sink().row("b.User", "a.Util", "CALLS")))
+        .containsExactly("L8 method:b.User#f() toMethod=method:a.UBase#stBase()");
+    assertThat(twoRoots.sink().tuples())
+        .containsExactly(
+            "a.Util -> a.UBase EXTENDS x1 RESOLVED",
+            "b.User -> a.Util IMPORTS x1 INFERRED",
+            "b.User -> a.Util CALLS x1 INFERRED");
+    assertThat(evidence(twoRoots.sink().row("b.User", "a.Util", "IMPORTS")))
+        .containsExactly("L3 -");
+    assertThat(evidence(twoRoots.sink().row("b.User", "a.Util", "CALLS")))
+        .containsExactly("L8 method:b.User#f()");
   }
 
   private record Extraction(
@@ -1745,7 +1921,12 @@ final class DependencyExtractorTest {
         if (entry.fromMethod() != null) {
           assertThat(entry.fromMethod().value()).as(tuple(row)).startsWith(owner);
         }
-        assertThat(entry.toMethod()).as(tuple(row) + ": toMethod fica nulo").isNull();
+        if (entry.toMethod() != null) {
+          assertThat(row.dependency().type())
+              .as(tuple(row) + ": toMethod só em uma chamada")
+              .isEqualTo(DependencyType.CALLS);
+          assertThat(entry.toMethod().kind()).as(tuple(row)).isEqualTo(ElementKind.METHOD);
+        }
       }
     }
   }
@@ -1795,7 +1976,8 @@ final class DependencyExtractorTest {
               + row.get("occurrences").asInt()
               + " "
               + row.get("resolution").asText()
-              + (row.path("external").asBoolean(false) ? " external" : ""));
+              + (row.path("external").asBoolean(false) ? " external" : "")
+              + (row.path("ambiguous").asBoolean(false) ? " ambiguous" : ""));
     }
     return List.copyOf(tuples);
   }

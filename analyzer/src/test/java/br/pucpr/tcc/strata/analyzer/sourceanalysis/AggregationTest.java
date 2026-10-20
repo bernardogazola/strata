@@ -303,6 +303,48 @@ final class AggregationTest {
   }
 
   @Test
+  void asContagensSaoPorOcorrenciaEPorOrigem() {
+    final CodeElementId external = CodeElementId.ofType("Config");
+    final EvidenceCollector collector = new EvidenceCollector(FILE);
+    collector.add(call(A, B, RESOLVED, 3, 30, null));
+    collector.add(call(A, B, INFERRED, 4, 40, null));
+    collector.add(call(A, B, RESOLVED, 5, 50, null));
+    collector.add(occurrence(A, external, FIELD_TYPE, RESOLVED, false, 6, 60, null));
+    collector.add(
+        new Occurrence(
+            A, external, FIELD_TYPE, UNRESOLVED_EXTERNAL, false, true, 7, 70, null, null));
+    collector.add(call(C, B, INFERRED, 8, 80, null));
+
+    assertThat(collector.counts())
+        .containsOnly(
+            Map.entry(A, new ResolutionCounts(3, 1, 1, 1)),
+            Map.entry(C, new ResolutionCounts(0, 1, 0, 0)));
+  }
+
+  @Test
+  void aLinhaAmbiguaEOOuDasOcorrenciasEOToMethodVaiParaAEvidencia() {
+    final CodeElementId external = CodeElementId.ofType("Config");
+    final CodeElementId callee = new CodeElementId("method:p.B#go()");
+    final EvidenceCollector collector = new EvidenceCollector(FILE);
+    collector.add(
+        new Occurrence(
+            A, external, FIELD_TYPE, UNRESOLVED_EXTERNAL, false, true, 3, 30, null, null));
+    collector.add(
+        new Occurrence(
+            A, external, FIELD_TYPE, UNRESOLVED_EXTERNAL, false, false, 4, 40, null, null));
+    collector.add(new Occurrence(A, B, CALLS, RESOLVED, true, false, 5, 50, null, callee));
+
+    final List<ExtractedDependency> rows = collector.collect();
+
+    assertThat(rows)
+        .extracting(row -> row.dependency().target(), ExtractedDependency::ambiguous)
+        .containsExactly(tuple(external, true), tuple(B, false));
+    assertThat(rows.getLast().evidence())
+        .extracting(DependencyEvidence::toMethod)
+        .containsExactly(callee);
+  }
+
+  @Test
   void oTetoGuardaAsVintePrimeirasLinhasEContaTodas() {
     assertThat(AnalysisConstants.DEPENDENCY_EVIDENCE_CAP).isEqualTo(20);
     final ExtractedDependency twentyFive = single(shuffledCalls(25));
@@ -451,7 +493,7 @@ final class AggregationTest {
       int offset,
       CodeElementId fromMethod) {
     return new Occurrence(
-        source, target, type, resolution, targetDeclared, line, offset, fromMethod, null);
+        source, target, type, resolution, targetDeclared, false, line, offset, fromMethod, null);
   }
 
   private static Occurrence call(

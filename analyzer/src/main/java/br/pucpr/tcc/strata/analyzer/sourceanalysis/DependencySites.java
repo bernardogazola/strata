@@ -1,7 +1,6 @@
 package br.pucpr.tcc.strata.analyzer.sourceanalysis;
 
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
-import java.util.Map;
 import java.util.Set;
 import spoon.reflect.code.CtConstructorCall;
 import spoon.reflect.code.CtInvocation;
@@ -28,13 +27,12 @@ import spoon.reflect.visitor.filter.TypeFilter;
 final class DependencySites {
 
   private final OccurrenceRecorder recorder;
-  private final Map<String, String> staticImports;
+  private final CallTargets calls;
   private final Set<Long> fieldDeclarations;
 
-  DependencySites(
-      OccurrenceRecorder recorder, Map<String, String> staticImports, Set<Long> fieldDeclarations) {
+  DependencySites(OccurrenceRecorder recorder, CallTargets calls, Set<Long> fieldDeclarations) {
     this.recorder = recorder;
-    this.staticImports = staticImports;
+    this.calls = calls;
     this.fieldDeclarations = fieldDeclarations;
   }
 
@@ -66,15 +64,14 @@ final class DependencySites {
   private void invocation(CtInvocation<?> invocation) {
     final CodeElementId source = recorder.source(invocation);
     if (source != null) {
-      recorder.call(
-          invocation, source, CallTargets.of(invocation, source, staticImports, recorder.names()));
+      recorder.call(invocation, source, calls.of(invocation, source));
     }
   }
 
   private void constructorCall(CtConstructorCall<?> call) {
     final CodeElementId source = recorder.source(call);
     if (source != null) {
-      recorder.call(call, source, CallTargets.of(call, recorder.names()));
+      recorder.call(call, source, calls.of(call));
     }
   }
 

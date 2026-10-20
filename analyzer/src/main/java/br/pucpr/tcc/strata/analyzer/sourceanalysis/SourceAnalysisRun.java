@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
+import java.util.function.UnaryOperator;
 import spoon.Launcher;
 import spoon.compiler.Environment;
 import spoon.reflect.factory.Factory;
@@ -45,9 +47,14 @@ final class SourceAnalysisRun {
 
   private final Map<String, Integer> sizes = new LinkedHashMap<>();
 
+  private final Map<String, UnitShape> shapes = new HashMap<>();
+
+  private final Map<SourceRootId, List<List<String>>> plannedChunks = new LinkedHashMap<>();
+
   private int assignedFiles;
 
   private List<SourceFile> preParsed = List.of();
+  private SimpleNameIndex index;
   private int batches;
   private int splitBatches;
   private int quarantinedBatches;
@@ -69,8 +76,16 @@ final class SourceAnalysisRun {
   SourceAnalysis run(Map<SourceRoot, List<JavaSource>> assigned) {
     final long started = System.nanoTime();
     assignedFiles = assigned.values().stream().mapToInt(List::size).sum();
-    assigned.forEach(this::preParseRoot);
+    final Map<String, String> interned = new HashMap<>();
+    final UnaryOperator<String> interner =
+        text -> {
+          final String known = interned.putIfAbsent(text, text);
+          return known == null ? text : known;
+        };
+    assigned.forEach((root, sources) -> preParseRoot(root, sources, interner));
+    interned.clear();
     preParsed = List.copyOf(outcomes.values());
+    index = buildIndex(assigned.keySet());
     preParseNanos = System.nanoTime() - started;
     final long beginStarted = System.nanoTime();
     visitor.begin(preParsed);
@@ -83,36 +98,38 @@ final class SourceAnalysisRun {
     return analysis;
   }
 
-  private void preParseRoot(SourceRoot root, List<JavaSource> sources) {
+  private void preParseRoot(
+      SourceRoot root, List<JavaSource> sources, UnaryOperator<String> interner) {
     typeFiles.put(root.id(), new ArrayList<>());
     descriptors.put(root.id(), new ArrayList<>());
     for (final JavaSource source : sources) {
       checkCancelled();
-      preParseFile(root, source);
+      preParseFile(root, source, interner);
     }
   }
 
-  private void preParseFile(SourceRoot root, JavaSource source) {
+  private void preParseFile(SourceRoot root, JavaSource source, UnaryOperator<String> interner) {
     final String file = source.relativePath();
     if (source.sizeBytes() > MAX_SOURCE_FILE_BYTES) {
       record(file, root, SourceFileStatus.SKIPPED_TOO_LARGE, null, null);
       return;
     }
     switch (readBounded(file)) {
-      case Read.Content content -> preParseContent(root, file, content.bytes());
+      case Read.Content content -> preParseContent(root, file, content.bytes(), interner);
       case Read.TooLarge _ -> record(file, root, SourceFileStatus.SKIPPED_TOO_LARGE, null, null);
       case Read.Unreadable _ ->
           record(file, root, SourceFileStatus.PARSE_FAILED, ParseFailureCause.UNREADABLE, null);
     }
   }
 
-  private void preParseContent(SourceRoot root, String file, byte[] content) {
+  private void preParseContent(
+      SourceRoot root, String file, byte[] content, UnaryOperator<String> interner) {
     final char[] text = SourceCharsets.decode(content);
     if (tooDeep(file, text)) {
       record(file, root, SourceFileStatus.PARSE_FAILED, ParseFailureCause.NESTING_TOO_DEEP, null);
       return;
     }
-    final Optional<SyntaxPreParser.PreParse> preParse = preParse(file, text);
+    final Optional<SyntaxPreParser.PreParse> preParse = preParse(file, text, interner);
     if (preParse.isEmpty()) {
       record(file, root, SourceFileStatus.PARSE_FAILED, ParseFailureCause.PRE_PARSE_CRASH, null);
       return;
@@ -129,6 +146,7 @@ final class SourceAnalysisRun {
     } else if (!parsed.empty()) {
       typeFiles.get(root.id()).add(file);
       sizes.put(file, content.length);
+      shapes.put(file, parsed.shape());
     }
   }
 
@@ -149,9 +167,10 @@ final class SourceAnalysisRun {
     return true;
   }
 
-  private static Optional<SyntaxPreParser.PreParse> preParse(String file, char[] text) {
+  private static Optional<SyntaxPreParser.PreParse> preParse(
+      String file, char[] text, UnaryOperator<String> interner) {
     try {
-      return Optional.of(SyntaxPreParser.parse(file, text));
+      return Optional.of(SyntaxPreParser.parse(file, text, interner));
     } catch (CancellationException cancellation) {
       throw cancellation;
     } catch (RuntimeException | StackOverflowError crash) {
@@ -195,11 +214,40 @@ final class SourceAnalysisRun {
     record Unreadable() implements Read {}
   }
 
+  private SimpleNameIndex buildIndex(Set<SourceRoot> roots) {
+    final long started = System.nanoTime();
+    final IndexBuilder builder = SimpleNameIndex.builder();
+    int units = 0;
+    for (final SourceRoot root : roots) {
+      final List<List<String>> chunks = chunks(typeFiles.get(root.id()));
+      plannedChunks.put(root.id(), chunks);
+      for (final List<String> chunk : chunks) {
+        for (final String file : chunk) {
+          builder.add(shapes.get(file), repositoryRoot.resolve(file));
+          units++;
+        }
+      }
+    }
+    shapes.clear();
+    final SimpleNameIndex built = builder.addDeclarations(preParsed).build();
+    Log.info(
+        "índice de nomes: "
+            + units
+            + " unidade(s), "
+            + built.size()
+            + " tipo(s) nomeado(s), "
+            + built.retainedStaticImports()
+            + " import(s) estático(s) retido(s), montado em "
+            + (System.nanoTime() - started) / 1_000_000
+            + " ms");
+    return built;
+  }
+
   private void modelRoot(SourceRoot root) {
     final long started = System.nanoTime();
     final int buildsBefore = builds;
     final int batchesBefore = batches;
-    final List<List<String>> chunks = chunks(typeFiles.get(root.id()));
+    final List<List<String>> chunks = plannedChunks.get(root.id());
     splitBatches += Math.max(0, chunks.size() - 1);
     for (final List<String> chunk : chunks) {
       readAndModel(root, chunk);
@@ -372,7 +420,7 @@ final class SourceAnalysisRun {
 
   private void visit(SourceRoot root, List<String> files, Factory factory) {
     final ModeledBatch batch =
-        new ModeledBatch(root, files, factory, repositoryRoot, preParsed, cancelled);
+        new ModeledBatch(root, files, factory, repositoryRoot, preParsed, index, cancelled);
     final Set<String> modeled = batch.modeledFiles();
     for (final String file : files) {
       if (!modeled.contains(file)) {

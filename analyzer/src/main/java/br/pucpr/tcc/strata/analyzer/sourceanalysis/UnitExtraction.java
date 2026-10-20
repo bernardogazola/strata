@@ -10,6 +10,7 @@ import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.MethodElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.PackageElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.TypeElement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,9 +39,8 @@ final class UnitExtraction {
   }
 
   UnitElements extract(CtCompilationUnit unit) {
-    final Set<String> onDemand = ElementIds.onDemandPackages(unit);
-    final Map<String, String> singleTypeImports = ElementIds.singleTypeImports(unit);
     final Map<String, PackageElement> packages = new LinkedHashMap<>();
+    final Map<String, SimpleNameIndex.Scope> scopes = new HashMap<>();
     final List<DeclaredType> types = new ArrayList<>();
     for (final CtType<?> top : unit.getDeclaredTypes()) {
       if (!ElementIds.isElementType(top)) {
@@ -48,7 +48,9 @@ final class UnitExtraction {
       }
       final String declaredPackage = ElementIds.packageName(top);
       packages.computeIfAbsent(declaredPackage, UnitExtraction::packageElement);
-      types.add(walk(top, index.scope(declaredPackage, onDemand, singleTypeImports)));
+      final SimpleNameIndex.Scope scope =
+          scopes.computeIfAbsent(declaredPackage, own -> index.scopeOf(unit, own));
+      types.add(walk(top, scope));
     }
     return new UnitElements(relativePath, List.copyOf(packages.values()), types);
   }

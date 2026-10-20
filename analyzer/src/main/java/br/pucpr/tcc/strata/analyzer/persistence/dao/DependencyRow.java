@@ -11,7 +11,8 @@ public record DependencyRow(
     DependencyType type,
     ResolutionQuality resolution,
     int occurrences,
-    int weight) {
+    int weight,
+    boolean ambiguous) {
 
   public DependencyRow {
     Objects.requireNonNull(type, "type");

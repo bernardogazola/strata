@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "measuredAt": "2026-10-19T03:53:49Z",
-  "baseCommit": "fb12a9a",
+  "measuredAt": "2026-10-20T03:12:25Z",
+  "baseCommit": "ecec563",
   "measure": "The analysis pipeline, wired by hand: RepositoryValidator, the selected roots in MAIN, GENERATED, TEST order, a fresh cache, one RUNNING analysis, then SpoonModelBuilder.analyze with a CodeElementExtractor over an ElementWriter; every row is read back from code_element, source_file and source_root after end(), and the writes are timed by an ElementSink that wraps the ElementWriter",
   "settings": {
     "spoonVersion": "11.5.0",
@@ -99,7 +99,7 @@
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "write": {
-            "beginMillis": 2,
+            "beginMillis": 8,
             "acceptCalls": 1,
             "flushes": [],
             "bufferingMillis": 0,
@@ -107,16 +107,16 @@
               "batches": 1,
               "rows": 4765,
               "fileElements": 259,
-              "millis": 33
+              "millis": 40
             },
-            "sinkMillis": 36
+            "sinkMillis": 49
           },
           "timing": {
-            "wallMillis": 1658,
-            "preParseMillis": 314,
-            "buildMillis": 1190,
-            "visitMillis": 90,
-            "extractionMillis": 88
+            "wallMillis": 2013,
+            "preParseMillis": 464,
+            "buildMillis": 1348,
+            "visitMillis": 125,
+            "extractionMillis": 117
           },
           "models": {
             "batches": 1,
@@ -124,10 +124,10 @@
             "quarantinedBatches": 0,
             "builds": 1
           },
-          "cacheBytes": 3166208,
+          "cacheBytes": 3182592,
           "heap": {
-            "peakLiveBytes": 117771256,
-            "peakUsedBytes": 241110712
+            "peakLiveBytes": 118172696,
+            "peakUsedBytes": 245216928
           },
           "parseFailures": [],
           "duplicates": []
@@ -196,16 +196,16 @@
               "batches": 2,
               "rows": 11533,
               "fileElements": 527,
-              "millis": 80
+              "millis": 101
             },
-            "sinkMillis": 81
+            "sinkMillis": 103
           },
           "timing": {
-            "wallMillis": 11720,
-            "preParseMillis": 156,
-            "buildMillis": 11285,
-            "visitMillis": 164,
-            "extractionMillis": 163
+            "wallMillis": 12390,
+            "preParseMillis": 192,
+            "buildMillis": 11835,
+            "visitMillis": 221,
+            "extractionMillis": 220
           },
           "models": {
             "batches": 2,
@@ -213,10 +213,10 @@
             "quarantinedBatches": 0,
             "builds": 2
           },
-          "cacheBytes": 7344128,
+          "cacheBytes": 7360512,
           "heap": {
-            "peakLiveBytes": 250390944,
-            "peakUsedBytes": 577106352
+            "peakLiveBytes": 245058840,
+            "peakUsedBytes": 658722072
           },
           "parseFailures": [],
           "duplicates": []
@@ -298,16 +298,16 @@
               "batches": 1,
               "rows": 4720,
               "fileElements": 260,
-              "millis": 28
+              "millis": 34
             },
-            "sinkMillis": 29
+            "sinkMillis": 35
           },
           "timing": {
-            "wallMillis": 891,
-            "preParseMillis": 196,
-            "buildMillis": 612,
-            "visitMillis": 37,
-            "extractionMillis": 36
+            "wallMillis": 723,
+            "preParseMillis": 142,
+            "buildMillis": 467,
+            "visitMillis": 64,
+            "extractionMillis": 63
           },
           "models": {
             "batches": 1,
@@ -315,10 +315,10 @@
             "quarantinedBatches": 0,
             "builds": 1
           },
-          "cacheBytes": 3133440,
+          "cacheBytes": 3149824,
           "heap": {
-            "peakLiveBytes": 117567640,
-            "peakUsedBytes": 243015608
+            "peakLiveBytes": 118494888,
+            "peakUsedBytes": 242367272
           },
           "parseFailures": [
             {
@@ -403,16 +403,16 @@
               "batches": 2,
               "rows": 11488,
               "fileElements": 528,
-              "millis": 74
+              "millis": 83
             },
-            "sinkMillis": 76
+            "sinkMillis": 85
           },
           "timing": {
-            "wallMillis": 11288,
-            "preParseMillis": 158,
-            "buildMillis": 10881,
-            "visitMillis": 143,
-            "extractionMillis": 142
+            "wallMillis": 11928,
+            "preParseMillis": 163,
+            "buildMillis": 11462,
+            "visitMillis": 187,
+            "extractionMillis": 186
           },
           "models": {
             "batches": 2,
@@ -420,10 +420,10 @@
             "quarantinedBatches": 0,
             "builds": 2
           },
-          "cacheBytes": 7303168,
+          "cacheBytes": 7319552,
           "heap": {
-            "peakLiveBytes": 254334808,
-            "peakUsedBytes": 609146864
+            "peakLiveBytes": 246784312,
+            "peakUsedBytes": 556000160
           },
           "parseFailures": [
             {
@@ -466,38 +466,38 @@
           "outcome": "COMPLETED",
           "files": {
             "total": 914,
-            "analyzed": 913,
+            "analyzed": 914,
             "tooLarge": 0,
-            "parseFailed": 1,
+            "parseFailed": 0,
             "parseFailedByCause": {
               "SYNTAX_ERROR": 0,
               "NESTING_TOO_DEEP": 0,
               "PRE_PARSE_CRASH": 0,
               "MODEL_BUILD_CRASH": 0,
               "DROPPED_BY_SPOON": 0,
-              "EXTRACTION_CRASH": 1,
+              "EXTRACTION_CRASH": 0,
               "UNREADABLE": 0
             }
           },
           "rows": {
             "packages": 76,
-            "types": 1109,
-            "methods": 6458,
+            "types": 1110,
+            "methods": 6461,
             "files": 914,
             "sourceFiles": 914,
             "sourceRoots": 25,
             "sourceFileStatuses": {
-              "ANALYZED": 913,
+              "ANALYZED": 914,
               "SKIPPED_TOO_LARGE": 0,
-              "PARSE_FAILED": 1
+              "PARSE_FAILED": 0
             }
           },
           "checks": {
             "foreignKeyViolations": 0,
             "fileRowsJoined": 914,
             "distinctSourceFilesJoined": 914,
-            "typesAccepted": 1109,
-            "distinctTypeIdsAccepted": 1109
+            "typesAccepted": 1110,
+            "distinctTypeIdsAccepted": 1110
           },
           "extractionIssues": {
             "SOURCE_PARSE_FAILED": 0,
@@ -506,7 +506,7 @@
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "analysisIssues": {
-            "SOURCE_PARSE_FAILED": 1,
+            "SOURCE_PARSE_FAILED": 0,
             "SOURCE_FILE_TOO_LARGE": 0,
             "SOURCE_DUPLICATE_ELEMENT": 0,
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
@@ -518,18 +518,18 @@
             "bufferingMillis": 0,
             "end": {
               "batches": 39,
-              "rows": 7643,
+              "rows": 7647,
               "fileElements": 914,
-              "millis": 58
+              "millis": 69
             },
-            "sinkMillis": 60
+            "sinkMillis": 71
           },
           "timing": {
-            "wallMillis": 1995,
-            "preParseMillis": 203,
-            "buildMillis": 1615,
-            "visitMillis": 82,
-            "extractionMillis": 80
+            "wallMillis": 2130,
+            "preParseMillis": 229,
+            "buildMillis": 1674,
+            "visitMillis": 119,
+            "extractionMillis": 117
           },
           "models": {
             "batches": 39,
@@ -537,18 +537,12 @@
             "quarantinedBatches": 0,
             "builds": 39
           },
-          "cacheBytes": 6262784,
+          "cacheBytes": 6275072,
           "heap": {
-            "peakLiveBytes": 132584624,
-            "peakUsedBytes": 315036848
+            "peakLiveBytes": 135113264,
+            "peakUsedBytes": 396497992
           },
-          "parseFailures": [
-            {
-              "path": "junit-platform-console/src/main/java/org/junit/platform/console/output/Style.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            }
-          ],
+          "parseFailures": [],
           "duplicates": [
             {
               "filePath": "platform-tooling-support-tests/projects/jupiter-starter/src/main/java/com/example/project/Calculator.java",
@@ -566,38 +560,38 @@
           "outcome": "COMPLETED",
           "files": {
             "total": 1712,
-            "analyzed": 1711,
+            "analyzed": 1712,
             "tooLarge": 0,
-            "parseFailed": 1,
+            "parseFailed": 0,
             "parseFailedByCause": {
               "SYNTAX_ERROR": 0,
               "NESTING_TOO_DEEP": 0,
               "PRE_PARSE_CRASH": 0,
               "MODEL_BUILD_CRASH": 0,
               "DROPPED_BY_SPOON": 0,
-              "EXTRACTION_CRASH": 1,
+              "EXTRACTION_CRASH": 0,
               "UNREADABLE": 0
             }
           },
           "rows": {
             "packages": 114,
-            "types": 3750,
-            "methods": 17578,
+            "types": 3751,
+            "methods": 17581,
             "files": 1712,
             "sourceFiles": 1712,
             "sourceRoots": 45,
             "sourceFileStatuses": {
-              "ANALYZED": 1711,
+              "ANALYZED": 1712,
               "SKIPPED_TOO_LARGE": 0,
-              "PARSE_FAILED": 1
+              "PARSE_FAILED": 0
             }
           },
           "checks": {
             "foreignKeyViolations": 0,
             "fileRowsJoined": 1712,
             "distinctSourceFilesJoined": 1712,
-            "typesAccepted": 3750,
-            "distinctTypeIdsAccepted": 3750
+            "typesAccepted": 3751,
+            "distinctTypeIdsAccepted": 3751
           },
           "extractionIssues": {
             "SOURCE_PARSE_FAILED": 0,
@@ -606,7 +600,7 @@
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "analysisIssues": {
-            "SOURCE_PARSE_FAILED": 1,
+            "SOURCE_PARSE_FAILED": 0,
             "SOURCE_FILE_TOO_LARGE": 0,
             "SOURCE_DUPLICATE_ELEMENT": 0,
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
@@ -618,18 +612,18 @@
             "bufferingMillis": 0,
             "end": {
               "batches": 59,
-              "rows": 21442,
+              "rows": 21446,
               "fileElements": 1712,
-              "millis": 152
+              "millis": 187
             },
-            "sinkMillis": 156
+            "sinkMillis": 191
           },
           "timing": {
-            "wallMillis": 4103,
-            "preParseMillis": 240,
-            "buildMillis": 3460,
-            "visitMillis": 185,
-            "extractionMillis": 181
+            "wallMillis": 4351,
+            "preParseMillis": 288,
+            "buildMillis": 3527,
+            "visitMillis": 282,
+            "extractionMillis": 278
           },
           "models": {
             "batches": 59,
@@ -637,18 +631,12 @@
             "quarantinedBatches": 0,
             "builds": 59
           },
-          "cacheBytes": 17051648,
+          "cacheBytes": 17100800,
           "heap": {
-            "peakLiveBytes": 209139648,
-            "peakUsedBytes": 469995104
+            "peakLiveBytes": 208098264,
+            "peakUsedBytes": 491175168
           },
-          "parseFailures": [
-            {
-              "path": "junit-platform-console/src/main/java/org/junit/platform/console/output/Style.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            }
-          ],
+          "parseFailures": [],
           "duplicates": [
             {
               "filePath": "platform-tooling-support-tests/projects/jupiter-starter/src/main/java/com/example/project/Calculator.java",
@@ -690,38 +678,38 @@
           "outcome": "COMPLETED",
           "files": {
             "total": 5459,
-            "analyzed": 5458,
+            "analyzed": 5459,
             "tooLarge": 0,
-            "parseFailed": 1,
+            "parseFailed": 0,
             "parseFailedByCause": {
               "SYNTAX_ERROR": 0,
               "NESTING_TOO_DEEP": 0,
               "PRE_PARSE_CRASH": 0,
               "MODEL_BUILD_CRASH": 0,
               "DROPPED_BY_SPOON": 0,
-              "EXTRACTION_CRASH": 1,
+              "EXTRACTION_CRASH": 0,
               "UNREADABLE": 0
             }
           },
           "rows": {
             "packages": 571,
-            "types": 6916,
-            "methods": 49347,
+            "types": 6923,
+            "methods": 49380,
             "files": 5459,
             "sourceFiles": 5459,
             "sourceRoots": 30,
             "sourceFileStatuses": {
-              "ANALYZED": 5458,
+              "ANALYZED": 5459,
               "SKIPPED_TOO_LARGE": 0,
-              "PARSE_FAILED": 1
+              "PARSE_FAILED": 0
             }
           },
           "checks": {
             "foreignKeyViolations": 0,
             "fileRowsJoined": 5459,
             "distinctSourceFilesJoined": 5459,
-            "typesAccepted": 6916,
-            "distinctTypeIdsAccepted": 6916
+            "typesAccepted": 6923,
+            "distinctTypeIdsAccepted": 6923
           },
           "extractionIssues": {
             "SOURCE_PARSE_FAILED": 0,
@@ -730,36 +718,36 @@
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "analysisIssues": {
-            "SOURCE_PARSE_FAILED": 1,
+            "SOURCE_PARSE_FAILED": 0,
             "SOURCE_FILE_TOO_LARGE": 0,
             "SOURCE_DUPLICATE_ELEMENT": 0,
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "write": {
-            "beginMillis": 10,
+            "beginMillis": 11,
             "acceptCalls": 30,
             "flushes": [
               {
                 "batches": 24,
                 "rows": 35997,
-                "millis": 229
+                "millis": 255
               }
             ],
             "bufferingMillis": 0,
             "end": {
               "batches": 6,
-              "rows": 20837,
+              "rows": 20877,
               "fileElements": 5459,
-              "millis": 206
+              "millis": 218
             },
-            "sinkMillis": 446
+            "sinkMillis": 485
           },
           "timing": {
-            "wallMillis": 7703,
-            "preParseMillis": 937,
-            "buildMillis": 5627,
-            "visitMillis": 748,
-            "extractionMillis": 509
+            "wallMillis": 8181,
+            "preParseMillis": 1118,
+            "buildMillis": 5666,
+            "visitMillis": 970,
+            "extractionMillis": 704
           },
           "models": {
             "batches": 30,
@@ -767,18 +755,12 @@
             "quarantinedBatches": 0,
             "builds": 30
           },
-          "cacheBytes": 45240320,
+          "cacheBytes": 45281280,
           "heap": {
-            "peakLiveBytes": 336492528,
-            "peakUsedBytes": 557355696
+            "peakLiveBytes": 327341672,
+            "peakUsedBytes": 558686888
           },
-          "parseFailures": [
-            {
-              "path": "spring-web/src/main/java/org/springframework/web/service/registry/AbstractHttpServiceRegistrar.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            }
-          ],
+          "parseFailures": [],
           "duplicates": []
         },
         {
@@ -791,38 +773,38 @@
           "outcome": "COMPLETED",
           "files": {
             "total": 9202,
-            "analyzed": 9201,
+            "analyzed": 9202,
             "tooLarge": 0,
-            "parseFailed": 1,
+            "parseFailed": 0,
             "parseFailedByCause": {
               "SYNTAX_ERROR": 0,
               "NESTING_TOO_DEEP": 0,
               "PRE_PARSE_CRASH": 0,
               "MODEL_BUILD_CRASH": 0,
               "DROPPED_BY_SPOON": 0,
-              "EXTRACTION_CRASH": 1,
+              "EXTRACTION_CRASH": 0,
               "UNREADABLE": 0
             }
           },
           "rows": {
             "packages": 817,
-            "types": 18461,
-            "methods": 103831,
+            "types": 18468,
+            "methods": 103864,
             "files": 9202,
             "sourceFiles": 9202,
             "sourceRoots": 60,
             "sourceFileStatuses": {
-              "ANALYZED": 9201,
+              "ANALYZED": 9202,
               "SKIPPED_TOO_LARGE": 0,
-              "PARSE_FAILED": 1
+              "PARSE_FAILED": 0
             }
           },
           "checks": {
             "foreignKeyViolations": 0,
             "fileRowsJoined": 9202,
             "distinctSourceFilesJoined": 9202,
-            "typesAccepted": 18461,
-            "distinctTypeIdsAccepted": 18461
+            "typesAccepted": 18468,
+            "distinctTypeIdsAccepted": 18468
           },
           "extractionIssues": {
             "SOURCE_PARSE_FAILED": 0,
@@ -831,29 +813,29 @@
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "analysisIssues": {
-            "SOURCE_PARSE_FAILED": 1,
+            "SOURCE_PARSE_FAILED": 0,
             "SOURCE_FILE_TOO_LARGE": 0,
             "SOURCE_DUPLICATE_ELEMENT": 0,
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "write": {
-            "beginMillis": 16,
+            "beginMillis": 17,
             "acceptCalls": 60,
             "flushes": [
               {
                 "batches": 24,
                 "rows": 35997,
-                "millis": 225
+                "millis": 264
               },
               {
                 "batches": 17,
-                "rows": 39575,
-                "millis": 289
+                "rows": 39615,
+                "millis": 320
               },
               {
                 "batches": 15,
                 "rows": 36460,
-                "millis": 306
+                "millis": 328
               }
             ],
             "bufferingMillis": 0,
@@ -863,14 +845,14 @@
               "fileElements": 9202,
               "millis": 227
             },
-            "sinkMillis": 1066
+            "sinkMillis": 1159
           },
           "timing": {
-            "wallMillis": 17127,
-            "preParseMillis": 1294,
-            "buildMillis": 13181,
-            "visitMillis": 1936,
-            "extractionMillis": 1098
+            "wallMillis": 17595,
+            "preParseMillis": 1433,
+            "buildMillis": 13071,
+            "visitMillis": 2495,
+            "extractionMillis": 1564
           },
           "models": {
             "batches": 60,
@@ -878,18 +860,12 @@
             "quarantinedBatches": 0,
             "builds": 60
           },
-          "cacheBytes": 98508800,
+          "cacheBytes": 98512896,
           "heap": {
-            "peakLiveBytes": 311794024,
-            "peakUsedBytes": 597674776
+            "peakLiveBytes": 379126632,
+            "peakUsedBytes": 717844632
           },
-          "parseFailures": [
-            {
-              "path": "spring-web/src/main/java/org/springframework/web/service/registry/AbstractHttpServiceRegistrar.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            }
-          ],
+          "parseFailures": [],
           "duplicates": [
             {
               "filePath": "spring-context/src/test/java/org/springframework/aop/aspectj/AspectJExpressionPointcutAdvisorTests.java",
@@ -943,96 +919,96 @@
           "outcome": "COMPLETED",
           "files": {
             "total": 16848,
-            "analyzed": 16795,
+            "analyzed": 16847,
             "tooLarge": 0,
-            "parseFailed": 53,
+            "parseFailed": 1,
             "parseFailedByCause": {
               "SYNTAX_ERROR": 0,
               "NESTING_TOO_DEEP": 0,
               "PRE_PARSE_CRASH": 0,
               "MODEL_BUILD_CRASH": 1,
               "DROPPED_BY_SPOON": 0,
-              "EXTRACTION_CRASH": 52,
+              "EXTRACTION_CRASH": 0,
               "UNREADABLE": 0
             }
           },
           "rows": {
-            "packages": 2006,
-            "types": 26748,
-            "methods": 200936,
+            "packages": 2007,
+            "types": 26883,
+            "methods": 202690,
             "files": 16848,
             "sourceFiles": 16848,
             "sourceRoots": 292,
             "sourceFileStatuses": {
-              "ANALYZED": 16795,
+              "ANALYZED": 16847,
               "SKIPPED_TOO_LARGE": 0,
-              "PARSE_FAILED": 53
+              "PARSE_FAILED": 1
             }
           },
           "checks": {
             "foreignKeyViolations": 0,
             "fileRowsJoined": 16848,
             "distinctSourceFilesJoined": 16848,
-            "typesAccepted": 26748,
-            "distinctTypeIdsAccepted": 26748
+            "typesAccepted": 26883,
+            "distinctTypeIdsAccepted": 26883
           },
           "extractionIssues": {
             "SOURCE_PARSE_FAILED": 0,
             "SOURCE_FILE_TOO_LARGE": 0,
-            "SOURCE_DUPLICATE_ELEMENT": 1,
+            "SOURCE_DUPLICATE_ELEMENT": 2,
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "analysisIssues": {
-            "SOURCE_PARSE_FAILED": 53,
+            "SOURCE_PARSE_FAILED": 1,
             "SOURCE_FILE_TOO_LARGE": 0,
             "SOURCE_DUPLICATE_ELEMENT": 0,
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "write": {
-            "beginMillis": 34,
+            "beginMillis": 41,
             "acceptCalls": 410,
             "flushes": [
               {
                 "batches": 195,
-                "rows": 58545,
-                "millis": 406
+                "rows": 58940,
+                "millis": 422
               },
               {
                 "batches": 2,
-                "rows": 44311,
-                "millis": 320
+                "rows": 44727,
+                "millis": 343
               },
               {
                 "batches": 46,
-                "rows": 34713,
-                "millis": 272
+                "rows": 35137,
+                "millis": 302
               },
               {
                 "batches": 55,
-                "rows": 42289,
-                "millis": 333
+                "rows": 42453,
+                "millis": 347
               },
               {
-                "batches": 72,
-                "rows": 33868,
-                "millis": 276
+                "batches": 70,
+                "rows": 33030,
+                "millis": 304
               }
             ],
-            "bufferingMillis": 0,
+            "bufferingMillis": 1,
             "end": {
-              "batches": 40,
-              "rows": 15964,
+              "batches": 42,
+              "rows": 17293,
               "fileElements": 16848,
-              "millis": 336
+              "millis": 377
             },
-            "sinkMillis": 1980
+            "sinkMillis": 2141
           },
           "timing": {
-            "wallMillis": 57219,
-            "preParseMillis": 3379,
-            "buildMillis": 47833,
-            "visitMillis": 4104,
-            "extractionMillis": 2461
+            "wallMillis": 62285,
+            "preParseMillis": 4362,
+            "buildMillis": 50360,
+            "visitMillis": 5234,
+            "extractionMillis": 3471
           },
           "models": {
             "batches": 410,
@@ -1040,282 +1016,26 @@
             "quarantinedBatches": 1,
             "builds": 444
           },
-          "cacheBytes": 188628992,
+          "cacheBytes": 190111744,
           "heap": {
-            "peakLiveBytes": 812628928,
-            "peakUsedBytes": 1248836544
+            "peakLiveBytes": 841578576,
+            "peakUsedBytes": 1308302000
           },
           "parseFailures": [
-            {
-              "path": "build-tools-internal/src/main/java/org/elasticsearch/gradle/internal/RestrictedBuildApiService.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "build-tools-internal/src/main/java/org/elasticsearch/gradle/internal/precommit/CheckForbiddenApisTask.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "build-tools-internal/src/main/java/org/elasticsearch/gradle/internal/precommit/FilePermissionsPrecommitPlugin.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "build-tools-internal/src/main/java/org/elasticsearch/gradle/internal/precommit/ForbiddenPatternsPrecommitPlugin.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "build-tools/src/main/java/org/elasticsearch/gradle/plugin/BasePluginBuildPlugin.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "libs/gpu-codec/src/main/java/org/elasticsearch/gpu/codec/ES92GpuHnswVectorsFormat.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "libs/ssl-config/src/main/java/org/elasticsearch/common/ssl/SslConfigurationKeys.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "modules/reindex/src/main/java/org/elasticsearch/reindex/remote/RemoteResponseParsers.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/action/admin/cluster/snapshots/get/PreflightFilterResult.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/cluster/metadata/ComposableIndexTemplate.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/cluster/metadata/IndexMetadata.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/cluster/routing/allocation/ExistingShardsAllocator.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/index/codec/vectors/diskbbq/ES920DiskBBQVectorsFormat.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/index/engine/Engine.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/index/mapper/TimeSeriesRoutingHashFieldMapper.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/index/seqno/SequenceNumbers.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/indices/cluster/IndexRemovalReason.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/rest/RestResponse.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/rest/RestStatus.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/search/vectors/KnnVectorQueryBuilder.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/transport/RemoteClusterPortSettings.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "test/framework/src/main/java/org/elasticsearch/test/ESTestCase.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/analytics/src/main/java/org/elasticsearch/xpack/analytics/multiterms/MultiTermsAggregationBuilder.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/blob-cache/src/main/java/org/elasticsearch/blobcache/BlobCacheMetrics.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/core/src/main/java/org/elasticsearch/xpack/core/ClientHelper.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/core/src/main/java/org/elasticsearch/xpack/core/security/authc/RealmConfig.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/core/src/main/java/org/elasticsearch/xpack/core/watcher/transform/chain/ChainTransform.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/ent-search/src/main/java/org/elasticsearch/xpack/application/analytics/event/parser/field/DocumentAnalyticsEventField.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/ent-search/src/main/java/org/elasticsearch/xpack/application/analytics/event/parser/field/PageAnalyticsEventField.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/ent-search/src/main/java/org/elasticsearch/xpack/application/analytics/event/parser/field/PaginationAnalyticsEventField.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/eql/src/main/java/org/elasticsearch/xpack/eql/execution/assembler/SampleQueryRequest.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/esql/qa/server/src/main/java/org/elasticsearch/xpack/esql/datasources/FixtureUtils.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/esql/qa/server/src/main/java/org/elasticsearch/xpack/esql/datasources/S3FixtureUtils.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/core/type/DataType.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/core/util/SpatialCoordinateTypes.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/main/java/org/elasticsearch/xpack/inference/InferencePlugin.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/main/java/org/elasticsearch/xpack/inference/rest/Paths.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/main/java/org/elasticsearch/xpack/inference/services/ServiceFields.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/main/java/org/elasticsearch/xpack/inference/services/amazonbedrock/AmazonBedrockConstants.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/main/java/org/elasticsearch/xpack/inference/services/azureaistudio/AzureAiStudioConstants.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/main/java/org/elasticsearch/xpack/inference/services/cohere/CohereService.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/main/java/org/elasticsearch/xpack/inference/services/mistral/MistralConstants.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/ml/src/main/java/org/elasticsearch/xpack/ml/MachineLearning.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/ml/src/main/java/org/elasticsearch/xpack/ml/dataframe/DestinationIndex.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/monitoring/src/main/java/org/elasticsearch/xpack/monitoring/exporter/ClusterAlertsUtil.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/searchable-snapshots/src/main/java/org/elasticsearch/xpack/searchablesnapshots/SearchableSnapshots.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/security/src/main/java/org/elasticsearch/xpack/security/Security.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/security/src/main/java/org/elasticsearch/xpack/security/audit/logfile/LoggingAuditTrail.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
             {
               "path": "x-pack/plugin/snapshot-repo-test-kit/src/main/java/org/elasticsearch/repositories/blobstore/testkit/analyze/ContendedRegisterAnalyzeAction.java",
               "rootKind": "MAIN",
               "cause": "MODEL_BUILD_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/sql/qa/jdbc/src/main/java/org/elasticsearch/xpack/sql/qa/jdbc/JdbcTestUtils.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/sql/sql-action/src/main/java/org/elasticsearch/xpack/sql/action/Protocol.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/stateless/src/main/java/org/elasticsearch/xpack/stateless/StatelessPlugin.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/watcher/src/main/java/org/elasticsearch/xpack/watcher/input/chain/ChainInput.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
             }
           ],
           "duplicates": [
             {
               "filePath": "x-pack/plugin/sql/qa/server/src/main/java/org/elasticsearch/xpack/sql/qa/jdbc/JdbcIntegrationTestCase.java",
               "firstFilePath": "x-pack/plugin/sql/qa/jdbc/src/main/java/org/elasticsearch/xpack/sql/qa/jdbc/JdbcIntegrationTestCase.java"
+            },
+            {
+              "filePath": "x-pack/plugin/sql/qa/server/src/main/java/org/elasticsearch/xpack/sql/qa/jdbc/JdbcTestUtils.java",
+              "firstFilePath": "x-pack/plugin/sql/qa/jdbc/src/main/java/org/elasticsearch/xpack/sql/qa/jdbc/JdbcTestUtils.java"
             }
           ]
         },
@@ -1329,99 +1049,99 @@
           "outcome": "COMPLETED",
           "files": {
             "total": 26782,
-            "analyzed": 26724,
+            "analyzed": 26779,
             "tooLarge": 0,
-            "parseFailed": 58,
+            "parseFailed": 3,
             "parseFailedByCause": {
               "SYNTAX_ERROR": 0,
               "NESTING_TOO_DEEP": 0,
               "PRE_PARSE_CRASH": 0,
               "MODEL_BUILD_CRASH": 3,
               "DROPPED_BY_SPOON": 0,
-              "EXTRACTION_CRASH": 55,
+              "EXTRACTION_CRASH": 0,
               "UNREADABLE": 0
             }
           },
           "rows": {
             "packages": 2129,
-            "types": 39224,
-            "methods": 326214,
+            "types": 39364,
+            "methods": 328022,
             "files": 26782,
             "sourceFiles": 26782,
             "sourceRoots": 527,
             "sourceFileStatuses": {
-              "ANALYZED": 26724,
+              "ANALYZED": 26779,
               "SKIPPED_TOO_LARGE": 0,
-              "PARSE_FAILED": 58
+              "PARSE_FAILED": 3
             }
           },
           "checks": {
             "foreignKeyViolations": 0,
             "fileRowsJoined": 26782,
             "distinctSourceFilesJoined": 26782,
-            "typesAccepted": 39224,
-            "distinctTypeIdsAccepted": 39224
+            "typesAccepted": 39364,
+            "distinctTypeIdsAccepted": 39364
           },
           "extractionIssues": {
             "SOURCE_PARSE_FAILED": 0,
             "SOURCE_FILE_TOO_LARGE": 0,
-            "SOURCE_DUPLICATE_ELEMENT": 5,
+            "SOURCE_DUPLICATE_ELEMENT": 6,
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "analysisIssues": {
-            "SOURCE_PARSE_FAILED": 58,
+            "SOURCE_PARSE_FAILED": 3,
             "SOURCE_FILE_TOO_LARGE": 0,
             "SOURCE_DUPLICATE_ELEMENT": 0,
             "SOURCE_ELEMENT_ID_TOO_LONG": 0
           },
           "write": {
-            "beginMillis": 57,
+            "beginMillis": 64,
             "acceptCalls": 647,
             "flushes": [
               {
                 "batches": 195,
-                "rows": 58545,
-                "millis": 392
+                "rows": 58940,
+                "millis": 430
               },
               {
                 "batches": 2,
-                "rows": 44311,
-                "millis": 317
+                "rows": 44727,
+                "millis": 348
               },
               {
                 "batches": 46,
-                "rows": 34713,
-                "millis": 283
+                "rows": 35137,
+                "millis": 311
               },
               {
                 "batches": 55,
-                "rows": 42289,
-                "millis": 337
+                "rows": 42453,
+                "millis": 358
               },
               {
-                "batches": 72,
-                "rows": 33868,
-                "millis": 275
+                "batches": 70,
+                "rows": 33030,
+                "millis": 312
               },
               {
-                "batches": 143,
-                "rows": 49072,
-                "millis": 427
+                "batches": 139,
+                "rows": 33144,
+                "millis": 316
               },
               {
-                "batches": 27,
-                "rows": 36431,
-                "millis": 356
-              },
-              {
-                "batches": 36,
-                "rows": 33770,
-                "millis": 319
+                "batches": 7,
+                "rows": 37201,
+                "millis": 384
               },
               {
                 "batches": 62,
-                "rows": 33729,
-                "millis": 344
+                "rows": 50252,
+                "millis": 513
+              },
+              {
+                "batches": 62,
+                "rows": 33792,
+                "millis": 366
               }
             ],
             "bufferingMillis": 0,
@@ -1429,16 +1149,16 @@
               "batches": 9,
               "rows": 839,
               "fileElements": 26782,
-              "millis": 352
+              "millis": 385
             },
-            "sinkMillis": 3463
+            "sinkMillis": 3792
           },
           "timing": {
-            "wallMillis": 138114,
-            "preParseMillis": 4892,
-            "buildMillis": 122048,
-            "visitMillis": 7964,
-            "extractionMillis": 4854
+            "wallMillis": 148230,
+            "preParseMillis": 7257,
+            "buildMillis": 127051,
+            "visitMillis": 9780,
+            "extractionMillis": 6373
           },
           "models": {
             "batches": 647,
@@ -1446,276 +1166,16 @@
             "quarantinedBatches": 1,
             "builds": 713
           },
-          "cacheBytes": 305917952,
+          "cacheBytes": 307249152,
           "heap": {
-            "peakLiveBytes": 934093624,
-            "peakUsedBytes": 1384970176
+            "peakLiveBytes": 1170136192,
+            "peakUsedBytes": 1745156640
           },
           "parseFailures": [
-            {
-              "path": "build-tools-internal/src/main/java/org/elasticsearch/gradle/internal/RestrictedBuildApiService.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "build-tools-internal/src/main/java/org/elasticsearch/gradle/internal/precommit/CheckForbiddenApisTask.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "build-tools-internal/src/main/java/org/elasticsearch/gradle/internal/precommit/FilePermissionsPrecommitPlugin.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "build-tools-internal/src/main/java/org/elasticsearch/gradle/internal/precommit/ForbiddenPatternsPrecommitPlugin.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "build-tools/src/main/java/org/elasticsearch/gradle/plugin/BasePluginBuildPlugin.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "libs/gpu-codec/src/main/java/org/elasticsearch/gpu/codec/ES92GpuHnswVectorsFormat.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "libs/ssl-config/src/main/java/org/elasticsearch/common/ssl/SslConfigurationKeys.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "modules/reindex/src/main/java/org/elasticsearch/reindex/remote/RemoteResponseParsers.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/action/admin/cluster/snapshots/get/PreflightFilterResult.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/cluster/metadata/ComposableIndexTemplate.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/cluster/metadata/IndexMetadata.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/cluster/routing/allocation/ExistingShardsAllocator.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/index/codec/vectors/diskbbq/ES920DiskBBQVectorsFormat.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/index/engine/Engine.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/index/mapper/TimeSeriesRoutingHashFieldMapper.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/index/seqno/SequenceNumbers.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/indices/cluster/IndexRemovalReason.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/rest/RestResponse.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/rest/RestStatus.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/search/vectors/KnnVectorQueryBuilder.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "server/src/main/java/org/elasticsearch/transport/RemoteClusterPortSettings.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "test/framework/src/main/java/org/elasticsearch/test/ESTestCase.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/analytics/src/main/java/org/elasticsearch/xpack/analytics/multiterms/MultiTermsAggregationBuilder.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/blob-cache/src/main/java/org/elasticsearch/blobcache/BlobCacheMetrics.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/core/src/main/java/org/elasticsearch/xpack/core/ClientHelper.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/core/src/main/java/org/elasticsearch/xpack/core/security/authc/RealmConfig.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/core/src/main/java/org/elasticsearch/xpack/core/watcher/transform/chain/ChainTransform.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/ent-search/src/main/java/org/elasticsearch/xpack/application/analytics/event/parser/field/DocumentAnalyticsEventField.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/ent-search/src/main/java/org/elasticsearch/xpack/application/analytics/event/parser/field/PageAnalyticsEventField.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/ent-search/src/main/java/org/elasticsearch/xpack/application/analytics/event/parser/field/PaginationAnalyticsEventField.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/eql/src/main/java/org/elasticsearch/xpack/eql/execution/assembler/SampleQueryRequest.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/esql/qa/server/src/main/java/org/elasticsearch/xpack/esql/datasources/FixtureUtils.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/esql/qa/server/src/main/java/org/elasticsearch/xpack/esql/datasources/S3FixtureUtils.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/core/type/DataType.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/core/util/SpatialCoordinateTypes.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/main/java/org/elasticsearch/xpack/inference/InferencePlugin.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/main/java/org/elasticsearch/xpack/inference/rest/Paths.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/main/java/org/elasticsearch/xpack/inference/services/ServiceFields.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/main/java/org/elasticsearch/xpack/inference/services/amazonbedrock/AmazonBedrockConstants.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/main/java/org/elasticsearch/xpack/inference/services/azureaistudio/AzureAiStudioConstants.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/main/java/org/elasticsearch/xpack/inference/services/cohere/CohereService.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/main/java/org/elasticsearch/xpack/inference/services/mistral/MistralConstants.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/ml/src/main/java/org/elasticsearch/xpack/ml/MachineLearning.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/ml/src/main/java/org/elasticsearch/xpack/ml/dataframe/DestinationIndex.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/monitoring/src/main/java/org/elasticsearch/xpack/monitoring/exporter/ClusterAlertsUtil.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/searchable-snapshots/src/main/java/org/elasticsearch/xpack/searchablesnapshots/SearchableSnapshots.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/security/src/main/java/org/elasticsearch/xpack/security/Security.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/security/src/main/java/org/elasticsearch/xpack/security/audit/logfile/LoggingAuditTrail.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
             {
               "path": "x-pack/plugin/snapshot-repo-test-kit/src/main/java/org/elasticsearch/repositories/blobstore/testkit/analyze/ContendedRegisterAnalyzeAction.java",
               "rootKind": "MAIN",
               "cause": "MODEL_BUILD_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/sql/qa/jdbc/src/main/java/org/elasticsearch/xpack/sql/qa/jdbc/JdbcTestUtils.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/sql/sql-action/src/main/java/org/elasticsearch/xpack/sql/action/Protocol.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/stateless/src/main/java/org/elasticsearch/xpack/stateless/StatelessPlugin.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/watcher/src/main/java/org/elasticsearch/xpack/watcher/input/chain/ChainInput.java",
-              "rootKind": "MAIN",
-              "cause": "EXTRACTION_CRASH"
             },
             {
               "path": "libs/core/src/test/java/org/elasticsearch/core/internal/provider/EmbeddedImplClassLoaderTests.java",
@@ -1726,27 +1186,16 @@
               "path": "server/src/test/java/org/elasticsearch/index/analysis/CustomNormalizerTests.java",
               "rootKind": "TEST",
               "cause": "MODEL_BUILD_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/test/java/org/elasticsearch/xpack/inference/Utils.java",
-              "rootKind": "TEST",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/test/java/org/elasticsearch/xpack/inference/services/azureopenai/AzureOpenAiServiceSettingsTests.java",
-              "rootKind": "TEST",
-              "cause": "EXTRACTION_CRASH"
-            },
-            {
-              "path": "x-pack/plugin/inference/src/test/java/org/elasticsearch/xpack/inference/services/contextualai/ContextualAiRerankTestFixtures.java",
-              "rootKind": "TEST",
-              "cause": "EXTRACTION_CRASH"
             }
           ],
           "duplicates": [
             {
               "filePath": "x-pack/plugin/sql/qa/server/src/main/java/org/elasticsearch/xpack/sql/qa/jdbc/JdbcIntegrationTestCase.java",
               "firstFilePath": "x-pack/plugin/sql/qa/jdbc/src/main/java/org/elasticsearch/xpack/sql/qa/jdbc/JdbcIntegrationTestCase.java"
+            },
+            {
+              "filePath": "x-pack/plugin/sql/qa/server/src/main/java/org/elasticsearch/xpack/sql/qa/jdbc/JdbcTestUtils.java",
+              "firstFilePath": "x-pack/plugin/sql/qa/jdbc/src/main/java/org/elasticsearch/xpack/sql/qa/jdbc/JdbcTestUtils.java"
             },
             {
               "filePath": "server/src/test/java/org/elasticsearch/common/logging/LoggersTests.java",

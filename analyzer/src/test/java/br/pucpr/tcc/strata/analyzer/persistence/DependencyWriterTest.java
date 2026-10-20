@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import br.pucpr.tcc.strata.analyzer.analysis.HistoryScope;
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
+import br.pucpr.tcc.strata.analyzer.persistence.DependencyDraft.EvidenceDraft;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.AnalysisDao;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.DaoTestDatabase;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.ElementDao;
@@ -42,6 +43,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.stream.IntStream;
@@ -110,6 +112,7 @@ final class DependencyWriterTest {
   private static final CodeElementId LISTA = id("type:java.util.List");
   private static final CodeElementId ENTRADA = id("type:java.util.Map$Entry");
   private static final CodeElementId FOO = id("type:Foo");
+  private static final CodeElementId CONFIG = id("type:Config");
 
   @TempDir private Path temp;
 
@@ -174,6 +177,11 @@ final class DependencyWriterTest {
         origem == null ? null : origem.id(), null, linha, ResolutionQuality.RESOLVED);
   }
 
+  private static DependencyEvidence chamada(
+      MethodElement origem, CodeElementId chamado, int linha, ResolutionQuality qualidade) {
+    return new DependencyEvidence(origem.id(), chamado, linha, qualidade);
+  }
+
   private static ExtractedDependency linha(
       TypeElement origem,
       CodeElementId alvo,
@@ -189,6 +197,7 @@ final class DependencyWriterTest {
         new Dependency(origem.id(), alvo, tipo, qualidade, ocorrencias),
         origem.filePath(),
         declarado,
+        false,
         evidencia);
   }
 
@@ -332,6 +341,7 @@ final class DependencyWriterTest {
                 TIPO_A.id(), TIPO_B.id(), DependencyType.FIELD_TYPE, ResolutionQuality.INFERRED, 1),
             A,
             true,
+            false,
             List.of(ocorrencia(RUN, 12)));
 
     writer.accept(lote(elementos(TIPO_A, RUN), paraFrente));
@@ -460,6 +470,7 @@ final class DependencyWriterTest {
             new Dependency(TIPO_A.id(), LISTA, DependencyType.CALLS, ResolutionQuality.RESOLVED, 3),
             A,
             false,
+            false,
             List.of(ocorrencia(RUN, 7), ocorrencia(semLinha, 9), ocorrencia(null, 0)));
 
     writer.accept(lote(elementos(TIPO_A, RUN), chamada));
@@ -482,6 +493,7 @@ final class DependencyWriterTest {
             new Dependency(TIPO_A.id(), LISTA, DependencyType.CALLS, ResolutionQuality.RESOLVED, 1),
             A,
             false,
+            false,
             List.of(ocorrencia(ausente, 7)));
 
     assertThatThrownBy(() -> writer.accept(lote(elementos(TIPO_A, RUN), chamada)))
@@ -490,6 +502,109 @@ final class DependencyWriterTest {
 
     assertThat(contar("code_element")).isEqualTo("0");
     assertThat(contar("dependency")).isEqualTo("0");
+  }
+
+  @Test
+  void umMetodoChamadoDoLoteGanhaAChaveDaMesmaDescargaMesmoComOutroDono() throws Exception {
+    final long analise = novaAnalise("an_01");
+    final ElementWriter writer = gravador(analise, 1);
+    final MethodElement far = metodo(TIPO_B, "far");
+    final BatchElements doisTipos =
+        new BatchElements(
+            List.of(
+                new PackageElement(TIPO_A.packageId(), "a", "a"),
+                new PackageElement(TIPO_B.packageId(), "b", "b")),
+            List.of(TIPO_A, TIPO_B),
+            List.of(RUN, far));
+    final ExtractedDependency chamadas =
+        new ExtractedDependency(
+            new Dependency(
+                TIPO_A.id(), TIPO_A.id(), DependencyType.CALLS, ResolutionQuality.RESOLVED, 2),
+            A,
+            true,
+            false,
+            List.of(
+                chamada(RUN, far.id(), 7, ResolutionQuality.RESOLVED),
+                chamada(RUN, RUN.id(), 8, ResolutionQuality.RESOLVED)));
+
+    writer.accept(lote(doisTipos, chamadas));
+
+    final long run = pkDe(RUN.id());
+    assertThat(evidenciasDe(analise))
+        .containsExactly(
+            new EvidenceRow(1, run, pkDe(far.id()), ARQUIVO_A, 7, ResolutionQuality.RESOLVED),
+            new EvidenceRow(1, run, run, ARQUIVO_A, 8, ResolutionQuality.RESOLVED));
+    assertThat(writer.unnumberedCallees()).isZero();
+    assertThat(violacoesDeChaveEstrangeira()).isEmpty();
+  }
+
+  @Test
+  void umMetodoChamadoQueADescargaNaoNumerouViraNullEEContado() throws Exception {
+    final long analise = novaAnalise("an_01");
+    final ElementWriter writer = gravador(analise, 1);
+    final CodeElementId perdido = id("method:g.Ghost#lost()");
+    final MethodElement semLinha =
+        metodo(TIPO_A, "l" + "o".repeat(AnalysisConstants.MAX_ELEMENT_ID_BYTES) + "ngo");
+    final ExtractedDependency chamadas =
+        new ExtractedDependency(
+            new Dependency(
+                TIPO_A.id(), TIPO_A.id(), DependencyType.CALLS, ResolutionQuality.RESOLVED, 4),
+            A,
+            true,
+            false,
+            List.of(
+                chamada(RUN, perdido, 7, ResolutionQuality.RESOLVED),
+                chamada(RUN, RUN.id(), 8, ResolutionQuality.RESOLVED),
+                ocorrencia(RUN, 9),
+                chamada(RUN, semLinha.id(), 10, ResolutionQuality.RESOLVED)));
+
+    writer.accept(lote(elementos(TIPO_A, RUN), chamadas));
+
+    final long run = pkDe(RUN.id());
+    assertThat(evidenciasDe(analise))
+        .containsExactly(
+            new EvidenceRow(1, run, null, ARQUIVO_A, 7, ResolutionQuality.RESOLVED),
+            new EvidenceRow(1, run, run, ARQUIVO_A, 8, ResolutionQuality.RESOLVED),
+            new EvidenceRow(1, run, null, ARQUIVO_A, 9, ResolutionQuality.RESOLVED),
+            new EvidenceRow(1, run, null, ARQUIVO_A, 10, ResolutionQuality.RESOLVED));
+    assertThat(writer.unnumberedCallees()).isEqualTo(2);
+
+    writer.end(PRE_PARSE, List.of(arquivo(A)));
+
+    assertThat(writer.unnumberedCallees()).isEqualTo(2);
+  }
+
+  @Test
+  void umaLinhaPendenteGuardaAChaveDoMetodoChamadoDaDescargaDela() throws Exception {
+    final long analise = novaAnalise("an_01");
+    final ElementWriter writer = gravador(analise, 1);
+    final MethodElement helper = metodo(TIPO_A, "helper");
+    final ExtractedDependency paraFrente =
+        new ExtractedDependency(
+            new Dependency(
+                TIPO_A.id(), TIPO_B.id(), DependencyType.CALLS, ResolutionQuality.INFERRED, 2),
+            A,
+            true,
+            false,
+            List.of(
+                chamada(RUN, helper.id(), 12, ResolutionQuality.INFERRED),
+                chamada(RUN, id("method:g.Ghost#lost()"), 13, ResolutionQuality.INFERRED)));
+
+    writer.accept(lote(elementos(TIPO_A, RUN, helper), paraFrente));
+
+    assertThat(dependencias()).isEmpty();
+    assertThat(writer.unnumberedCallees()).isZero();
+
+    writer.accept(lote(elementos(TIPO_B)));
+
+    final long run = pkDe(RUN.id());
+    assertThat(dependencias()).containsExactly("type:a.A -> type:b.B CALLS INFERRED x2 w4");
+    assertThat(evidenciasDe(analise))
+        .containsExactly(
+            new EvidenceRow(1, run, pkDe(helper.id()), ARQUIVO_A, 12, ResolutionQuality.INFERRED),
+            new EvidenceRow(1, run, null, ARQUIVO_A, 13, ResolutionQuality.INFERRED));
+    assertThat(writer.unnumberedCallees()).isEqualTo(1);
+    assertThat(violacoesDeChaveEstrangeira()).isEmpty();
   }
 
   @Test
@@ -629,6 +744,85 @@ final class DependencyWriterTest {
                         externa(TIPO_A, LISTA, DependencyType.CALLS, ResolutionQuality.INFERRED))))
         .isInstanceOf(IllegalStateException.class);
     assertThat(contar("code_element")).isEqualTo("0");
+  }
+
+  @Test
+  void umaLinhaAmbiguaEGravadaComAmbiguousUmEUmaComumComZero() throws Exception {
+    final ElementWriter writer = gravador(novaAnalise("an_01"), 1);
+    final ExtractedDependency ambigua =
+        new ExtractedDependency(
+            new Dependency(
+                TIPO_A.id(),
+                CONFIG,
+                DependencyType.FIELD_TYPE,
+                ResolutionQuality.UNRESOLVED_EXTERNAL,
+                1),
+            A,
+            false,
+            true,
+            List.of(new DependencyEvidence(null, null, 5, ResolutionQuality.UNRESOLVED_EXTERNAL)));
+
+    writer.accept(
+        lote(
+            elementos(TIPO_A),
+            ambigua,
+            externa(TIPO_A, FOO, DependencyType.CALLS, ResolutionQuality.UNRESOLVED_EXTERNAL)));
+
+    assertThat(
+            coluna(
+                "SELECT t.element_id || ' ' || d.resolution || ' ambiguous=' || d.ambiguous"
+                    + " || ' is_external=' || t.is_external FROM dependency AS d"
+                    + " JOIN code_element AS t ON t.id = d.target_pk ORDER BY d.id"))
+        .containsExactly(
+            "type:Config UNRESOLVED_EXTERNAL ambiguous=1 is_external=1",
+            "type:Foo UNRESOLVED_EXTERNAL ambiguous=0 is_external=1");
+  }
+
+  @Test
+  void umaLinhaAmbiguaQueNaoEUnresolvedExternalERecusadaAntesDeQualquerInstrucao()
+      throws Exception {
+    final long analise = novaAnalise("an_01");
+    gravador(analise, 1).accept(lote(elementos(TIPO_A, RUN)));
+    final long origem = pkDe(TIPO_A.id());
+    final DependencyFlush descarga =
+        new DependencyFlush(
+            analise, Map.of(), Map.of(), Map.of(TIPO_A.id(), origem), Map.of(), caminho -> 1);
+    final List<BatchStructure> valida =
+        List.of(
+            lote(
+                new BatchElements(List.of(), List.of(), List.of()),
+                externa(TIPO_A, LISTA, DependencyType.RETURN_TYPE, ResolutionQuality.RESOLVED)));
+    final List<DependencyDraft> ambiguas =
+        List.of(
+            rascunhoAmbiguo(origem, CONFIG, false, ResolutionQuality.RESOLVED),
+            rascunhoAmbiguo(origem, TIPO_B.id(), true, ResolutionQuality.INFERRED));
+
+    for (final DependencyDraft ambigua : ambiguas) {
+      assertThatThrownBy(
+              () -> connections.withWriter(c -> descarga.write(c, List.of(ambigua), valida)))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining(ambigua.target().value())
+          .hasMessageContaining(ambigua.resolution().name());
+    }
+
+    assertThat(contar("dependency")).isEqualTo("0");
+    assertThat(lido("SELECT count(*) FROM code_element WHERE is_external = 1")).isEqualTo("0");
+  }
+
+  private static DependencyDraft rascunhoAmbiguo(
+      long origem, CodeElementId alvo, boolean declarado, ResolutionQuality qualidade) {
+    return new DependencyDraft(
+        origem,
+        alvo,
+        declarado,
+        true,
+        DependencyType.CALLS,
+        qualidade,
+        1,
+        2,
+        ARQUIVO_A,
+        List.of(new EvidenceDraft(null, null, 7, qualidade)),
+        0);
   }
 
   @Test
