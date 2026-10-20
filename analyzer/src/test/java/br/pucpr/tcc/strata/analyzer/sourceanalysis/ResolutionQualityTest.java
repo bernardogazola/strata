@@ -49,6 +49,9 @@ final class ResolutionQualityTest {
     todos.addAll(oraculoDeTipos());
     todos.addAll(chamadas());
     todos.addAll(nomesQueOSpoonEstraga());
+    todos.addAll(variaveisDeTipo());
+    todos.addAll(receptoresQueOSpoonFazDeTipo());
+    todos.addAll(revisaoIndependente());
     return todos.stream();
   }
 
@@ -87,8 +90,9 @@ final class ResolutionQualityTest {
             + " import sob demanda de pacote não nomeia tipo, sem IMPORTS";
     final Map<String, String> s05core = Map.of("a/Registry.java", REGISTRY);
     final String s05 =
-        "escrito aqui, escopo completo, nome simples, um candidato de topo → a.Registry,"
-            + " INFERRED também em uma raiz (colocado pela regra iii)";
+        "escrito aqui, escopo completo, nome simples, um candidato de topo:"
+            + " a regra (iii) não atribui: o nome nu Registry, U, não ambíguo (um candidato só);"
+            + " o pacote c pode ter um Registry que o índice não vê";
     final Map<String, String> s16core =
         Map.of("a/Order.java", "package a;\n\npublic class Order {}\n");
     final Map<String, String> s16app =
@@ -123,8 +127,9 @@ final class ResolutionQualityTest {
             "q/Log.java",
             "package q;\n\npublic class Log {}\n");
     final String s19 =
-        "JLS 7.5: do pacote padrão, q.Log é o único candidato → INFERRED; de p, o Bootstrap do"
-            + " pacote padrão nunca é candidato, e o nome nu que o colide é descartado";
+        "JLS 7.5: do pacote padrão, q.Log é o único candidato → o nome nu Log, U, não"
+            + " ambíguo; de p, o Bootstrap do pacote padrão nunca é candidato, e o nome nu que o"
+            + " colide é descartado";
     final Map<String, String> s20core =
         Map.of("p/Record.java", "package p;\n\npublic class Record {}\n");
     final Map<String, String> s20app =
@@ -153,8 +158,9 @@ final class ResolutionQualityTest {
             }
             """);
     final String x3 =
-        "os candidatos da regra (iii) são tipos de topo; a.Holder$Registry não se nomeia por"
-            + " nome simples fora do seu escopo → um candidato só";
+        "os candidatos do detector de ambiguidade são tipos de topo; a.Holder$Registry"
+            + " não se nomeia por nome simples fora do seu escopo → um candidato só: o nome nu, U,"
+            + " não ambíguo";
     return List.of(
         trecho("S01 regra (i)", Layout.TWO_ROOTS, s01core, s01app, s01)
             .com("b.User -> a.Api IMPORTS x1 INFERRED", "b.User -> a.Api FIELD_TYPE x1 INFERRED"),
@@ -169,9 +175,9 @@ final class ResolutionQualityTest {
                 "b.User -> a.Api FIELD_TYPE x1 RESOLVED",
                 "b.User -> b.Peer FIELD_TYPE x1 RESOLVED"),
         trecho("S05 regra (iii)", Layout.TWO_ROOTS, s05core, PROBE_REGISTRY, s05)
-            .com("c.Probe -> a.Registry FIELD_TYPE x1 INFERRED"),
+            .com("c.Probe -> Registry FIELD_TYPE x1 UNRESOLVED_EXTERNAL external"),
         trecho("S06 regra (iii)", Layout.ONE_ROOT, s05core, PROBE_REGISTRY, s05)
-            .com("c.Probe -> a.Registry FIELD_TYPE x1 INFERRED"),
+            .com("c.Probe -> Registry FIELD_TYPE x1 UNRESOLVED_EXTERNAL external"),
         trecho("S16 vetor interno", Layout.TWO_ROOTS, s16core, s16app, s16)
             .com(
                 "b.Ledger -> a.Order IMPORTS x1 INFERRED",
@@ -181,16 +187,16 @@ final class ResolutionQualityTest {
                 "b.Ledger -> a.Order IMPORTS x1 RESOLVED",
                 "b.Ledger -> a.Order FIELD_TYPE x1 RESOLVED"),
         trecho("S19 pacote padrão", Layout.ONE_ROOT, Map.of(), s19app, s19)
-            .com("Bootstrap -> q.Log FIELD_TYPE x1 INFERRED")
+            .com("Bootstrap -> Log FIELD_TYPE x1 UNRESOLVED_EXTERNAL external")
             .descartando(DropReason.DEFAULT_PACKAGE_COLLISION, 1),
         trecho("S20 próprio pacote sobre java.lang", Layout.TWO_ROOTS, s20core, s20app, s20)
             .com("p.User -> p.Record FIELD_TYPE x1 INFERRED"),
         trecho("S20b próprio pacote sobre java.lang", Layout.ONE_ROOT, s20core, s20app, s20)
             .com("p.User -> p.Record FIELD_TYPE x1 RESOLVED"),
         trecho("X3 tipo membro não é candidato", Layout.TWO_ROOTS, x3core, PROBE_REGISTRY, x3)
-            .com("c.Probe -> a.Registry FIELD_TYPE x1 INFERRED"),
+            .com("c.Probe -> Registry FIELD_TYPE x1 UNRESOLVED_EXTERNAL external"),
         trecho("X3 tipo membro não é candidato", Layout.ONE_ROOT, x3core, PROBE_REGISTRY, x3)
-            .com("c.Probe -> a.Registry FIELD_TYPE x1 INFERRED"));
+            .com("c.Probe -> Registry FIELD_TYPE x1 UNRESOLVED_EXTERNAL external"));
   }
 
   private static List<Trecho> ambiguidade() {
@@ -200,7 +206,9 @@ final class ResolutionQualityTest {
     final String s07 =
         "dois candidatos de topo, c.Config e d.Config → type:Config nu, U, ambíguo; nenhuma"
             + " linha para c.Config ou d.Config";
-    final String s07c = "controle do S07: sem o d.Config sobra um candidato → INFERRED";
+    final String s07c =
+        "controle do S07: sem o d.Config sobra um candidato → o nome nu Config, U, não"
+            + " ambíguo (a ambiguidade exige dois)";
     final Map<String, String> s07dcore =
         Map.of("c/Config.java", CONFIG_IN_C, "d/Config.java", CONFIG_IN_D);
     final Map<String, String> s07dapp =
@@ -318,14 +326,14 @@ final class ResolutionQualityTest {
                 configs,
                 Map.of("e/Probe.java", PROBE_CONFIG),
                 s07c)
-            .com("e.Probe -> c.Config FIELD_TYPE x1 INFERRED"),
+            .com("e.Probe -> Config FIELD_TYPE x1 UNRESOLVED_EXTERNAL external"),
         trecho(
                 "S07c controle",
                 Layout.ONE_ROOT,
                 configs,
                 Map.of("e/Probe.java", PROBE_CONFIG),
                 s07c)
-            .com("e.Probe -> c.Config FIELD_TYPE x1 INFERRED"),
+            .com("e.Probe -> Config FIELD_TYPE x1 UNRESOLVED_EXTERNAL external"),
         trecho("S07d dois imports sob demanda", Layout.TWO_ROOTS, s07dcore, s07dapp, s07d)
             .com("e.Probe -> Config FIELD_TYPE x1 UNRESOLVED_EXTERNAL external ambiguous"),
         trecho("S07d dois imports sob demanda", Layout.ONE_ROOT, s07dcore, s07dapp, s07d)
@@ -1080,8 +1088,15 @@ final class ResolutionQualityTest {
             }
             """);
     final String c22 =
-        "javac C22/C22b/C23: o primeiro tipo da cadeia com D = SIM é b.Sub10, de In,"
-            + " da anônima (Runnable do JDK sem membros) e de InExt (ext.Lib externo conta como NÃO)";
+        "javac C22/C22b/C23: de In, In responde NÃO e b.Sub10"
+            + " SIM → b.Sub10, RESOLVED. A anônima (Runnable do JDK) e InExt (ext.Lib externo)"
+            + " respondem UNKNOWN: a subida para e a resposta do Spoon fica (medido: o this implícito é"
+            + " b.Sub10 em uma raiz; em duas, o tipo mais interno, b.Sub10$1, cortado em b.Sub10, e"
+            + " b.Sub10$InExt). O UNKNOWN da anônima é só do JDK, que o JDT vê: RESOLVED. O de InExt"
+            + " é de um supertipo de fora do JDK: um alvo de fora dele (b.Sub10, em uma raiz) é a"
+            + " ligação léxica do JDT, INFERRED e sem toMethod; o próprio InExt em duas raízes não é"
+            + " de fora dele: RESOLVED, a resposta do Spoon, que o javac (b.Sub10, C22b) desmente e"
+            + " o índice não pode decidir";
     casos.add(
         trecho("C22 herdado do tipo de fora", Layout.TWO_ROOTS, c22core, c22app, c22)
             .com(
@@ -1089,7 +1104,7 @@ final class ResolutionQualityTest {
                 "b.Sub10 -> b.Sub10 CALLS x1 RESOLVED",
                 "b.Sub10 -> java.lang.Runnable CALLS x1 RESOLVED external",
                 "b.Sub10$In -> b.Sub10 CALLS x1 RESOLVED",
-                "b.Sub10$InExt -> b.Sub10 CALLS x1 RESOLVED",
+                "b.Sub10$InExt -> b.Sub10$InExt CALLS x1 RESOLVED",
                 "b.Sub10$InExt -> ext.Lib EXTENDS x1 UNRESOLVED_EXTERNAL external"));
     casos.add(
         trecho("C22 herdado do tipo de fora", Layout.ONE_ROOT, c22core, c22app, c22)
@@ -1098,7 +1113,7 @@ final class ResolutionQualityTest {
                 "b.Sub10 -> b.Sub10 CALLS x1 RESOLVED",
                 "b.Sub10 -> java.lang.Runnable CALLS x1 RESOLVED external",
                 "b.Sub10$In -> b.Sub10 CALLS x1 RESOLVED",
-                "b.Sub10$InExt -> b.Sub10 CALLS x1 RESOLVED",
+                "b.Sub10$InExt -> b.Sub10 CALLS x1 INFERRED",
                 "b.Sub10$InExt -> ext.Lib EXTENDS x1 UNRESOLVED_EXTERNAL external"));
     final Map<String, String> c25core =
         Map.of(
@@ -1441,12 +1456,13 @@ final class ResolutionQualityTest {
                 Map.of(),
                 untypedVar,
                 "o var do for aprimorado não tem inicializador → desconhecido, +1"
-                    + " CALL_WITHOUT_TARGET, nunca type:var; o missing capturado no lambda sem tipo"
-                    + " é parâmetro, não campo → +1, nunca type:missing")
+                    + " CALL_WITHOUT_TARGET, nunca type:var; o missing capturado no lambda, sem tipo"
+                    + " na leitura, é o parâmetro declarado nesta unidade → o tipo escrito dele,"
+                    + " org.ext.Missing, x2 com o missing.run de fora")
             .com(
-                "b.User -> org.ext.Missing CALLS x1 UNRESOLVED_EXTERNAL external",
+                "b.User -> org.ext.Missing CALLS x2 UNRESOLVED_EXTERNAL external",
                 "b.User -> org.ext.Missing PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external")
-            .descartando(DropReason.CALL_WITHOUT_TARGET, 2));
+            .descartando(DropReason.CALL_WITHOUT_TARGET, 1));
   }
 
   private static List<Trecho> nomesQueOSpoonEstraga() {
@@ -1503,6 +1519,703 @@ final class ResolutionQualityTest {
             .com("p.User -> jdk.internal.misc.Unsafe FIELD_TYPE x1 UNRESOLVED_EXTERNAL external"));
   }
 
+  private static List<Trecho> variaveisDeTipo() {
+    final Map<String, String> core =
+        Map.of(
+            "a/Response.java",
+            "package a;\n\npublic class Response {}\n",
+            "a/Listener.java",
+            "package a;\n\npublic interface Listener<R> {\n  void on(R r);\n}\n");
+    final Map<String, String> metodo =
+        Map.of(
+            "b/Tasks.java",
+            """
+            package b;
+
+            import a.Listener;
+
+            public class Tasks {
+              <Request, Response extends CharSequence> void register(
+                  org.ext.Action<Request, Response> action, Request request) {
+                action.execute(
+                    request,
+                    new Listener<>() {
+                      public void on(Response response) {}
+                    });
+              }
+            }
+            """);
+    final String derivacaoMetodo =
+        "Response é parâmetro de tipo do método que envolve a"
+            + " anônima → variável de tipo (JLS 6.4.1), sem linha, nem descarte; a regra (iii)"
+            + " a poria em a.Response, INFERRED. O import e o new Listener<>() pelo import (R em uma"
+            + " raiz, I em duas); org.ext.Action externo; Request e os argumentos de tipo são"
+            + " CtTypeParameterReference, sem linha; action.execute: o Spoon não tipa a leitura do"
+            + " action cujo tipo tem variável de tipo como argumento (medido); o tipo escrito na"
+            + " declaração do parâmetro, org.ext.Action";
+    final Map<String, String> classe =
+        Map.of(
+            "b/Split.java",
+            """
+            package b;
+
+            import a.Listener;
+
+            public class Split<Response extends CharSequence> {
+              void delegate(org.ext.Action<Response> action) {
+                action.execute(
+                    new Listener<>() {
+                      public void on(Response response) {}
+                    });
+              }
+            }
+            """);
+    final String derivacaoClasse =
+        "Response é parâmetro de tipo da classe que"
+            + " envolve a anônima, perguntado depois dos membros dela e da anônima → variável de"
+            + " tipo, sem linha; action.execute pela declaração do parâmetro";
+    final Map<String, String> controle =
+        Map.of(
+            "b/Plain.java",
+            """
+            package b;
+
+            import a.Listener;
+
+            public class Plain {
+              <Request> void register(org.ext.Action<Request> action) {
+                action.execute(
+                    new Listener<>() {
+                      public void on(Response response) {}
+                    });
+              }
+            }
+            """);
+    final String derivacaoControle =
+        "controle: só Request é variável de tipo; Response escrito aqui, escopo completo (a"
+            + " anônima de a.Listener, Plain sem supertipo, só o import de Listener), um candidato"
+            + " de topo → o nome nu Response, U, não ambíguo (a regra iii não atribui);"
+            + " action.execute pela declaração do parâmetro";
+    final Map<String, String> membroProprio =
+        Map.of(
+            "b/Own.java",
+            """
+            package b;
+
+            import a.Listener;
+
+            public class Own<T extends CharSequence> {
+              static class T {}
+
+              void m(org.ext.Action action) {
+                action.execute(
+                    new Listener<>() {
+                      public void on(T t) {}
+                    });
+              }
+            }
+            """);
+    final String derivacaoMembroProprio =
+        "javac (OwnMember, com controle negativo): o tipo membro T de Own esconde o parâmetro de"
+            + " tipo T de Own no corpo dele (JLS 6.4.1) → b.Own$T, reescrita de b.T, INFERRED"
+            + "; com a variável de tipo antes de toda busca de membros a linha sumiria";
+    final Map<String, String> metodoSobreMembro =
+        Map.of(
+            "b/Over.java",
+            """
+            package b;
+
+            import a.Listener;
+
+            public class Over {
+              static class T {}
+
+              <T extends CharSequence> void m(org.ext.Action action) {
+                action.execute(
+                    new Listener<>() {
+                      public void on(T t) {}
+                    });
+              }
+            }
+            """);
+    final String derivacaoMetodoSobreMembro =
+        "javac (MethodOverMember): o parâmetro de tipo T do método esconde o tipo membro T de Over"
+            + " (JLS 6.4.1) → variável de tipo, sem linha, nunca b.Over$T";
+    final List<Trecho> casos = new ArrayList<>();
+    casos.add(
+        trecho("N7 variável de tipo do método", Layout.ONE_ROOT, core, metodo, derivacaoMetodo)
+            .com(
+                "b.Tasks -> a.Listener IMPORTS x1 RESOLVED",
+                "b.Tasks -> a.Listener CALLS x1 RESOLVED",
+                "b.Tasks -> org.ext.Action CALLS x1 UNRESOLVED_EXTERNAL external",
+                "b.Tasks -> org.ext.Action PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external")
+            .contando(2, 0, 2, 0));
+    casos.add(
+        trecho("N7 variável de tipo do método", Layout.TWO_ROOTS, core, metodo, derivacaoMetodo)
+            .com(
+                "b.Tasks -> a.Listener IMPORTS x1 INFERRED",
+                "b.Tasks -> a.Listener CALLS x1 INFERRED",
+                "b.Tasks -> org.ext.Action CALLS x1 UNRESOLVED_EXTERNAL external",
+                "b.Tasks -> org.ext.Action PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external")
+            .contando(0, 2, 2, 0));
+    for (final Layout layout : Layout.values()) {
+      final String listener = layout == Layout.ONE_ROOT ? "RESOLVED" : "INFERRED";
+      casos.add(
+          trecho("N7 variável de tipo da classe", layout, core, classe, derivacaoClasse)
+              .com(
+                  "b.Split -> a.Listener IMPORTS x1 " + listener,
+                  "b.Split -> a.Listener CALLS x1 " + listener,
+                  "b.Split -> org.ext.Action CALLS x1 UNRESOLVED_EXTERNAL external",
+                  "b.Split -> org.ext.Action PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external"));
+      casos.add(
+          trecho("N7 controle: regra (iii)", layout, core, controle, derivacaoControle)
+              .com(
+                  "b.Plain -> Response PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external",
+                  "b.Plain -> a.Listener IMPORTS x1 " + listener,
+                  "b.Plain -> a.Listener CALLS x1 " + listener,
+                  "b.Plain -> org.ext.Action CALLS x1 UNRESOLVED_EXTERNAL external",
+                  "b.Plain -> org.ext.Action PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external"));
+      casos.add(
+          trecho(
+                  "N7 membro esconde o próprio parâmetro",
+                  layout,
+                  core,
+                  membroProprio,
+                  derivacaoMembroProprio)
+              .com(
+                  "b.Own -> a.Listener IMPORTS x1 " + listener,
+                  "b.Own -> a.Listener CALLS x1 " + listener,
+                  "b.Own -> b.Own$T PARAMETER_TYPE x1 INFERRED",
+                  "b.Own -> org.ext.Action CALLS x1 UNRESOLVED_EXTERNAL external",
+                  "b.Own -> org.ext.Action PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external"));
+      casos.add(
+          trecho(
+                  "N7 método esconde o membro",
+                  layout,
+                  core,
+                  metodoSobreMembro,
+                  derivacaoMetodoSobreMembro)
+              .com(
+                  "b.Over -> a.Listener IMPORTS x1 " + listener,
+                  "b.Over -> a.Listener CALLS x1 " + listener,
+                  "b.Over -> org.ext.Action CALLS x1 UNRESOLVED_EXTERNAL external",
+                  "b.Over -> org.ext.Action PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external"));
+    }
+    return casos;
+  }
+
+  private static List<Trecho> receptoresQueOSpoonFazDeTipo() {
+    final Map<String, String> core =
+        Map.of(
+            "a/Base.java",
+            "package a;\n\npublic class Base {\n  protected Service service;\n}\n",
+            "a/Service.java",
+            "package a;\n\npublic class Service {\n  public void go() {}\n}\n");
+    final String base = "a.Base -> a.Service FIELD_TYPE x1 RESOLVED";
+    final Map<String, String> captura =
+        Map.of(
+            "b/Catcher.java",
+            """
+            package b;
+
+            public class Catcher {
+              void m(org.ext.Missing missing) {
+                missing.run(
+                    () -> {
+                      try {
+                        missing.call();
+                      } catch (IllegalStateException e) {
+                        e.printStackTrace();
+                      }
+                    });
+              }
+            }
+            """);
+    final String derivacaoCaptura =
+        "o e do Elasticsearch: e.printStackTrace() chega como acesso de tipo b.e; a"
+            + " variável do catch está à vista no corpo dele → o tipo escrito, java.lang"
+            + ".IllegalStateException (R,1), nunca type:e; missing.call() no lambda, sem tipo na"
+            + " leitura, pela declaração do parâmetro";
+    final Map<String, String> padrao =
+        Map.of(
+            "b/Patterns.java",
+            """
+            package b;
+
+            public class Patterns {
+              void m(org.ext.Missing missing) {
+                missing.run(
+                    () -> {
+                      Object o = missing.get();
+                      if (o instanceof String s) {
+                        s.trim();
+                      }
+                    });
+              }
+            }
+            """);
+    final String derivacaoPadrao =
+        "o a e o list do Elasticsearch: s.trim() chega como acesso de tipo b.s; o padrão"
+            + " de instanceof introduz s no ramo verdadeiro (JLS 6.3.1) → java.lang.String (R,1);"
+            + " missing.get() pela declaração do parâmetro";
+    final Map<String, String> componenteVar =
+        Map.of(
+            "b/Records.java",
+            """
+            package b;
+
+            public class Records {
+              void m(org.ext.Missing missing) {
+                missing.run(
+                    () -> {
+                      Object o = missing.get();
+                      if (o instanceof org.ext.Pair(var left, var right)) {
+                        left.first();
+                      }
+                    });
+              }
+            }
+            """);
+    final String derivacaoComponenteVar =
+        "left.first() chega como acesso de tipo b.left; left é o componente var de um padrão"
+            + " de record externo, sem inicializador → tipo desconhecido, +1 CALL_WITHOUT_TARGET,"
+            + " nunca type:left; missing.get() pela declaração do parâmetro";
+    final Map<String, String> herdado =
+        Map.of(
+            "b/Sub.java",
+            """
+            package b;
+
+            public class Sub extends a.Base {
+              void m(org.ext.Missing missing) {
+                missing.run(() -> service.go());
+              }
+            }
+            """);
+    final String derivacaoHerdado =
+        "o clusterService do Elasticsearch: em uma raiz o Spoon liga o campo (a"
+            + " declaração no lote → a.Service, R); em duas faz o acesso de tipo b.service, e o"
+            + " índice acha o campo herdado de a.Base (D = SIM) → o tipo declarado, a.Service,"
+            + " recuperado → INFERRED; nunca type:service";
+    final Map<String, String> deFora =
+        Map.of(
+            "b/Outer.java",
+            """
+            package b;
+
+            public class Outer {
+              private static final a.Service logger = null;
+
+              enum Tracker implements org.ext.Policy {
+                INSTANCE;
+
+                public void process(org.ext.Missing missing) {
+                  missing.run(() -> logger.go());
+                }
+              }
+            }
+            """);
+    final String derivacaoDeFora =
+        "o logger do Elasticsearch: o campo do tipo de fora lido em um lambda do enum"
+            + " aninhado chega como acesso de tipo b.logger também em uma raiz; Tracker tem um"
+            + " supertipo externo: o campo dele é UNKNOWN, a subida segue (parar deixaria o"
+            + " fantasma type:logger), Outer declara logger → a declaração no lote, lida na unidade"
+            + ": a.Service; um campo herdado de org.ext.Policy poderia escondê-lo, então nunca"
+            + " RESOLVED: INFERRED nas duas disposições";
+    final Map<String, String> util =
+        Map.of(
+            "b/Caller.java",
+            """
+            package b;
+
+            import org.ext.*;
+
+            public class Caller {
+              void m(org.ext.Missing missing) {
+                Util.foo();
+                missing.run(() -> Util.foo());
+              }
+            }
+            """);
+    final String derivacaoUtil =
+        "controle: nenhuma variável Util à vista → o acesso de tipo fica; o Spoon dá Util"
+            + " sem pacote, o import sob demanda org.ext.* não é do índice → incompleto, sem regra"
+            + " (iii) → Util externo, as duas chamadas";
+    final List<Trecho> casos = new ArrayList<>();
+    for (final Layout layout : Layout.values()) {
+      final String quality = layout == Layout.ONE_ROOT ? "RESOLVED" : "INFERRED";
+      casos.add(
+          trecho("C3b variável de catch em um lambda", layout, core, captura, derivacaoCaptura)
+              .com(
+                  base,
+                  "b.Catcher -> java.lang.IllegalStateException CALLS x1 RESOLVED external",
+                  "b.Catcher -> org.ext.Missing CALLS x2 UNRESOLVED_EXTERNAL external",
+                  "b.Catcher -> org.ext.Missing PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external"));
+      casos.add(
+          trecho("C3b variável de padrão em um lambda", layout, core, padrao, derivacaoPadrao)
+              .com(
+                  base,
+                  "b.Patterns -> java.lang.String CALLS x1 RESOLVED external",
+                  "b.Patterns -> org.ext.Missing CALLS x2 UNRESOLVED_EXTERNAL external",
+                  "b.Patterns -> org.ext.Missing PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external"));
+      casos.add(
+          trecho("C3b componente var sem tipo", layout, core, componenteVar, derivacaoComponenteVar)
+              .com(
+                  base,
+                  "b.Records -> org.ext.Missing CALLS x2 UNRESOLVED_EXTERNAL external",
+                  "b.Records -> org.ext.Missing PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external")
+              .descartando(DropReason.CALL_WITHOUT_TARGET, 1));
+      casos.add(
+          trecho("C3b campo herdado de outra raiz", layout, core, herdado, derivacaoHerdado)
+              .com(
+                  base,
+                  "b.Sub -> a.Base EXTENDS x1 " + quality,
+                  "b.Sub -> a.Service CALLS x1 " + quality,
+                  "b.Sub -> org.ext.Missing CALLS x1 UNRESOLVED_EXTERNAL external",
+                  "b.Sub -> org.ext.Missing PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external"));
+      casos.add(
+          trecho("C3b campo do tipo de fora", layout, core, deFora, derivacaoDeFora)
+              .com(
+                  base,
+                  "b.Outer -> a.Service FIELD_TYPE x1 " + quality,
+                  "b.Outer$Tracker -> a.Service CALLS x1 INFERRED",
+                  "b.Outer$Tracker -> org.ext.Missing CALLS x1 UNRESOLVED_EXTERNAL external",
+                  "b.Outer$Tracker -> org.ext.Missing PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL"
+                      + " external",
+                  "b.Outer$Tracker -> org.ext.Policy IMPLEMENTS x1 UNRESOLVED_EXTERNAL external"));
+      casos.add(
+          trecho("C3b controle: Util externo", layout, core, util, derivacaoUtil)
+              .com(
+                  base,
+                  "b.Caller -> Util CALLS x2 UNRESOLVED_EXTERNAL external",
+                  "b.Caller -> org.ext.Missing CALLS x1 UNRESOLVED_EXTERNAL external",
+                  "b.Caller -> org.ext.Missing PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external"));
+    }
+    return casos;
+  }
+
+  private static List<Trecho> revisaoIndependente() {
+    final Map<String, String> dummy =
+        Map.of("z/Dummy.java", "package z;\n\npublic class Dummy {}\n");
+    final Map<String, String> p03 = Map.of("b/Outer.java", P03_OUTER);
+    final String derivacaoP03 =
+        "Inner e a anônima têm ext.Base, de fora do JDK, e respondem"
+            + " UNKNOWN para helper: a subida para, e a resposta do Spoon (medido: o this implícito é"
+            + " b.Outer nos dois sítios, a ligação léxica do JDT) é de fora delas: INFERRED, sem"
+            + " toMethod; o javac diz ext.Base.helper";
+    final Map<String, String> p05 =
+        Map.of(
+            "p/U.java",
+            """
+            package p;
+
+            import org.ext.*;
+
+            public class U {
+              Foo field;
+
+              void m(Foo f) {
+                f.bar();
+                field.baz();
+                Foo l = null;
+                l.q();
+              }
+            }
+            """);
+    final String derivacaoP05 =
+        "Foo pelo import sob demanda externo é incompleto, e a regra 10 o deixa"
+            + " nu; o parâmetro f e o local l são lidos pela declaração, o tipo escrito, também Foo"
+            + " nu, nunca o palpite p.Foo do tipo da leitura; field pela declaração no lote";
+    final Map<String, String> p06core =
+        Map.of("x/Helper.java", "package x;\n\npublic class Helper {}\n");
+    final Map<String, String> p06 =
+        Map.of(
+            "b/Helper.java",
+            "package b;\n\npublic class Helper {\n  void m( {}\n}\n",
+            "b/User.java",
+            "package b;\n\npublic class User {\n  Helper helper;\n}\n");
+    final String derivacaoP06 =
+        "b/Helper.java tem erro de sintaxe e sai do índice, então o pacote b não é"
+            + " provadamente completo; um candidato só, x.Helper, não é atribuído: o nome nu, U,"
+            + " não ambíguo (o javac daria b.Helper)";
+    final Map<String, String> p09core =
+        Map.of(
+            "x/Inner.java",
+            "package x;\n\npublic @interface Inner {}\n",
+            "a/Base.java",
+            "package a;\n\npublic class Base<T> {\n  public static class Inner {}\n}\n");
+    final Map<String, String> p09 =
+        Map.of(
+            "b/C.java",
+            """
+            package b;
+
+            import x.Inner;
+
+            @Inner
+            public class C<T extends Inner> {
+              @interface Inner {}
+
+              void m(T t) {}
+
+              @Inner
+              void n() {}
+            }
+            """,
+            "b/D.java",
+            """
+            package b;
+
+            import a.Base;
+            import x.Inner;
+
+            @Inner
+            public class D<U extends Inner> extends Base<Inner> {
+              void m(U u, Inner i) {}
+            }
+            """);
+    final String derivacaoP09 =
+        "JLS 6.3: a anotação de C e de D está no cabeçalho, que não vê os membros"
+            + " deles (o import, x.Inner); a de n() está no corpo de C: o membro b.C$Inner. O"
+            + " Inner do parâmetro de D.m está no corpo, e o membro herdado de a.Base esconde o"
+            + " import (6.4.1): a.Base$Inner, reescrita do Spoon em duas raízes (I). Parâmetros de"
+            + " tipo e argumentos de supertipo não dão linha";
+    final Map<String, String> p12core =
+        Map.of(
+            "a/Holder.java",
+            """
+            package a;
+
+            import ext.Base;
+
+            public class Holder extends Base {
+              public static Record rec;
+              public Record own;
+              public Thread worker;
+            }
+            """);
+    final Map<String, String> p12 =
+        Map.of(
+            "b/User.java",
+            """
+            package b;
+
+            import a.Holder;
+
+            public class User {
+              void m(Holder h) {
+                Holder.rec.run();
+                h.own.run();
+                h.worker.run();
+              }
+            }
+            """);
+    final String derivacaoP12 =
+        "limitação conhecida: Holder estende ext.Base, de fora do JDK,"
+            + " que pode declarar um tipo membro Record que o JDT não vê (o javac dá"
+            + " ext.Base$Record); o java.lang que o Spoon deu fica: java.lang"
+            + " .Record e java.lang.Thread (R,1) nos campos e nas chamadas, pela declaração no lote"
+            + " ou pelo índice com o JavaLangTypes. A forma só muda uma linha externa";
+    final Map<String, String> p13core =
+        Map.of(
+            "a/Registry.java", "package a;\n\npublic class Registry {\n  public void go() {}\n}\n");
+    final Map<String, String> p13 =
+        Map.of(
+            "c/Probe.java",
+            """
+            package c;
+
+            public class Probe {
+              Registry field;
+
+              void m(Registry r) {
+                r.go();
+                field.go();
+                new Registry().go();
+              }
+            }
+            """);
+    final String derivacaoP13 =
+        "Registry escrito aqui, escopo completo, um candidato → o nome nu"
+            + " em toda posição; o receptor r pela declaração (nunca o palpite c.Registry), field"
+            + " pela declaração no lote, e o new Registry() e a chamada nele também nus";
+    final Map<String, String> p16core =
+        Map.of(
+            "a/Registry.java",
+            "package a;\n\npublic class Registry {\n  public void go() {}\n}\n",
+            "x/Registry.java",
+            "package x;\n\npublic class Registry {\n  public void go() {}\n}\n");
+    final Map<String, String> p16 =
+        Map.of(
+            "c/Holder.java",
+            "package c;\n\npublic class Holder {\n  public Registry registry;\n}\n",
+            "d/User.java",
+            """
+            package d;
+
+            import c.Holder;
+
+            public class User {
+              void m(Holder h) {
+                h.registry.go();
+              }
+            }
+            """);
+    final String derivacaoP16 =
+        "o Registry de Holder tem dois candidatos de topo → nu, U, ambíguo"
+            + " na unidade que o escreveu; em User ele é um nome copiado da declaração do campo,"
+            + " lido em Holder, nu, mas nunca a bandeira de ambiguidade, que é de quem escreveu";
+    final Map<String, String> p19core =
+        Map.of(
+            "a/Box.java",
+            "package a;\n\npublic class Box<T> {\n  public void put(T t) {}\n}\n",
+            "a/Plain.java",
+            "package a;\n\npublic class Plain {\n  public void go() {}\n}\n");
+    final Map<String, String> p19 =
+        Map.of(
+            "p/User.java",
+            """
+            package p;
+
+            import a.Box;
+            import a.Plain;
+
+            public class User {
+              Box<String> field;
+
+              void m(Box<String> param, Plain plain, Box raw) {
+                a.Box<String> fqn = null;
+                fqn.put("1");
+                Box<String> simple = null;
+                simple.put("2");
+                param.put("3");
+                plain.go();
+                raw.put("4");
+                field.put("5");
+                java.util.List<Box<String>> list = null;
+                list.get(0).put("6");
+              }
+            }
+            """);
+    final String derivacaoP19 =
+        "o local fqn com o tipo escrito por extenso de outro lote é lido pela"
+            + " declaração: a.Box nas duas disposições; em duas raízes, sem isso, o tipo da leitura"
+            + " faltaria e o sítio cairia. O list.get(0).put() do List<Box<String>> é uma cadeia por um"
+            + " método do JDK cujo retorno o Spoon só tipa com a.Box no lote (CHAIN_UNTYPED)";
+    final Map<String, String> sharedCore =
+        Map.of(
+            "a/Base.java",
+            """
+            package a;
+
+            public class Base {
+              public static class Inner {
+                public void run() {}
+              }
+
+              public static final Inner SHARED = new Inner();
+            }
+            """);
+    final Map<String, String> shared =
+        Map.of(
+            "c/Leaf.java",
+            """
+            package c;
+
+            public class Leaf extends a.Base {
+              void m() {
+                SHARED.run();
+              }
+            }
+            """);
+    final String derivacaoShared =
+        "um nome em maiúsculas (nunca decidido pela grafia): o SHARED herdado de"
+            + " outra raiz chega como acesso de tipo c.SHARED; o índice acha o campo em a.Base (D ="
+            + " SIM) → o tipo declarado a.Base$Inner, recuperado (I); em uma raiz o Spoon liga o campo"
+            + " e a declaração no lote dá a.Base$Inner (R). Em a.Base, o campo e o new Inner() dão"
+            + " o tipo membro, no lote dele";
+    final List<Trecho> casos = new ArrayList<>();
+    for (final Layout layout : Layout.values()) {
+      final boolean one = layout == Layout.ONE_ROOT;
+      final String quality = one ? "RESOLVED" : "INFERRED";
+      casos.add(
+          trecho("ligação léxica do JDT", layout, dummy, p03, derivacaoP03)
+              .com(
+                  "b.Outer -> b.Outer CALLS x1 INFERRED",
+                  "b.Outer -> ext.Base IMPORTS x1 UNRESOLVED_EXTERNAL external",
+                  "b.Outer -> ext.Base CALLS x1 UNRESOLVED_EXTERNAL external",
+                  "b.Outer$Inner -> b.Outer CALLS x1 INFERRED",
+                  "b.Outer$Inner -> ext.Base EXTENDS x1 UNRESOLVED_EXTERNAL external"));
+      casos.add(
+          trecho("receptor e regra 10", layout, dummy, p05, derivacaoP05)
+              .com(
+                  "p.U -> Foo CALLS x3 UNRESOLVED_EXTERNAL external",
+                  "p.U -> Foo FIELD_TYPE x1 UNRESOLVED_EXTERNAL external",
+                  "p.U -> Foo PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external"));
+      casos.add(
+          trecho("arquivo com erro no pacote", layout, p06core, p06, derivacaoP06)
+              .com("b.User -> Helper FIELD_TYPE x1 UNRESOLVED_EXTERNAL external"));
+      casos.add(
+          trecho("cabeçalho", layout, p09core, p09, derivacaoP09)
+              .com(
+                  "b.C -> b.C$Inner ANNOTATION_REFERENCE x1 RESOLVED",
+                  "b.C -> x.Inner IMPORTS x1 " + quality,
+                  "b.C -> x.Inner ANNOTATION_REFERENCE x1 " + quality,
+                  "b.D -> a.Base IMPORTS x1 " + quality,
+                  "b.D -> a.Base EXTENDS x1 " + quality,
+                  "b.D -> a.Base$Inner PARAMETER_TYPE x1 " + quality,
+                  "b.D -> x.Inner IMPORTS x1 " + quality,
+                  "b.D -> x.Inner ANNOTATION_REFERENCE x1 " + quality));
+      casos.add(
+          trecho("java.lang escondido", layout, p12core, p12, derivacaoP12)
+              .com(
+                  "a.Holder -> ext.Base IMPORTS x1 UNRESOLVED_EXTERNAL external",
+                  "a.Holder -> ext.Base EXTENDS x1 UNRESOLVED_EXTERNAL external",
+                  "a.Holder -> java.lang.Record FIELD_TYPE x2 RESOLVED external",
+                  "a.Holder -> java.lang.Thread FIELD_TYPE x1 RESOLVED external",
+                  "b.User -> a.Holder IMPORTS x1 " + quality,
+                  "b.User -> a.Holder PARAMETER_TYPE x1 " + quality,
+                  "b.User -> java.lang.Record CALLS x2 RESOLVED external",
+                  "b.User -> java.lang.Thread CALLS x1 RESOLVED external"));
+      casos.add(
+          trecho("regra (iii) e receptor", layout, p13core, p13, derivacaoP13)
+              .com(
+                  "c.Probe -> Registry CALLS x4 UNRESOLVED_EXTERNAL external",
+                  "c.Probe -> Registry FIELD_TYPE x1 UNRESOLVED_EXTERNAL external",
+                  "c.Probe -> Registry PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external"));
+      casos.add(
+          trecho("nome copiado", layout, p16core, p16, derivacaoP16)
+              .com(
+                  "c.Holder -> Registry FIELD_TYPE x1 UNRESOLVED_EXTERNAL external ambiguous",
+                  "d.User -> Registry CALLS x1 UNRESOLVED_EXTERNAL external",
+                  "d.User -> c.Holder IMPORTS x1 RESOLVED",
+                  "d.User -> c.Holder PARAMETER_TYPE x1 RESOLVED")
+              .contando(2, 0, 2, 1));
+      final Trecho p19trecho =
+          trecho("local de outro lote", layout, p19core, p19, derivacaoP19)
+              .com(
+                  "p.User -> a.Box IMPORTS x1 " + quality,
+                  "p.User -> a.Box CALLS x" + (one ? 6 : 5) + " " + quality,
+                  "p.User -> a.Box FIELD_TYPE x1 " + quality,
+                  "p.User -> a.Box PARAMETER_TYPE x2 " + quality,
+                  "p.User -> a.Plain IMPORTS x1 " + quality,
+                  "p.User -> a.Plain CALLS x1 " + quality,
+                  "p.User -> a.Plain PARAMETER_TYPE x1 " + quality,
+                  "p.User -> java.lang.String FIELD_TYPE x1 RESOLVED external",
+                  "p.User -> java.lang.String PARAMETER_TYPE x1 RESOLVED external",
+                  "p.User -> java.util.List CALLS x1 RESOLVED external");
+      casos.add(one ? p19trecho : p19trecho.descartando(DropReason.CALL_WITHOUT_TARGET, 1));
+      casos.add(
+          trecho("SHARED herdado", layout, sharedCore, shared, derivacaoShared)
+              .com(
+                  "a.Base -> a.Base$Inner CALLS x1 RESOLVED",
+                  "a.Base -> a.Base$Inner FIELD_TYPE x1 RESOLVED",
+                  "c.Leaf -> a.Base EXTENDS x1 " + quality,
+                  "c.Leaf -> a.Base$Inner CALLS x1 " + quality));
+    }
+    return casos;
+  }
+
   @Test
   void oMissingClasspathReproduzOGoldenExatamente() throws Exception {
     final Extraction run =
@@ -1534,10 +2247,10 @@ final class ResolutionQualityTest {
                 .distinct()
                 .toList())
         .as("os alvos externos de Probe que contam no fanOutExternal")
-        .containsExactly("type:Config", "type:com.thirdparty.Missing");
+        .containsExactly("type:Config", "type:Registry", "type:com.thirdparty.Missing");
 
     final ResolutionCounts counts = run.extractor().resolutionCounts();
-    assertThat(counts).isEqualTo(new ResolutionCounts(1, 4, 3, 1));
+    assertThat(counts).isEqualTo(new ResolutionCounts(1, 3, 4, 1));
     assertThat(counts.rate()).hasValue(0.125);
   }
 
@@ -1566,6 +2279,25 @@ final class ResolutionQualityTest {
         run.sink().rows().stream().mapToLong(row -> row.dependency().occurrences()).sum();
     assertThat(counts.resolved() + counts.inferred() + counts.unresolved()).isEqualTo(occurrences);
     assertThat(counts.rate()).hasValue(1.0);
+  }
+
+  @Test
+  void aLigacaoLexicaDoJdtNaoTemMetodoChamado() throws Exception {
+    for (final Layout layout : Layout.values()) {
+      final Extraction run =
+          ResolutionHarness.extract(
+              temp.resolve("lexica-" + layout.roots()),
+              layout,
+              Map.of("z/Dummy.java", "package z;\n\npublic class Dummy {}\n"),
+              Map.of("b/Outer.java", P03_OUTER));
+
+      assertThat(evidence(run.sink().row("b.Outer$Inner", "b.Outer", "CALLS")))
+          .as(layout + ": helper() em Inner")
+          .containsExactly("L10 method:b.Outer$Inner#run()");
+      assertThat(evidence(run.sink().row("b.Outer", "b.Outer", "CALLS")))
+          .as(layout + ": helper() na anônima, cujo go() sobe para Outer")
+          .containsExactly("L17 method:b.Outer#go()");
+    }
   }
 
   @Test
@@ -1728,6 +2460,31 @@ final class ResolutionQualityTest {
 
       public class Api {
         public static class Inner {}
+      }
+      """;
+
+  private static final String P03_OUTER =
+      """
+      package b;
+
+      import ext.Base;
+
+      public class Outer {
+        void helper() {}
+
+        class Inner extends Base {
+          void run() {
+            helper();
+          }
+        }
+
+        void anon() {
+          new Base() {
+            void go() {
+              helper();
+            }
+          };
+        }
       }
       """;
 

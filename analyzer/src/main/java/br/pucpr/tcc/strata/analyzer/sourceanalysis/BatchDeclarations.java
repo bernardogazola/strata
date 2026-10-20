@@ -31,8 +31,8 @@ final class BatchDeclarations {
     this.batchTopLevelTypes = batchTopLevelTypes;
   }
 
-  Set<String> batchTopLevelTypes() {
-    return batchTopLevelTypes;
+  SimpleNameIndex index() {
+    return index;
   }
 
   boolean inBatch(String idName) {

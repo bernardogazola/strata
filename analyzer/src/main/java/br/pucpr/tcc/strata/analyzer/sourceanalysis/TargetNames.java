@@ -22,9 +22,6 @@ final class TargetNames {
 
   private static final String DOUBLE_DOT = "..";
 
-  private static final Set<String> PRIMITIVES =
-      Set.of("boolean", "byte", "char", "short", "int", "long", "float", "double", "void");
-
   private final Rules rules;
   private final Home unit;
   private final Map<DropReason, Integer> drops;
@@ -39,7 +36,8 @@ final class TargetNames {
     if (ElementIds.hasLocalSegment(reference.getQualifiedName())) {
       return drop(DropReason.LOCAL_TARGET);
     }
-    return named(name(reference, unit, true));
+    final Named named = name(reference, unit, true);
+    return named.typeVariable() ? null : named(named);
   }
 
   Target qualifier(CtTypeReference<?> reference, boolean written) {
@@ -76,6 +74,17 @@ final class TargetNames {
     return ElementIds.erase(reference, unit.scope());
   }
 
+  boolean isOwnPackageGuess(CtTypeReference<?> type) {
+    final String ownPackage = unit.ownPackage();
+    final String name = type.getQualifiedName();
+    return !ownPackage.isEmpty()
+        && !ElementIds.isWrittenSimple(type)
+        && name.lastIndexOf('.') == ownPackage.length()
+        && name.startsWith(ownPackage)
+        && name.indexOf('$') < 0
+        && rules.index().declaredTopLevel(name).isEmpty();
+  }
+
   FieldLookup field(CtTypeReference<?> owner, String member) {
     return rules.index().field(canonical(owner), member);
   }
@@ -93,7 +102,7 @@ final class TargetNames {
   }
 
   Target recovered(String typeName) {
-    if (typeName == null || PRIMITIVES.contains(typeName)) {
+    if (typeName == null || ElementIds.PRIMITIVES.contains(typeName)) {
       return callWithoutTarget();
     }
     if (typeName.indexOf('.') < 0 && rules.index().type(typeName) == null) {
@@ -116,24 +125,31 @@ final class TargetNames {
     if (print.endsWith(DIAMOND)) {
       final String stripped = print.substring(0, print.length() - DIAMOND.length());
       return decide(
+          reference,
           home.scope().resolve(stripped, true, home.scope().context(reference)),
-          print,
           true,
           home,
           written);
     }
     return decide(
+        reference,
         ElementIds.resolveLeaf(reference, home.scope()),
-        print,
         ElementIds.isWrittenSimple(reference),
         home,
         written);
   }
 
   private Named decide(
-      NameResolution resolution, String print, boolean simple, Home home, boolean written) {
+      CtTypeReference<?> reference,
+      NameResolution resolution,
+      boolean simple,
+      Home home,
+      boolean written) {
+    final String print = reference.getQualifiedName();
     final String name = resolution.name();
     return switch (resolution.outcome()) {
+      case TYPE_VARIABLE ->
+          new Named(ElementIds.erase(reference, home.scope()), false, false, true);
       case PLACED -> new Named(name, name.equals(print), false);
       case AMBIGUOUS ->
           simple
@@ -142,7 +158,7 @@ final class TargetNames {
       case UNCHANGED_COMPLETE -> {
         final String spelled = simple ? bare(name, home) : name;
         yield written && simple && spelled.indexOf('.') < 0
-            ? ruleIii(spelled, home.ownPackage())
+            ? ambiguity(spelled, home.ownPackage())
             : new Named(spelled, spelled.equals(print), false);
       }
       case UNCHANGED_INCOMPLETE -> {
@@ -152,13 +168,9 @@ final class TargetNames {
     };
   }
 
-  private Named ruleIii(String simpleName, String fromPackage) {
+  private Named ambiguity(String simpleName, String fromPackage) {
     final List<String> candidates = rules.index().topLevelCandidates(simpleName, fromPackage);
-    return switch (candidates.size()) {
-      case 0 -> new Named(simpleName, false, false);
-      case 1 -> new Named(candidates.getFirst(), false, false);
-      default -> new Named(simpleName, false, true);
-    };
+    return new Named(simpleName, false, candidates.size() >= 2);
   }
 
   private String bare(String name, Home home) {
@@ -280,7 +292,12 @@ final class TargetNames {
     return true;
   }
 
-  private record Named(String name, boolean exact, boolean ambiguous) {}
+  private record Named(String name, boolean exact, boolean ambiguous, boolean typeVariable) {
+
+    private Named(String name, boolean exact, boolean ambiguous) {
+      this(name, exact, ambiguous, false);
+    }
+  }
 
   record Rules(
       SimpleNameIndex index,
@@ -304,5 +321,21 @@ final class TargetNames {
     private Platform() {}
   }
 
-  record Target(CodeElementId id, boolean declared, ResolutionQuality quality, boolean ambiguous) {}
+  record Target(
+      CodeElementId id,
+      boolean declared,
+      ResolutionQuality quality,
+      boolean ambiguous,
+      boolean uncertainCallee) {
+
+    Target(CodeElementId id, boolean declared, ResolutionQuality quality, boolean ambiguous) {
+      this(id, declared, quality, ambiguous, false);
+    }
+
+    Target uncertain() {
+      final ResolutionQuality weaker =
+          declared && quality == ResolutionQuality.RESOLVED ? ResolutionQuality.INFERRED : quality;
+      return new Target(id, declared, weaker, ambiguous, true);
+    }
+  }
 }

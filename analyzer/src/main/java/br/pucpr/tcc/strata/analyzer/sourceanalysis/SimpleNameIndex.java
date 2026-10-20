@@ -111,18 +111,6 @@ final class SimpleNameIndex {
     return new UnitScope(this, ImportScope.of(ownPackage, onDemandPackages, singleTypeImports));
   }
 
-  String canonicalize(String name, String ownPackage, Set<String> onDemandPackages) {
-    return canonicalize(name, ownPackage, onDemandPackages, Map.of());
-  }
-
-  String canonicalize(
-      String name,
-      String ownPackage,
-      Set<String> onDemandPackages,
-      Map<String, String> singleTypeImports) {
-    return scope(ownPackage, onDemandPackages, singleTypeImports).canonical(name, false);
-  }
-
   Scope scopeOf(CtCompilationUnit unit, String ownPackage) {
     Objects.requireNonNull(unit, "unit");
     final List<String> retained =
@@ -195,6 +183,17 @@ final class SimpleNameIndex {
 
   IndexedType type(String id) {
     return types.get(id);
+  }
+
+  boolean opaque(String supertype) {
+    if (supertype == null) {
+      return true;
+    }
+    final IndexedType type = types.get(supertype);
+    if (type != null) {
+      return type.opaque();
+    }
+    return !isRoot(supertype) && !platform.isJdk(supertype);
   }
 
   boolean isTopLevel(String name) {
@@ -331,17 +330,45 @@ final class SimpleNameIndex {
     UNKNOWN
   }
 
-  record NameContext(List<String> enclosingTypes, Map<String, List<WrittenName>> localSupertypes) {
+  record NameContext(
+      List<String> enclosingTypes,
+      Map<String, List<WrittenName>> localSupertypes,
+      List<Set<String>> typeVariables) {
 
     static final NameContext NONE = new NameContext(List.of());
 
     NameContext {
       enclosingTypes = List.copyOf(enclosingTypes);
       localSupertypes = Map.copyOf(localSupertypes);
+      typeVariables = List.copyOf(typeVariables);
+      if (!typeVariables.isEmpty() && typeVariables.size() != enclosingTypes.size() + 1) {
+        throw new IllegalArgumentException(
+            "um nível de variáveis de tipo por tipo e mais um: " + typeVariables.size());
+      }
+    }
+
+    NameContext(List<String> enclosingTypes, Map<String, List<WrittenName>> localSupertypes) {
+      this(enclosingTypes, localSupertypes, List.of());
     }
 
     NameContext(List<String> enclosingTypes) {
       this(enclosingTypes, Map.of());
+    }
+
+    Set<String> typeVariablesAt(int level) {
+      return typeVariables.isEmpty() ? Set.of() : typeVariables.get(level);
+    }
+
+    NameContext withInnerTypeVariables(Set<String> inner) {
+      if (inner.isEmpty() && typeVariables.isEmpty()) {
+        return this;
+      }
+      final List<Set<String>> levels = new ArrayList<>(enclosingTypes.size() + 1);
+      levels.add(Set.copyOf(inner));
+      for (int level = 1; level <= enclosingTypes.size(); level++) {
+        levels.add(typeVariablesAt(level));
+      }
+      return new NameContext(enclosingTypes, localSupertypes, levels);
     }
   }
 
@@ -358,7 +385,8 @@ final class SimpleNameIndex {
     PLACED,
     UNCHANGED_COMPLETE,
     UNCHANGED_INCOMPLETE,
-    AMBIGUOUS
+    AMBIGUOUS,
+    TYPE_VARIABLE
   }
 
   @FunctionalInterface

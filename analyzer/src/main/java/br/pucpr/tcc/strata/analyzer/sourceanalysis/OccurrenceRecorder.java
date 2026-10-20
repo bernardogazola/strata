@@ -87,7 +87,7 @@ final class OccurrenceRecorder {
           DependencyType.CALLS,
           anchor,
           attribution.fromMethod(site),
-          callees.of(site));
+          target.uncertainCallee() ? null : callees.of(site, target.id()));
     }
   }
 

@@ -10,6 +10,7 @@ import java.util.Comparator;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +54,9 @@ import spoon.support.reflect.CtExtendedModifier;
 final class ElementIds {
 
   static final String OBJECT = "java.lang.Object";
+
+  static final Set<String> PRIMITIVES =
+      Set.of("boolean", "byte", "char", "short", "int", "long", "float", "double", "void");
 
   private static final String CONSTRUCTOR = "<init>";
   private static final String STATIC_INITIALIZER = "<clinit>";
@@ -143,20 +147,32 @@ final class ElementIds {
               ? OBJECT
               : erase(intersection.getBounds().getFirst(), scope, seen);
       case CtWildcardReference _ -> OBJECT;
-      case CtTypeParameterReference variable -> eraseVariable(variable, scope, seen);
-      default -> resolveLeaf(reference, scope).name();
+      case CtTypeParameterReference variable ->
+          eraseVariable(variable.getDeclaration(), scope, seen);
+      default -> {
+        final SimpleNameIndex.NameResolution leaf = resolveLeaf(reference, scope);
+        yield leaf.outcome() == SimpleNameIndex.Outcome.TYPE_VARIABLE
+            ? eraseVariable(typeParameter(reference, leaf.name()), scope, seen)
+            : leaf.name();
+      }
     };
   }
 
   static SimpleNameIndex.NameContext context(CtElement element) {
-    final CtType<?> owner = bodyOwner(element);
-    return owner == null ? SimpleNameIndex.NameContext.NONE : contextOf(owner);
+    final Site site = site(element);
+    final SimpleNameIndex.NameContext base =
+        site.owner() == null ? SimpleNameIndex.NameContext.NONE : contextOf(site.owner());
+    return site.declarer() == null ? base : withTypeVariables(base, site);
   }
 
   static SimpleNameIndex.NameContext contextOf(CtType<?> start) {
     final List<String> chain = new ArrayList<>();
     final Map<String, List<SimpleNameIndex.WrittenName>> locals = new HashMap<>();
-    for (CtType<?> type = start; type != null; type = type.getParent(CtType.class)) {
+    final List<Set<String>> variables = new ArrayList<>();
+    variables.add(Set.of());
+    boolean anyVariable = false;
+    CtType<?> type = start;
+    while (type != null) {
       if (isElementType(type)) {
         chain.add(idName(type));
       } else {
@@ -164,10 +180,100 @@ final class ElementIds {
         chain.add(key);
         locals.put(key, writtenSupertypes(type));
       }
+      final CtType<?> outer = type.getParent(CtType.class);
+      final Set<String> after = new HashSet<>();
+      addTypeVariables(type, after);
+      if (outer != null) {
+        for (CtElement between = type.getParent();
+            between != outer;
+            between = between.getParent()) {
+          if (between instanceof CtExecutable<?>) {
+            addTypeVariables(between, after);
+          }
+        }
+      }
+      anyVariable |= !after.isEmpty();
+      variables.add(Set.copyOf(after));
+      type = outer;
     }
-    return chain.isEmpty()
-        ? SimpleNameIndex.NameContext.NONE
-        : new SimpleNameIndex.NameContext(chain, locals);
+    if (chain.isEmpty()) {
+      return SimpleNameIndex.NameContext.NONE;
+    }
+    return new SimpleNameIndex.NameContext(chain, locals, anyVariable ? variables : List.of());
+  }
+
+  static Site site(CtElement element) {
+    if (element instanceof CtType<?> type && !(element instanceof CtTypeParameter)) {
+      return new Site(type, null);
+    }
+    CtElement declarer = null;
+    CtElement child = element;
+    while (child.isParentInitialized()) {
+      final CtElement parent = child.getParent();
+      if (parent == null) {
+        break;
+      }
+      if (parent instanceof CtType<?> type && !(parent instanceof CtTypeParameter)) {
+        if (!isHeader(child)) {
+          return new Site(type, declarer);
+        }
+        if (declarer == null && declaresTypeVariables(type)) {
+          declarer = type;
+        }
+        if (type.isTopLevel()) {
+          break;
+        }
+      } else if (declarer == null
+          && parent instanceof CtExecutable<?>
+          && declaresTypeVariables(parent)) {
+        declarer = parent;
+      }
+      child = parent;
+    }
+    return new Site(null, declarer);
+  }
+
+  static SimpleNameIndex.NameContext withTypeVariables(
+      SimpleNameIndex.NameContext base, Site site) {
+    final Set<String> inner = new HashSet<>();
+    for (CtElement current = site.declarer();
+        current != null && current != site.owner() && !(current instanceof CtPackage);
+        current = current.isParentInitialized() ? current.getParent() : null) {
+      if (current instanceof CtExecutable<?>
+          || current instanceof CtType<?> && !(current instanceof CtTypeParameter)) {
+        addTypeVariables(current, inner);
+      }
+    }
+    return base.withInnerTypeVariables(inner);
+  }
+
+  static CtTypeParameter typeParameter(CtElement from, String name) {
+    for (CtElement current = from;
+        current != null && !(current instanceof CtPackage);
+        current = current.isParentInitialized() ? current.getParent() : null) {
+      if (current instanceof CtFormalTypeDeclarer declarer
+          && !(current instanceof CtTypeParameter)) {
+        for (final CtTypeParameter parameter : declarer.getFormalCtTypeParameters()) {
+          if (name.equals(parameter.getSimpleName())) {
+            return parameter;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  private static boolean declaresTypeVariables(CtElement element) {
+    return element instanceof CtFormalTypeDeclarer declarer
+        && !declarer.getFormalCtTypeParameters().isEmpty();
+  }
+
+  private static void addTypeVariables(CtElement element, Set<String> names) {
+    if (element instanceof CtFormalTypeDeclarer declarer) {
+      for (final CtTypeParameter parameter : declarer.getFormalCtTypeParameters()) {
+        names.add(parameter.getSimpleName());
+      }
+    }
   }
 
   static SimpleNameIndex.NameResolution resolveLeaf(
@@ -181,22 +287,10 @@ final class ElementIds {
   }
 
   static CtType<?> bodyOwner(CtElement element) {
-    if (element instanceof CtType<?> type && !(element instanceof CtTypeParameter)) {
-      return type;
-    }
-    CtElement child = element;
-    while (child.isParentInitialized()) {
-      final CtElement parent = child.getParent();
-      if (parent == null) {
-        return null;
-      }
-      if (parent instanceof CtType<?> type && !(parent instanceof CtTypeParameter)) {
-        return isHeader(child) ? type.getParent(CtType.class) : type;
-      }
-      child = parent;
-    }
-    return null;
+    return site(element).owner();
   }
+
+  record Site(CtType<?> owner, CtElement declarer) {}
 
   private static boolean isHeader(CtElement child) {
     final boolean candidate =
@@ -229,8 +323,7 @@ final class ElementIds {
   }
 
   private static String eraseVariable(
-      CtTypeParameterReference variable, SimpleNameIndex.Scope scope, Set<CtTypeParameter> seen) {
-    final CtTypeParameter declaration = variable.getDeclaration();
+      CtTypeParameter declaration, SimpleNameIndex.Scope scope, Set<CtTypeParameter> seen) {
     if (declaration == null || declaration.getSuperclass() == null) {
       return OBJECT;
     }

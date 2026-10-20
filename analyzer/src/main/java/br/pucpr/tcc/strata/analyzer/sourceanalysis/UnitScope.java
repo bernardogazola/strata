@@ -8,6 +8,7 @@ import br.pucpr.tcc.strata.analyzer.sourceanalysis.SimpleNameIndex.TypeLookup;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SimpleNameIndex.WrittenName;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -20,9 +21,6 @@ import spoon.reflect.declaration.CtType;
 
 final class UnitScope implements SimpleNameIndex.Scope {
 
-  private static final Set<String> PRIMITIVES =
-      Set.of("boolean", "byte", "char", "short", "int", "long", "float", "double", "void");
-
   private static final String JAVA_LANG = "java.lang.";
   private static final String DIMENSION = "[]";
 
@@ -32,6 +30,7 @@ final class UnitScope implements SimpleNameIndex.Scope {
   private final Map<NameContext, Map<String, NameResolution>> qualifiedNames = new HashMap<>();
   private final Map<NameContext, List<Frame>> chains = new HashMap<>();
   private final Map<CtType<?>, NameContext> contexts = new IdentityHashMap<>();
+  private final Map<CtElement, NameContext> declaredContexts = new IdentityHashMap<>();
   private final Map<String, Map<String, TypeLookup>> memberTypes = new HashMap<>();
   private final Map<String, Placement> scopeSteps = new HashMap<>();
   private final Map<String, Placement> scopeStepsWithJavaLang = new HashMap<>();
@@ -64,10 +63,15 @@ final class UnitScope implements SimpleNameIndex.Scope {
 
   @Override
   public NameContext context(CtElement element) {
-    final CtType<?> owner = ElementIds.bodyOwner(element);
-    return owner == null
-        ? NameContext.NONE
-        : contexts.computeIfAbsent(owner, ElementIds::contextOf);
+    final ElementIds.Site site = ElementIds.site(element);
+    final NameContext base =
+        site.owner() == null
+            ? NameContext.NONE
+            : contexts.computeIfAbsent(site.owner(), ElementIds::contextOf);
+    return site.declarer() == null
+        ? base
+        : declaredContexts.computeIfAbsent(
+            site.declarer(), _ -> ElementIds.withTypeVariables(base, site));
   }
 
   long dottedConflicts() {
@@ -77,7 +81,7 @@ final class UnitScope implements SimpleNameIndex.Scope {
   String resolveSource(String text, List<String> chain) {
     final List<Frame> frames = new ArrayList<>(chain.size());
     for (final String id : chain) {
-      frames.add(new Frame(id, null));
+      frames.add(new Frame(id, null, Set.of()));
     }
     final Reading reading = read(text, frames, null);
     return reading.validity() == Validity.NONE || reading.validity() == Validity.AMBIGUOUS
@@ -94,7 +98,7 @@ final class UnitScope implements SimpleNameIndex.Scope {
     if (typeVariables.contains(base)) {
       return null;
     }
-    if (PRIMITIVES.contains(base)) {
+    if (ElementIds.PRIMITIVES.contains(base)) {
       return written;
     }
     final String placed = resolveSource(base, body);
@@ -103,12 +107,16 @@ final class UnitScope implements SimpleNameIndex.Scope {
   }
 
   private NameResolution compute(String name, boolean writtenSimple, NameContext context) {
-    if (PRIMITIVES.contains(name)) {
+    if (ElementIds.PRIMITIVES.contains(name)) {
       return new NameResolution(name, Outcome.UNCHANGED_INCOMPLETE);
     }
     final List<Frame> frames = chains.computeIfAbsent(context, this::frames);
     if (writtenSimple) {
-      final Placement placement = simple(name.substring(name.lastIndexOf('.') + 1), frames, name);
+      final String n = name.substring(name.lastIndexOf('.') + 1);
+      final Placement placement = simple(n, frames, context.typeVariablesAt(0), name);
+      if (placement.typeVariable()) {
+        return new NameResolution(n, Outcome.TYPE_VARIABLE);
+      }
       return switch (placement.state()) {
         case FOUND -> new NameResolution(placement.name(), Outcome.PLACED);
         case AMBIGUOUS -> new NameResolution(name, Outcome.AMBIGUOUS);
@@ -158,7 +166,8 @@ final class UnitScope implements SimpleNameIndex.Scope {
   private Reading read(String text, List<Frame> frames, String spoonName) {
     final int separator = nextSeparator(text, 1);
     final String first = text.substring(0, separator);
-    final Placement head = simple(first, frames, separator == text.length() ? spoonName : null);
+    final Placement head =
+        simple(first, frames, null, separator == text.length() ? spoonName : null);
     if (head.state() == LookupState.AMBIGUOUS) {
       return new Reading(text, Validity.AMBIGUOUS, false);
     }
@@ -194,7 +203,10 @@ final class UnitScope implements SimpleNameIndex.Scope {
     return new Reading(index.canonicalInstance(name), validity, false);
   }
 
-  private Placement simple(String n, List<Frame> frames, String spoonName) {
+  private Placement simple(String n, List<Frame> frames, Set<String> leading, String spoonName) {
+    if (leading != null && leading.contains(n)) {
+      return Placement.TYPE_VARIABLE;
+    }
     boolean incomplete = false;
     for (final Frame frame : frames) {
       final TypeLookup member = memberOf(frame, n);
@@ -207,6 +219,9 @@ final class UnitScope implements SimpleNameIndex.Scope {
         }
         case UNKNOWN -> incomplete = true;
         case NONE -> {}
+      }
+      if (leading != null && frame.typeVariables().contains(n)) {
+        return Placement.TYPE_VARIABLE;
       }
     }
     final boolean javaLang =
@@ -332,9 +347,10 @@ final class UnitScope implements SimpleNameIndex.Scope {
     final Deque<Frame> frames = new ArrayDeque<>(entries.size());
     for (int at = entries.size() - 1; at >= 0; at--) {
       final String entry = entries.get(at);
+      final Set<String> after = context.typeVariablesAt(at + 1);
       final List<WrittenName> written = context.localSupertypes().get(entry);
       if (written == null) {
-        frames.addFirst(new Frame(entry, null));
+        frames.addFirst(new Frame(entry, null, after));
         continue;
       }
       final List<Frame> outer = List.copyOf(frames);
@@ -342,7 +358,7 @@ final class UnitScope implements SimpleNameIndex.Scope {
       for (int i = 0; i < supertypes.length; i++) {
         supertypes[i] = localSupertype(written.get(i), outer);
       }
-      frames.addFirst(new Frame(entry, supertypes));
+      frames.addFirst(new Frame(entry, supertypes, after));
     }
     return List.copyOf(frames);
   }
@@ -359,7 +375,8 @@ final class UnitScope implements SimpleNameIndex.Scope {
   }
 
   private NameResolution simpleResolution(String name, List<Frame> outer) {
-    final Placement placement = simple(name.substring(name.lastIndexOf('.') + 1), outer, name);
+    final Placement placement =
+        simple(name.substring(name.lastIndexOf('.') + 1), outer, null, name);
     return placement.state() == LookupState.FOUND
         ? new NameResolution(placement.name(), Outcome.PLACED)
         : new NameResolution(
@@ -383,18 +400,29 @@ final class UnitScope implements SimpleNameIndex.Scope {
     return text.length();
   }
 
-  private record Frame(String id, String[] localSupertypes) {}
+  private record Frame(String id, String[] localSupertypes, Set<String> typeVariables) {}
 
-  private record Placement(LookupState state, String name, boolean incomplete) {
+  List<String> localSupertypes(CtType<?> localType) {
+    final List<Frame> frames = chains.computeIfAbsent(context(localType), this::frames);
+    final String[] supertypes = frames.isEmpty() ? null : frames.getFirst().localSupertypes();
+    return supertypes == null ? List.of() : Arrays.asList(supertypes);
+  }
 
-    private static final Placement AMBIGUOUS = new Placement(LookupState.AMBIGUOUS, null, false);
+  private record Placement(
+      LookupState state, String name, boolean incomplete, boolean typeVariable) {
+
+    private static final Placement AMBIGUOUS =
+        new Placement(LookupState.AMBIGUOUS, null, false, false);
+
+    private static final Placement TYPE_VARIABLE =
+        new Placement(LookupState.NONE, null, false, true);
 
     private static Placement found(String name) {
-      return new Placement(LookupState.FOUND, name, false);
+      return new Placement(LookupState.FOUND, name, false, false);
     }
 
     private static Placement none(boolean incomplete) {
-      return new Placement(LookupState.NONE, null, incomplete);
+      return new Placement(LookupState.NONE, null, incomplete, false);
     }
   }
 

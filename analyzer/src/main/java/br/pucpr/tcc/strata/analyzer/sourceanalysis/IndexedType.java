@@ -19,6 +19,7 @@ final class IndexedType {
   private String[] supertypes;
   private String[] fieldTypes;
   private boolean complete;
+  private boolean opaque;
 
   IndexedType(
       String id,
@@ -111,5 +112,13 @@ final class IndexedType {
 
   void complete(boolean value) {
     complete = value;
+  }
+
+  boolean opaque() {
+    return opaque;
+  }
+
+  void opaque(boolean value) {
+    opaque = value;
   }
 }

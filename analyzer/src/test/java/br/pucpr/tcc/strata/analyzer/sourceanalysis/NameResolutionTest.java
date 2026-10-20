@@ -18,6 +18,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import spoon.experimental.CtUnresolvedImport;
@@ -337,6 +338,121 @@ final class NameResolutionTest {
         .isEqualTo(Outcome.UNCHANGED_INCOMPLETE);
     assertThat(scope.resolve("b.Missing", true, in("b.Top")).outcome())
         .isEqualTo(Outcome.UNCHANGED_COMPLETE);
+  }
+
+  @Test
+  void umaVariavelDeTipoAVistaNaoEColocadaComoTipo() {
+    final Fixture fixture =
+        Fixture.of(
+            Map.of(
+                "c/Response.java", "package c;\npublic class Response {}\n",
+                "c/Listener.java", "package c;\npublic interface Listener<R> {}\n",
+                "c/Tasks.java", "package c;\npublic class Tasks {}\n"));
+    final List<String> chain = List.of("c.Tasks$1", "c.Tasks");
+    final Map<String, List<WrittenName>> anonymous =
+        Map.of("c.Tasks$1", List.of(new WrittenName("c.Listener", true)));
+    final NameContext withVariables =
+        new NameContext(
+            chain, anonymous, List.of(Set.of(), Set.of("Request", "Response"), Set.of()));
+    final UnitScope scope = fixture.scope("c/Tasks.java");
+
+    assertThat(scope.resolve("c.Response", true, withVariables))
+        .isEqualTo(new NameResolution("Response", Outcome.TYPE_VARIABLE));
+    assertPlaced(
+        scope.resolve("c.Response", true, new NameContext(chain, anonymous)), "c.Response");
+    assertPlaced(scope.resolve("c.Response", false, withVariables), "c.Response");
+  }
+
+  @Test
+  void aVariavelDeTipoEOTipoMembroSeEscondemPorNivelLexico() {
+    final Fixture fixture =
+        Fixture.of(
+            Map.of(
+                "c/Base.java", "package c;\npublic class Base {\n  public static class R {}\n}\n",
+                "c/Own.java", "package c;\npublic class Own<T> {\n  static class T {}\n}\n",
+                "c/Over.java", "package c;\npublic class Over {\n  static class T {}\n}\n",
+                "c/Use.java", "package c;\npublic class Use {}\n"));
+    final NameContext inherited =
+        new NameContext(
+            List.of("c.Use$1", "c.Use"),
+            Map.of("c.Use$1", List.of(new WrittenName("c.Base", false))),
+            List.of(Set.of(), Set.of("R"), Set.of()));
+    final NameContext ownMember =
+        new NameContext(List.of("c.Own"), Map.of(), List.of(Set.of(), Set.of("T")));
+    final NameContext methodOverMember =
+        new NameContext(List.of("c.Over"), Map.of(), List.of(Set.of("T"), Set.of()));
+    final NameContext externalAnonymous =
+        new NameContext(
+            List.of("c.Use$2", "c.Use"),
+            Map.of("c.Use$2", List.of(new WrittenName("org.ext.Thing", false))),
+            List.of(Set.of(), Set.of("R"), Set.of()));
+
+    assertPlaced(fixture.scope("c/Use.java").resolve("c.R", true, inherited), "c.Base$R");
+    assertPlaced(fixture.scope("c/Own.java").resolve("c.T", true, ownMember), "c.Own$T");
+    assertThat(fixture.scope("c/Over.java").resolve("c.T", true, methodOverMember))
+        .isEqualTo(new NameResolution("T", Outcome.TYPE_VARIABLE));
+    assertThat(fixture.scope("c/Use.java").resolve("c.R", true, externalAnonymous))
+        .isEqualTo(new NameResolution("R", Outcome.TYPE_VARIABLE));
+  }
+
+  @Test
+  void opacoEOTipoComUmSupertipoDeForaDoJdkTransitivamente() {
+    final Fixture fixture =
+        Fixture.of(
+            Map.ofEntries(
+                Map.entry("x/Plain.java", "package x;\npublic class Plain {}\n"),
+                Map.entry("x/Kind.java", "package x;\npublic enum Kind { A }\n"),
+                Map.entry("x/OkHeir.java", "package x;\npublic class OkHeir extends Plain {}\n"),
+                Map.entry(
+                    "x/Jdk.java",
+                    "package x;\nimport java.util.HashMap;\npublic class Jdk extends HashMap {}\n"),
+                Map.entry(
+                    "x/Ext.java",
+                    "package x;\nimport org.ext.Base;\npublic class Ext extends Base {}\n"),
+                Map.entry("x/Heir.java", "package x;\npublic class Heir extends Ext {}\n"),
+                Map.entry(
+                    "x/Fqn.java",
+                    "package x;\npublic class Fqn extends java.util.AbstractList {}\n"),
+                Map.entry(
+                    "x/ExtFqn.java", "package x;\npublic class ExtFqn extends org.ext.Thing {}\n"),
+                Map.entry(
+                    "x/Rte.java", "package x;\npublic class Rte extends RuntimeException {}\n"),
+                Map.entry("x/Ghosty.java", "package x;\npublic class Ghosty extends Phantom {}\n"),
+                Map.entry("x/Cy1.java", "package x;\npublic class Cy1 extends Cy2 {}\n"),
+                Map.entry("x/Cy2.java", "package x;\npublic class Cy2 extends Cy1 {}\n"),
+                Map.entry(
+                    "x/Oc1.java",
+                    "package x;\npublic class Oc1 extends Oc2 implements org.ext.Api {}\n"),
+                Map.entry("x/Oc2.java", "package x;\npublic class Oc2 extends Oc1 {}\n")));
+    final SimpleNameIndex index = fixture.index();
+
+    assertThat(
+            List.of("x.Plain", "x.Kind", "x.OkHeir", "x.Jdk", "x.Fqn", "x.Rte", "x.Cy1", "x.Cy2"))
+        .allSatisfy(id -> assertThat(index.type(id).opaque()).as(id).isFalse());
+    assertThat(List.of("x.Ext", "x.Heir", "x.ExtFqn", "x.Ghosty", "x.Oc1", "x.Oc2"))
+        .allSatisfy(id -> assertThat(index.type(id).opaque()).as(id).isTrue());
+    assertThat(index.opaque("java.util.HashMap")).isFalse();
+    assertThat(index.opaque("java.lang.Object")).isFalse();
+    assertThat(index.opaque("org.ext.Base")).isTrue();
+    assertThat(index.opaque(null)).as("um supertipo que nenhuma regra pôs").isTrue();
+  }
+
+  @Test
+  void oJavaLangQueOSpoonDeuValeMesmoComUmSupertipoDeFora() {
+    final Fixture fixture =
+        Fixture.of(
+            Map.of(
+                "a/Holder.java",
+                "package a;\nimport ext.Base;\npublic class Holder extends Base {}\n",
+                "a/MyMap.java",
+                "package a;\npublic class MyMap extends java.util.HashMap {}\n"));
+
+    assertThat(fixture.resolve("a/MyMap.java", "java.lang.String", "a.MyMap"))
+        .isEqualTo(new NameResolution("java.lang.String", Outcome.PLACED));
+    assertThat(fixture.resolve("a/Holder.java", "java.lang.Record", "a.Holder"))
+        .isEqualTo(new NameResolution("java.lang.Record", Outcome.PLACED));
+    assertThat(fixture.resolve("a/Holder.java", "java.lang.String", "a.Holder"))
+        .isEqualTo(new NameResolution("java.lang.String", Outcome.PLACED));
   }
 
   @Test

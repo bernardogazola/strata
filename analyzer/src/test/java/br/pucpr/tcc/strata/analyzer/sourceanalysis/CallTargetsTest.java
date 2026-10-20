@@ -522,6 +522,69 @@ final class CallTargetsTest {
     assertThat(clean).isEmpty();
   }
 
+  @Test
+  void oReceptorQueOSpoonFazDeTipoEAVariavelAVistaPeloEscopoDaJls() throws Exception {
+    final String scopes =
+        """
+        package p;
+
+        public class Scopes {
+          void m(org.ext.Missing missing) {
+            missing.run(
+                () -> {
+                  Object o = missing.get();
+                  if (o instanceof Integer i && i.intValue() > 0) {}
+                  if (!(o instanceof Long l)) {
+                  } else {
+                    l.longValue();
+                  }
+                  if (!(o instanceof Short sh)) {
+                    return;
+                  }
+                  sh.shortValue();
+                  double value = o instanceof Double d ? d.doubleValue() : 0;
+                  if (!(o instanceof Float f) || f.isNaN()) {}
+                  switch (o) {
+                    case Byte b -> b.byteValue();
+                    default -> {}
+                  }
+                  try {
+                    missing.call();
+                  } catch (IllegalStateException e) {
+                    new Object() {
+                      Runnable e = null;
+
+                      void g() {
+                        e.run();
+                      }
+                    };
+                  }
+                  if (o instanceof Character c) {}
+                  c.charValue();
+                });
+          }
+        }
+        """;
+
+    final Run run = extract(Map.of("src/main/java/p/Scopes.java", scopes));
+
+    assertThat(run.sink().tuples())
+        .containsExactly(
+            "p.Scopes -> c CALLS x1 UNRESOLVED_EXTERNAL external",
+            "p.Scopes -> java.lang.Byte CALLS x1 RESOLVED external",
+            "p.Scopes -> java.lang.Double CALLS x1 RESOLVED external",
+            "p.Scopes -> java.lang.Float CALLS x1 RESOLVED external",
+            "p.Scopes -> java.lang.Integer CALLS x1 RESOLVED external",
+            "p.Scopes -> java.lang.Long CALLS x1 RESOLVED external",
+            "p.Scopes -> java.lang.Object CALLS x1 RESOLVED external",
+            "p.Scopes -> java.lang.Runnable CALLS x1 RESOLVED external",
+            "p.Scopes -> java.lang.Runnable FIELD_TYPE x1 RESOLVED external",
+            "p.Scopes -> java.lang.Short CALLS x1 RESOLVED external",
+            "p.Scopes -> org.ext.Missing CALLS x3 UNRESOLVED_EXTERNAL external",
+            "p.Scopes -> org.ext.Missing PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external");
+    assertThat(run.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 0L);
+  }
+
   private record Run(StructureExtractor extractor, RecordingStructureSink sink) {
 
     Map<DropReason, Long> drops() {

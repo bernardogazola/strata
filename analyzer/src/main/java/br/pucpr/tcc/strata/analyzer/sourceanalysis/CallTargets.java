@@ -4,6 +4,8 @@ import br.pucpr.tcc.strata.analyzer.sourceanalysis.SimpleNameIndex.FieldLookup;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SimpleNameIndex.MemberAnswer;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.TargetNames.Target;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.UnitHomes.Home;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.UnqualifiedCalls.Qualifying;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.UnqualifiedCalls.Variable;
 import java.util.Set;
 import spoon.reflect.code.CtConstructorCall;
 import spoon.reflect.code.CtExpression;
@@ -14,11 +16,14 @@ import spoon.reflect.code.CtSuperAccess;
 import spoon.reflect.code.CtThisAccess;
 import spoon.reflect.code.CtTypeAccess;
 import spoon.reflect.code.CtVariableRead;
+import spoon.reflect.declaration.CtElement;
+import spoon.reflect.declaration.CtEnum;
 import spoon.reflect.declaration.CtEnumValue;
 import spoon.reflect.declaration.CtExecutable;
 import spoon.reflect.declaration.CtField;
 import spoon.reflect.declaration.CtMethod;
 import spoon.reflect.declaration.CtType;
+import spoon.reflect.declaration.CtVariable;
 import spoon.reflect.reference.CtArrayTypeReference;
 import spoon.reflect.reference.CtExecutableReference;
 import spoon.reflect.reference.CtFieldReference;
@@ -64,11 +69,20 @@ final class CallTargets {
     final CtExpression<?> receiver = invocation.getTarget();
     final CtExecutableReference<?> executable = invocation.getExecutable();
     if (executable != null && !executable.isConstructor() && isUnqualified(receiver)) {
-      final String qualifying = unqualified.qualifying(invocation, executable.getSimpleName());
-      if (qualifying != null) {
-        return names.exact(qualifying);
+      final Qualifying qualifying = unqualified.qualifying(invocation, executable.getSimpleName());
+      if (qualifying.name() != null) {
+        return names.exact(qualifying.name());
       }
+      final Target spoon = byReceiver(invocation, receiver, source);
+      return spoon != null && qualifying.outerOfUnknown().contains(spoon.id())
+          ? spoon.uncertain()
+          : spoon;
     }
+    return byReceiver(invocation, receiver, source);
+  }
+
+  private Target byReceiver(
+      CtInvocation<?> invocation, CtExpression<?> receiver, CodeElementId source) {
     return switch (receiver) {
       case CtSuperAccess<?> parent -> superclass(invocation, parent, source);
       case CtFieldRead<?> read -> field(invocation, read, source);
@@ -76,8 +90,61 @@ final class CallTargets {
       case CtInvocation<?> chained -> chained(invocation, chained, source);
       case CtConstructorCall<?> created when created.getType() != null ->
           names.qualifier(created.getType(), true);
+      case CtTypeAccess<?> access when !access.isImplicit() ->
+          typeAccess(invocation, access, source);
       case null, default -> fallback(invocation, receiver, source);
     };
+  }
+
+  private Target typeAccess(
+      CtInvocation<?> invocation, CtTypeAccess<?> access, CodeElementId source) {
+    final CtTypeReference<?> accessed = access.getAccessedType();
+    if (accessed != null && ElementIds.isWrittenSimple(accessed)) {
+      final String name = accessed.getSimpleName();
+      final Variable variable = unqualified.variable(access, name);
+      final Target target;
+      if (variable.declaration() != null) {
+        target = declared(variable.declaration());
+      } else if (variable.field() != null) {
+        target = indexed(access, variable.field(), name);
+      } else {
+        return fallback(invocation, access, source);
+      }
+      return target != null && variable.uncertain() ? target.uncertain() : target;
+    }
+    return fallback(invocation, access, source);
+  }
+
+  private Target declared(CtVariable<?> declaration) {
+    final CtTypeReference<?> type = declaration.getType();
+    if (unknown(type, declaration.getSimpleName())) {
+      return names.callWithoutTarget();
+    }
+    if (declaration instanceof CtLocalVariable<?> local
+        && (VAR.equals(type.getSimpleName()) || local.isInferred())) {
+      return byInitializer(local);
+    }
+    if (declaration instanceof CtField<?> field && isNamed(type)) {
+      final Home home = homes.of(field);
+      if (home != null) {
+        return names.copied(type, home);
+      }
+    }
+    return names.qualifier(captured(type), !type.isImplicit());
+  }
+
+  private Target indexed(CtElement site, FieldLookup found, String name) {
+    final CtType<?> owner =
+        declarations.type(site.getFactory().Type().createReference(found.declaringType()));
+    final CtField<?> declaration = owner == null ? null : fieldOf(owner, name);
+    return declaration != null ? declared(declaration) : names.recovered(found.typeName());
+  }
+
+  private static CtField<?> fieldOf(CtType<?> owner, String name) {
+    final CtField<?> field = owner.getField(name);
+    return field == null && owner instanceof CtEnum<?> enumeration
+        ? enumeration.getEnumValue(name)
+        : field;
   }
 
   private static boolean isUnqualified(CtExpression<?> receiver) {
@@ -145,9 +212,20 @@ final class CallTargets {
 
   private Target variable(CtVariableRead<?> read) {
     final CtVariableReference<?> variable = read.getVariable();
-    final CtTypeReference<?> type = read.getType();
-    if (variable == null || unknown(type, variable.getSimpleName())) {
+    if (variable == null) {
       return names.callWithoutTarget();
+    }
+    final CtTypeReference<?> type = read.getType();
+    final boolean unknown = unknown(type, variable.getSimpleName());
+    if (unknown || names.isOwnPackageGuess(type)) {
+      final CtVariable<?> declaration =
+          LexicalScope.local(read, variable.getSimpleName()).declaration();
+      if (declaration != null) {
+        return declared(declaration);
+      }
+      if (unknown) {
+        return names.callWithoutTarget();
+      }
     }
     final boolean literalVar = VAR.equals(type.getSimpleName());
     if (literalVar || ElementIds.OBJECT.equals(type.getQualifiedName())) {
@@ -156,13 +234,17 @@ final class CallTargets {
               ? reference.getDeclaration()
               : null;
       if (literalVar || local != null && local.isInferred()) {
-        final CtTypeReference<?> initialized = initializerType(local);
-        return initialized == null
-            ? names.callWithoutTarget()
-            : names.qualifier(captured(initialized), true);
+        return byInitializer(local);
       }
     }
     return names.qualifier(captured(type), !type.isImplicit());
+  }
+
+  private Target byInitializer(CtLocalVariable<?> local) {
+    final CtTypeReference<?> initialized = initializerType(local);
+    return initialized == null
+        ? names.callWithoutTarget()
+        : names.qualifier(captured(initialized), true);
   }
 
   private Target chained(CtInvocation<?> invocation, CtInvocation<?> inner, CodeElementId source) {

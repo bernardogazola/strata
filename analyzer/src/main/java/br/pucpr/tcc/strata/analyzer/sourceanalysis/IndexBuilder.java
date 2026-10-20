@@ -21,6 +21,7 @@ final class IndexBuilder {
   private static final String ANNOTATION = "java.lang.annotation.Annotation";
 
   private final ExternalPackages platform;
+  private final JavaLangTypes javaLang = new JavaLangTypes();
   private final Map<String, IndexedType> types = new HashMap<>();
   private final Map<IndexedType, Draft> drafts = new IdentityHashMap<>();
   private final List<Unit> units = new ArrayList<>();
@@ -92,6 +93,7 @@ final class IndexBuilder {
       index.resolvingSupertypesWith(null);
     }
     markComplete(ordered);
+    markOpaque(ordered);
     for (final IndexedType type : ordered) {
       final Draft draft = drafts.get(type);
       if (draft != null) {
@@ -114,11 +116,15 @@ final class IndexBuilder {
       final List<String> outer = draft.outerChain();
       final List<String> resolved = new ArrayList<>();
       final UnitShape.TypeShape shape = draft.shape();
+      final List<String> written = new ArrayList<>(shape.superInterfaces().size() + 1);
       if (shape.superclass() != null) {
-        resolved.add(scope.resolveSource(shape.superclass(), outer));
+        written.add(shape.superclass());
       }
-      for (final String written : shape.superInterfaces()) {
-        resolved.add(scope.resolveSource(written, outer));
+      written.addAll(shape.superInterfaces());
+      for (final String text : written) {
+        final String name = scope.resolveSource(text, outer);
+        resolved.add(name);
+        type.opaque(type.opaque() || outsideJdk(text, name));
       }
       final String implicit = implicitSupertype(type, shape);
       if (implicit != null) {
@@ -132,6 +138,21 @@ final class IndexBuilder {
     }
   }
 
+  private boolean outsideJdk(String text, String name) {
+    if (name != null) {
+      return !types.containsKey(name) && !SimpleNameIndex.isRoot(name) && !platform.isJdk(name);
+    }
+    if (text.indexOf('.') < 0) {
+      return javaLang.qualify(text) == null;
+    }
+    for (int dot = text.lastIndexOf('.'); dot > 0; dot = text.lastIndexOf('.', dot - 1)) {
+      if (platform.isJdkPackage(text.substring(0, dot))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private static String implicitSupertype(IndexedType type, UnitShape.TypeShape shape) {
     return switch (shape.kind()) {
       case ENUM -> ENUM;
@@ -140,6 +161,30 @@ final class IndexBuilder {
       case INTERFACE -> null;
       case CLASS -> shape.superclass() == null && !OBJECT.equals(type.id()) ? OBJECT : null;
     };
+  }
+
+  private void markOpaque(List<IndexedType> ordered) {
+    final Map<IndexedType, List<IndexedType>> heirs = new IdentityHashMap<>();
+    final Deque<IndexedType> opaque = new ArrayDeque<>();
+    for (final IndexedType type : ordered) {
+      for (final String supertype : type.supertypes()) {
+        final IndexedType parent = supertype == null ? null : types.get(supertype);
+        if (parent != null) {
+          heirs.computeIfAbsent(parent, _ -> new ArrayList<>()).add(type);
+        }
+      }
+      if (type.opaque() || !type.structured()) {
+        type.opaque(false);
+        opaque.add(type);
+      }
+    }
+    while (!opaque.isEmpty()) {
+      final IndexedType type = opaque.poll();
+      if (!type.opaque()) {
+        type.opaque(true);
+        opaque.addAll(heirs.getOrDefault(type, List.of()));
+      }
+    }
   }
 
   private void markComplete(List<IndexedType> ordered) {

@@ -369,6 +369,38 @@ final class Rule7RegressionTest {
             "method:b.Top$Inner#<init>()"));
   }
 
+  @Test
+  void umaVariavelDeTipoNumaAnonimaComDiamanteApagaParaOLimite() throws Exception {
+    assertSameMethodIds(
+        Map.of(
+            "a/Listener.java",
+            "package a;\n\npublic interface Listener<R> {\n  void on(R r);\n}\n"),
+        "b/Internal.java",
+        """
+        package b;
+
+        import a.Listener;
+
+        public class Internal {
+          <Response extends CharSequence> void m(Listener<Response> l) {
+            run(
+                l,
+                new Listener<>() {
+                  public void on(Response r) {}
+                });
+          }
+
+          <R> void run(Listener<R> l, Listener<R> other) {}
+        }
+        """,
+        List.of(
+            "method:a.Listener#on(java.lang.Object)",
+            "method:b.Internal#<init>()",
+            "method:b.Internal#m(a.Listener)",
+            "method:b.Internal#on(java.lang.CharSequence)",
+            "method:b.Internal#run(a.Listener,a.Listener)"));
+  }
+
   private static final String API_IN_A =
       """
       package a;

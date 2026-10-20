@@ -25,7 +25,7 @@
     {"from": "type:com.acme.plugin.Loader", "to": "type:com.acme.core.Widget", "type": "IMPORTS", "occurrences": 1, "resolution": "INFERRED"},
     {"from": "type:com.acme.plugin.Loader", "to": "type:com.acme.core.Widget", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "INFERRED"},
     {"from": "type:com.acme.plugin.spi.Probe", "to": "type:Config", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "UNRESOLVED_EXTERNAL", "external": true, "ambiguous": true},
-    {"from": "type:com.acme.plugin.spi.Probe", "to": "type:com.acme.core.Registry", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "INFERRED"},
+    {"from": "type:com.acme.plugin.spi.Probe", "to": "type:Registry", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "UNRESOLVED_EXTERNAL", "external": true},
     {"from": "type:com.acme.plugin.spi.Probe", "to": "type:com.thirdparty.Missing", "type": "IMPORTS", "occurrences": 1, "resolution": "UNRESOLVED_EXTERNAL", "external": true},
     {"from": "type:com.acme.plugin.spi.Probe", "to": "type:com.thirdparty.Missing", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "UNRESOLVED_EXTERNAL", "external": true},
     {"from": "type:com.acme.plugin.spi.Probe", "to": "type:java.lang.String", "type": "FIELD_TYPE", "occurrences": 1, "resolution": "RESOLVED", "external": true}
