@@ -29,7 +29,8 @@ record DependencyExtractionReport(
       int maxModelSourceBytes,
       String rootOrder,
       Map<String, String> selections,
-      Baseline baseline) {}
+      Baseline baseline,
+      List<String> runtimeImageModules) {}
 
   record Baseline(String file, String measuredAt, String baseCommit) {}
 
@@ -94,6 +95,7 @@ record DependencyExtractionReport(
       Ambiguity ambiguous,
       ToMethod toMethod,
       Externals externals,
+      OwnPackageExternals ownPackageExternals,
       FanOutExternal fanOutExternal,
       Checks checks,
       Drops drops,
@@ -199,7 +201,18 @@ record DependencyExtractionReport(
       Share notJdkJavax,
       Share bare,
       Share bareLowerCase,
-      List<NamedCount> bareLowerCaseSample) {}
+      List<NamedCount> bareLowerCaseSample,
+      Share bareAllCaps,
+      List<NamedCount> bareAllCapsSample,
+      Share jdkOutsideImage,
+      Map<String, Share> jdkOutsideImageByModule) {}
+
+  record OwnPackageExternals(
+      long rows,
+      long occurrences,
+      long distinctTargets,
+      Map<String, Long> rowsByType,
+      List<NamedCount> sample) {}
 
   record FanOutExternal(
       long types, Spread all, Spread withoutDenylisted, long pairs, long pairsWithoutDenylisted) {}

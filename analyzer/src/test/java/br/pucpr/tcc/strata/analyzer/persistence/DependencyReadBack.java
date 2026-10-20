@@ -13,6 +13,7 @@ import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.FanOu
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.LargestRow;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Modules;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.NamedCount;
+import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.OwnPackageExternals;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.ParseFailedFile;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Share;
 import br.pucpr.tcc.strata.analyzer.persistence.DependencyExtractionReport.Spread;
@@ -28,6 +29,14 @@ import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.Dependency;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyEdge;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality;
+import java.io.IOException;
+import java.lang.module.Configuration;
+import java.lang.module.ModuleDescriptor;
+import java.lang.module.ModuleFinder;
+import java.lang.module.ModuleReference;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -42,6 +51,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 final class DependencyReadBack {
 
@@ -56,6 +67,13 @@ final class DependencyReadBack {
   private static final int SAMPLE = 10;
   private static final String JAVA_PREFIX = "java.";
   private static final String JAVAX_PREFIX = "javax.";
+  private static final String COMMENT = "#";
+  private static final String HAND_ADDED_MODULE = "+";
+
+  private static final int ALL_CAPS_MIN_LENGTH = 2;
+
+  private static final String NOT_EXPORTED_HERE = "(not exported by the measuring JDK)";
+
   private static final ExternalPackages PACKAGES = ExternalPackages.load();
 
   private static final String ELEMENTS_BY_KIND =
@@ -158,7 +176,8 @@ final class DependencyReadBack {
 
   private DependencyReadBack() {}
 
-  static Result read(SqliteConnections connections, long analysisPk, int unnumberedCallees)
+  static Result read(
+      SqliteConnections connections, long analysisPk, int unnumberedCallees, RuntimeImage image)
       throws SQLException {
     return connections.read(
         c -> {
@@ -199,7 +218,8 @@ final class DependencyReadBack {
               scan.ambiguity(),
               new ToMethod(
                   callees[0], callees[1], callees[2], callees[3], unnumberedCallees, callees[6]),
-              externals(types, scan.externalTargets()),
+              externals(types, scan.externalTargets(), image),
+              scan.ownPackage(),
               scan.fanOutExternal(),
               integrity,
               census(types, scan.basePairs()));
@@ -303,6 +323,7 @@ final class DependencyReadBack {
         tally.ambiguousMalformed,
         tally.externalQualityMismatches,
         tally.externalTargets,
+        tally.ownPackage(),
         fanOutExternal(aggregated, types, byId));
   }
 
@@ -353,7 +374,8 @@ final class DependencyReadBack {
     return sorted[Math.max(0, (int) Math.ceil(fraction * sorted.length) - 1)];
   }
 
-  private static Externals externals(Map<Long, TypeRow> types, Map<Long, long[]> targets) {
+  private static Externals externals(
+      Map<Long, TypeRow> types, Map<Long, long[]> targets, RuntimeImage image) {
     final long[] all = new long[2];
     final long[] jdk = new long[2];
     final long[] denylisted = new long[2];
@@ -363,6 +385,10 @@ final class DependencyReadBack {
     final long[] bare = new long[2];
     final long[] lowerCase = new long[2];
     final List<NamedCount> lowerCaseNames = new ArrayList<>();
+    final long[] allCaps = new long[2];
+    final List<NamedCount> allCapsNames = new ArrayList<>();
+    final long[] outsideImage = new long[2];
+    final Map<String, long[]> outsideImageByModule = new TreeMap<>();
     for (final TypeRow type : types.values()) {
       if (!type.external()) {
         continue;
@@ -378,6 +404,11 @@ final class DependencyReadBack {
         if (!name.startsWith(JAVA_PREFIX)) {
           add(beyondJava, used);
         }
+        final String module = image.moduleOf(packageOf(name));
+        if (!image.links(module)) {
+          add(outsideImage, used);
+          add(outsideImageByModule.computeIfAbsent(module, _ -> new long[2]), used);
+        }
       } else {
         add(notJdk, used);
         if (name.startsWith(JAVAX_PREFIX)) {
@@ -389,9 +420,14 @@ final class DependencyReadBack {
         if (Character.isLowerCase(name.codePointAt(0))) {
           add(lowerCase, used);
           lowerCaseNames.add(new NamedCount(type.id().value(), used[0], used[1]));
+        } else if (isAllCaps(name)) {
+          add(allCaps, used);
+          allCapsNames.add(new NamedCount(type.id().value(), used[0], used[1]));
         }
       }
     }
+    final Map<String, Share> byModule = new LinkedHashMap<>();
+    outsideImageByModule.forEach((module, counts) -> byModule.put(module, share(counts)));
     return new Externals(
         share(all),
         share(jdk),
@@ -401,7 +437,24 @@ final class DependencyReadBack {
         share(javax),
         share(bare),
         share(lowerCase),
-        sample(lowerCaseNames, Comparator.comparingLong(NamedCount::occurrences)));
+        sample(lowerCaseNames, Comparator.comparingLong(NamedCount::occurrences)),
+        share(allCaps),
+        sample(allCapsNames, Comparator.comparingLong(NamedCount::occurrences)),
+        share(outsideImage),
+        byModule);
+  }
+
+  private static boolean isAllCaps(String name) {
+    return name.codePointCount(0, name.length()) >= ALL_CAPS_MIN_LENGTH
+        && Character.isUpperCase(name.codePointAt(0))
+        && name.codePoints().noneMatch(Character::isLowerCase);
+  }
+
+  private static String packageOf(String idName) {
+    final int dollar = idName.indexOf('$');
+    final String top = dollar < 0 ? idName : idName.substring(0, dollar);
+    final int lastDot = top.lastIndexOf('.');
+    return lastDot < 0 ? "" : top.substring(0, lastDot);
   }
 
   private static void add(long[] share, long[] used) {
@@ -582,6 +635,49 @@ final class DependencyReadBack {
     return violations;
   }
 
+  record RuntimeImage(List<String> modules, Map<String, String> moduleOfPackage) {
+
+    static RuntimeImage of(Path runtimeModules) throws IOException {
+      final List<String> roots = new ArrayList<>();
+      boolean jdepsLineRead = false;
+      for (final String line : Files.readAllLines(runtimeModules, StandardCharsets.UTF_8)) {
+        final String text = line.strip();
+        if (text.isEmpty() || text.startsWith(COMMENT)) {
+          continue;
+        }
+        if (text.startsWith(HAND_ADDED_MODULE)) {
+          roots.add(text.substring(HAND_ADDED_MODULE.length()).strip());
+        } else if (!jdepsLineRead) {
+          Arrays.stream(text.split(",")).map(String::strip).forEach(roots::add);
+          jdepsLineRead = true;
+        }
+      }
+      final Set<String> modules = new TreeSet<>();
+      Configuration.empty()
+          .resolve(ModuleFinder.ofSystem(), ModuleFinder.of(), roots)
+          .modules()
+          .forEach(module -> modules.add(module.name()));
+      final Map<String, String> moduleOfPackage = new HashMap<>();
+      for (final ModuleReference reference : ModuleFinder.ofSystem().findAll()) {
+        final ModuleDescriptor descriptor = reference.descriptor();
+        for (final ModuleDescriptor.Exports exports : descriptor.exports()) {
+          if (!exports.isQualified()) {
+            moduleOfPackage.put(exports.source(), descriptor.name());
+          }
+        }
+      }
+      return new RuntimeImage(List.copyOf(modules), Map.copyOf(moduleOfPackage));
+    }
+
+    private String moduleOf(String packageName) {
+      return moduleOfPackage.getOrDefault(packageName, NOT_EXPORTED_HERE);
+    }
+
+    private boolean links(String module) {
+      return modules.contains(module);
+    }
+  }
+
   record TypeRow(long pk, CodeElementId id, boolean external, String filePath) {}
 
   record Integrity(
@@ -622,6 +718,7 @@ final class DependencyReadBack {
       Ambiguity ambiguity,
       ToMethod toMethod,
       Externals externals,
+      OwnPackageExternals ownPackageExternals,
       FanOutExternal fanOutExternal,
       Integrity integrity,
       CensusBase census) {}
@@ -639,6 +736,7 @@ final class DependencyReadBack {
       long ambiguousMalformed,
       long externalQualityMismatches,
       Map<Long, long[]> externalTargets,
+      OwnPackageExternals ownPackage,
       FanOutExternal fanOutExternal) {}
 
   private static final class RowTally {
@@ -651,6 +749,9 @@ final class DependencyReadBack {
     private final Map<String, long[]> ambiguousTargets = new HashMap<>();
 
     private final Map<Long, long[]> externalTargets = new HashMap<>();
+
+    private final Map<DependencyType, Long> ownPackageByType = new EnumMap<>(DependencyType.class);
+    private final Map<String, long[]> ownPackageTargets = new HashMap<>();
 
     private final int[] perRow;
     private final long[] pairs;
@@ -668,6 +769,8 @@ final class DependencyReadBack {
     private long ambiguousOccurrences;
     private long ambiguousMalformed;
     private long externalQualityMismatches;
+    private long ownPackageRows;
+    private long ownPackageOccurrences;
     private Dependency largest;
 
     private RowTally(int capacity) {
@@ -678,6 +781,7 @@ final class DependencyReadBack {
           rowsByType.put(type, 0L);
           occurrencesByType.put(type, 0L);
           ambiguousByType.put(type, 0L);
+          ownPackageByType.put(type, 0L);
         }
       }
       for (final int external : new int[] {0, 1}) {
@@ -690,7 +794,7 @@ final class DependencyReadBack {
 
     private void add(
         Dependency row, TypeRow source, TypeRow target, long weight, boolean ambiguous) {
-      p25(row, target, ambiguous);
+      p25(row, source, target, ambiguous);
       final int occurrencesOfRow = row.occurrences();
       perRow[rows++] = occurrencesOfRow;
       occurrences += occurrencesOfRow;
@@ -719,7 +823,7 @@ final class DependencyReadBack {
       }
     }
 
-    private void p25(Dependency row, TypeRow target, boolean ambiguous) {
+    private void p25(Dependency row, TypeRow source, TypeRow target, boolean ambiguous) {
       final long occurrencesOfRow = row.occurrences();
       resolutionPairOccurrences.merge(
           key(row.resolution(), target.external()), occurrencesOfRow, Long::sum);
@@ -731,6 +835,7 @@ final class DependencyReadBack {
         if (resolved != PACKAGES.isJdk(target.id().sortKey())) {
           externalQualityMismatches++;
         }
+        ownPackage(row, source, target);
       }
       if (!ambiguous) {
         return;
@@ -746,6 +851,33 @@ final class DependencyReadBack {
           || target.id().sortKey().indexOf('.') >= 0) {
         ambiguousMalformed++;
       }
+    }
+
+    private void ownPackage(Dependency row, TypeRow source, TypeRow target) {
+      final String targetPackage = packageOf(target.id().sortKey());
+      if (targetPackage.isEmpty() || !targetPackage.equals(packageOf(source.id().sortKey()))) {
+        return;
+      }
+      ownPackageRows++;
+      ownPackageOccurrences += row.occurrences();
+      ownPackageByType.merge(row.type(), 1L, Long::sum);
+      final long[] named = ownPackageTargets.computeIfAbsent(target.id().value(), _ -> new long[2]);
+      named[0]++;
+      named[1] += row.occurrences();
+    }
+
+    private OwnPackageExternals ownPackage() {
+      final Map<String, Long> byType = new LinkedHashMap<>();
+      ownPackageByType.forEach((type, count) -> byType.put(type.name(), count));
+      final List<NamedCount> named = new ArrayList<>();
+      ownPackageTargets.forEach(
+          (target, counts) -> named.add(new NamedCount(target, counts[0], counts[1])));
+      return new OwnPackageExternals(
+          ownPackageRows,
+          ownPackageOccurrences,
+          ownPackageTargets.size(),
+          byType,
+          sample(named, Comparator.comparingLong(NamedCount::rows)));
     }
 
     private Map<String, Long> rowOccurrences() {

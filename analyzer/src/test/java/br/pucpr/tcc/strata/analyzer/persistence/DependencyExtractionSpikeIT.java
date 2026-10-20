@@ -79,6 +79,7 @@ final class DependencyExtractionSpikeIT {
   private static final String OUT_OF_MEMORY = "OUT_OF_MEMORY";
   private static final String DERIVED = "broken-tree";
   private static final String DERIVED_FROM = "commons-lang";
+  private static final String RUNTIME_MODULES = "analyzer/runtime-modules.txt";
 
   private static final long CANCELLATION_DEADLINE_MICROS = 2_000_000;
 
@@ -105,7 +106,10 @@ final class DependencyExtractionSpikeIT {
           + " untimed pass over the same batches times the two per-unit functions and counts the"
           + " excluded constructs. It also records StructureExtractor.resolutionCounts() checked"
           + " against the rows, the ambiguous rows, to_method_pk, the external rows split by"
-          + " ExternalPackages and fanOutExternal with and without the denylist, all read back";
+          + " ExternalPackages and fanOutExternal with and without the denylist, all read back;"
+          + " also the bare external targets split by first letter, the external"
+          + " targets in the source's own package and the JDK targets of a module outside the jlink"
+          + " image, from the same rows";
 
   private enum Selection {
     DEFAULT(
@@ -134,6 +138,8 @@ final class DependencyExtractionSpikeIT {
     final JsonNode baseline = new ObjectMapper().readTree(strataRoot.resolve(BASELINE).toFile());
     final Path corpus = corpusDirectory();
     final Path report = strataRoot.resolve(REPORT);
+    final DependencyReadBack.RuntimeImage image =
+        DependencyReadBack.RuntimeImage.of(strataRoot.resolve(RUNTIME_MODULES));
     final List<RepositoryResult> results = new ArrayList<>();
 
     for (final String name : REPOSITORIES) {
@@ -141,10 +147,10 @@ final class DependencyExtractionSpikeIT {
       final List<SelectionResult> selections = new ArrayList<>();
       for (final Selection selection : Selection.values()) {
         final JsonNode expected = baselineOf(baseline, name, selection);
-        selections.add(measure(name, repository, selection, expected));
+        selections.add(measure(name, repository, selection, expected, image));
         final List<RepositoryResult> measured = new ArrayList<>(results);
         measured.add(repositoryResult(name, repository, selections));
-        write(report, reportOf(baseCommit, baseline, measured));
+        write(report, reportOf(baseCommit, baseline, image, measured));
       }
       results.add(repositoryResult(name, repository, selections));
     }
@@ -153,7 +159,11 @@ final class DependencyExtractionSpikeIT {
   }
 
   private SelectionResult measure(
-      String name, ValidatedRepository repository, Selection selection, JsonNode expected)
+      String name,
+      ValidatedRepository repository,
+      Selection selection,
+      JsonNode expected,
+      DependencyReadBack.RuntimeImage image)
       throws Exception {
     final List<SourceRoot> roots = roots(repository, selection);
     final Path data = temp.toRealPath().resolve(name).resolve(selection.name());
@@ -196,7 +206,8 @@ final class DependencyExtractionSpikeIT {
                     optionalLong(expected, "heap", "peakLiveBytes"),
                     optionalLong(expected, "heap", "peakUsedBytes")));
       }
-      readBack = DependencyReadBack.read(connections, analysisPk, writer.unnumberedCallees());
+      readBack =
+          DependencyReadBack.read(connections, analysisPk, writer.unnumberedCallees(), image);
     }
     final long cacheBytes = Files.size(database);
     TestCaches.deleteTree(data);
@@ -251,6 +262,7 @@ final class DependencyExtractionSpikeIT {
         readBack.ambiguity(),
         readBack.toMethod(),
         readBack.externals(),
+        readBack.ownPackageExternals(),
         readBack.fanOutExternal(),
         checks(readBack, sink, files, census, expected, write, drops, resolution),
         drops,
@@ -282,6 +294,7 @@ final class DependencyExtractionSpikeIT {
         selection.name(),
         rootsByKind(roots),
         OUT_OF_MEMORY,
+        null,
         null,
         null,
         null,
@@ -679,7 +692,10 @@ final class DependencyExtractionSpikeIT {
   }
 
   private static DependencyExtractionReport reportOf(
-      String baseCommit, JsonNode baseline, List<RepositoryResult> repositories) {
+      String baseCommit,
+      JsonNode baseline,
+      DependencyReadBack.RuntimeImage image,
+      List<RepositoryResult> repositories) {
     final Map<String, String> selections = new LinkedHashMap<>();
     for (final Selection selection : Selection.values()) {
       selections.put(selection.name(), selection.description);
@@ -701,7 +717,8 @@ final class DependencyExtractionSpikeIT {
             new Baseline(
                 BASELINE,
                 baseline.path("measuredAt").asText(),
-                baseline.path("baseCommit").asText())),
+                baseline.path("baseCommit").asText()),
+            image.modules()),
         Environment.ofThisJvm(),
         List.copyOf(repositories));
   }
