@@ -42,6 +42,9 @@ final class TargetNames {
 
   Target qualifier(CtTypeReference<?> reference, boolean written) {
     final String qualified = reference.getQualifiedName();
+    if (ElementIds.PRIMITIVES.contains(qualified)) {
+      return callWithoutTarget();
+    }
     final int local = ElementIds.localSegmentStart(qualified);
     if (local >= 0) {
       return exact(qualified.substring(0, local));

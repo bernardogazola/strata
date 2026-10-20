@@ -585,6 +585,64 @@ final class CallTargetsTest {
     assertThat(run.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 0L);
   }
 
+  @Test
+  void oReceptorComCastSeQualificaPeloCastEmTodaForma() throws Exception {
+    final Run run =
+        extract(
+            Map.of(
+                "src/main/java/p/Caster.java",
+                """
+                package p;
+
+                import com.thirdparty.Client;
+                import java.util.function.Supplier;
+
+                public class Caster<T extends Base> {
+
+                  private Object held;
+
+                  public Caster() {}
+
+                  public void run(Client client, Supplier<Object> supplier, Object[] all, Object any) {
+                    ((Sub) this.held).only();
+                    ((Sub) supplier.get()).only();
+                    ((Sub) all[0]).only();
+                    client.onEvent(event -> ((Sub) event).only());
+                    ((Hook) this).hook();
+                    ((T) any).hook();
+                    ((Outer.Inner) any).deep();
+                  }
+                }
+                """,
+                "src/main/java/p/Base.java",
+                "package p;\n\npublic class Base {\n\n  public Base() {}\n\n  public void hook() {}\n}\n",
+                "src/main/java/p/Sub.java",
+                "package p;\n\npublic class Sub extends Base {\n\n  public Sub() {}\n\n"
+                    + "  public void only() {}\n}\n",
+                "src/main/java/p/Hook.java",
+                "package p;\n\npublic interface Hook {\n  void hook();\n}\n",
+                "src/main/java/p/Outer.java",
+                "package p;\n\npublic class Outer {\n\n  public static class Inner {\n\n"
+                    + "    public void deep() {}\n  }\n}\n"));
+
+    assertThat(run.sink().tuples())
+        .containsExactly(
+            "p.Caster -> com.thirdparty.Client IMPORTS x1 UNRESOLVED_EXTERNAL external",
+            "p.Caster -> com.thirdparty.Client CALLS x1 UNRESOLVED_EXTERNAL external",
+            "p.Caster -> com.thirdparty.Client PARAMETER_TYPE x1 UNRESOLVED_EXTERNAL external",
+            "p.Caster -> java.lang.Object FIELD_TYPE x1 RESOLVED external",
+            "p.Caster -> java.lang.Object PARAMETER_TYPE x3 RESOLVED external",
+            "p.Caster -> java.util.function.Supplier IMPORTS x1 RESOLVED external",
+            "p.Caster -> java.util.function.Supplier CALLS x1 RESOLVED external",
+            "p.Caster -> java.util.function.Supplier PARAMETER_TYPE x1 RESOLVED external",
+            "p.Caster -> p.Base CALLS x1 RESOLVED",
+            "p.Caster -> p.Hook CALLS x1 RESOLVED",
+            "p.Caster -> p.Outer$Inner CALLS x1 RESOLVED",
+            "p.Caster -> p.Sub CALLS x4 RESOLVED",
+            "p.Sub -> p.Base EXTENDS x1 RESOLVED");
+    assertThat(run.drops()).containsEntry(DropReason.CALL_WITHOUT_TARGET, 0L);
+  }
+
   private record Run(StructureExtractor extractor, RecordingStructureSink sink) {
 
     Map<DropReason, Long> drops() {

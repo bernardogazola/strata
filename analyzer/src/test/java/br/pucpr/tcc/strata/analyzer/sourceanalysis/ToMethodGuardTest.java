@@ -366,6 +366,62 @@ final class ToMethodGuardTest {
         .containsExactly("b.PlainUser L5 -", "b.PlainUser L6 method:b.Plain#log(java.lang.Object)");
   }
 
+  @Test
+  void oReceptorComCastGuardaOCalleeDoTipoDoCast() throws Exception {
+    final Map<String, String> core =
+        Map.of(
+            "p/Iface.java",
+            "package p;\n\npublic interface Iface {\n  void m();\n}\n",
+            "p/Impl.java",
+            """
+            package p;
+
+            public class Impl implements Iface {
+              public void m() {}
+
+              public void only() {}
+            }
+            """,
+            "p/Flag.java",
+            """
+            package p;
+
+            public class Flag {
+              private boolean value;
+
+              public boolean booleanValue() {
+                return value;
+              }
+
+              @Override
+              public boolean equals(Object obj) {
+                return obj instanceof Flag && value == ((Flag) obj).booleanValue();
+              }
+
+              @Override
+              public int hashCode() {
+                return 0;
+              }
+
+              void use(Iface iface, Object x) {
+                ((Impl) iface).only();
+                ((Impl) iface).m();
+                ((Iface) (Impl) x).m();
+              }
+            }
+            """);
+
+    final Extraction run =
+        ResolutionHarness.extract(temp.resolve("cast"), Layout.ONE_ROOT, core, Map.of());
+
+    assertThat(chamadas(run))
+        .containsExactly(
+            "p.Flag L12 method:p.Flag#booleanValue()",
+            "p.Flag L21 method:p.Impl#only()",
+            "p.Flag L22 method:p.Impl#m()",
+            "p.Flag L23 method:p.Iface#m()");
+  }
+
   private static final Map<String, String> SHAPES =
       Map.of(
           "p/Base.java",

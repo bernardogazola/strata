@@ -1370,7 +1370,219 @@ final class ResolutionQualityTest {
             .com("b.V2 -> ext.Consts IMPORTS x1 UNRESOLVED_EXTERNAL external")
             .descartando(DropReason.CALL_WITHOUT_TARGET, 1));
     casos.addAll(receptoresDeVariavel());
+    casos.addAll(receptoresComCast());
     return casos;
+  }
+
+  private static List<Trecho> receptoresComCast() {
+    final Map<String, String> iface =
+        Map.of(
+            "a/Iface.java",
+            "package a;\n\npublic interface Iface {\n  void m();\n}\n",
+            "a/Impl.java",
+            """
+            package a;
+
+            public class Impl implements Iface {
+              public void m() {}
+
+              public void only() {}
+            }
+            """);
+    final Map<String, String> downcast =
+        Map.of(
+            "b/User.java",
+            """
+            package b;
+
+            import a.Iface;
+            import a.Impl;
+
+            public class User {
+              void f(Iface iface) {
+                ((Impl) iface).only();
+                ((Impl) iface).m();
+              }
+            }
+            """);
+    final String user =
+        "JLS 13.1, javac: Methodref a/Impl.only e a/Impl.m: o tipo do cast, nunca o da variável"
+            + " (nunca b.User -> a.Iface CALLS x2); Impl é escrito aqui e o import de tipo"
+            + " único o coloca: em uma raiz a impressão do Spoon, R; em outro lote, I";
+    final Map<String, String> twice =
+        Map.of(
+            "b/Twice.java",
+            """
+            package b;
+
+            import a.Iface;
+            import a.Impl;
+
+            public class Twice {
+              void f(Object x) {
+                ((Iface) (Impl) x).m();
+              }
+            }
+            """);
+    final String twiceDerivation =
+        "JLS 13.1, javac: InterfaceMethod a/Iface.m: o cast de fora, o primeiro da lista do"
+            + " Spoon ((A) (B) x dá [A, B], medido); nem o de dentro, a.Impl, nem o Object de x";
+    final Map<String, String> gauge =
+        Map.of(
+            "a/Gauge.java",
+            "package a;\n\npublic class Gauge {\n  public double level() {\n    return 0;\n  }\n}\n");
+    final Map<String, String> meter =
+        Map.of(
+            "b/Meter.java",
+            """
+            package b;
+
+            import a.Gauge;
+
+            public class Meter {
+              private double last;
+
+              double read(Gauge gauge, double d, byte[] values, int i) {
+                return ((Number) d).doubleValue()
+                    + ((Number) last).doubleValue()
+                    + ((Number) gauge.level()).doubleValue()
+                    + ((Byte) values[i]).floatValue();
+              }
+            }
+            """);
+    final String meterDerivation =
+        "JLS 13.1, javac: java/lang/Number.doubleValue x3 e java/lang/Byte.floatValue: o cast"
+            + " sobre um parâmetro, um campo, uma chamada e um acesso a vetor primitivos (o"
+            + " Double.valueOf e o Byte.valueOf do boxing são do compilador, não sítios); JDK →"
+            + " (R,1); nenhuma linha type:double nem type:byte (ES NumberFieldMapper,"
+            + " EmbeddingByteResults); gauge.level() → a.Gauge pelo parâmetro";
+    final Map<String, String> node =
+        Map.of(
+            "a/Node.java",
+            """
+            package a;
+
+            import org.ext.Listener;
+
+            public abstract class Node<T extends Node<T>> {
+              public boolean isLeaf() {
+                return true;
+              }
+
+              public <E extends T> T transformDown(
+                  Class<E> type, java.util.function.Function<E, ? extends T> rule) {
+                return null;
+              }
+
+              public void transformDown(
+                  java.util.function.BiConsumer<? super T, Listener<T>> rule,
+                  Listener<T> listener) {}
+            }
+            """,
+            "a/Plan.java",
+            "package a;\n\npublic abstract class Plan extends Node<Plan> {}\n");
+    final Map<String, String> rewrite =
+        Map.of(
+            "b/Rewrite.java",
+            """
+            package b;
+
+            import a.Plan;
+
+            public class Rewrite {
+              Plan f(Plan plan) {
+                var res = plan.transformDown(Plan.class, p -> p);
+                res.isLeaf();
+                return res;
+              }
+            }
+            """);
+    final String rewriteDerivation =
+        "em uma raiz o ECJ liga o transformDown à sobrecarga void, a de"
+            + " parâmetro externo que chega por import de tipo único (medido: escrito por extenso, o"
+            + " ECJ acerta; ES Analyzer, EnableSpatialDistancePushdown), e o var tem o tipo do"
+            + " inicializador, void → nenhuma linha type:void, +1 CALL_WITHOUT_TARGET; em duas, o"
+            + " inicializador fica sem tipo → o mesmo descarte. O javac diz a/Plan.isLeaf (o T"
+            + " inferido), que nenhuma regra de texto recupera: a perda é contada. Node: Class,"
+            + " Function e BiConsumer (R,1); org.ext.Listener (U,1), o import e x2 parâmetro (o do"
+            + " argumento de tipo e o do parâmetro); T e E são variáveis de tipo, sem linha";
+    return List.of(
+        trecho("cast para a implementação", Layout.TWO_ROOTS, iface, downcast, user)
+            .com(
+                "a.Impl -> a.Iface IMPLEMENTS x1 RESOLVED",
+                "b.User -> a.Iface IMPORTS x1 INFERRED",
+                "b.User -> a.Iface PARAMETER_TYPE x1 INFERRED",
+                "b.User -> a.Impl IMPORTS x1 INFERRED",
+                "b.User -> a.Impl CALLS x2 INFERRED")
+            .contando(1, 5, 0, 0),
+        trecho("cast para a implementação", Layout.ONE_ROOT, iface, downcast, user)
+            .com(
+                "a.Impl -> a.Iface IMPLEMENTS x1 RESOLVED",
+                "b.User -> a.Iface IMPORTS x1 RESOLVED",
+                "b.User -> a.Iface PARAMETER_TYPE x1 RESOLVED",
+                "b.User -> a.Impl IMPORTS x1 RESOLVED",
+                "b.User -> a.Impl CALLS x2 RESOLVED")
+            .contando(6, 0, 0, 0),
+        trecho("dois casts", Layout.TWO_ROOTS, iface, twice, twiceDerivation)
+            .com(
+                "a.Impl -> a.Iface IMPLEMENTS x1 RESOLVED",
+                "b.Twice -> a.Iface IMPORTS x1 INFERRED",
+                "b.Twice -> a.Iface CALLS x1 INFERRED",
+                "b.Twice -> a.Impl IMPORTS x1 INFERRED",
+                "b.Twice -> java.lang.Object PARAMETER_TYPE x1 RESOLVED external")
+            .contando(2, 3, 0, 0),
+        trecho("dois casts", Layout.ONE_ROOT, iface, twice, twiceDerivation)
+            .com(
+                "a.Impl -> a.Iface IMPLEMENTS x1 RESOLVED",
+                "b.Twice -> a.Iface IMPORTS x1 RESOLVED",
+                "b.Twice -> a.Iface CALLS x1 RESOLVED",
+                "b.Twice -> a.Impl IMPORTS x1 RESOLVED",
+                "b.Twice -> java.lang.Object PARAMETER_TYPE x1 RESOLVED external")
+            .contando(5, 0, 0, 0),
+        trecho("cast sobre primitivo", Layout.TWO_ROOTS, gauge, meter, meterDerivation)
+            .com(
+                "b.Meter -> a.Gauge IMPORTS x1 INFERRED",
+                "b.Meter -> a.Gauge CALLS x1 INFERRED",
+                "b.Meter -> a.Gauge PARAMETER_TYPE x1 INFERRED",
+                "b.Meter -> java.lang.Byte CALLS x1 RESOLVED external",
+                "b.Meter -> java.lang.Number CALLS x3 RESOLVED external")
+            .contando(4, 3, 0, 0),
+        trecho("cast sobre primitivo", Layout.ONE_ROOT, gauge, meter, meterDerivation)
+            .com(
+                "b.Meter -> a.Gauge IMPORTS x1 RESOLVED",
+                "b.Meter -> a.Gauge CALLS x1 RESOLVED",
+                "b.Meter -> a.Gauge PARAMETER_TYPE x1 RESOLVED",
+                "b.Meter -> java.lang.Byte CALLS x1 RESOLVED external",
+                "b.Meter -> java.lang.Number CALLS x3 RESOLVED external")
+            .contando(7, 0, 0, 0),
+        trecho("var que o Spoon tipa void", Layout.TWO_ROOTS, node, rewrite, rewriteDerivation)
+            .com(
+                "a.Node -> java.lang.Class PARAMETER_TYPE x1 RESOLVED external",
+                "a.Node -> java.util.function.BiConsumer PARAMETER_TYPE x1 RESOLVED external",
+                "a.Node -> java.util.function.Function PARAMETER_TYPE x1 RESOLVED external",
+                "a.Node -> org.ext.Listener IMPORTS x1 UNRESOLVED_EXTERNAL external",
+                "a.Node -> org.ext.Listener PARAMETER_TYPE x2 UNRESOLVED_EXTERNAL external",
+                "a.Plan -> a.Node EXTENDS x1 RESOLVED",
+                "b.Rewrite -> a.Plan IMPORTS x1 INFERRED",
+                "b.Rewrite -> a.Plan CALLS x1 INFERRED",
+                "b.Rewrite -> a.Plan PARAMETER_TYPE x1 INFERRED",
+                "b.Rewrite -> a.Plan RETURN_TYPE x1 INFERRED")
+            .descartando(DropReason.CALL_WITHOUT_TARGET, 1)
+            .contando(4, 4, 3, 0),
+        trecho("var que o Spoon tipa void", Layout.ONE_ROOT, node, rewrite, rewriteDerivation)
+            .com(
+                "a.Node -> java.lang.Class PARAMETER_TYPE x1 RESOLVED external",
+                "a.Node -> java.util.function.BiConsumer PARAMETER_TYPE x1 RESOLVED external",
+                "a.Node -> java.util.function.Function PARAMETER_TYPE x1 RESOLVED external",
+                "a.Node -> org.ext.Listener IMPORTS x1 UNRESOLVED_EXTERNAL external",
+                "a.Node -> org.ext.Listener PARAMETER_TYPE x2 UNRESOLVED_EXTERNAL external",
+                "a.Plan -> a.Node EXTENDS x1 RESOLVED",
+                "b.Rewrite -> a.Plan IMPORTS x1 RESOLVED",
+                "b.Rewrite -> a.Plan CALLS x1 RESOLVED",
+                "b.Rewrite -> a.Plan PARAMETER_TYPE x1 RESOLVED",
+                "b.Rewrite -> a.Plan RETURN_TYPE x1 RESOLVED")
+            .descartando(DropReason.CALL_WITHOUT_TARGET, 1)
+            .contando(8, 0, 3, 0));
   }
 
   private static List<Trecho> receptoresDeVariavel() {

@@ -83,6 +83,9 @@ final class CallTargets {
 
   private Target byReceiver(
       CtInvocation<?> invocation, CtExpression<?> receiver, CodeElementId source) {
+    if (receiver != null && !receiver.getTypeCasts().isEmpty()) {
+      return cast(receiver);
+    }
     return switch (receiver) {
       case CtSuperAccess<?> parent -> superclass(invocation, parent, source);
       case CtFieldRead<?> read -> field(invocation, read, source);
@@ -94,6 +97,10 @@ final class CallTargets {
           typeAccess(invocation, access, source);
       case null, default -> fallback(invocation, receiver, source);
     };
+  }
+
+  private Target cast(CtExpression<?> receiver) {
+    return names.qualifier(receiver.getTypeCasts().getFirst(), true);
   }
 
   private Target typeAccess(
