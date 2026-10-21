@@ -38,11 +38,22 @@ public final class JsonLines {
             .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+            .enable(DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS)
+            .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
             .build();
 
     for (final LogicalType scalar :
         new LogicalType[] {LogicalType.Integer, LogicalType.Float, LogicalType.Boolean}) {
       mapper.coercionConfigFor(scalar).setCoercion(CoercionInputShape.String, CoercionAction.Fail);
+    }
+    mapper
+        .coercionConfigFor(LogicalType.Boolean)
+        .setCoercion(CoercionInputShape.Integer, CoercionAction.Fail);
+    for (final CoercionInputShape scalar :
+        new CoercionInputShape[] {
+          CoercionInputShape.Integer, CoercionInputShape.Float, CoercionInputShape.Boolean
+        }) {
+      mapper.coercionConfigFor(LogicalType.Textual).setCoercion(scalar, CoercionAction.Fail);
     }
     return mapper;
   }

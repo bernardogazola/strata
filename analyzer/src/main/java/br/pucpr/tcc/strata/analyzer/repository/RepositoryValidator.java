@@ -82,7 +82,7 @@ public final class RepositoryValidator {
     return switch (readHead(real)) {
       case RepositoryOutcome.Rejected<HeadState>(RepositoryIssue reason) -> rejected(reason);
       case RepositoryOutcome.Accepted<HeadState>(HeadState head, List<RepositoryIssue> warnings) ->
-          withInventory(real, head, warnings);
+          withInventory(real, head, warnings, cancelled, javaFilesSeen);
     };
   }
 
@@ -122,12 +122,7 @@ public final class RepositoryValidator {
   }
 
   private static RepositoryOutcome<HeadState> readHead(Path real) {
-    final File rootFile = real.toFile();
-    final FileRepositoryBuilder builder =
-        new FileRepositoryBuilder()
-            .setFS(FS.DETECTED)
-            .addCeilingDirectory(rootFile.getParentFile())
-            .findGitDir(rootFile);
+    final FileRepositoryBuilder builder = repositoryAt(real);
     if (builder.getGitDir() == null) {
       Log.warn("nenhum diretório git em " + real);
       return rejected(RepositoryIssue.notAGitRepository());
@@ -138,6 +133,14 @@ public final class RepositoryValidator {
       Log.error("o JGit não consegue abrir o repositório em " + real, refused);
       return rejected(RepositoryIssue.notAGitRepository());
     }
+  }
+
+  static FileRepositoryBuilder repositoryAt(Path real) {
+    final File rootFile = real.toFile();
+    return new FileRepositoryBuilder()
+        .setFS(FS.DETECTED)
+        .addCeilingDirectory(rootFile.getParentFile())
+        .findGitDir(rootFile);
   }
 
   private static RepositoryOutcome<HeadState> headOf(Path real, Repository repository)
@@ -170,8 +173,12 @@ public final class RepositoryValidator {
   }
 
   private RepositoryOutcome<RepositorySnapshot> withInventory(
-      Path real, HeadState head, List<RepositoryIssue> headWarnings) {
-    return switch (walker.walk(real)) {
+      Path real,
+      HeadState head,
+      List<RepositoryIssue> headWarnings,
+      BooleanSupplier cancelled,
+      IntConsumer javaFilesSeen) {
+    return switch (walker.walk(real, cancelled, javaFilesSeen)) {
       case RepositoryOutcome.Rejected<RepositoryInventory>(RepositoryIssue reason) ->
           rejected(reason);
       case RepositoryOutcome.Accepted<RepositoryInventory>(

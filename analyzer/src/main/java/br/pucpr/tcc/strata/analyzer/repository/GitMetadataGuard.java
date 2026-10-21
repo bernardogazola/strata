@@ -48,10 +48,12 @@ final class GitMetadataGuard {
   private static final String INCLUDE_KEY = "path";
   private static final byte[] UTF8_BOM = {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
 
+  private final RepositoryLimits limits;
   private final int maxGitConfigBytes;
   private final int maxPackedRefsBytes;
 
   GitMetadataGuard(RepositoryLimits limits) {
+    this.limits = limits;
     this.maxGitConfigBytes = limits.maxGitConfigBytes();
     this.maxPackedRefsBytes = limits.maxPackedRefsBytes();
   }
@@ -110,7 +112,7 @@ final class GitMetadataGuard {
     return resolveAgainst(root, Files.readSymbolicLink(dotGit).toString());
   }
 
-  private boolean looksLikeGitDir(Path directory, Path root) throws IOException, Refusal {
+  boolean looksLikeGitDir(Path directory, Path root) throws IOException, Refusal {
     final Path commonDir = commonDirOf(directory, root);
     if (attributes(commonDir.resolve(Constants.OBJECTS), root).isEmpty()
         || attributes(commonDir.resolve(REFS), root).isEmpty()) {
@@ -160,6 +162,11 @@ final class GitMetadataGuard {
   }
 
   private void checkGitDir(Path gitDir, Path root) throws IOException, Refusal {
+    final Path commonDir = checkMetadata(gitDir, root);
+    GitObjectStoreGuard.check(commonDir, root, limits, this);
+  }
+
+  Path checkMetadata(Path gitDir, Path root) throws IOException, Refusal {
     requireSmallPlainFile(gitDir.resolve(Constants.HEAD), root);
     requireSmallPlainFile(gitDir.resolve(CONFIG_WORKTREE), root);
     requireNoSymbolicLink(gitDir.resolve(INDEX), root);
@@ -181,6 +188,7 @@ final class GitMetadataGuard {
     requireSmallPlainFile(commonDir.resolve(Constants.SHALLOW), root);
     checkLooseRefChain(gitDir, commonDir, root);
     checkReftable(commonDir, root);
+    return commonDir;
   }
 
   private Path commonDirOf(Path gitDir, Path root) throws IOException, Refusal {
@@ -396,7 +404,7 @@ final class GitMetadataGuard {
     attributes(path, root);
   }
 
-  private static Optional<BasicFileAttributes> ownAttributes(Path path) throws IOException {
+  static Optional<BasicFileAttributes> ownAttributes(Path path) throws IOException {
     try {
       return Optional.of(
           Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS));
@@ -405,7 +413,7 @@ final class GitMetadataGuard {
     }
   }
 
-  private static Path resolveAgainst(Path base, String value) throws Refusal {
+  static Path resolveAgainst(Path base, String value) throws Refusal {
     if (namesNetworkLocation(value)) {
       throw new Refusal("o repositório nomeia o local de rede " + value + " sob " + base);
     }
@@ -428,7 +436,7 @@ final class GitMetadataGuard {
 
   private record ConfigScope(Path gitDir, Path commonDir, Path root) {}
 
-  private static final class Refusal extends Exception {
+  static final class Refusal extends Exception {
 
     @Serial private static final long serialVersionUID = 1L;
 

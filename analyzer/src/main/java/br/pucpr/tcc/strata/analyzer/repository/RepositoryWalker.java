@@ -1,5 +1,6 @@
 package br.pucpr.tcc.strata.analyzer.repository;
 
+import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.bootstrap.Log;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -15,6 +16,7 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
 import java.util.function.IntConsumer;
 
@@ -38,15 +40,22 @@ final class RepositoryWalker {
 
   RepositoryOutcome<RepositoryInventory> walk(
       Path root, BooleanSupplier cancelled, IntConsumer javaFilesSeen) {
-    Objects.requireNonNull(cancelled, "cancelled");
-    Objects.requireNonNull(javaFilesSeen, "javaFilesSeen");
-    final Visitor visitor = new Visitor(root, limits);
+    final Visitor visitor =
+        new Visitor(
+            root,
+            limits,
+            Objects.requireNonNull(cancelled, "cancelled"),
+            Objects.requireNonNull(javaFilesSeen, "javaFilesSeen"));
     try {
       Files.walkFileTree(
           root, EnumSet.noneOf(FileVisitOption.class), limits.maxDirectoryDepth(), visitor);
     } catch (IOException impossible) {
       Log.error("a varredura de " + root + " falhou fora do visitor", impossible);
       return new RepositoryOutcome.Rejected<>(RepositoryIssue.rootUnreadable());
+    }
+    if (visitor.cancelledAtEntry > 0) {
+      throw new CancellationException(
+          "varredura do repositório cancelada na entrada " + visitor.cancelledAtEntry);
     }
     return visitor.outcome();
   }
@@ -55,6 +64,8 @@ final class RepositoryWalker {
 
     private final Path root;
     private final RepositoryLimits limits;
+    private final BooleanSupplier cancelled;
+    private final IntConsumer javaFilesSeen;
     private final List<JavaSource> javaSources = new ArrayList<>();
     private final List<BuildFileEntry> buildFiles = new ArrayList<>();
     private final List<RepositoryIssue> warnings = new ArrayList<>();
@@ -68,9 +79,14 @@ final class RepositoryWalker {
     private int silencedEntries;
     private RepositoryIssue refusal;
 
-    Visitor(Path root, RepositoryLimits limits) {
+    private int cancelledAtEntry;
+
+    Visitor(
+        Path root, RepositoryLimits limits, BooleanSupplier cancelled, IntConsumer javaFilesSeen) {
       this.root = root;
       this.limits = limits;
+      this.cancelled = cancelled;
+      this.javaFilesSeen = javaFilesSeen;
     }
 
     @Override
@@ -167,11 +183,19 @@ final class RepositoryWalker {
 
     private boolean enumerate() {
       enumeratedEntries++;
-      if (enumeratedEntries <= limits.maxEnumeratedFiles()) {
+      if (enumeratedEntries > limits.maxEnumeratedFiles()) {
+        refusal = RepositoryIssue.tooManyFiles(limits.maxEnumeratedFiles(), enumeratedEntries);
+        return false;
+      }
+      if (enumeratedEntries % AnalysisConstants.WALK_CHECK_STRIDE_ENTRIES != 0) {
         return true;
       }
-      refusal = RepositoryIssue.tooManyFiles(limits.maxEnumeratedFiles(), enumeratedEntries);
-      return false;
+      javaFilesSeen.accept(javaSources.size());
+      if (cancelled.getAsBoolean()) {
+        cancelledAtEntry = enumeratedEntries;
+        return false;
+      }
+      return true;
     }
 
     private void recordBuildFile(Path entry, String relative, boolean regularFile, long size) {
@@ -282,6 +306,7 @@ final class RepositoryWalker {
       }
       javaSources.sort(Comparator.comparing(JavaSource::relativePath));
       buildFiles.sort(Comparator.comparing(BuildFileEntry::relativePath));
+      javaFilesSeen.accept(javaSources.size());
       return new RepositoryOutcome.Accepted<>(
           new RepositoryInventory(totalFileCount, javaSources, buildFiles), warnings);
     }

@@ -4,6 +4,7 @@ import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootId;
 import java.util.List;
 import java.util.Objects;
+import java.util.TreeSet;
 
 public record AnalysisConfiguration(
     boolean includeTests,
@@ -58,7 +59,40 @@ public record AnalysisConfiguration(
       Long historyScopeCommits,
       List<String> sourceRootIds,
       Boolean rebuildCache) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    final HistoryScope scope = historyScope == null ? HistoryScope.ALL : historyScope;
+    return new AnalysisConfiguration(
+        Boolean.TRUE.equals(includeTests),
+        scope,
+        normalizedCommits(scope, historyScopeCommits),
+        sourceRootIds == null ? null : normalizedSelection(sourceRootIds),
+        Boolean.TRUE.equals(rebuildCache));
+  }
+
+  private static Integer normalizedCommits(HistoryScope scope, Long commits) {
+    if (commits != null && commits < 1) {
+      throw new IllegalArgumentException(N_BELOW_ONE);
+    }
+    return switch (scope) {
+      case ALL -> null;
+      case LAST_N_COMMITS -> {
+        if (commits == null) {
+          throw new IllegalArgumentException(LAST_N_WITHOUT_N);
+        }
+        yield (int) Math.min(commits, AnalysisConstants.MAX_COMMITS_WALKED);
+      }
+    };
+  }
+
+  private static List<String> normalizedSelection(List<String> ids) {
+    if (ids.isEmpty()) {
+      throw new IllegalArgumentException(EMPTY_SELECTION);
+    }
+    for (final String id : ids) {
+      if (!isSourceRootId(id)) {
+        throw new IllegalArgumentException(MALFORMED_SOURCE_ROOT_ID);
+      }
+    }
+    return List.copyOf(new TreeSet<>(ids));
   }
 
   private static List<String> checkedSelection(List<String> ids) {
