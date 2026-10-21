@@ -15,10 +15,16 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
+import java.util.function.IntConsumer;
 
 final class RepositoryWalker {
 
   private static final String JAVA_SUFFIX = ".java";
+
+  private static final BooleanSupplier NEVER_CANCELLED = () -> false;
+
+  private static final IntConsumer IGNORE_JAVA_FILES_SEEN = count -> {};
 
   private final RepositoryLimits limits;
 
@@ -27,6 +33,13 @@ final class RepositoryWalker {
   }
 
   RepositoryOutcome<RepositoryInventory> walk(Path root) {
+    return walk(root, NEVER_CANCELLED, IGNORE_JAVA_FILES_SEEN);
+  }
+
+  RepositoryOutcome<RepositoryInventory> walk(
+      Path root, BooleanSupplier cancelled, IntConsumer javaFilesSeen) {
+    Objects.requireNonNull(cancelled, "cancelled");
+    Objects.requireNonNull(javaFilesSeen, "javaFilesSeen");
     final Visitor visitor = new Visitor(root, limits);
     try {
       Files.walkFileTree(
