@@ -1,0 +1,6 @@
+# cloc 2.10
+src/main/java/br/pucpr/books/Catalog.java	9
+src/main/java/br/pucpr/books/GeneralLedger.java	9
+src/main/java/br/pucpr/books/Loan.java	9
+src/main/java/br/pucpr/books/Member.java	9
+src/main/java/br/pucpr/books/Report.java	9

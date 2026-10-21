@@ -1,0 +1,5 @@
+# cloc 2.10
+src/main/java/br/pucpr/shipping/Parcel.java	9
+src/main/java/br/pucpr/shipping/Route.java	9
+src/main/java/br/pucpr/shipping/Tracker.java	9
+src/main/java/br/pucpr/shipping/Waybill.java	9

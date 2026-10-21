@@ -10,6 +10,8 @@ fixtures/repositories/**/*.gradle text eol=lf
 fixtures/repositories/**/*.properties text eol=lf
 fixtures/repositories/**/*.txt text eol=lf
 
+fixtures/cc-golden/**/*.java text eol=lf
+
 fixtures/repositories/**/.mailmap text eol=lf
 
 analyzer/mvnw text eol=lf

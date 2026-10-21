@@ -121,7 +121,7 @@ END {
     printf "  pulado  índice externo .......... nenhuma fixture de repositório para versionar\n"
     printf "  pulado  git das fixtures ........ nenhuma fixture de repositório para gerar\n"
   } else {
-    printf "  %s  inventário do corpus .... %d fixture%s com expected.json, README.md, .java\n",
+    printf "  %s  inventário do corpus .... %d fixture%s com expected.json, README.md, cloc-golden.txt, .java\n",
            (CORPUSINV == "" ? "ok    " : "falha "), NREPOS, (NREPOS == 1 ? "" : "s")
     printf "  %s  codificação do golden ... UTF-8 válido, sem BOM, sem CR, com quebra de linha no fim\n",
            (GOLDENENC == "" ? "ok    " : "falha ")
@@ -214,10 +214,29 @@ END {
 }
 AWK
 
+golden_bytes() {
+  local file="$1" label="$2"
+  if [ "$(head -c 3 "$file" | od -An -tx1 | tr -d ' \n')" = "efbbbf" ]; then
+    goldenenc="${goldenenc}golden: ${label} começa com uma marca de ordem de bytes (BOM)"$US
+  fi
+  if LC_ALL=C grep -q "$(printf '\r')" "$file"; then
+    goldenenc="${goldenenc}golden: ${label} contém um retorno de carro (CR)"$US
+  fi
+  if LC_ALL=C grep -q "$(printf '[\001-\010\013\014\016-\037]')" "$file"; then
+    goldenenc="${goldenenc}golden: ${label} contém um byte de controle"$US
+  fi
+  if ! iconv -f UTF-8 -t UTF-8 < "$file" > /dev/null 2>&1; then
+    goldenenc="${goldenenc}golden: ${label} não é UTF-8 válido"$US
+  fi
+  if [ "$(tail -c 1 "$file" | wc -l | tr -d ' ')" -ne 1 ]; then
+    goldenenc="${goldenenc}golden: ${label} não termina com quebra de linha"$US
+  fi
+}
+
 scan_corpus() {
   local repos="$1" expectgit="$2"
   local US; US=$(printf '\037')
-  local dir name golden readme njava toplevel head declared sidecars
+  local dir name golden readme clocgolden njava toplevel head declared sidecars
 
   corpusinv=""; goldenenc=""; goldenshape=""; outerindex=""; fixturegit=""
   ngolden=0; ntracked=0; ngitlink=0; ngitrepos=0; indexskip=""
@@ -228,32 +247,32 @@ scan_corpus() {
     name=$(basename "$dir")
     golden="$dir/expected.json"
     readme="$dir/README.md"
+    clocgolden="$dir/cloc-golden.txt"
 
     if [ ! -s "$golden" ]; then
       corpusinv="${corpusinv}corpus: ${name}/expected.json ausente ou vazio"$US
     else
       ngolden=$((ngolden + 1))
-      if [ "$(head -c 3 "$golden" | od -An -tx1 | tr -d ' \n')" = "efbbbf" ]; then
-        goldenenc="${goldenenc}golden: ${name}/expected.json começa com uma marca de ordem de bytes (BOM)"$US
-      fi
-      if LC_ALL=C grep -q "$(printf '\r')" "$golden"; then
-        goldenenc="${goldenenc}golden: ${name}/expected.json contém um retorno de carro (CR)"$US
-      fi
-      if LC_ALL=C grep -q "$(printf '[\001-\010\013\014\016-\037]')" "$golden"; then
-        goldenenc="${goldenenc}golden: ${name}/expected.json contém um byte de controle"$US
-      fi
-      if ! iconv -f UTF-8 -t UTF-8 < "$golden" > /dev/null 2>&1; then
-        goldenenc="${goldenenc}golden: ${name}/expected.json não é UTF-8 válido"$US
-      fi
-      if [ "$(tail -c 1 "$golden" | wc -l | tr -d ' ')" -ne 1 ]; then
-        goldenenc="${goldenenc}golden: ${name}/expected.json não termina com quebra de linha"$US
-      fi
+      golden_bytes "$golden" "${name}/expected.json"
       while IFS= read -r line; do
         [ -n "$line" ] && goldenshape="${goldenshape}${line}"$US
       done < <(awk "$AWK_GOLDEN" "$golden")
     fi
 
     [ -s "$readme" ] || corpusinv="${corpusinv}corpus: ${name}/README.md ausente ou vazio"$US
+
+    if [ ! -s "$clocgolden" ]; then
+      corpusinv="${corpusinv}corpus: ${name}/cloc-golden.txt ausente ou vazio"$US
+    else
+      golden_bytes "$clocgolden" "${name}/cloc-golden.txt"
+      case "$(head -n 1 "$clocgolden")" in
+        "# cloc "*) : ;;
+        *) goldenshape="${goldenshape}golden: ${name}/cloc-golden.txt não começa com uma linha '# cloc <versão>'"$US ;;
+      esac
+      if tail -n +2 "$clocgolden" | grep -q -E '^(/|[A-Za-z]:|\\\\)'; then
+        goldenshape="${goldenshape}golden: ${name}/cloc-golden.txt: caminho absoluto em uma linha"$US
+      fi
+    fi
 
     njava=$(find "$dir" -name .git -prune -o -type f -name '*.java' -print | wc -l | tr -d ' ')
     [ "$njava" -gt 0 ] || corpusinv="${corpusinv}corpus: ${name} não tem nenhum arquivo .java"$US
@@ -421,6 +440,7 @@ self_test() {
     printf '# corpus\n' > "$tmp/outer/repositories/README.md"
     printf 'class A {}\n' > "$tmp/outer/repositories/alpha/src/main/java/A.java"
     printf '# alpha\n' > "$tmp/outer/repositories/alpha/README.md"
+    printf '# cloc 2.10\nsrc/main/java/A.java\t1\n' > "$tmp/outer/repositories/alpha/cloc-golden.txt"
     cat > "$tmp/outer/repositories/alpha/expected.json" <<'GOLDEN'
 {
   "version": 1,
@@ -603,6 +623,26 @@ GOLDEN
   seed; seed_repos; outer_commit
   rm -f "$tmp/outer/repositories/alpha/README.md"
   expect "uma fixture sem README.md"                    fail "README.md ausente"
+
+  seed; seed_repos; outer_commit
+  rm -f "$tmp/outer/repositories/alpha/cloc-golden.txt"
+  expect "uma fixture sem cloc-golden.txt"              fail "cloc-golden.txt ausente"
+
+  seed; seed_repos
+  awk '{ printf "%s\r\n", $0 }' "$tmp/outer/repositories/alpha/cloc-golden.txt" > "$tmp/g" \
+    && mv "$tmp/g" "$tmp/outer/repositories/alpha/cloc-golden.txt"
+  outer_commit
+  expect "um golden do cloc em CRLF"                    fail "golden: alpha/cloc-golden.txt contém um retorno de carro"
+
+  seed; seed_repos
+  printf 'src/main/java/A.java\t1\n' > "$tmp/outer/repositories/alpha/cloc-golden.txt"
+  outer_commit
+  expect "um golden do cloc sem linha de versão"        fail "não começa com uma linha '# cloc <versão>'"
+
+  seed; seed_repos
+  printf '# cloc 2.10\n/Users/alguem/A.java\t1\n' > "$tmp/outer/repositories/alpha/cloc-golden.txt"
+  outer_commit
+  expect "um golden do cloc com caminho absoluto"       fail "cloc-golden.txt: caminho absoluto em uma linha"
 
   seed; seed_repos; outer_commit
   rm -f "$tmp/outer/repositories/alpha/src/main/java/A.java"

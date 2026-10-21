@@ -1,0 +1,8 @@
+# cloc 2.10
+src/main/java/br/pucpr/payments/Auditable.java	4
+src/main/java/br/pucpr/payments/BaseGateway.java	7
+src/main/java/br/pucpr/payments/Card.java	7
+src/main/java/br/pucpr/payments/CardGateway.java	13
+src/main/java/br/pucpr/payments/Instrument.java	4
+src/main/java/br/pucpr/payments/Named.java	4
+src/main/java/br/pucpr/payments/Traceable.java	4

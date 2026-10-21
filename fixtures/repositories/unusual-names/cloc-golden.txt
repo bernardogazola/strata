@@ -1,0 +1,4 @@
+# cloc 2.10
+src/main/java/br/pucpr/pedidos/Pedido.java	9
+src/main/java/br/pucpr/pedidos/Relatório‮gpj.java	9
+src/main/java/br/pucpr/pedidos/avaliação/Avaliação.java	9

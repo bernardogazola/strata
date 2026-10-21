@@ -1,0 +1,9 @@
+# cloc 2.10
+core/src/main/java/com/acme/core/Config.java	5
+core/src/main/java/com/acme/core/Registry.java	5
+core/src/main/java/com/acme/core/Widget.java	5
+plugin/src/main/java/com/acme/core/Shared.java	5
+plugin/src/main/java/com/acme/plugin/Config.java	5
+plugin/src/main/java/com/acme/plugin/Finder.java	7
+plugin/src/main/java/com/acme/plugin/Loader.java	7
+plugin/src/main/java/com/acme/plugin/spi/Probe.java	12
