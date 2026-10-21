@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ConfigConstants;
@@ -59,10 +60,14 @@ final class GitMetadataGuard {
   }
 
   boolean admits(Path root) {
+    return admits(root, () -> false);
+  }
+
+  boolean admits(Path root, BooleanSupplier cancelled) {
     try {
       final Optional<Path> gitDir = locateGitDir(root);
       if (gitDir.isPresent()) {
-        checkGitDir(gitDir.get(), root);
+        checkGitDir(gitDir.get(), root, cancelled);
       }
       return true;
     } catch (Refusal refusal) {
@@ -161,9 +166,10 @@ final class GitMetadataGuard {
     return Optional.of(target);
   }
 
-  private void checkGitDir(Path gitDir, Path root) throws IOException, Refusal {
+  private void checkGitDir(Path gitDir, Path root, BooleanSupplier cancelled)
+      throws IOException, Refusal {
     final Path commonDir = checkMetadata(gitDir, root);
-    GitObjectStoreGuard.check(commonDir, root, limits, this);
+    GitObjectStoreGuard.check(commonDir, root, limits, this, cancelled);
   }
 
   Path checkMetadata(Path gitDir, Path root) throws IOException, Refusal {

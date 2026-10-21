@@ -12,7 +12,7 @@ record RepositoryLimits(
     int maxPackedRefsBytes,
     int maxGitAlternates,
     int maxGitAlternatesDepth,
-    int maxLooseObjects,
+    int maxObjectStoreEntries,
     long maxPackIndexBytes,
     long maxPackIndexTotalBytes,
     long maxCommitGraphBytes) {
@@ -37,7 +37,7 @@ record RepositoryLimits(
         || maxPackedRefsBytes < 1
         || maxGitAlternates < 1
         || maxGitAlternatesDepth < 1
-        || maxLooseObjects < 1
+        || maxObjectStoreEntries < 1
         || maxPackIndexBytes < 1
         || maxPackIndexTotalBytes < 1
         || maxCommitGraphBytes < 1) {
@@ -63,7 +63,7 @@ record RepositoryLimits(
         maxPackedRefsBytes,
         AnalysisConstants.MAX_GIT_ALTERNATES,
         AnalysisConstants.MAX_GIT_ALTERNATES_DEPTH,
-        AnalysisConstants.MAX_LOOSE_OBJECTS,
+        AnalysisConstants.MAX_OBJECT_STORE_ENTRIES,
         AnalysisConstants.MAX_PACK_INDEX_BYTES,
         AnalysisConstants.MAX_PACK_INDEX_TOTAL_BYTES,
         AnalysisConstants.MAX_COMMIT_GRAPH_BYTES);

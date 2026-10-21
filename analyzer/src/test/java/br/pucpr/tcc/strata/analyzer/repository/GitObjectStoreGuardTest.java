@@ -1,6 +1,7 @@
 package br.pucpr.tcc.strata.analyzer.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import java.io.ByteArrayOutputStream;
@@ -13,7 +14,9 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import jdk.jfr.EventType;
@@ -154,6 +157,15 @@ final class GitObjectStoreGuardTest {
   }
 
   @Test
+  void alternatesQuebradoSoEmCrTemDuasLinhasEASegundaNaRedeERecusada() throws Exception {
+    final Path repo = naoNascido("alt-cr");
+    Files.writeString(
+        alternates(repo), real.resolve("nao-existe/objects") + "\r//strata.invalid/share/objects");
+
+    recusadoNomeando(repo, P, "nomeia o local de rede //strata.invalid/share/objects");
+  }
+
+  @Test
   void alternatesAninhadosAlemDoLimiteRecusadoENoLimitePassa() throws Exception {
     final int limite = AnalysisConstants.MAX_GIT_ALTERNATES_DEPTH;
     assertThat(limite + 1)
@@ -250,26 +262,83 @@ final class GitObjectStoreGuardTest {
   }
 
   @Test
-  void objetosSoltosAcimaDoTetoInjetadoRecusadoENoTetoPassa() throws Exception {
+  void entradasDosObjetosSoltosAcimaDoTetoInjetadoRecusadoENoTetoPassa() throws Exception {
     final Path repo = real.resolve("soltos");
     repositorioComCommit(repo);
-    final int soltos = contarSoltos(objetos(repo));
-    assertThat(soltos).as("blob, árvores e commit").isGreaterThan(2);
+    assertThat(contarSoltos(objetos(repo))).as("blob, árvores e commit").isGreaterThan(2);
+    final int entradas = contarEntradas(objetos(repo));
 
-    recusadoNomeando(repo, comSoltos(soltos - 1), "objects");
-    admitido(repo, comSoltos(soltos));
+    recusadoNomeando(repo, comEntradas(entradas - 1), acimaDe(entradas - 1));
+    admitido(repo, comEntradas(entradas));
   }
 
   @Test
-  void osObjetosSoltosDosAlternatesContamNoMesmoTeto() throws Exception {
+  void asEntradasDosAlternatesContamNoMesmoTeto() throws Exception {
     final Path base = real.resolve("base-soltos");
     repositorioComCommit(base);
-    final int soltos = contarSoltos(objetos(base));
     final Path clone = naoNascido("clone-soltos");
     Files.writeString(alternates(clone), objetos(base) + "\n");
+    final int entradas = contarEntradas(objetos(clone)) + contarEntradas(objetos(base));
 
-    recusadoNomeando(clone, comSoltos(soltos - 1), "objects");
-    admitido(clone, comSoltos(soltos));
+    recusadoNomeando(clone, comEntradas(entradas - 1), acimaDe(entradas - 1));
+    admitido(clone, comEntradas(entradas));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"pack", ".", SOLTO_DIR})
+  void lixoNoBancoDeObjetosAcimaDoTetoInjetadoRecusadoENoTetoPassa(String pasta) throws Exception {
+    final int arquivos = 40;
+    final Path repo = naoNascido("lixo-" + (".".equals(pasta) ? "objects" : pasta));
+    lixo(objetos(repo).resolve(pasta), arquivos);
+    final int entradas = contarEntradas(objetos(repo));
+    final int fanoutCriado = SOLTO_DIR.equals(pasta) ? 1 : 0;
+    assertThat(entradas)
+        .as(
+            "o lixo, o info/ e o pack/ do git init, e a pasta de fanout quando o lixo está dentro de uma")
+        .isEqualTo(arquivos + 2 + fanoutCriado);
+
+    recusadoNomeando(repo, comEntradas(entradas - 1), acimaDe(entradas - 1));
+    admitido(repo, comEntradas(entradas));
+  }
+
+  @Test
+  void aGuardaConsultaOCancelamentoACadaPassoECanceladaLancaNoPrimeiro() throws Exception {
+    final int passo = AnalysisConstants.WALK_CHECK_STRIDE_ENTRIES;
+    final Path repo = naoNascido("lixo-cancelado");
+    lixo(objetos(repo).resolve("pack"), 3 * passo);
+    final int entradas = contarEntradas(objetos(repo));
+    final AtomicInteger consultas = new AtomicInteger();
+
+    final RepositoryOutcome<RepositorySnapshot> semCancelar =
+        new RepositoryValidator(P)
+            .inspect(
+                repo,
+                () -> {
+                  consultas.incrementAndGet();
+                  return false;
+                },
+                vistos -> {});
+
+    assertThat(semCancelar).isInstanceOf(RepositoryOutcome.Accepted.class);
+    assertThat(consultas).as("uma consulta por passo inteiro").hasValue(entradas / passo);
+
+    consultas.set(0);
+    final Throwable cancelado =
+        catchThrowable(
+            () ->
+                new RepositoryValidator(P)
+                    .inspect(
+                        repo,
+                        () -> {
+                          consultas.incrementAndGet();
+                          return true;
+                        },
+                        vistos -> {}));
+
+    assertThat(cancelado)
+        .isInstanceOf(CancellationException.class)
+        .hasMessage("conferência do object store do git cancelada na entrada " + passo);
+    assertThat(consultas).as("parou na primeira consulta").hasValue(1);
   }
 
   @Test
@@ -647,6 +716,34 @@ final class GitObjectStoreGuardTest {
     return linha.append('\n').toString();
   }
 
+  private static void lixo(Path pasta, int arquivos) throws IOException {
+    Files.createDirectories(pasta);
+    for (int i = 0; i < arquivos; i++) {
+      Files.createFile(pasta.resolve("lixo-" + i));
+    }
+  }
+
+  private static int contarEntradas(Path objetos) throws IOException {
+    int entradas = 0;
+    try (Stream<Path> listadas = Files.list(objetos)) {
+      for (final Path entrada : listadas.toList()) {
+        entradas++;
+        final String nome = entrada.getFileName().toString();
+        final boolean enumerada = HEXA_2.matcher(nome).matches() || "pack".equals(nome);
+        if (enumerada && Files.isDirectory(entrada, LinkOption.NOFOLLOW_LINKS)) {
+          try (Stream<Path> dentro = Files.list(entrada)) {
+            entradas += Math.toIntExact(dentro.count());
+          }
+        }
+      }
+    }
+    return entradas;
+  }
+
+  private static String acimaDe(int teto) {
+    return "para mais de " + teto + " entradas";
+  }
+
   private static int contarSoltos(Path objetos) throws IOException {
     int soltos = 0;
     try (Stream<Path> fanouts = Files.list(objetos)) {
@@ -683,36 +780,37 @@ final class GitObjectStoreGuardTest {
   private static RepositoryLimits comConfig(int bytes) {
     return tetos(
         bytes,
-        P.maxLooseObjects(),
+        P.maxObjectStoreEntries(),
         P.maxPackIndexBytes(),
         P.maxPackIndexTotalBytes(),
         P.maxCommitGraphBytes());
   }
 
-  private static RepositoryLimits comSoltos(int soltos) {
+  private static RepositoryLimits comEntradas(int entradas) {
     return tetos(
         P.maxGitConfigBytes(),
-        soltos,
+        entradas,
         P.maxPackIndexBytes(),
         P.maxPackIndexTotalBytes(),
         P.maxCommitGraphBytes());
   }
 
   private static RepositoryLimits comIndices(long cada, long total) {
-    return tetos(P.maxGitConfigBytes(), P.maxLooseObjects(), cada, total, P.maxCommitGraphBytes());
+    return tetos(
+        P.maxGitConfigBytes(), P.maxObjectStoreEntries(), cada, total, P.maxCommitGraphBytes());
   }
 
   private static RepositoryLimits comCommitGraph(long bytes) {
     return tetos(
         P.maxGitConfigBytes(),
-        P.maxLooseObjects(),
+        P.maxObjectStoreEntries(),
         P.maxPackIndexBytes(),
         P.maxPackIndexTotalBytes(),
         bytes);
   }
 
   private static RepositoryLimits tetos(
-      int config, int soltos, long indice, long totalIndices, long commitGraph) {
+      int config, int entradas, long indice, long totalIndices, long commitGraph) {
     return new RepositoryLimits(
         P.maxEnumeratedFiles(),
         P.maxDirectoryDepth(),
@@ -723,7 +821,7 @@ final class GitObjectStoreGuardTest {
         P.maxPackedRefsBytes(),
         P.maxGitAlternates(),
         P.maxGitAlternatesDepth(),
-        soltos,
+        entradas,
         indice,
         totalIndices,
         commitGraph);

@@ -1,5 +1,6 @@
 package br.pucpr.tcc.strata.analyzer.repository;
 
+import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.repository.GitMetadataGuard.Refusal;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -10,12 +11,13 @@ import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
 import java.util.regex.Pattern;
 import org.eclipse.jgit.lib.Constants;
 
@@ -35,25 +37,34 @@ final class GitObjectStoreGuard {
   private final Path root;
   private final RepositoryLimits limits;
   private final GitMetadataGuard metadata;
+  private final BooleanSupplier cancelled;
 
   private final Set<Path> visited = new HashSet<>();
 
   private int alternates;
-  private int looseObjects;
+  private int enumeratedEntries;
   private long packIndexBytes;
 
-  private GitObjectStoreGuard(Path root, RepositoryLimits limits, GitMetadataGuard metadata) {
+  private GitObjectStoreGuard(
+      Path root, RepositoryLimits limits, GitMetadataGuard metadata, BooleanSupplier cancelled) {
     this.root = root;
     this.limits = limits;
     this.metadata = metadata;
+    this.cancelled = cancelled;
   }
 
-  static void check(Path commonDir, Path root, RepositoryLimits limits, GitMetadataGuard metadata)
+  static void check(
+      Path commonDir,
+      Path root,
+      RepositoryLimits limits,
+      GitMetadataGuard metadata,
+      BooleanSupplier cancelled)
       throws IOException, Refusal {
     new GitObjectStoreGuard(
             Objects.requireNonNull(root, "root"),
             Objects.requireNonNull(limits, "limits"),
-            Objects.requireNonNull(metadata, "metadata"))
+            Objects.requireNonNull(metadata, "metadata"),
+            Objects.requireNonNull(cancelled, "cancelled"))
         .checkRepository(Objects.requireNonNull(commonDir, "commonDir"), 0);
   }
 
@@ -78,25 +89,18 @@ final class GitObjectStoreGuard {
   }
 
   private void checkLooseObjects(Path objects) throws IOException, Refusal {
-    for (final Path fanout : entries(objects)) {
-      if (!LOOSE_FANOUT.matcher(fanout.getFileName().toString()).matches()) {
-        continue;
-      }
-      final Optional<Reached> directory = reachEntry(fanout);
-      if (directory.isEmpty() || !directory.get().attributes().isDirectory()) {
-        continue;
-      }
-      for (final Path object : entries(directory.get().path())) {
-        looseObjects++;
-        if (looseObjects > limits.maxLooseObjects()) {
-          throw new Refusal(
-              objects
-                  + " leva os objetos soltos do repositório e dos seus alternates para mais de "
-                  + limits.maxLooseObjects());
-        }
-        requireRegular(object, reachEntry(object));
-      }
-    }
+    forEachEntry(
+        objects,
+        fanout -> {
+          if (!LOOSE_FANOUT.matcher(fanout.getFileName().toString()).matches()) {
+            return;
+          }
+          final Optional<Reached> directory = reachEntry(fanout);
+          if (directory.isPresent() && directory.get().attributes().isDirectory()) {
+            forEachEntry(
+                directory.get().path(), object -> requireRegular(object, reachEntry(object)));
+          }
+        });
   }
 
   private void checkPacks(Path pack) throws IOException, Refusal {
@@ -107,21 +111,23 @@ final class GitObjectStoreGuard {
     if (!directory.get().attributes().isDirectory()) {
       throw new Refusal(pack + " não é um diretório");
     }
-    for (final Path entry : entries(directory.get().path())) {
-      final String name = entry.getFileName().toString();
-      final Optional<Reached> reached = reachEntry(entry);
-      if (PRESERVED.equals(name)) {
-        if (reached.isPresent() && !isEmptyDirectory(reached.get())) {
-          throw new Refusal(
-              entry + " tem packs preservados, que o JGit liga de volta ao repositório");
-        }
-        continue;
+    forEachEntry(directory.get().path(), this::checkPackEntry);
+  }
+
+  private void checkPackEntry(Path entry) throws IOException, Refusal {
+    final String name = entry.getFileName().toString();
+    final Optional<Reached> reached = reachEntry(entry);
+    if (PRESERVED.equals(name)) {
+      if (reached.isPresent() && !isEmptyDirectory(reached.get())) {
+        throw new Refusal(
+            entry + " tem packs preservados, que o JGit liga de volta ao repositório");
       }
-      requireRegular(entry, reached);
-      if (reached.isPresent()
-          && (name.endsWith(PACK_INDEX_SUFFIX) || MULTI_PACK_INDEX.equals(name))) {
-        countPackIndex(entry, reached.get().attributes().size());
-      }
+      return;
+    }
+    requireRegular(entry, reached);
+    if (reached.isPresent()
+        && (name.endsWith(PACK_INDEX_SUFFIX) || MULTI_PACK_INDEX.equals(name))) {
+      countPackIndex(entry, reached.get().attributes().size());
     }
   }
 
@@ -220,16 +226,37 @@ final class GitObjectStoreGuard {
     }
   }
 
-  private static List<Path> entries(Path directory) throws IOException {
+  private void forEachEntry(Path directory, EntryCheck check) throws IOException, Refusal {
     try (DirectoryStream<Path> listed = Files.newDirectoryStream(directory)) {
-      final List<Path> entries = new ArrayList<>();
       for (final Path entry : listed) {
-        entries.add(entry);
+        enumerate(directory);
+        check.accept(entry);
       }
-      return entries;
     } catch (DirectoryIteratorException failed) {
       throw failed.getCause();
     }
+  }
+
+  private void enumerate(Path directory) throws Refusal {
+    enumeratedEntries++;
+    if (enumeratedEntries > limits.maxObjectStoreEntries()) {
+      throw new Refusal(
+          directory
+              + " leva o object store do repositório e dos seus alternates para mais de "
+              + limits.maxObjectStoreEntries()
+              + " entradas");
+    }
+    if (enumeratedEntries % AnalysisConstants.WALK_CHECK_STRIDE_ENTRIES == 0
+        && cancelled.getAsBoolean()) {
+      throw new CancellationException(
+          "conferência do object store do git cancelada na entrada " + enumeratedEntries);
+    }
+  }
+
+  @FunctionalInterface
+  private interface EntryCheck {
+
+    void accept(Path entry) throws IOException, Refusal;
   }
 
   private Optional<Reached> reach(Path path) throws IOException, Refusal {

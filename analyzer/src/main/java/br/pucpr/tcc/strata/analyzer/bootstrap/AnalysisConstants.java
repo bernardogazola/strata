@@ -100,7 +100,7 @@ public final class AnalysisConstants {
 
   public static final int MAX_GIT_ALTERNATES_DEPTH = 6;
 
-  public static final int MAX_LOOSE_OBJECTS = 200_000;
+  public static final int MAX_OBJECT_STORE_ENTRIES = 200_000;
 
   public static final long MAX_PACK_INDEX_BYTES = 268_435_456L;
 

@@ -314,9 +314,13 @@ const errorRegistry: ErrorRegistry = {
   },
   REPO_NOT_A_GIT_REPOSITORY: {
     format: () => ({
-      body: [t("A pasta selecionada não é um repositório Git.")],
-      hint: "Selecione a raiz de um repositório clonado.",
-      title: "Não é um repositório Git",
+      body: [
+        t(
+          "A pasta selecionada não é um repositório Git, ou guarda os objetos do Git de um jeito que o Strata não lê com segurança."
+        ),
+      ],
+      hint: "Selecione a raiz de um repositório clonado. Se ele já é um, compacte os objetos com git gc e tente de novo.",
+      title: "Repositório Git não suportado",
     }),
     retryable: false,
     severity: "error",

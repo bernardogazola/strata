@@ -20,9 +20,14 @@ final class AnalysisConstantsTest {
                 Map.entry("MAX_SOURCE_WARNINGS_PER_CODE", 100),
                 Map.entry("MAX_GIT_ALTERNATES", 8),
                 Map.entry("MAX_GIT_ALTERNATES_DEPTH", 6),
-                Map.entry("MAX_LOOSE_OBJECTS", 200_000),
+                Map.entry("MAX_OBJECT_STORE_ENTRIES", 200_000),
                 Map.entry("MAX_PACK_INDEX_BYTES", 268_435_456L),
                 Map.entry("MAX_PACK_INDEX_TOTAL_BYTES", 536_870_912L),
                 Map.entry("MAX_COMMIT_GRAPH_BYTES", 268_435_456L)));
+  }
+
+  @Test
+  void oTetoDeEntradasDoBancoDeObjetosSubstituiODeObjetosSoltos() {
+    assertThat(AnalysisConstants.asMetadata()).doesNotContainKey("MAX_LOOSE_OBJECTS");
   }
 }

@@ -206,6 +206,20 @@ describe("formatProtocolError", () => {
     expect(plainText(message)).not.toContain("este repositório");
   });
 
+  test("REPO_NOT_A_GIT_REPOSITORY tem a cópia exata, verdadeira também para o clone que a guarda recusa", () => {
+    const message = formatProtocolError({ code: "REPO_NOT_A_GIT_REPOSITORY" });
+
+    expect(message.title).toBe("Repositório Git não suportado");
+    expect(plainText(message)).toBe(
+      "A pasta selecionada não é um repositório Git, ou guarda os objetos do Git de um jeito que o Strata não lê com segurança."
+    );
+    expect(message.hint).toBe(
+      "Selecione a raiz de um repositório clonado. Se ele já é um, compacte os objetos com git gc e tente de novo."
+    );
+    expect(message.severity).toBe("error");
+    expect(message.retryable).toBe(false);
+  });
+
   test("ANALYSIS_CACHE_CORRUPTED tem a cópia exata e não promete que nada se perdeu", () => {
     const message = formatProtocolError({ code: "ANALYSIS_CACHE_CORRUPTED" });
 

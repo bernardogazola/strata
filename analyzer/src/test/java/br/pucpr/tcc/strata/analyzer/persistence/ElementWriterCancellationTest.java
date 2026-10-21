@@ -46,6 +46,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 final class ElementWriterCancellationTest {
 
@@ -109,6 +111,36 @@ final class ElementWriterCancellationTest {
     @Override
     public boolean getAsBoolean() {
       if (armado && !virado && ++consultas >= naConsulta) {
+        virado = true;
+      }
+      return virado;
+    }
+  }
+
+  private static final class CancelamentoDoProprioEscritor implements BooleanSupplier {
+
+    private static final StackWalker PILHA =
+        StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
+
+    private final int naConsulta;
+    private boolean armado;
+    private int consultas;
+    private boolean virado;
+
+    private CancelamentoDoProprioEscritor(int naConsulta) {
+      this.naConsulta = naConsulta;
+    }
+
+    private void armar() {
+      armado = true;
+    }
+
+    @Override
+    public boolean getAsBoolean() {
+      if (armado
+          && !virado
+          && PILHA.getCallerClass() == ElementWriter.class
+          && ++consultas >= naConsulta) {
         virado = true;
       }
       return virado;
@@ -302,7 +334,49 @@ final class ElementWriterCancellationTest {
         .as("o end() também é cancelável, pedaço a pedaço")
         .isInstanceOf(CancellationException.class)
         .isNotInstanceOf(ElementWriter.WriteFailedException.class);
+    endDesfeitoInteiro(analise);
+  }
 
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2})
+  void umCancelamentoAntesDeCadaInstrucaoUnicaDoEndDesfazOEndInteiro(int depoisDasTrocas)
+      throws Exception {
+    final long analise = novaAnalise("an_01");
+    final long trocas =
+        IntStream.range(0, finais().size())
+            .filter(i -> finais().get(i).status() != preParse().get(i).status())
+            .count();
+    assertThat(trocas).as("o Broken, reprovado na extração").isEqualTo(1);
+    final CancelamentoDoProprioEscritor cancelamento =
+        new CancelamentoDoProprioEscritor(Math.toIntExact(trocas) + depoisDasTrocas);
+    final ElementWriter writer =
+        new ElementWriter(
+            connections, analise, List.of(MAIN), fontes(), LINHAS_POR_LOTE + 1, cancelamento);
+    writer.begin(preParse());
+    writer.accept(lote(0));
+    writer.accept(lote(1));
+    writer.accept(lote(2));
+    cancelamento.armar();
+
+    final Throwable falha = catchThrowable(() -> writer.end(finais(), elementosFile()));
+
+    assertThat(falha)
+        .as(
+            "a consulta %d depois das trocas de desfecho, antes da instrução única, cancela",
+            depoisDasTrocas)
+        .isInstanceOf(CancellationException.class)
+        .isNotInstanceOf(ElementWriter.WriteFailedException.class);
+    endDesfeitoInteiro(analise);
+    assertThat(
+            lido(
+                "SELECT count(*) FROM code_metric m JOIN code_element e ON e.id = m.element_pk"
+                    + " WHERE e.analysis_pk = ? AND e.kind = 'PACKAGE'",
+                analise))
+        .as("nenhuma soma de pacote")
+        .isEqualTo("0");
+  }
+
+  private void endDesfeitoInteiro(long analise) throws SQLException {
     assertThat(contarFile(analise)).as("nenhuma linha FILE").isZero();
     assertThat(contarElementos(analise))
         .as("a última descarga, dentro do end, foi desfeita com ele")
@@ -428,6 +502,10 @@ final class ElementWriterCancellationTest {
     final Gravado esperado = gravado(deQuatro);
     assertThat(esperado.elementos()).hasSize(LOTES * LINHAS_POR_LOTE + LOTES + 1);
     assertThat(esperado.metricas()).isNotEmpty();
+    assertThat(esperado.metricas())
+        .as("a soma do pacote, que o end cancelado não pode deixar")
+        .extracting(Metrica::elementId)
+        .contains("pkg:p");
     assertThat(gravado(cancelavel)).isEqualTo(esperado);
     assertThat(violacoesDeChaveEstrangeira()).isEmpty();
   }

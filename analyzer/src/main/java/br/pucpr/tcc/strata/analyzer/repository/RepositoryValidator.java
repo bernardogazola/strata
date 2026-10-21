@@ -76,7 +76,7 @@ public final class RepositoryValidator {
     if (!isListable(real)) {
       return rejected(RepositoryIssue.rootUnreadable());
     }
-    if (!gitMetadataGuard.admits(real)) {
+    if (!gitMetadataGuard.admits(real, cancelled)) {
       return rejected(RepositoryIssue.notAGitRepository());
     }
     return switch (readHead(real)) {
