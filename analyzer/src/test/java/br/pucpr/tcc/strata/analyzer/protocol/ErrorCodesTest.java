@@ -9,11 +9,15 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 final class ErrorCodesTest {
@@ -108,5 +112,72 @@ final class ErrorCodesTest {
   void sourceParseFailedTemAFraseDaFixture() {
     assertThat(ErrorCodes.source(SourceIssue.parseFailed("a/B.java")).detail())
         .isEqualTo("o arquivo não pôde ser modelado e ficou de fora da análise estrutural");
+  }
+
+  private static final String CAUSE_SCHEMA = "cacheUnavailableCauseSchema";
+
+  private static final Pattern MEMBRO = Pattern.compile("\"([A-Z_]+)\"");
+
+  private static Path enumsTs() {
+    return FIXTURES.getParent().getParent().resolve("src/protocol/enums.ts");
+  }
+
+  private static Matcher blocoDoEnum(String fonte, String schema) {
+    return Pattern.compile(
+            Pattern.quote(schema) + "\\s*=\\s*z\\.enum\\(\\[(.*?)\\]\\)", Pattern.DOTALL)
+        .matcher(fonte);
+  }
+
+  static List<String> membrosDoEnum(String fonte, String schema) {
+    final Matcher bloco = blocoDoEnum(fonte, schema);
+    if (!bloco.find()) {
+      return List.of();
+    }
+    final List<String> membros = new ArrayList<>();
+    final Matcher membro = MEMBRO.matcher(bloco.group(1));
+    while (membro.find()) {
+      membros.add(membro.group(1));
+    }
+    return membros;
+  }
+
+  static List<String> divergencias(List<String> java, List<String> typeScript) {
+    return java.equals(typeScript)
+        ? List.of()
+        : List.of("Kind " + java + " != " + CAUSE_SCHEMA + " " + typeScript);
+  }
+
+  private static List<String> kinds() {
+    return Arrays.stream(CacheUnavailableException.Kind.values()).map(Enum::name).toList();
+  }
+
+  @Test
+  void osKindsDoCacheSaoOsMembrosDoCacheUnavailableCauseSchemaNaMesmaOrdem() throws IOException {
+    final List<String> doTypeScript =
+        membrosDoEnum(Files.readString(enumsTs(), StandardCharsets.UTF_8), CAUSE_SCHEMA);
+
+    assertThat(doTypeScript)
+        .as("anti-vacuidade: o schema existe em enums.ts e tem membros")
+        .isNotEmpty();
+    assertThat(divergencias(kinds(), doTypeScript)).isEmpty();
+  }
+
+  @Test
+  void umQuintoKindDeUmLadoSoEDivergencia() throws IOException {
+    final String fonte = Files.readString(enumsTs(), StandardCharsets.UTF_8);
+    final Matcher bloco = blocoDoEnum(fonte, CAUSE_SCHEMA);
+    assertThat(bloco.find()).isTrue();
+    final String comQuinto =
+        fonte.substring(0, bloco.end(1)) + "  \"DISK_FULL\",\n" + fonte.substring(bloco.end(1));
+    final List<String> javaComQuinto = new ArrayList<>(kinds());
+    javaComQuinto.add("DISK_FULL");
+
+    assertThat(membrosDoEnum(comQuinto, CAUSE_SCHEMA)).hasSize(kinds().size() + 1);
+    assertThat(divergencias(kinds(), membrosDoEnum(comQuinto, CAUSE_SCHEMA)))
+        .as("um membro a mais só no TypeScript")
+        .isNotEmpty();
+    assertThat(divergencias(javaComQuinto, membrosDoEnum(fonte, CAUSE_SCHEMA)))
+        .as("um Kind a mais só no Java")
+        .isNotEmpty();
   }
 }

@@ -34,6 +34,7 @@ describe("a descoberta das transcrições", () => {
     expect(fakeBridgeRoutes()).toStrictEqual({
       "analysis.cancel": ["unknown"],
       "analysis.start": ["ok"],
+      "analysis.status": ["completed"],
       "graph.search": ["hit"],
       "graph.slice": ["package", "type"],
       "outline.children": ["orders", "root"],

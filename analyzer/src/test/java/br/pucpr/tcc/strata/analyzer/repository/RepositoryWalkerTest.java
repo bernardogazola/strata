@@ -1,13 +1,21 @@
 package br.pucpr.tcc.strata.analyzer.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntConsumer;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -408,5 +416,146 @@ final class RepositoryWalkerTest {
         Files.isReadable(trancada),
         "este usuário lê um diretório sem permissões (rodando como root?): o caso ilegível"
             + " não pode ser produzido aqui");
+  }
+
+  private static final int PASSO = AnalysisConstants.WALK_CHECK_STRIDE_ENTRIES;
+
+  private int arvore(int diretorios, int porDiretorio) throws Exception {
+    for (int d = 0; d < diretorios; d++) {
+      final Path pasta = Files.createDirectories(real.resolve("src/main/java/p" + d));
+      for (int f = 0; f < porDiretorio; f++) {
+        Files.createFile(pasta.resolve("C" + f + ".java"));
+      }
+    }
+    return 3 + diretorios + diretorios * porDiretorio;
+  }
+
+  @Test
+  void umCancelamentoQueViraNoMeioLancaDentroDeUmPassoENuncaDevolveDesfecho() throws Exception {
+    arvore(4, 900);
+    final AtomicBoolean cancelado = new AtomicBoolean();
+    final AtomicInteger vistosAoVirar = new AtomicInteger(-1);
+    final List<Integer> vistos = new ArrayList<>();
+    final int virarEm = 1_500;
+    final IntConsumer progresso =
+        visto -> {
+          vistos.add(visto);
+          if (visto >= virarEm && !cancelado.get()) {
+            vistosAoVirar.set(visto);
+            cancelado.set(true);
+          }
+        };
+
+    assertThatThrownBy(
+            () -> walker(RepositoryLimits.PRODUCTION).walk(real, cancelado::get, progresso))
+        .as("um cancelamento não é fato do repositório: nunca um RepositoryOutcome")
+        .isInstanceOf(CancellationException.class);
+    assertThat(vistosAoVirar.get())
+        .as("o progresso chegou a %d antes do fim", virarEm)
+        .isPositive();
+    assertThat(vistos.stream().mapToInt(Integer::intValue).max().orElseThrow())
+        .as("parou na consulta seguinte: no máximo um passo (%d entradas) depois de virar", PASSO)
+        .isLessThanOrEqualTo(vistosAoVirar.get() + PASSO)
+        .isLessThan(3_600);
+  }
+
+  @Test
+  void umCancelamentoJaPedidoLancaNaPrimeiraConsulta() throws Exception {
+    arvore(3, 1_000);
+    final AtomicInteger consultas = new AtomicInteger();
+    final List<Integer> vistos = new ArrayList<>();
+
+    assertThatThrownBy(
+            () ->
+                walker(RepositoryLimits.PRODUCTION)
+                    .walk(
+                        real,
+                        () -> {
+                          consultas.incrementAndGet();
+                          return true;
+                        },
+                        vistos::add))
+        .isInstanceOf(CancellationException.class);
+    assertThat(consultas).as("lançou na primeira consulta").hasValue(1);
+    assertThat(vistos).allMatch(visto -> visto <= PASSO);
+  }
+
+  @Test
+  void umaConsultaQueViraNaTerceiraParaNaTerceira() throws Exception {
+    arvore(4, 1_000);
+    final AtomicInteger consultas = new AtomicInteger();
+    final List<Integer> vistos = new ArrayList<>();
+
+    assertThatThrownBy(
+            () ->
+                walker(RepositoryLimits.PRODUCTION)
+                    .walk(real, () -> consultas.incrementAndGet() >= 3, vistos::add))
+        .isInstanceOf(CancellationException.class);
+    assertThat(consultas).hasValue(3);
+    assertThat(vistos)
+        .as("três consultas são no máximo três passos de entradas")
+        .allMatch(visto -> visto <= 3 * PASSO);
+  }
+
+  @Test
+  void oCancelamentoEConsultadoUmaVezPorPassoDeEntradas() throws Exception {
+    final int entradas = arvore(3, 1_100);
+    final AtomicInteger consultas = new AtomicInteger();
+
+    aceito(
+        walker(RepositoryLimits.PRODUCTION)
+            .walk(
+                real,
+                () -> {
+                  consultas.incrementAndGet();
+                  return false;
+                },
+                visto -> {}));
+
+    assertThat(consultas.get()).isBetween(entradas / PASSO, entradas / PASSO + 2);
+  }
+
+  @Test
+  void oProgressoSobeNoPassoETerminaNoTotalDeFontesJava() throws Exception {
+    arvore(3, 1_000);
+    TestRepositories.write(real, "README.md", "não é fonte");
+    final List<Integer> vistos = new ArrayList<>();
+
+    final var accepted =
+        aceito(walker(RepositoryLimits.PRODUCTION).walk(real, () -> false, vistos::add));
+
+    final int total = accepted.value().javaSources().size();
+    assertThat(total).isEqualTo(3_000);
+    assertThat(vistos).as("o gancho de progresso foi chamado").isNotEmpty();
+    assertThat(vistos).as("monotônico").isSorted();
+    assertThat(vistos.getLast()).as("a última chamada é o total do inventário").isEqualTo(total);
+    assertThat(vistos)
+        .as("contou durante a varredura, e não só no fim")
+        .anyMatch(visto -> visto > 0 && visto < total);
+  }
+
+  @Test
+  void numaArvoreMenorQueUmPassoOProgressoAindaTerminaNoTotal() throws Exception {
+    TestRepositories.write(real, "src/A.java", "class A {}");
+    TestRepositories.write(real, "src/B.java", "class B {}");
+    final List<Integer> vistos = new ArrayList<>();
+
+    aceito(walker(RepositoryLimits.PRODUCTION).walk(real, () -> false, vistos::add));
+
+    assertThat(vistos).as("uma vez no fim, com o total").isNotEmpty().endsWith(2);
+  }
+
+  @Test
+  void aFormaDeUmArgumentoEAMesmaVarreduraSemCancelamentoNemProgresso() throws Exception {
+    arvore(2, 700);
+    TestRepositories.symlink(real.resolve("vazamento"), temp.getParent());
+
+    final RepositoryOutcome<RepositoryInventory> umArgumento =
+        walker(RepositoryLimits.PRODUCTION).walk(real);
+    final RepositoryOutcome<RepositoryInventory> tresArgumentos =
+        walker(RepositoryLimits.PRODUCTION).walk(real, () -> false, visto -> {});
+
+    assertThat(tresArgumentos).isEqualTo(umArgumento);
+    assertThat(aceito(umArgumento).warnings()).isNotEmpty();
   }
 }
