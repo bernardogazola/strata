@@ -2,21 +2,35 @@ package br.pucpr.tcc.strata.analyzer.sourceanalysis.metrics;
 
 public final class LocCounter {
 
-  private LocCounter() {}
+  private final int[] codeLinePrefix;
+
+  private LocCounter(int[] codeLinePrefix) {
+    this.codeLinePrefix = codeLinePrefix;
+  }
 
   public static LocCounter of(char[] text) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return new LocCounter(LineClassifier.codeLinePrefix(text));
   }
 
   public int lines() {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return codeLinePrefix.length - 1;
   }
 
   public int loc() {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return codeLinePrefix[lines()];
   }
 
   public int loc(int startLine, int endLine) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    if (startLine < 1 || endLine > lines() || endLine < startLine) {
+      throw new IllegalArgumentException(
+          "as linhas "
+              + startLine
+              + ".."
+              + endLine
+              + " estão fora de um texto de "
+              + lines()
+              + " linha(s)");
+    }
+    return codeLinePrefix[endLine] - codeLinePrefix[startLine - 1];
   }
 }
