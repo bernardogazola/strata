@@ -1,8 +1,31 @@
 import { describe, expect, test } from "vitest";
 import { analysisStatusSchema } from "../analysis";
-import { analysisStatusReportSchema } from "../repository";
+import {
+  analysisStatusReportSchema,
+  repositoryDescriptionSchema,
+} from "../repository";
 
 const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
+
+const MAX_DESCRIBED_MODULES = 256;
+const MAX_MODULE_CHARS = 1024;
+
+const description = (declaredModules: unknown): Record<string, unknown> => ({
+  buildSystem: "MAVEN",
+  cachedAnalysisId: null,
+  declaredModules,
+  defaultBranch: "main",
+  displayName: "multi-module",
+  headCommitId: null,
+  isBare: false,
+  isGitRepository: true,
+  isShallow: false,
+  sourceRoots: [],
+  totalFileCount: 0,
+});
+
+const modules = (count: number): string[] =>
+  Array.from({ length: count }, (_, index) => `m${index}`);
 
 const FAILURE = {
   code: "CACHE_UNAVAILABLE",
@@ -84,6 +107,53 @@ describe("analysisStatusReportSchema", () => {
       analysisStatusReportSchema.safeParse(
         report("FAILED", { ...FAILURE, sobrando: 1 })
       ).success
+    ).toBe(false);
+  });
+});
+
+describe("repositoryDescriptionSchema.declaredModules", () => {
+  test("a ordem do documento chega intacta, sem ordenar", () => {
+    const parsed = repositoryDescriptionSchema.parse(
+      description(["core", "api"])
+    );
+
+    expect(parsed.declaredModules).toStrictEqual(["core", "api"]);
+  });
+
+  test("256 módulos passam e 257 reprovam no bridge", () => {
+    expect(
+      repositoryDescriptionSchema.safeParse(
+        description(modules(MAX_DESCRIBED_MODULES))
+      ).success
+    ).toBe(true);
+    expect(
+      repositoryDescriptionSchema.safeParse(
+        description(modules(MAX_DESCRIBED_MODULES + 1))
+      ).success
+    ).toBe(false);
+  });
+
+  test("uma entrada cabe no teto de um caminho, e uma unidade a mais reprova", () => {
+    expect(
+      repositoryDescriptionSchema.safeParse(
+        description(["a".repeat(MAX_MODULE_CHARS)])
+      ).success
+    ).toBe(true);
+    expect(
+      repositoryDescriptionSchema.safeParse(
+        description(["a".repeat(MAX_MODULE_CHARS + 1)])
+      ).success
+    ).toBe(false);
+  });
+
+  test("a chave é obrigatória: um Java sem ela é divergência de versão", () => {
+    const { declaredModules: _omitted, ...withoutKey } = description([]);
+
+    expect(repositoryDescriptionSchema.safeParse(withoutKey).success).toBe(
+      false
+    );
+    expect(
+      repositoryDescriptionSchema.safeParse(description(null)).success
     ).toBe(false);
   });
 });

@@ -30,6 +30,7 @@ export type SourceRoot = z.infer<typeof sourceRootSchema>;
 export const repositoryDescriptionSchema = z.strictObject({
   buildSystem: buildSystemSchema,
   cachedAnalysisId: analysisIdSchema.nullable(),
+  declaredModules: z.array(filePathSchema).max(256),
   defaultBranch: z.string().max(255).nullable(),
   displayName: z.string().max(255),
   headCommitId: commitIdSchema.nullable(),

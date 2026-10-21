@@ -54,6 +54,8 @@ public final class AnalysisConstants {
 
   public static final int MAX_BRANCH_NAME_CHARS = 255;
 
+  public static final int MAX_DESCRIBED_MODULES = 256;
+
   public static final int MAX_BUILD_FILE_BYTES = 1_048_576;
 
   public static final int MAX_GIT_CONFIG_BYTES = 1_048_576;
