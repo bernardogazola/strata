@@ -173,18 +173,19 @@ CREATE TABLE module_dependency (
 CREATE INDEX idx_module_dep_analysis ON module_dependency(analysis_pk, module_name, required_name);
 
 CREATE TABLE code_metric (
-  element_pk    INTEGER PRIMARY KEY REFERENCES code_element(id) ON DELETE CASCADE,
-  analysis_pk   INTEGER NOT NULL REFERENCES analysis(id) ON DELETE CASCADE,
-  loc           INTEGER NOT NULL DEFAULT 0,
-  source_lines  INTEGER NOT NULL DEFAULT 0,
-  comment_lines INTEGER NOT NULL DEFAULT 0,
-  method_count  INTEGER NOT NULL DEFAULT 0,
-  field_count   INTEGER NOT NULL DEFAULT 0,
-  cc_sum        INTEGER NOT NULL DEFAULT 0,
-  cc_max        INTEGER NOT NULL DEFAULT 0,
-  cc_mean       REAL    NOT NULL DEFAULT 0,
-  cc_p90        REAL    NOT NULL DEFAULT 0,
-  nesting_max   INTEGER NOT NULL DEFAULT 0
+  element_pk  INTEGER PRIMARY KEY REFERENCES code_element(id) ON DELETE CASCADE,
+  analysis_pk INTEGER NOT NULL REFERENCES analysis(id) ON DELETE CASCADE,
+  loc         INTEGER NOT NULL CHECK (loc >= 0),
+  unit_count  INTEGER CHECK (unit_count >= 0),
+  cc_sum      INTEGER,
+  cc_max      INTEGER,
+  cc_p90      INTEGER,
+  CHECK ((cc_sum IS NULL) = (cc_max IS NULL)),
+  CHECK (cc_sum IS NULL OR unit_count IS NOT NULL),
+  CHECK (cc_sum IS NULL OR (cc_sum >= unit_count AND cc_max >= 0 AND cc_max <= cc_sum
+                            AND cc_max * unit_count >= cc_sum)),
+  CHECK (cc_p90 IS NULL OR (cc_max IS NOT NULL AND cc_p90 >= 0 AND cc_p90 <= cc_max
+                            AND (cc_p90 = 0) = (unit_count = 0)))
 ) STRICT, WITHOUT ROWID;
 CREATE INDEX idx_code_metric_loc ON code_metric(analysis_pk, loc DESC);
 

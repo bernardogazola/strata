@@ -353,7 +353,7 @@ final class SourceAnalysisRun {
     final ParseFailureIsolator<String, Factory> isolator =
         new ParseFailureIsolator<>(batch -> build(root, batch, contents));
     final ParseFailureIsolator.Isolation<String> isolation =
-        isolator.isolate(files, (batch, factory) -> visit(root, batch, factory));
+        isolator.isolate(files, (batch, factory) -> visit(root, batch, factory, contents));
     for (final String failed : isolation.failed()) {
       fail(failed, ParseFailureCause.MODEL_BUILD_CRASH);
     }
@@ -418,9 +418,11 @@ final class SourceAnalysisRun {
     }
   }
 
-  private void visit(SourceRoot root, List<String> files, Factory factory) {
+  private void visit(
+      SourceRoot root, List<String> files, Factory factory, Map<String, byte[]> contents) {
     final ModeledBatch batch =
-        new ModeledBatch(root, files, factory, repositoryRoot, preParsed, index, cancelled);
+        new ModeledBatch(
+            root, files, factory, repositoryRoot, preParsed, index, cancelled, contents);
     final Set<String> modeled = batch.modeledFiles();
     for (final String file : files) {
       if (!modeled.contains(file)) {

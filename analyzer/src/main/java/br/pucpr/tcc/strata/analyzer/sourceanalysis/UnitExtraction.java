@@ -6,6 +6,7 @@ import br.pucpr.tcc.strata.analyzer.repository.SourceRootKind;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementExtractor.DeclaredType;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementExtractor.UnitElements;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.CodeElement;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.MethodElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.PackageElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.TypeElement;
@@ -15,6 +16,7 @@ import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import spoon.reflect.declaration.CtCompilationUnit;
@@ -53,6 +55,10 @@ final class UnitExtraction {
       types.add(walk(top, scope));
     }
     return new UnitElements(relativePath, List.copyOf(packages.values()), types);
+  }
+
+  Walked walk(CtCompilationUnit unit) {
+    throw new UnsupportedOperationException("ainda não implementado");
   }
 
   private DeclaredType walk(CtType<?> top, SimpleNameIndex.Scope scope) {
@@ -164,4 +170,43 @@ final class UnitExtraction {
   }
 
   private record Offered(MethodElement method, boolean own) {}
+
+  record Walked(UnitElements elements, List<TypeSite> types, List<ExecutableSite> executables) {
+
+    Walked {
+      Objects.requireNonNull(elements, "elements");
+      types = List.copyOf(Objects.requireNonNull(types, "types"));
+      executables = List.copyOf(Objects.requireNonNull(executables, "executables"));
+    }
+  }
+
+  record TypeSite(CtType<?> type, CodeElementId owner, boolean element) {
+
+    TypeSite {
+      Objects.requireNonNull(type, "type");
+      Objects.requireNonNull(owner, "owner");
+      if (owner.kind() != ElementKind.TYPE) {
+        throw new IllegalArgumentException("o dono de um local de tipo é um TYPE: " + owner);
+      }
+    }
+  }
+
+  record ExecutableSite(
+      CtExecutable<?> executable,
+      CodeElementId owner,
+      CodeElementId method,
+      boolean representative) {
+
+    ExecutableSite {
+      Objects.requireNonNull(executable, "executable");
+      Objects.requireNonNull(owner, "owner");
+      if (owner.kind() != ElementKind.TYPE
+          || (method != null && method.kind() != ElementKind.METHOD)) {
+        throw new IllegalArgumentException("não é um método de um tipo: " + owner + " / " + method);
+      }
+      if (representative && method == null) {
+        throw new IllegalArgumentException("só um local com id de METHOD pode representá-lo");
+      }
+    }
+  }
 }
