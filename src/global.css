@@ -280,3 +280,32 @@
   outline: 2px solid var(--ring);
   outline-offset: var(--focus-ring-offset, 2px);
 }
+
+:is(
+  input,
+  [data-slot="checkbox"],
+  [data-slot="radio-group-item"]
+):focus-visible:not([aria-invalid="true"], [data-checked]) {
+  border-color: var(--input);
+}
+
+:is(
+  [data-slot="checkbox"],
+  [data-slot="radio-group-item"]
+)[data-checked]:focus-visible:not([aria-invalid="true"]) {
+  border-color: var(--primary);
+}
+
+:is([data-slot="switch"], [data-slot="button"]):focus-visible:not(
+  [aria-invalid="true"]
+) {
+  border-color: transparent;
+}
+
+[data-slot="button"].border-border:focus-visible {
+  border-color: var(--border);
+}
+
+.dark [data-slot="button"].border-border:focus-visible {
+  border-color: var(--input);
+}

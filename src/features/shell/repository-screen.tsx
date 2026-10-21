@@ -1,9 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef } from "react";
-import { ModeToggle } from "@/components/mode-toggle";
 import { buttonVariants } from "@/components/ui/button";
-import { AnalyzerStatus } from "@/features/backend/analyzer-status";
 import { ElementLabel } from "@/features/graph/element-label";
 import { GraphPanel } from "@/features/graph/graph-panel";
 import {
@@ -22,6 +20,7 @@ import {
   type GraphViewParams,
   graphSliceQueryOptions,
 } from "@/queries/options";
+import { AppHeader } from "./app-header";
 import { AppShell } from "./app-shell";
 import {
   backToLevelOne,
@@ -245,14 +244,9 @@ export function RepositoryScreen() {
   return (
     <AppShell
       header={
-        <>
-          <h1 className="font-semibold">{t.app.name}</h1>
-          <MapBreadcrumb analysisId={analysisId} view={view} />
-          <div className="ml-auto flex items-center gap-3">
-            <AnalyzerStatus />
-            <ModeToggle />
-          </div>
-        </>
+        <AppHeader
+          trail={<MapBreadcrumb analysisId={analysisId} view={view} />}
+        />
       }
       inspector={
         analysisId === undefined ? (

@@ -419,6 +419,38 @@ describe("ArchitectureOutline: o caminho de dados", () => {
       rows.every((row) => row.getAttribute("aria-selected") !== null)
     ).toBe(true);
   });
+
+  test("as raias: o tipo recua 20 px e guarda a seta vazia, e o ícone dele cai sob o nome do pacote", async () => {
+    renderOutline({ focus: ORDER_SERVICE, view: ordersTypes });
+    await waitForRows(6);
+
+    const [chevron, packageIcon, packageName] = rowById(ORDERS).children;
+    const [emptyChevron, typeIcon, typeName] = rowById(ORDER).children;
+    expect(chevron?.hasAttribute("data-chevron")).toBe(true);
+    expect(chevron?.classList.contains("w-3.5")).toBe(true);
+    expect(emptyChevron?.hasAttribute("data-chevron")).toBe(false);
+    expect(emptyChevron?.classList.contains("w-3.5")).toBe(true);
+    for (const icon of [packageIcon, typeIcon]) {
+      expect(icon?.getAttribute("aria-hidden")).toBe("true");
+      expect(icon?.classList.contains("w-3")).toBe(true);
+    }
+    expect(packageName?.tagName).toBe("BDI");
+    expect(typeName?.tagName).toBe("BDI");
+    expect(rowById(ORDERS).classList.contains("pl-2")).toBe(true);
+    expect(rowById(ORDER).classList.contains("pl-7")).toBe(true);
+
+    expect(screen.getByRole("tree").querySelector(".font-mono")).toBeNull();
+  });
+
+  test("a linha selecionada sobe e marca o ícone no acento; nenhuma outra o faz", async () => {
+    renderOutline({ focus: ORDER_SERVICE, view: ordersTypes });
+    const rows = await waitForRows(6);
+
+    const accented = rows.filter(
+      (row) => row.querySelector(".border-accent-strong") !== null
+    );
+    expect(accented).toStrictEqual([rowById(ORDER_SERVICE)]);
+  });
 });
 
 describe("ArchitectureOutline: páginas", () => {

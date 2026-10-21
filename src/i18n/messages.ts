@@ -123,6 +123,7 @@ const ptBR = {
         "O processo de análise encerrou sem um código de saída. Ele não é reiniciado sozinho, porque reabrir o mesmo repositório pode repetir a falha.",
       title: "O analisador parou",
     },
+    exitCode: "código de saída {code}",
     exportDiagnostics: "Exportar diagnóstico…",
     incompatible: {
       title: "Versões incompatíveis",

@@ -1,4 +1,5 @@
 import { IconChevronRight } from "@tabler/icons-react";
+import { ElementKindIcon } from "@/features/graph/element-kind-icon";
 import { ElementLabel } from "@/features/graph/element-label";
 import { formatInteger, interpolate, plural } from "@/i18n/format";
 import { t } from "@/i18n/messages";
@@ -15,30 +16,35 @@ import type {
 export const ROW_HEIGHT = 28;
 
 const ROW_CLASS =
-  "absolute inset-x-0 top-0 flex cursor-default select-none items-center gap-1.5 rounded-sm pr-2 text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset aria-selected:bg-accent aria-selected:font-medium data-active:bg-muted";
+  "absolute inset-x-0 top-0 flex cursor-default select-none items-center gap-1.5 rounded-md pr-2 text-sm transition-[background-color,box-shadow] duration-150 ease-out-quart hover:not-aria-selected:bg-accent aria-selected:bg-raised aria-selected:font-medium aria-selected:shadow-raised data-active:not-aria-selected:bg-accent motion-reduce:transition-none";
 
 const rowStyle = (start: number) => ({
   height: ROW_HEIGHT,
   transform: `translateY(${start}px)`,
 });
 
-const indentOf = (level: 1 | 2): string => (level === 2 ? "pl-8" : "pl-1");
+const indentOf = (level: 1 | 2): string => (level === 2 ? "pl-7" : "pl-2");
+
+const ChevronSlot = () => (
+  <span aria-hidden="true" className="w-3.5 shrink-0" />
+);
 
 function Chevron({ expanded }: { readonly expanded: boolean | undefined }) {
   if (expanded === undefined) {
-    return <span aria-hidden="true" className="size-4 shrink-0" />;
+    return <ChevronSlot />;
   }
   return (
     <span
       aria-hidden="true"
-      className="flex size-4 shrink-0 items-center justify-center"
+      className="flex h-full w-3.5 shrink-0 items-center justify-center"
       data-chevron=""
     >
       <IconChevronRight
         className={cn(
-          "size-3.5 transition-transform motion-reduce:transition-none",
-          expanded && "rotate-90"
+          "size-3.5 transition-transform duration-150 ease-out-quart motion-reduce:transition-none",
+          expanded ? "rotate-90 text-foreground" : "text-subtle-foreground"
         )}
+        stroke={1.5}
       />
     </span>
   );
@@ -49,7 +55,7 @@ function TypeCount({ count }: { readonly count: number }) {
     <>
       <span
         aria-hidden="true"
-        className="ml-auto shrink-0 text-muted-foreground text-xs tabular-nums"
+        className="w-6 shrink-0 text-right text-muted-foreground text-xs tabular-nums"
       >
         {formatInteger(count)}
       </span>
@@ -92,9 +98,13 @@ function NodeRow({
       style={rowStyle(start)}
       tabIndex={tabbable ? 0 : -1}
     >
-      {row.level === 1 ? <Chevron expanded={row.expanded} /> : null}
+      {row.level === 1 ? <Chevron expanded={row.expanded} /> : <ChevronSlot />}
+      <ElementKindIcon kind={node.kind} selected={selected} />
       <ElementLabel
-        className="min-w-0 truncate"
+        className={cn(
+          "min-w-0 flex-1 truncate pl-0.5",
+          row.level === 2 && !selected && "text-muted-foreground"
+        )}
         kind={node.kind}
         label={node.label}
       />
@@ -102,6 +112,13 @@ function NodeRow({
     </div>
   );
 }
+
+const ActionLanes = () => (
+  <>
+    <ChevronSlot />
+    <span aria-hidden="true" className="w-3 shrink-0" />
+  </>
+);
 
 function ActionRow({
   index,
@@ -120,15 +137,16 @@ function ActionRow({
       className={cn(
         ROW_CLASS,
         indentOf(row.level),
-        "text-muted-foreground underline-offset-4 hover:underline"
+        "underline-offset-4 hover:underline",
+        row.type === "more" ? "text-accent-strong" : "text-muted-foreground"
       )}
       data-index={index}
       role="treeitem"
       style={rowStyle(start)}
       tabIndex={tabbable ? 0 : -1}
     >
-      <span className="size-4 shrink-0" />
-      <span className="min-w-0 truncate">{text}</span>
+      <ActionLanes />
+      <span className="min-w-0 truncate pl-0.5">{text}</span>
     </div>
   );
 }
@@ -145,8 +163,8 @@ function StatusRow({
       data-index={index}
       style={rowStyle(start)}
     >
-      <span className="size-4 shrink-0" />
-      <span className="min-w-0 truncate">
+      <ActionLanes />
+      <span className="min-w-0 truncate pl-0.5">
         {row.type === "loading" ? t.outline.loadingTypes : t.graph.empty.TYPE}
       </span>
     </div>

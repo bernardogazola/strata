@@ -411,7 +411,7 @@ function OutlineTree({
     <div
       aria-busy={busy}
       aria-labelledby={headingId}
-      className="min-h-0 flex-1 overflow-y-auto"
+      className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1"
       onBlur={handleBlur}
       onClick={handleClick}
       onFocus={handleFocus}
@@ -461,7 +461,12 @@ function RootFailure({
         )}
       </div>
       {message.retryable ? (
-        <Button onClick={onRetry} size="sm" variant="outline">
+        <Button
+          className="shadow-control"
+          onClick={onRetry}
+          size="sm"
+          variant="outline"
+        >
           {t.graph.retry}
         </Button>
       ) : null}
@@ -471,7 +476,7 @@ function RootFailure({
 
 function RootStatus({ text }: { readonly text: string }) {
   return (
-    <p className="px-2 text-muted-foreground text-sm" role="status">
+    <p className="px-2 py-1.5 text-muted-foreground text-sm" role="status">
       {text}
     </p>
   );
@@ -536,7 +541,7 @@ export function ArchitectureOutline({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <h2
-        className="mb-2 rounded-sm px-2 font-medium text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="rounded-sm px-2 pt-1.5 pb-2 font-medium text-muted-foreground text-xs"
         id={headingId}
         ref={headingRef}
         tabIndex={-1}

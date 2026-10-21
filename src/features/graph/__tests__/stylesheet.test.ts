@@ -29,6 +29,7 @@ import {
   GRAPH_SCRATCH,
   GRAPH_STYLE,
   graphRuntimeForSlice,
+  LABEL_FONT_FAMILY,
   nodeDiameter,
   readGraphRuntime,
   SELECTED_CLASS,
@@ -193,6 +194,17 @@ describe("buildStylesheet pelo parser do Cytoscape", () => {
         parsedColor(palette["--graph-edge-structural"])
       );
     }
+  });
+
+  test("o rótulo do nó é a Inter da interface, em 500, no tamanho da constante", () => {
+    const cy = createGraph(palettes.light, packageSlice);
+    const node = cy.getElementById(packageSlice.nodes[0].id);
+
+    expect(node.style("font-family")).toBe(LABEL_FONT_FAMILY);
+    expect(node.style("font-weight")).toBe(
+      String(GRAPH_STYLE.node.labelFontWeight)
+    );
+    expect(node.style("font-size")).toBe(`${GRAPH_STYLE.node.labelFontSize}px`);
   });
 
   test("toda cor da folha vem da paleta: nenhuma literal", () => {

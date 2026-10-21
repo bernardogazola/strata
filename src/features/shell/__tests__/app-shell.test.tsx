@@ -6,7 +6,7 @@ import { t } from "@/i18n/messages";
 const renderShell = () =>
   render(
     <AppShell
-      header={<p>cabeçalho</p>}
+      header={<header>cabeçalho</header>}
       inspector={<p>inspetor</p>}
       main={<p>canvas</p>}
       sidebar={<p>lateral</p>}
@@ -69,5 +69,13 @@ describe("AppShell", () => {
     renderShell();
 
     expect(screen.getAllByRole("main")).toHaveLength(1);
+  });
+
+  test("não embrulha o cabeçalho em um segundo <header>: o banner é um só", () => {
+    renderShell();
+
+    const banners = screen.getAllByRole("banner");
+    expect(banners).toHaveLength(1);
+    expect(banners[0]?.parentElement?.tagName).not.toBe("HEADER");
   });
 });

@@ -1,3 +1,4 @@
+import { IconSearch } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import {
   type ChangeEvent,
@@ -15,6 +16,7 @@ import {
 } from "react";
 import { protocolErrorOf } from "@/bridge/analyzer";
 import { Button } from "@/components/ui/button";
+import { ElementKindIcon } from "@/features/graph/element-kind-icon";
 import { ElementLabel } from "@/features/graph/element-label";
 import { isRevealable } from "@/features/shell/repository-search";
 import { formatProtocolError } from "@/i18n/errors";
@@ -34,10 +36,10 @@ const SEARCH_RESULTS_LIMIT = 50;
 const NAVIGATION_KEYS = new Set(["ArrowDown", "ArrowUp", "End", "Home"]);
 
 const INPUT_CLASS =
-  "h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+  "h-8 w-full min-w-0 rounded-md border border-input bg-background pr-2.5 pl-8 text-sm shadow-control placeholder:text-subtle-foreground";
 
 const OPTION_CLASS =
-  "flex cursor-pointer flex-col gap-0.5 rounded-md px-2 py-1 text-sm outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 aria-disabled:cursor-default aria-disabled:opacity-60 aria-selected:bg-primary/10";
+  "flex cursor-pointer items-start gap-1.5 rounded-md px-2 py-1 text-sm transition-[background-color,box-shadow] duration-150 ease-out-quart hover:not-aria-selected:bg-accent aria-disabled:cursor-default aria-disabled:opacity-60 aria-selected:bg-raised aria-selected:shadow-raised motion-reduce:transition-none";
 
 export interface NodeSearchProps {
   readonly analysisId: string;
@@ -165,23 +167,30 @@ export function NodeSearch({
       <label className="sr-only" htmlFor={inputId}>
         {t.search.label}
       </label>
-      <input
-        aria-controls={hits.length > 0 ? listId : undefined}
-        autoComplete="off"
-        className={INPUT_CLASS}
-        id={inputId}
-        maxLength={SEARCH_QUERY_MAX_CHARS}
-        onChange={handleChange}
-        onKeyDown={handleInputKeyDown}
-        placeholder={t.search.placeholder}
-        ref={inputRef}
-        spellCheck={false}
-        type="search"
-        value={input}
-      />
+      <div className="relative mx-1">
+        <IconSearch
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-subtle-foreground"
+          stroke={1.5}
+        />
+        <input
+          aria-controls={hits.length > 0 ? listId : undefined}
+          autoComplete="off"
+          className={INPUT_CLASS}
+          id={inputId}
+          maxLength={SEARCH_QUERY_MAX_CHARS}
+          onChange={handleChange}
+          onKeyDown={handleInputKeyDown}
+          placeholder={t.search.placeholder}
+          ref={inputRef}
+          spellCheck={false}
+          type="search"
+          value={input}
+        />
+      </div>
       <p
         aria-live="polite"
-        className="text-muted-foreground text-xs"
+        className="px-2 text-muted-foreground text-xs"
         role="status"
       >
         {settled ? announcementOf(hits.length) : ""}
@@ -376,7 +385,7 @@ function SearchResults({
     <div
       aria-busy={busy}
       aria-label={t.search.results}
-      className="flex max-h-64 flex-col gap-0.5 overflow-y-auto"
+      className="-mx-1 flex max-h-64 flex-col gap-0.5 overflow-y-auto px-1"
       id={id}
       onBlur={handleBlur}
       onClick={handleClick}
@@ -434,23 +443,28 @@ function SearchOption({
       role="option"
       tabIndex={tabbable ? 0 : -1}
     >
-      <span className="flex min-w-0 items-baseline gap-2">
-        <ElementLabel
-          className="truncate font-medium"
-          kind={hit.kind}
-          label={hit.label}
-        />
-        <span className="shrink-0 text-muted-foreground text-xs">
-          {elementKindLabels[hit.kind]}
-        </span>
+      <span className="flex h-4.5 shrink-0 items-center">
+        <ElementKindIcon kind={hit.kind} selected={selected} />
       </span>
-      <bdi
-        className="truncate text-muted-foreground text-xs"
-        lang=""
-        translate="no"
-      >
-        {clampText(sanitizeUntrusted(hit.qualifiedName))}
-      </bdi>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5 pl-0.5">
+        <span className="flex min-w-0 items-baseline gap-2">
+          <ElementLabel
+            className="truncate font-medium"
+            kind={hit.kind}
+            label={hit.label}
+          />
+          <span className="shrink-0 text-muted-foreground text-xs">
+            {elementKindLabels[hit.kind]}
+          </span>
+        </span>
+        <bdi
+          className="truncate text-muted-foreground text-xs"
+          lang=""
+          translate="no"
+        >
+          {clampText(sanitizeUntrusted(hit.qualifiedName))}
+        </bdi>
+      </span>
     </div>
   );
 }
@@ -464,7 +478,7 @@ function SearchFailure({
 }) {
   const message = formatProtocolError(protocolErrorOf(error));
   return (
-    <div className="flex flex-col items-start gap-2">
+    <div className="flex flex-col items-start gap-2 px-2">
       <div className="flex flex-col gap-1" role="alert">
         <p className="font-medium text-sm">{message.title}</p>
         {message.hint === undefined ? null : (
@@ -472,7 +486,12 @@ function SearchFailure({
         )}
       </div>
       {message.retryable ? (
-        <Button onClick={onRetry} size="sm" variant="outline">
+        <Button
+          className="shadow-control"
+          onClick={onRetry}
+          size="sm"
+          variant="outline"
+        >
           {t.graph.retry}
         </Button>
       ) : null}

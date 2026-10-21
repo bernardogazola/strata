@@ -319,7 +319,7 @@ describe("/repository/$handle: a moldura", () => {
 
     expect(screen.getByRole("banner")).toBeDefined();
     expect(
-      screen.getByRole("heading", { level: 1, name: t.app.name })
+      within(screen.getByRole("banner")).getByText(t.app.name)
     ).toBeDefined();
     expect(
       screen.getByRole("complementary", { name: t.shell.regions.sidebar })

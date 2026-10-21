@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import { ModeToggle } from "@/components/mode-toggle";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -19,6 +19,19 @@ describe("ModeToggle: estado fechado", () => {
     expect(trigger.tagName).toBe("BUTTON");
     expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  test("o ícone é o do tema em uso: lua no escuro, sol no claro", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "dark");
+    const dark = renderToggle();
+    expect(dark.querySelector(".tabler-icon-moon")).not.toBeNull();
+    expect(dark.querySelector(".tabler-icon-sun")).toBeNull();
+    cleanup();
+
+    localStorage.setItem(THEME_STORAGE_KEY, "light");
+    const light = renderToggle();
+    expect(light.querySelector(".tabler-icon-sun")).not.toBeNull();
+    expect(light.querySelector(".tabler-icon-moon")).toBeNull();
   });
 });
 

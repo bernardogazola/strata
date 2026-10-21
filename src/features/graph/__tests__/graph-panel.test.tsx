@@ -520,6 +520,44 @@ describe("NodeSummary", () => {
     }
   });
 
+  test("o título do inspetor é o nome em Inter, e não em mono", async () => {
+    render(<NodeSummary node={await packageNode()} onExpand={vi.fn()} />);
+
+    const heading = screen.getByRole("heading", { level: 2 });
+    expect(heading.className).not.toContain("font-mono");
+    expect(heading.querySelector(".font-mono")).toBeNull();
+  });
+
+  test("a ressalva assenta no pé do inspetor, com ou sem seleção, depois do resumo", async () => {
+    const caveat = <p>ressalva parcial</p>;
+    const { rerender } = render(
+      <NodeSummary caveat={caveat} node={null} onExpand={vi.fn()} />
+    );
+    expect(screen.getByText("ressalva parcial")).toBeDefined();
+
+    rerender(
+      <NodeSummary
+        caveat={caveat}
+        node={await packageNode()}
+        onExpand={vi.fn()}
+      />
+    );
+    const button = screen.getByRole("button", { name: t.inspector.expand });
+    const note = screen.getByText("ressalva parcial");
+    expect(button.compareDocumentPosition(note)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(note.parentElement?.classList.contains("mt-auto")).toBe(true);
+  });
+
+  test("sem ressalva, o pé fica vazio: nenhum invólucro a mais", () => {
+    const { container } = render(
+      <NodeSummary node={null} onExpand={vi.fn()} />
+    );
+
+    expect(container.firstElementChild?.childElementCount).toBe(1);
+  });
+
   test("um tipo não oferece expandir nem conta tipos", async () => {
     const node = { ...(await packageNode()), id: "type:x.Y", kind: "TYPE" };
     render(<NodeSummary node={node as GraphNode} onExpand={vi.fn()} />);
@@ -601,6 +639,20 @@ describe("GraphLegend", () => {
     expect(svgs).toHaveLength(6);
     for (const svg of svgs) {
       expect(svg.getAttribute("aria-hidden")).toBe("true");
+    }
+  });
+
+  test("na linha única, os nomes dos grupos ficam para o leitor de tela, sem sumir da árvore", () => {
+    render(<GraphLegend />);
+
+    const groups = screen.getAllByRole("heading", { level: 3 });
+    expect(groups.map((group) => group.textContent)).toStrictEqual([
+      t.graph.legend.kind,
+      t.graph.legend.resolution,
+    ]);
+    for (const group of groups) {
+      expect(group.className).toContain("sr-only");
+      expect(group.nextElementSibling?.tagName).toBe("UL");
     }
   });
 
