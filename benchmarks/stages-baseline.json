@@ -1,0 +1,2620 @@
+{
+  "schema": 1,
+  "measuredAt": "2026-10-21T16:23:00Z",
+  "baseCommit": "5367f0f",
+  "measure": "The production pipeline over the corpus: the real AnalysisRegistry built from RegistrySettings.production with Stages.production(), one analysis.start per run on a fresh data directory (COLD), events captured in process. Per stage, durationMs, status and counters come from analysis.stage.completed and are cross-checked equal to the analysis_stage rows; analysisWallMillis is analysis.started to the terminal event by arrival time; bindMillis is the runner's own log line; firstTickMillis is registry.start returning to the first analysis.progress frame (the in-process analogue of the first-progress line of scripts/verify-analysis.sh, without the pipe or a fresh JVM); heap from HeapPeakMeter over the whole run; cacheBytes is the closed file. Elements, dependencies and metric rows are SQL over the run's rows, against benchmarks/code-metrics.json. Each selection runs one gap-census analysis first (an injected copy of SOURCE_ANALYSIS wiring the same production classes, a timestamp-only BooleanSupplier in front of the token), then the three timed runs.",
+  "settings": {
+    "spoonVersion": "11.5.0",
+    "rootOrder": "MAIN, GENERATED, TEST",
+    "selections": {
+      "DEFAULT": {
+        "includeTests": false,
+        "historyScope": "ALL",
+        "historyScopeCommits": null,
+        "sourceRootIds": null
+      },
+      "ALL": {
+        "includeTests": true,
+        "historyScope": "ALL",
+        "historyScopeCommits": null,
+        "sourceRootIds": null
+      }
+    },
+    "cacheStates": ["COLD"],
+    "runsPerConfiguration": 3,
+    "statistic": "median",
+    "progressThrottleMillis": 100,
+    "cancellationDeadlineMillis": 2000,
+    "cpuPoolSize": 8,
+    "harness": "StagesBaselineSpikeIT (-Pspike)",
+    "baseline": {
+      "file": "benchmarks/code-metrics.json",
+      "measuredAt": "2026-10-21T04:11:46Z",
+      "baseCommit": "e88d6c1"
+    },
+    "firstTick": "registry.start returning -> the first analysis.progress frame reaching the sink, in process: the analogue of what scripts/verify-analysis.sh measures over the real pipe",
+    "gapCensus": "One extra analysis per selection, outside the medians: the production StagePlan with SOURCE_ANALYSIS replaced by a copy that wires the same production classes (ElementWriter with the cancellation supplier, StructureExtractor, SourceProgressVisitor, SpoonModelBuilder.analyze) and puts a timestamp-only BooleanSupplier in front of the stage's token. Every interval between two consecutive checks is counted; stack samples of the analysis thread, the first 100 ms into an open interval and then one every 250 ms, name its class (majority of samples); the tail, last check -> analyze returning, competes as an interval. prologueWalk is the same supplier through RepositoryValidator.inspect and the first-parent root walk, once per repository, outside the registry."
+  },
+  "environment": {
+    "os": "Mac OS X 27.0.1",
+    "arch": "aarch64",
+    "cpu": "Apple M4 Pro",
+    "logicalCores": 14,
+    "ramBytes": 25769803776,
+    "storage": "APPLE SSD AP1024Z internal NVMe SSD",
+    "runtime": "full JDK under Maven Surefire, not the jlink image the application ships",
+    "jvm": "Eclipse Adoptium 25.0.4.1+1-LTS",
+    "jvmFlags": [
+      "-Xmx2g",
+      "-Xss2m",
+      "-XX:-HeapDumpOnOutOfMemoryError",
+      "-Djava.awt.headless=true"
+    ],
+    "maxHeapBytes": 2147483648,
+    "garbageCollectors": [
+      "G1 Young Generation",
+      "G1 Concurrent GC",
+      "G1 Old Generation"
+    ],
+    "assertionsEnabled": false,
+    "host": {
+      "os": "Mac OS X 27.0.1",
+      "arch": "aarch64",
+      "cpu": "Apple M4 Pro",
+      "logicalCores": 14,
+      "ramBytes": 25769803776,
+      "storage": "APPLE SSD AP1024Z internal NVMe SSD",
+      "jvm": "Eclipse Adoptium 25.0.4.1+1-LTS"
+    }
+  },
+  "exceptions": [
+    {
+      "class": "COMPILE",
+      "description": "ECJ's COMPILE step of one compilation unit (InferenceContext18 inside CompilationUnitDeclaration.resolve) has no callback: neither the SpoonProgress nor the model-change listener fires inside it",
+      "boundMillis": 1380,
+      "repository": "elasticsearch",
+      "selection": "ALL",
+      "batch": "next batch built: 'modules/ingest-common/src/test/java' (74 file(s))",
+      "referenceBoundMillis": 1576,
+      "deadlineMillis": 2000
+    }
+  ],
+  "repositories": [
+    {
+      "name": "commons-lang",
+      "origin": "clone",
+      "commitId": "598dfc163b8b410fb3bb8794521206ec8dcec82a",
+      "sizeClass": "small",
+      "shallow": true,
+      "commitCount": 1,
+      "size": {
+        "entries": 613,
+        "javaFiles": 527
+      },
+      "prologueWalk": {
+        "checks": 0,
+        "longestGapMillis": 7,
+        "wallMillis": 7
+      },
+      "configurations": [
+        {
+          "selection": "DEFAULT",
+          "configHash": "c8ddc5aec20c88456feb94818eb0c8fe6c9838069031742b38a6b5dc4edffb1d",
+          "cacheState": "COLD",
+          "outcome": "analysis.completed",
+          "completeness": {
+            "totalFiles": 259,
+            "skippedFiles": 0,
+            "parseFailures": 0,
+            "shallowClone": true,
+            "historyTruncatedAtCommits": null
+          },
+          "warnings": {
+            "emitted": {},
+            "total": {
+              "SOURCE_DUPLICATE_ELEMENT": 0,
+              "SOURCE_ELEMENT_ID_TOO_LONG": 0,
+              "SOURCE_FILE_TOO_LARGE": 0,
+              "SOURCE_PARSE_FAILED": 0
+            }
+          },
+          "models": {
+            "batches": 1,
+            "builds": 1
+          },
+          "stages": [
+            {
+              "stage": "REPOSITORY_VALIDATION",
+              "status": "COMPLETED",
+              "counters": {
+                "files": 613,
+                "javaFiles": 527,
+                "warnings": 0
+              },
+              "durationMs": {
+                "median": 6,
+                "runs": [7, 6, 6]
+              }
+            },
+            {
+              "stage": "LAYOUT_DISCOVERY",
+              "status": "COMPLETED",
+              "counters": {
+                "generatedRoots": 0,
+                "mainRoots": 1,
+                "selectedRoots": 1,
+                "sourceRoots": 2,
+                "testRoots": 1
+              },
+              "durationMs": {
+                "median": 2,
+                "runs": [3, 2, 1]
+              }
+            },
+            {
+              "stage": "SOURCE_ANALYSIS",
+              "status": "COMPLETED",
+              "counters": {
+                "ambiguousRefs": 0,
+                "dropCallWithoutTarget": 0,
+                "dropDefaultPackageCollision": 0,
+                "dropIdTooLong": 0,
+                "dropInvalidName": 64,
+                "dropLocalTarget": 0,
+                "droppedDeclaredTargets": 0,
+                "duplicateElements": 0,
+                "elementIdsTooLong": 0,
+                "files": 259,
+                "inferredRefs": 0,
+                "resolvedRefs": 19006,
+                "types": 364,
+                "unnumberedCallees": 0,
+                "unresolvedRefs": 0
+              },
+              "durationMs": {
+                "median": 913,
+                "runs": [1006, 913, 841]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_CHEAP",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "STRUCTURAL_GRAPH",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_DETAILED",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "EVOLUTIONARY_COUPLING",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "HOTSPOT_PROFILES",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GUIDED_TOUR",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "PERSISTENCE",
+              "status": "COMPLETED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            }
+          ],
+          "analysisWallMillis": {
+            "median": 929,
+            "runs": [1024, 929, 855]
+          },
+          "bindMillis": {
+            "median": 4,
+            "runs": [5, 4, 4]
+          },
+          "firstTickMillis": {
+            "median": 0,
+            "runs": [0, 0, 0],
+            "stage": "REPOSITORY_VALIDATION",
+            "runsMicros": [416, 381, 355]
+          },
+          "heap": {
+            "peakLiveBytes": {
+              "max": 121494904,
+              "median": 120772896,
+              "runs": [121494904, 120772896, 120061512]
+            },
+            "peakUsedBytes": {
+              "max": 359707440,
+              "median": 343687368,
+              "runs": [343687368, 359707440, 235566920]
+            }
+          },
+          "cacheBytes": {
+            "median": 5074944,
+            "runs": [5074944, 5074944, 5074944]
+          },
+          "elements": {
+            "packages": 18,
+            "types": 364,
+            "methods": 4383,
+            "files": 259,
+            "externalTypes": 251,
+            "sourceFiles": 259,
+            "sourceRoots": 1,
+            "sourceFileStatuses": {
+              "ANALYZED": 259,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 0
+            }
+          },
+          "dependencies": {
+            "rows": 5366,
+            "occurrences": 19006,
+            "evidenceRows": 14551,
+            "moduleRows": 0
+          },
+          "metricRows": {
+            "PACKAGE": 18,
+            "TYPE": 364,
+            "METHOD": 4383,
+            "FILE": 259,
+            "external": 0
+          },
+          "baselineDifferences": [],
+          "cancellation": {
+            "longestGapMillis": 173,
+            "class": "PRE_COMPILE_PARSE",
+            "unitOrSite": "next batch built: 'src/main/java' (259 file(s))",
+            "over1000": 0,
+            "over2000": 0,
+            "tailMillis": 15,
+            "over250": 0,
+            "checks": 1795342,
+            "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+            "censusWallMillis": 2262,
+            "top": [
+              {
+                "millis": 173,
+                "class": "PRE_COMPILE_PARSE",
+                "samples": {
+                  "PRE_COMPILE_PARSE": 1
+                },
+                "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+                "batch": "next batch built: 'src/main/java' (259 file(s))",
+                "offsetMillis": 501
+              },
+              {
+                "millis": 118,
+                "class": "UNSAMPLED",
+                "samples": {},
+                "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.start <- JDTBatchCompiler.getUnits",
+                "offsetMillis": 383
+              }
+            ]
+          },
+          "runIds": [
+            "an_01M5FK4J9KK7CS7HXV4WQ4HHXY",
+            "an_01M5FK4KAM3Y9K9JJ6JDW7XN32",
+            "an_01M5FK4M8P2F2W0D41KXVFPSQ1"
+          ]
+        },
+        {
+          "selection": "ALL",
+          "configHash": "8d6fc5e58de068bb267d4d2af841ca516d7f658c987b529c7597e8b8a115c248",
+          "cacheState": "COLD",
+          "outcome": "analysis.completed",
+          "completeness": {
+            "totalFiles": 527,
+            "skippedFiles": 0,
+            "parseFailures": 0,
+            "shallowClone": true,
+            "historyTruncatedAtCommits": null
+          },
+          "warnings": {
+            "emitted": {},
+            "total": {
+              "SOURCE_DUPLICATE_ELEMENT": 0,
+              "SOURCE_ELEMENT_ID_TOO_LONG": 0,
+              "SOURCE_FILE_TOO_LARGE": 0,
+              "SOURCE_PARSE_FAILED": 0
+            }
+          },
+          "models": {
+            "batches": 2,
+            "builds": 2
+          },
+          "stages": [
+            {
+              "stage": "REPOSITORY_VALIDATION",
+              "status": "COMPLETED",
+              "counters": {
+                "files": 613,
+                "javaFiles": 527,
+                "warnings": 0
+              },
+              "durationMs": {
+                "median": 6,
+                "runs": [6, 6, 5]
+              }
+            },
+            {
+              "stage": "LAYOUT_DISCOVERY",
+              "status": "COMPLETED",
+              "counters": {
+                "generatedRoots": 0,
+                "mainRoots": 1,
+                "selectedRoots": 2,
+                "sourceRoots": 2,
+                "testRoots": 1
+              },
+              "durationMs": {
+                "median": 1,
+                "runs": [1, 1, 1]
+              }
+            },
+            {
+              "stage": "SOURCE_ANALYSIS",
+              "status": "COMPLETED",
+              "counters": {
+                "ambiguousRefs": 0,
+                "dropCallWithoutTarget": 2878,
+                "dropDefaultPackageCollision": 0,
+                "dropIdTooLong": 0,
+                "dropInvalidName": 475,
+                "dropLocalTarget": 6,
+                "droppedDeclaredTargets": 0,
+                "duplicateElements": 0,
+                "elementIdsTooLong": 0,
+                "files": 527,
+                "inferredRefs": 27946,
+                "resolvedRefs": 36113,
+                "types": 958,
+                "unnumberedCallees": 0,
+                "unresolvedRefs": 30752
+              },
+              "durationMs": {
+                "median": 11759,
+                "runs": [11983, 11759, 11621]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_CHEAP",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "STRUCTURAL_GRAPH",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_DETAILED",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "EVOLUTIONARY_COUPLING",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "HOTSPOT_PROFILES",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GUIDED_TOUR",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "PERSISTENCE",
+              "status": "COMPLETED",
+              "counters": {},
+              "durationMs": {
+                "median": 2,
+                "runs": [2, 2, 2]
+              }
+            }
+          ],
+          "analysisWallMillis": {
+            "median": 11776,
+            "runs": [11999, 11776, 11635]
+          },
+          "bindMillis": {
+            "median": 4,
+            "runs": [4, 4, 4]
+          },
+          "firstTickMillis": {
+            "median": 0,
+            "runs": [0, 0, 0],
+            "stage": "REPOSITORY_VALIDATION",
+            "runsMicros": [336, 365, 433]
+          },
+          "heap": {
+            "peakLiveBytes": {
+              "max": 267441592,
+              "median": 257622120,
+              "runs": [255996264, 257622120, 267441592]
+            },
+            "peakUsedBytes": {
+              "max": 674289080,
+              "median": 605968200,
+              "runs": [605968200, 584611880, 674289080]
+            }
+          },
+          "cacheBytes": {
+            "median": 12218368,
+            "runs": [12218368, 12218368, 12218368]
+          },
+          "elements": {
+            "packages": 20,
+            "types": 958,
+            "methods": 10555,
+            "files": 527,
+            "externalTypes": 348,
+            "sourceFiles": 527,
+            "sourceRoots": 2,
+            "sourceFileStatuses": {
+              "ANALYZED": 527,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 0
+            }
+          },
+          "dependencies": {
+            "rows": 12041,
+            "occurrences": 94811,
+            "evidenceRows": 39832,
+            "moduleRows": 0
+          },
+          "metricRows": {
+            "PACKAGE": 20,
+            "TYPE": 958,
+            "METHOD": 10555,
+            "FILE": 527,
+            "external": 0
+          },
+          "baselineDifferences": [],
+          "cancellation": {
+            "longestGapMillis": 73,
+            "class": "UNSAMPLED",
+            "unitOrSite": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+            "over1000": 0,
+            "over2000": 0,
+            "tailMillis": 2,
+            "over250": 0,
+            "checks": 7611601,
+            "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+            "censusWallMillis": 12331,
+            "top": []
+          },
+          "runIds": [
+            "an_01M5FK517RCY0465DBZ5GEP8MM",
+            "an_01M5FK5D00Y9EV882DD4WTFGDW",
+            "an_01M5FK5RHAX5DPTRKHBKVG4YN7"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "broken-tree",
+      "origin": "derived",
+      "commitId": "961b02c3ce73d09e98efd9817e9639883c1e0dec",
+      "derivedFrom": "commons-lang",
+      "sizeClass": "small",
+      "shallow": false,
+      "commitCount": 1,
+      "size": {
+        "entries": 615,
+        "javaFiles": 528
+      },
+      "prologueWalk": {
+        "checks": 1,
+        "longestGapMillis": 5,
+        "wallMillis": 5
+      },
+      "configurations": [
+        {
+          "selection": "DEFAULT",
+          "configHash": "c8ddc5aec20c88456feb94818eb0c8fe6c9838069031742b38a6b5dc4edffb1d",
+          "cacheState": "COLD",
+          "outcome": "analysis.completed",
+          "completeness": {
+            "totalFiles": 260,
+            "skippedFiles": 3,
+            "parseFailures": 3,
+            "shallowClone": false,
+            "historyTruncatedAtCommits": null
+          },
+          "warnings": {
+            "emitted": {
+              "SOURCE_PARSE_FAILED": 3
+            },
+            "total": {
+              "SOURCE_DUPLICATE_ELEMENT": 0,
+              "SOURCE_ELEMENT_ID_TOO_LONG": 0,
+              "SOURCE_FILE_TOO_LARGE": 0,
+              "SOURCE_PARSE_FAILED": 3
+            }
+          },
+          "models": {
+            "batches": 1,
+            "builds": 1
+          },
+          "stages": [
+            {
+              "stage": "REPOSITORY_VALIDATION",
+              "status": "COMPLETED",
+              "counters": {
+                "files": 615,
+                "javaFiles": 528,
+                "warnings": 0
+              },
+              "durationMs": {
+                "median": 6,
+                "runs": [6, 6, 6]
+              }
+            },
+            {
+              "stage": "LAYOUT_DISCOVERY",
+              "status": "COMPLETED",
+              "counters": {
+                "generatedRoots": 0,
+                "mainRoots": 1,
+                "selectedRoots": 1,
+                "sourceRoots": 2,
+                "testRoots": 1
+              },
+              "durationMs": {
+                "median": 1,
+                "runs": [1, 1, 1]
+              }
+            },
+            {
+              "stage": "SOURCE_ANALYSIS",
+              "status": "COMPLETED",
+              "counters": {
+                "ambiguousRefs": 0,
+                "dropCallWithoutTarget": 5,
+                "dropDefaultPackageCollision": 0,
+                "dropIdTooLong": 0,
+                "dropInvalidName": 64,
+                "dropLocalTarget": 0,
+                "droppedDeclaredTargets": 0,
+                "duplicateElements": 0,
+                "elementIdsTooLong": 0,
+                "files": 260,
+                "inferredRefs": 0,
+                "resolvedRefs": 18728,
+                "types": 362,
+                "unnumberedCallees": 0,
+                "unresolvedRefs": 6
+              },
+              "durationMs": {
+                "median": 726,
+                "runs": [744, 726, 715]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_CHEAP",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "STRUCTURAL_GRAPH",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_DETAILED",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "EVOLUTIONARY_COUPLING",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "HOTSPOT_PROFILES",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GUIDED_TOUR",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "PERSISTENCE",
+              "status": "COMPLETED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            }
+          ],
+          "analysisWallMillis": {
+            "median": 739,
+            "runs": [757, 739, 728]
+          },
+          "bindMillis": {
+            "median": 3,
+            "runs": [3, 4, 3]
+          },
+          "firstTickMillis": {
+            "median": 0,
+            "runs": [0, 0, 0],
+            "stage": "REPOSITORY_VALIDATION",
+            "runsMicros": [332, 301, 314]
+          },
+          "heap": {
+            "peakLiveBytes": {
+              "max": 120064736,
+              "median": 118203536,
+              "runs": [117753536, 118203536, 120064736]
+            },
+            "peakUsedBytes": {
+              "max": 412570384,
+              "median": 320412904,
+              "runs": [320412904, 261858448, 412570384]
+            }
+          },
+          "cacheBytes": {
+            "median": 5009408,
+            "runs": [5009408, 5009408, 5009408]
+          },
+          "elements": {
+            "packages": 18,
+            "types": 362,
+            "methods": 4340,
+            "files": 260,
+            "externalTypes": 252,
+            "sourceFiles": 260,
+            "sourceRoots": 1,
+            "sourceFileStatuses": {
+              "ANALYZED": 257,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 3
+            }
+          },
+          "dependencies": {
+            "rows": 5294,
+            "occurrences": 18734,
+            "evidenceRows": 14306,
+            "moduleRows": 0
+          },
+          "metricRows": {
+            "PACKAGE": 18,
+            "TYPE": 362,
+            "METHOD": 4340,
+            "FILE": 260,
+            "external": 0
+          },
+          "baselineDifferences": [],
+          "cancellation": {
+            "longestGapMillis": 57,
+            "class": "UNSAMPLED",
+            "unitOrSite": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+            "over1000": 0,
+            "over2000": 0,
+            "tailMillis": 15,
+            "over250": 0,
+            "checks": 1769884,
+            "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+            "censusWallMillis": 855,
+            "top": []
+          },
+          "runIds": [
+            "an_01M5FK64VXS1B9RFFBE7CSSJK9",
+            "an_01M5FK65MM6VX3TTPCJ749QNH1",
+            "an_01M5FK66CRA6NXY38JA5JTVAEC"
+          ]
+        },
+        {
+          "selection": "ALL",
+          "configHash": "8d6fc5e58de068bb267d4d2af841ca516d7f658c987b529c7597e8b8a115c248",
+          "cacheState": "COLD",
+          "outcome": "analysis.completed",
+          "completeness": {
+            "totalFiles": 528,
+            "skippedFiles": 3,
+            "parseFailures": 3,
+            "shallowClone": false,
+            "historyTruncatedAtCommits": null
+          },
+          "warnings": {
+            "emitted": {
+              "SOURCE_PARSE_FAILED": 3
+            },
+            "total": {
+              "SOURCE_DUPLICATE_ELEMENT": 0,
+              "SOURCE_ELEMENT_ID_TOO_LONG": 0,
+              "SOURCE_FILE_TOO_LARGE": 0,
+              "SOURCE_PARSE_FAILED": 3
+            }
+          },
+          "models": {
+            "batches": 2,
+            "builds": 2
+          },
+          "stages": [
+            {
+              "stage": "REPOSITORY_VALIDATION",
+              "status": "COMPLETED",
+              "counters": {
+                "files": 615,
+                "javaFiles": 528,
+                "warnings": 0
+              },
+              "durationMs": {
+                "median": 6,
+                "runs": [6, 6, 7]
+              }
+            },
+            {
+              "stage": "LAYOUT_DISCOVERY",
+              "status": "COMPLETED",
+              "counters": {
+                "generatedRoots": 0,
+                "mainRoots": 1,
+                "selectedRoots": 2,
+                "sourceRoots": 2,
+                "testRoots": 1
+              },
+              "durationMs": {
+                "median": 1,
+                "runs": [1, 1, 1]
+              }
+            },
+            {
+              "stage": "SOURCE_ANALYSIS",
+              "status": "COMPLETED",
+              "counters": {
+                "ambiguousRefs": 0,
+                "dropCallWithoutTarget": 2883,
+                "dropDefaultPackageCollision": 0,
+                "dropIdTooLong": 0,
+                "dropInvalidName": 475,
+                "dropLocalTarget": 6,
+                "droppedDeclaredTargets": 0,
+                "duplicateElements": 0,
+                "elementIdsTooLong": 0,
+                "files": 528,
+                "inferredRefs": 27297,
+                "resolvedRefs": 35835,
+                "types": 956,
+                "unnumberedCallees": 0,
+                "unresolvedRefs": 31407
+              },
+              "durationMs": {
+                "median": 11634,
+                "runs": [11633, 11634, 11638]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_CHEAP",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "STRUCTURAL_GRAPH",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_DETAILED",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "EVOLUTIONARY_COUPLING",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "HOTSPOT_PROFILES",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GUIDED_TOUR",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "PERSISTENCE",
+              "status": "COMPLETED",
+              "counters": {},
+              "durationMs": {
+                "median": 2,
+                "runs": [2, 3, 2]
+              }
+            }
+          ],
+          "analysisWallMillis": {
+            "median": 11650,
+            "runs": [11648, 11650, 11655]
+          },
+          "bindMillis": {
+            "median": 3,
+            "runs": [3, 3, 4]
+          },
+          "firstTickMillis": {
+            "median": 0,
+            "runs": [0, 0, 0],
+            "stage": "REPOSITORY_VALIDATION",
+            "runsMicros": [302, 282, 306]
+          },
+          "heap": {
+            "peakLiveBytes": {
+              "max": 263325544,
+              "median": 259983072,
+              "runs": [263325544, 254800328, 259983072]
+            },
+            "peakUsedBytes": {
+              "max": 612035760,
+              "median": 599721696,
+              "runs": [612035760, 562973416, 599721696]
+            }
+          },
+          "cacheBytes": {
+            "median": 12156928,
+            "runs": [12156928, 12156928, 12156928]
+          },
+          "elements": {
+            "packages": 20,
+            "types": 956,
+            "methods": 10512,
+            "files": 528,
+            "externalTypes": 351,
+            "sourceFiles": 528,
+            "sourceRoots": 2,
+            "sourceFileStatuses": {
+              "ANALYZED": 525,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 3
+            }
+          },
+          "dependencies": {
+            "rows": 11969,
+            "occurrences": 94539,
+            "evidenceRows": 39587,
+            "moduleRows": 0
+          },
+          "metricRows": {
+            "PACKAGE": 20,
+            "TYPE": 956,
+            "METHOD": 10512,
+            "FILE": 528,
+            "external": 0
+          },
+          "baselineDifferences": [],
+          "cancellation": {
+            "longestGapMillis": 54,
+            "class": "UNSAMPLED",
+            "unitOrSite": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+            "over1000": 0,
+            "over2000": 0,
+            "tailMillis": 2,
+            "over250": 0,
+            "checks": 7586141,
+            "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+            "censusWallMillis": 11738,
+            "top": []
+          },
+          "runIds": [
+            "an_01M5FK6JN0HGEHTNC6B41111KR",
+            "an_01M5FK6Y294CYN30KSSRSGPVSP",
+            "an_01M5FK79FKPA7BN12DY8E1N8M7"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "junit5",
+      "origin": "clone",
+      "commitId": "f59f60d2cebdf2224235d81f781b1f310cbc8138",
+      "sizeClass": "small",
+      "shallow": true,
+      "commitCount": 1,
+      "size": {
+        "entries": 2319,
+        "javaFiles": 1728
+      },
+      "prologueWalk": {
+        "checks": 2,
+        "longestGapMillis": 10,
+        "wallMillis": 29
+      },
+      "configurations": [
+        {
+          "selection": "DEFAULT",
+          "configHash": "c8ddc5aec20c88456feb94818eb0c8fe6c9838069031742b38a6b5dc4edffb1d",
+          "cacheState": "COLD",
+          "outcome": "analysis.completed",
+          "completeness": {
+            "totalFiles": 914,
+            "skippedFiles": 0,
+            "parseFailures": 0,
+            "shallowClone": true,
+            "historyTruncatedAtCommits": null
+          },
+          "warnings": {
+            "emitted": {
+              "SOURCE_DUPLICATE_ELEMENT": 1
+            },
+            "total": {
+              "SOURCE_DUPLICATE_ELEMENT": 1,
+              "SOURCE_ELEMENT_ID_TOO_LONG": 0,
+              "SOURCE_FILE_TOO_LARGE": 0,
+              "SOURCE_PARSE_FAILED": 0
+            }
+          },
+          "models": {
+            "batches": 39,
+            "builds": 39
+          },
+          "stages": [
+            {
+              "stage": "REPOSITORY_VALIDATION",
+              "status": "COMPLETED",
+              "counters": {
+                "files": 2319,
+                "javaFiles": 1728,
+                "warnings": 0
+              },
+              "durationMs": {
+                "median": 30,
+                "runs": [31, 29, 30]
+              }
+            },
+            {
+              "stage": "LAYOUT_DISCOVERY",
+              "status": "COMPLETED",
+              "counters": {
+                "generatedRoots": 0,
+                "mainRoots": 25,
+                "selectedRoots": 25,
+                "sourceRoots": 45,
+                "testRoots": 20
+              },
+              "durationMs": {
+                "median": 1,
+                "runs": [1, 1, 1]
+              }
+            },
+            {
+              "stage": "SOURCE_ANALYSIS",
+              "status": "COMPLETED",
+              "counters": {
+                "ambiguousRefs": 0,
+                "dropCallWithoutTarget": 1479,
+                "dropDefaultPackageCollision": 0,
+                "dropIdTooLong": 0,
+                "dropInvalidName": 4,
+                "dropLocalTarget": 2,
+                "droppedDeclaredTargets": 0,
+                "duplicateElements": 1,
+                "elementIdsTooLong": 0,
+                "files": 914,
+                "inferredRefs": 7176,
+                "resolvedRefs": 32643,
+                "types": 1110,
+                "unnumberedCallees": 0,
+                "unresolvedRefs": 4846
+              },
+              "durationMs": {
+                "median": 1994,
+                "runs": [2034, 1994, 1938]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_CHEAP",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "STRUCTURAL_GRAPH",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_DETAILED",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "EVOLUTIONARY_COUPLING",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "HOTSPOT_PROFILES",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GUIDED_TOUR",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "PERSISTENCE",
+              "status": "COMPLETED",
+              "counters": {},
+              "durationMs": {
+                "median": 7,
+                "runs": [7, 8, 6]
+              }
+            }
+          ],
+          "analysisWallMillis": {
+            "median": 2038,
+            "runs": [2080, 2038, 1983]
+          },
+          "bindMillis": {
+            "median": 4,
+            "runs": [4, 3, 4]
+          },
+          "firstTickMillis": {
+            "median": 0,
+            "runs": [0, 0, 0],
+            "stage": "REPOSITORY_VALIDATION",
+            "runsMicros": [340, 262, 308]
+          },
+          "heap": {
+            "peakLiveBytes": {
+              "max": 128984376,
+              "median": 115801872,
+              "runs": [128984376, 114888208, 115801872]
+            },
+            "peakUsedBytes": {
+              "max": 355216464,
+              "median": 338699576,
+              "runs": [338699576, 278572264, 355216464]
+            }
+          },
+          "cacheBytes": {
+            "median": 12488704,
+            "runs": [12488704, 12488704, 12488704]
+          },
+          "elements": {
+            "packages": 76,
+            "types": 1110,
+            "methods": 6461,
+            "files": 914,
+            "externalTypes": 439,
+            "sourceFiles": 914,
+            "sourceRoots": 25,
+            "sourceFileStatuses": {
+              "ANALYZED": 914,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 0
+            }
+          },
+          "dependencies": {
+            "rows": 23143,
+            "occurrences": 44665,
+            "evidenceRows": 42639,
+            "moduleRows": 80
+          },
+          "metricRows": {
+            "PACKAGE": 76,
+            "TYPE": 1110,
+            "METHOD": 6461,
+            "FILE": 914,
+            "external": 0
+          },
+          "baselineDifferences": [],
+          "cancellation": {
+            "longestGapMillis": 33,
+            "class": "UNSAMPLED",
+            "unitOrSite": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+            "over1000": 0,
+            "over2000": 0,
+            "tailMillis": 6,
+            "over250": 0,
+            "checks": 4993753,
+            "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+            "censusWallMillis": 2505,
+            "top": []
+          },
+          "runIds": [
+            "an_01M5FK7QF36EWH8YX2AF3BBQZ6",
+            "an_01M5FK7SHF5AXNTPMWRWZJJWJ7",
+            "an_01M5FK7VJK7R3W0AWY9ZCT6SNQ"
+          ]
+        },
+        {
+          "selection": "ALL",
+          "configHash": "8d6fc5e58de068bb267d4d2af841ca516d7f658c987b529c7597e8b8a115c248",
+          "cacheState": "COLD",
+          "outcome": "analysis.completed",
+          "completeness": {
+            "totalFiles": 1712,
+            "skippedFiles": 0,
+            "parseFailures": 0,
+            "shallowClone": true,
+            "historyTruncatedAtCommits": null
+          },
+          "warnings": {
+            "emitted": {
+              "SOURCE_DUPLICATE_ELEMENT": 4
+            },
+            "total": {
+              "SOURCE_DUPLICATE_ELEMENT": 4,
+              "SOURCE_ELEMENT_ID_TOO_LONG": 0,
+              "SOURCE_FILE_TOO_LARGE": 0,
+              "SOURCE_PARSE_FAILED": 0
+            }
+          },
+          "models": {
+            "batches": 59,
+            "builds": 59
+          },
+          "stages": [
+            {
+              "stage": "REPOSITORY_VALIDATION",
+              "status": "COMPLETED",
+              "counters": {
+                "files": 2319,
+                "javaFiles": 1728,
+                "warnings": 0
+              },
+              "durationMs": {
+                "median": 29,
+                "runs": [29, 29, 31]
+              }
+            },
+            {
+              "stage": "LAYOUT_DISCOVERY",
+              "status": "COMPLETED",
+              "counters": {
+                "generatedRoots": 0,
+                "mainRoots": 25,
+                "selectedRoots": 45,
+                "sourceRoots": 45,
+                "testRoots": 20
+              },
+              "durationMs": {
+                "median": 1,
+                "runs": [1, 1, 1]
+              }
+            },
+            {
+              "stage": "SOURCE_ANALYSIS",
+              "status": "COMPLETED",
+              "counters": {
+                "ambiguousRefs": 0,
+                "dropCallWithoutTarget": 14970,
+                "dropDefaultPackageCollision": 0,
+                "dropIdTooLong": 0,
+                "dropInvalidName": 5,
+                "dropLocalTarget": 3,
+                "droppedDeclaredTargets": 0,
+                "duplicateElements": 4,
+                "elementIdsTooLong": 0,
+                "files": 1712,
+                "inferredRefs": 47118,
+                "resolvedRefs": 57456,
+                "types": 3751,
+                "unnumberedCallees": 0,
+                "unresolvedRefs": 12142
+              },
+              "durationMs": {
+                "median": 4845,
+                "runs": [4941, 4845, 4777]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_CHEAP",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "STRUCTURAL_GRAPH",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_DETAILED",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "EVOLUTIONARY_COUPLING",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "HOTSPOT_PROFILES",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GUIDED_TOUR",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "PERSISTENCE",
+              "status": "COMPLETED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            }
+          ],
+          "analysisWallMillis": {
+            "median": 4881,
+            "runs": [4977, 4881, 4815]
+          },
+          "bindMillis": {
+            "median": 3,
+            "runs": [3, 4, 3]
+          },
+          "firstTickMillis": {
+            "median": 0,
+            "runs": [0, 0, 0],
+            "stage": "REPOSITORY_VALIDATION",
+            "runsMicros": [258, 291, 278]
+          },
+          "heap": {
+            "peakLiveBytes": {
+              "max": 208583344,
+              "median": 208475808,
+              "runs": [208475808, 197286120, 208583344]
+            },
+            "peakUsedBytes": {
+              "max": 503826032,
+              "median": 468524464,
+              "runs": [468524464, 463315256, 503826032]
+            }
+          },
+          "cacheBytes": {
+            "median": 31739904,
+            "runs": [31739904, 31739904, 31739904]
+          },
+          "elements": {
+            "packages": 114,
+            "types": 3751,
+            "methods": 17581,
+            "files": 1712,
+            "externalTypes": 598,
+            "sourceFiles": 1712,
+            "sourceRoots": 45,
+            "sourceFileStatuses": {
+              "ANALYZED": 1712,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 0
+            }
+          },
+          "dependencies": {
+            "rows": 49242,
+            "occurrences": 116716,
+            "evidenceRows": 101234,
+            "moduleRows": 80
+          },
+          "metricRows": {
+            "PACKAGE": 114,
+            "TYPE": 3751,
+            "METHOD": 17581,
+            "FILE": 1712,
+            "external": 0
+          },
+          "baselineDifferences": [],
+          "cancellation": {
+            "longestGapMillis": 55,
+            "class": "UNSAMPLED",
+            "unitOrSite": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+            "over1000": 0,
+            "over2000": 0,
+            "tailMillis": 19,
+            "over250": 0,
+            "checks": 10787672,
+            "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+            "censusWallMillis": 5147,
+            "top": []
+          },
+          "runIds": [
+            "an_01M5FK82N2GSJ079SKV5E3MHZ5",
+            "an_01M5FK87JP1SET6V5ARVC6YXZR",
+            "an_01M5FK8CD86QHWX6AF05AKT0SV"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "spring-framework",
+      "origin": "clone",
+      "commitId": "82a6b40b9366ec181ededdad282b307ee5381a52",
+      "sizeClass": "medium",
+      "shallow": true,
+      "commitCount": 1,
+      "size": {
+        "entries": 11362,
+        "javaFiles": 9210
+      },
+      "prologueWalk": {
+        "checks": 13,
+        "longestGapMillis": 10,
+        "wallMillis": 104
+      },
+      "configurations": [
+        {
+          "selection": "DEFAULT",
+          "configHash": "c8ddc5aec20c88456feb94818eb0c8fe6c9838069031742b38a6b5dc4edffb1d",
+          "cacheState": "COLD",
+          "outcome": "analysis.completed",
+          "completeness": {
+            "totalFiles": 5459,
+            "skippedFiles": 0,
+            "parseFailures": 0,
+            "shallowClone": true,
+            "historyTruncatedAtCommits": null
+          },
+          "warnings": {
+            "emitted": {},
+            "total": {
+              "SOURCE_DUPLICATE_ELEMENT": 0,
+              "SOURCE_ELEMENT_ID_TOO_LONG": 0,
+              "SOURCE_FILE_TOO_LARGE": 0,
+              "SOURCE_PARSE_FAILED": 0
+            }
+          },
+          "models": {
+            "batches": 30,
+            "builds": 30
+          },
+          "stages": [
+            {
+              "stage": "REPOSITORY_VALIDATION",
+              "status": "COMPLETED",
+              "counters": {
+                "files": 11362,
+                "javaFiles": 9210,
+                "warnings": 0
+              },
+              "durationMs": {
+                "median": 118,
+                "runs": [121, 115, 118]
+              }
+            },
+            {
+              "stage": "LAYOUT_DISCOVERY",
+              "status": "COMPLETED",
+              "counters": {
+                "generatedRoots": 0,
+                "mainRoots": 30,
+                "selectedRoots": 30,
+                "sourceRoots": 60,
+                "testRoots": 30
+              },
+              "durationMs": {
+                "median": 6,
+                "runs": [7, 6, 6]
+              }
+            },
+            {
+              "stage": "SOURCE_ANALYSIS",
+              "status": "COMPLETED",
+              "counters": {
+                "ambiguousRefs": 0,
+                "dropCallWithoutTarget": 5788,
+                "dropDefaultPackageCollision": 0,
+                "dropIdTooLong": 0,
+                "dropInvalidName": 40,
+                "dropLocalTarget": 5,
+                "droppedDeclaredTargets": 0,
+                "duplicateElements": 0,
+                "elementIdsTooLong": 0,
+                "files": 5459,
+                "inferredRefs": 48819,
+                "resolvedRefs": 221960,
+                "types": 6923,
+                "unnumberedCallees": 0,
+                "unresolvedRefs": 43272
+              },
+              "durationMs": {
+                "median": 10080,
+                "runs": [10191, 10080, 10003]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_CHEAP",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "STRUCTURAL_GRAPH",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_DETAILED",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "EVOLUTIONARY_COUPLING",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "HOTSPOT_PROFILES",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GUIDED_TOUR",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "PERSISTENCE",
+              "status": "COMPLETED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            }
+          ],
+          "analysisWallMillis": {
+            "median": 10208,
+            "runs": [10326, 10208, 10133]
+          },
+          "bindMillis": {
+            "median": 4,
+            "runs": [4, 4, 3]
+          },
+          "firstTickMillis": {
+            "median": 0,
+            "runs": [0, 0, 0],
+            "stage": "REPOSITORY_VALIDATION",
+            "runsMicros": [296, 281, 260]
+          },
+          "heap": {
+            "peakLiveBytes": {
+              "max": 275549880,
+              "median": 273740408,
+              "runs": [270692768, 273740408, 275549880]
+            },
+            "peakUsedBytes": {
+              "max": 598912672,
+              "median": 552452576,
+              "runs": [598912672, 535286944, 552452576]
+            }
+          },
+          "cacheBytes": {
+            "median": 90574848,
+            "runs": [90574848, 90574848, 90574848]
+          },
+          "elements": {
+            "packages": 571,
+            "types": 6923,
+            "methods": 49380,
+            "files": 5459,
+            "externalTypes": 2143,
+            "sourceFiles": 5459,
+            "sourceRoots": 30,
+            "sourceFileStatuses": {
+              "ANALYZED": 5459,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 0
+            }
+          },
+          "dependencies": {
+            "rows": 153274,
+            "occurrences": 314051,
+            "evidenceRows": 298521,
+            "moduleRows": 0
+          },
+          "metricRows": {
+            "PACKAGE": 571,
+            "TYPE": 6923,
+            "METHOD": 49380,
+            "FILE": 5459,
+            "external": 0
+          },
+          "baselineDifferences": [],
+          "cancellation": {
+            "longestGapMillis": 83,
+            "class": "UNSAMPLED",
+            "unitOrSite": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+            "over1000": 0,
+            "over2000": 0,
+            "tailMillis": 60,
+            "over250": 0,
+            "checks": 22169032,
+            "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+            "censusWallMillis": 11257,
+            "top": []
+          },
+          "runIds": [
+            "an_01M5FK8WMFQK320TR50FYYWYAN",
+            "an_01M5FK96VCTS0CB4QSMD0DW9J6",
+            "an_01M5FK9GYMGXEKH4TNT05GMBPE"
+          ]
+        },
+        {
+          "selection": "ALL",
+          "configHash": "8d6fc5e58de068bb267d4d2af841ca516d7f658c987b529c7597e8b8a115c248",
+          "cacheState": "COLD",
+          "outcome": "analysis.completed",
+          "completeness": {
+            "totalFiles": 9202,
+            "skippedFiles": 0,
+            "parseFailures": 0,
+            "shallowClone": true,
+            "historyTruncatedAtCommits": null
+          },
+          "warnings": {
+            "emitted": {
+              "SOURCE_DUPLICATE_ELEMENT": 7
+            },
+            "total": {
+              "SOURCE_DUPLICATE_ELEMENT": 7,
+              "SOURCE_ELEMENT_ID_TOO_LONG": 0,
+              "SOURCE_FILE_TOO_LARGE": 0,
+              "SOURCE_PARSE_FAILED": 0
+            }
+          },
+          "models": {
+            "batches": 60,
+            "builds": 60
+          },
+          "stages": [
+            {
+              "stage": "REPOSITORY_VALIDATION",
+              "status": "COMPLETED",
+              "counters": {
+                "files": 11362,
+                "javaFiles": 9210,
+                "warnings": 0
+              },
+              "durationMs": {
+                "median": 117,
+                "runs": [117, 121, 115]
+              }
+            },
+            {
+              "stage": "LAYOUT_DISCOVERY",
+              "status": "COMPLETED",
+              "counters": {
+                "generatedRoots": 0,
+                "mainRoots": 30,
+                "selectedRoots": 60,
+                "sourceRoots": 60,
+                "testRoots": 30
+              },
+              "durationMs": {
+                "median": 6,
+                "runs": [6, 6, 6]
+              }
+            },
+            {
+              "stage": "SOURCE_ANALYSIS",
+              "status": "COMPLETED",
+              "counters": {
+                "ambiguousRefs": 1,
+                "dropCallWithoutTarget": 109342,
+                "dropDefaultPackageCollision": 0,
+                "dropIdTooLong": 0,
+                "dropInvalidName": 49,
+                "dropLocalTarget": 91,
+                "droppedDeclaredTargets": 0,
+                "duplicateElements": 7,
+                "elementIdsTooLong": 0,
+                "files": 9202,
+                "inferredRefs": 201795,
+                "resolvedRefs": 342463,
+                "types": 18468,
+                "unnumberedCallees": 83,
+                "unresolvedRefs": 166641
+              },
+              "durationMs": {
+                "median": 23620,
+                "runs": [23802, 23620, 23529]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_CHEAP",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "STRUCTURAL_GRAPH",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_DETAILED",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "EVOLUTIONARY_COUPLING",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "HOTSPOT_PROFILES",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GUIDED_TOUR",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "PERSISTENCE",
+              "status": "COMPLETED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            }
+          ],
+          "analysisWallMillis": {
+            "median": 23754,
+            "runs": [23932, 23754, 23656]
+          },
+          "bindMillis": {
+            "median": 4,
+            "runs": [4, 4, 4]
+          },
+          "firstTickMillis": {
+            "median": 0,
+            "runs": [0, 0, 0],
+            "stage": "REPOSITORY_VALIDATION",
+            "runsMicros": [249, 251, 294]
+          },
+          "heap": {
+            "peakLiveBytes": {
+              "max": 336246840,
+              "median": 328526272,
+              "runs": [328526272, 317682024, 336246840]
+            },
+            "peakUsedBytes": {
+              "max": 672733752,
+              "median": 639799696,
+              "runs": [639799696, 625539544, 672733752]
+            }
+          },
+          "cacheBytes": {
+            "median": 188379136,
+            "runs": [188379136, 188379136, 188379136]
+          },
+          "elements": {
+            "packages": 817,
+            "types": 18468,
+            "methods": 103864,
+            "files": 9202,
+            "externalTypes": 2709,
+            "sourceFiles": 9202,
+            "sourceRoots": 60,
+            "sourceFileStatuses": {
+              "ANALYZED": 9202,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 0
+            }
+          },
+          "dependencies": {
+            "rows": 280542,
+            "occurrences": 710899,
+            "evidenceRows": 605847,
+            "moduleRows": 0
+          },
+          "metricRows": {
+            "PACKAGE": 817,
+            "TYPE": 18468,
+            "METHOD": 103864,
+            "FILE": 9202,
+            "external": 0
+          },
+          "baselineDifferences": [],
+          "cancellation": {
+            "longestGapMillis": 99,
+            "class": "UNSAMPLED",
+            "unitOrSite": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+            "over1000": 0,
+            "over2000": 0,
+            "tailMillis": 88,
+            "over250": 0,
+            "checks": 50846677,
+            "closedBy": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+            "censusWallMillis": 24659,
+            "top": []
+          },
+          "runIds": [
+            "an_01M5FKAKAB59TB3NA4S2E9A09R",
+            "an_01M5FKBAYAF83ZFWP3QRH00A35",
+            "an_01M5FKC2CG7V3K1YYNRQ6H3ZNR"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "elasticsearch",
+      "origin": "clone",
+      "commitId": "b42549c72e6e040825b13e5d8ebf7ff63886b24d",
+      "sizeClass": "large",
+      "shallow": true,
+      "commitCount": 1,
+      "size": {
+        "entries": 44951,
+        "javaFiles": 30841
+      },
+      "prologueWalk": {
+        "checks": 57,
+        "longestGapMillis": 16,
+        "wallMillis": 532
+      },
+      "configurations": [
+        {
+          "selection": "DEFAULT",
+          "configHash": "c8ddc5aec20c88456feb94818eb0c8fe6c9838069031742b38a6b5dc4edffb1d",
+          "cacheState": "COLD",
+          "outcome": "analysis.completed",
+          "completeness": {
+            "totalFiles": 16848,
+            "skippedFiles": 1,
+            "parseFailures": 1,
+            "shallowClone": true,
+            "historyTruncatedAtCommits": null
+          },
+          "warnings": {
+            "emitted": {
+              "SOURCE_DUPLICATE_ELEMENT": 2,
+              "SOURCE_PARSE_FAILED": 1
+            },
+            "total": {
+              "SOURCE_DUPLICATE_ELEMENT": 2,
+              "SOURCE_ELEMENT_ID_TOO_LONG": 0,
+              "SOURCE_FILE_TOO_LARGE": 0,
+              "SOURCE_PARSE_FAILED": 1
+            }
+          },
+          "models": {
+            "batches": 410,
+            "builds": 444
+          },
+          "stages": [
+            {
+              "stage": "REPOSITORY_VALIDATION",
+              "status": "COMPLETED",
+              "counters": {
+                "files": 44951,
+                "javaFiles": 30841,
+                "warnings": 0
+              },
+              "durationMs": {
+                "median": 528,
+                "runs": [528, 535, 526]
+              }
+            },
+            {
+              "stage": "LAYOUT_DISCOVERY",
+              "status": "COMPLETED",
+              "counters": {
+                "generatedRoots": 0,
+                "mainRoots": 292,
+                "selectedRoots": 292,
+                "sourceRoots": 527,
+                "testRoots": 235
+              },
+              "durationMs": {
+                "median": 16,
+                "runs": [18, 16, 16]
+              }
+            },
+            {
+              "stage": "SOURCE_ANALYSIS",
+              "status": "COMPLETED",
+              "counters": {
+                "ambiguousRefs": 0,
+                "dropCallWithoutTarget": 68617,
+                "dropDefaultPackageCollision": 0,
+                "dropIdTooLong": 0,
+                "dropInvalidName": 95,
+                "dropLocalTarget": 62,
+                "droppedDeclaredTargets": 9,
+                "duplicateElements": 2,
+                "elementIdsTooLong": 0,
+                "files": 16848,
+                "inferredRefs": 437256,
+                "resolvedRefs": 1017540,
+                "types": 26883,
+                "unnumberedCallees": 15,
+                "unresolvedRefs": 116824
+              },
+              "durationMs": {
+                "median": 74249,
+                "runs": [74574, 74249, 74081]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_CHEAP",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "STRUCTURAL_GRAPH",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_DETAILED",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "EVOLUTIONARY_COUPLING",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "HOTSPOT_PROFILES",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GUIDED_TOUR",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "PERSISTENCE",
+              "status": "COMPLETED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            }
+          ],
+          "analysisWallMillis": {
+            "median": 74807,
+            "runs": [75127, 74807, 74629]
+          },
+          "bindMillis": {
+            "median": 4,
+            "runs": [4, 4, 4]
+          },
+          "firstTickMillis": {
+            "median": 0,
+            "runs": [0, 0, 0],
+            "stage": "REPOSITORY_VALIDATION",
+            "runsMicros": [293, 288, 265]
+          },
+          "heap": {
+            "peakLiveBytes": {
+              "max": 819059488,
+              "median": 815685864,
+              "runs": [815685864, 819059488, 754309552]
+            },
+            "peakUsedBytes": {
+              "max": 1303442496,
+              "median": 1301700840,
+              "runs": [1301700840, 1303442496, 1299022768]
+            }
+          },
+          "cacheBytes": {
+            "median": 412045312,
+            "runs": [412045312, 412045312, 412045312]
+          },
+          "elements": {
+            "packages": 2007,
+            "types": 26883,
+            "methods": 202690,
+            "files": 16848,
+            "externalTypes": 5274,
+            "sourceFiles": 16848,
+            "sourceRoots": 292,
+            "sourceFileStatuses": {
+              "ANALYZED": 16847,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 1
+            }
+          },
+          "dependencies": {
+            "rows": 758143,
+            "occurrences": 1571606,
+            "evidenceRows": 1460020,
+            "moduleRows": 778
+          },
+          "metricRows": {
+            "PACKAGE": 2007,
+            "TYPE": 26883,
+            "METHOD": 202690,
+            "FILE": 16848,
+            "external": 0
+          },
+          "baselineDifferences": [],
+          "cancellation": {
+            "longestGapMillis": 402,
+            "class": "FLUSH",
+            "unitOrSite": "batch visited: 'server/src/main/java' (1939 file(s))",
+            "over1000": 0,
+            "over2000": 0,
+            "tailMillis": 142,
+            "over250": 4,
+            "checks": 153492834,
+            "closedBy": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+            "censusWallMillis": 78412,
+            "top": [
+              {
+                "millis": 402,
+                "class": "FLUSH",
+                "samples": {
+                  "FLUSH": 1,
+                  "BATCH_READ": 1
+                },
+                "closedBy": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+                "batch": "batch visited: 'server/src/main/java' (1939 file(s))",
+                "offsetMillis": 19979
+              },
+              {
+                "millis": 313,
+                "class": "FLUSH",
+                "samples": {
+                  "FLUSH": 1,
+                  "BATCH_READ": 1
+                },
+                "closedBy": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+                "batch": "batch visited: 'server/src/main/java' (2023 file(s))",
+                "offsetMillis": 27267
+              },
+              {
+                "millis": 307,
+                "class": "PRE_COMPILE_PARSE",
+                "samples": {
+                  "PRE_COMPILE_PARSE": 2
+                },
+                "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+                "batch": "next batch built: 'server/src/main/java' (1939 file(s))",
+                "offsetMillis": 12639
+              },
+              {
+                "millis": 270,
+                "class": "PRE_COMPILE_PARSE",
+                "samples": {
+                  "PRE_COMPILE_PARSE": 1
+                },
+                "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+                "batch": "next batch built: 'server/src/main/java' (2023 file(s))",
+                "offsetMillis": 20510
+              },
+              {
+                "millis": 243,
+                "class": "BATCH_READ",
+                "samples": {
+                  "BATCH_READ": 1
+                },
+                "closedBy": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+                "batch": "next batch built: 'server/src/main/java' (1939 file(s))",
+                "offsetMillis": 12260
+              },
+              {
+                "millis": 191,
+                "class": "BATCH_READ",
+                "samples": {
+                  "BATCH_READ": 1
+                },
+                "closedBy": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+                "batch": "next batch built: 'x-pack/plugin/esql/src/main/java' (1379 file(s))",
+                "offsetMillis": 44512
+              },
+              {
+                "millis": 189,
+                "class": "PRE_COMPILE_PARSE",
+                "samples": {
+                  "PRE_COMPILE_PARSE": 1
+                },
+                "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+                "batch": "next batch built: 'x-pack/plugin/esql/src/main/java' (1379 file(s))",
+                "offsetMillis": 44820
+              },
+              {
+                "millis": 173,
+                "class": "BATCH_READ",
+                "samples": {
+                  "BATCH_READ": 1
+                },
+                "closedBy": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+                "batch": "next batch built: 'x-pack/plugin/core/src/main/java' (1548 file(s))",
+                "offsetMillis": 34810
+              },
+              {
+                "millis": 169,
+                "class": "FLUSH",
+                "samples": {
+                  "FLUSH": 1
+                },
+                "closedBy": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+                "batch": "batch visited: 'x-pack/plugin/esql/src/main/java' (1379 file(s))",
+                "offsetMillis": 49602
+              },
+              {
+                "millis": 150,
+                "class": "FLUSH",
+                "samples": {
+                  "FLUSH": 1
+                },
+                "closedBy": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+                "batch": "batch visited: 'x-pack/plugin/core/src/main/java' (1548 file(s))",
+                "offsetMillis": 38932
+              }
+            ]
+          },
+          "runIds": [
+            "an_01M5FKF88X1AV62Q9KNM9W9SB4",
+            "an_01M5FKHJ5RYA3HQZG9JVZ1FP4Y",
+            "an_01M5FKKVRHAD4S56532FEKDGN3"
+          ]
+        },
+        {
+          "selection": "ALL",
+          "configHash": "8d6fc5e58de068bb267d4d2af841ca516d7f658c987b529c7597e8b8a115c248",
+          "cacheState": "COLD",
+          "outcome": "analysis.completed",
+          "completeness": {
+            "totalFiles": 26782,
+            "skippedFiles": 3,
+            "parseFailures": 3,
+            "shallowClone": true,
+            "historyTruncatedAtCommits": null
+          },
+          "warnings": {
+            "emitted": {
+              "SOURCE_DUPLICATE_ELEMENT": 6,
+              "SOURCE_PARSE_FAILED": 3
+            },
+            "total": {
+              "SOURCE_DUPLICATE_ELEMENT": 6,
+              "SOURCE_ELEMENT_ID_TOO_LONG": 0,
+              "SOURCE_FILE_TOO_LARGE": 0,
+              "SOURCE_PARSE_FAILED": 3
+            }
+          },
+          "models": {
+            "batches": 647,
+            "builds": 713
+          },
+          "stages": [
+            {
+              "stage": "REPOSITORY_VALIDATION",
+              "status": "COMPLETED",
+              "counters": {
+                "files": 44951,
+                "javaFiles": 30841,
+                "warnings": 0
+              },
+              "durationMs": {
+                "median": 942,
+                "runs": [732, 1078, 942]
+              }
+            },
+            {
+              "stage": "LAYOUT_DISCOVERY",
+              "status": "COMPLETED",
+              "counters": {
+                "generatedRoots": 0,
+                "mainRoots": 292,
+                "selectedRoots": 527,
+                "sourceRoots": 527,
+                "testRoots": 235
+              },
+              "durationMs": {
+                "median": 15,
+                "runs": [16, 15, 15]
+              }
+            },
+            {
+              "stage": "SOURCE_ANALYSIS",
+              "status": "COMPLETED",
+              "counters": {
+                "ambiguousRefs": 0,
+                "dropCallWithoutTarget": 331737,
+                "dropDefaultPackageCollision": 0,
+                "dropIdTooLong": 0,
+                "dropInvalidName": 205,
+                "dropLocalTarget": 453,
+                "droppedDeclaredTargets": 21,
+                "duplicateElements": 6,
+                "elementIdsTooLong": 0,
+                "files": 26782,
+                "inferredRefs": 1117426,
+                "resolvedRefs": 1846308,
+                "types": 39364,
+                "unnumberedCallees": 27,
+                "unresolvedRefs": 374817
+              },
+              "durationMs": {
+                "median": 174215,
+                "runs": [174177, 174721, 174215]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_CHEAP",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "STRUCTURAL_GRAPH",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GIT_HISTORY_DETAILED",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "EVOLUTIONARY_COUPLING",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "HOTSPOT_PROFILES",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "GUIDED_TOUR",
+              "status": "SKIPPED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            },
+            {
+              "stage": "PERSISTENCE",
+              "status": "COMPLETED",
+              "counters": {},
+              "durationMs": {
+                "median": 0,
+                "runs": [0, 0, 0]
+              }
+            }
+          ],
+          "analysisWallMillis": {
+            "median": 175180,
+            "runs": [174932, 175821, 175180]
+          },
+          "bindMillis": {
+            "median": 4,
+            "runs": [4, 4, 4]
+          },
+          "firstTickMillis": {
+            "median": 0,
+            "runs": [0, 0, 0],
+            "stage": "REPOSITORY_VALIDATION",
+            "runsMicros": [296, 309, 277]
+          },
+          "heap": {
+            "peakLiveBytes": {
+              "max": 1159501536,
+              "median": 1000037504,
+              "runs": [972088888, 1000037504, 1159501536]
+            },
+            "peakUsedBytes": {
+              "max": 1986334880,
+              "median": 1721184312,
+              "runs": [1721184312, 1695940936, 1986334880]
+            }
+          },
+          "cacheBytes": {
+            "median": 684036096,
+            "runs": [684036096, 684036096, 684036096]
+          },
+          "elements": {
+            "packages": 2129,
+            "types": 39364,
+            "methods": 328022,
+            "files": 26782,
+            "externalTypes": 6424,
+            "sourceFiles": 26782,
+            "sourceRoots": 527,
+            "sourceFileStatuses": {
+              "ANALYZED": 26779,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 3
+            }
+          },
+          "dependencies": {
+            "rows": 1181559,
+            "occurrences": 3338510,
+            "evidenceRows": 2636122,
+            "moduleRows": 778
+          },
+          "metricRows": {
+            "PACKAGE": 2129,
+            "TYPE": 39364,
+            "METHOD": 328022,
+            "FILE": 26782,
+            "external": 0
+          },
+          "baselineDifferences": [],
+          "cancellation": {
+            "longestGapMillis": 1380,
+            "class": "COMPILE",
+            "unitOrSite": "next batch built: 'modules/ingest-common/src/test/java' (74 file(s))",
+            "over1000": 1,
+            "over2000": 0,
+            "tailMillis": 246,
+            "over250": 6,
+            "checks": 325162723,
+            "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+            "censusWallMillis": 179559,
+            "top": [
+              {
+                "millis": 1380,
+                "class": "COMPILE",
+                "samples": {
+                  "COMPILE": 6
+                },
+                "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+                "batch": "next batch built: 'modules/ingest-common/src/test/java' (74 file(s))",
+                "offsetMillis": 81888
+              },
+              {
+                "millis": 394,
+                "class": "FLUSH",
+                "samples": {
+                  "FLUSH": 1,
+                  "BATCH_READ": 1
+                },
+                "closedBy": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+                "batch": "batch visited: 'server/src/main/java' (1939 file(s))",
+                "offsetMillis": 21942
+              },
+              {
+                "millis": 371,
+                "class": "FLUSH",
+                "samples": {
+                  "FLUSH": 1,
+                  "BATCH_READ": 1
+                },
+                "closedBy": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+                "batch": "batch visited: 'server/src/test/java' (1163 file(s))",
+                "offsetMillis": 120517
+              },
+              {
+                "millis": 291,
+                "class": "FLUSH",
+                "samples": {
+                  "FLUSH": 1,
+                  "BATCH_READ": 1
+                },
+                "closedBy": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+                "batch": "batch visited: 'server/src/main/java' (2023 file(s))",
+                "offsetMillis": 29092
+              },
+              {
+                "millis": 255,
+                "class": "FLUSH",
+                "samples": {
+                  "FLUSH": 1
+                },
+                "closedBy": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+                "batch": "batch visited: 'server/src/test/java' (1321 file(s))",
+                "offsetMillis": 135086
+              },
+              {
+                "millis": 250,
+                "class": "PRE_COMPILE_PARSE",
+                "samples": {
+                  "PRE_COMPILE_PARSE": 1
+                },
+                "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+                "batch": "next batch built: 'server/src/main/java' (2023 file(s))",
+                "offsetMillis": 22463
+              },
+              {
+                "millis": 248,
+                "class": "PRE_COMPILE_PARSE",
+                "samples": {
+                  "PRE_COMPILE_PARSE": 1
+                },
+                "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+                "batch": "next batch built: 'server/src/main/java' (1939 file(s))",
+                "offsetMillis": 14821
+              },
+              {
+                "millis": 246,
+                "class": "END",
+                "samples": {
+                  "END": 1
+                },
+                "closedBy": "analyze returned (tail)",
+                "offsetMillis": 178447
+              },
+              {
+                "millis": 218,
+                "class": "FLUSH",
+                "samples": {
+                  "FLUSH": 1
+                },
+                "closedBy": "SourceAnalysisRun.checkCancelled <- SourceAnalysisRun.build <- SourceAnalysisRun.lambda$isolateAndVisit$0",
+                "batch": "batch visited: 'x-pack/plugin/esql/src/test/java' (1383 file(s))",
+                "offsetMillis": 160752
+              },
+              {
+                "millis": 216,
+                "class": "PRE_COMPILE_PARSE",
+                "samples": {
+                  "PRE_COMPILE_PARSE": 1
+                },
+                "closedBy": "SpoonLaunchers$CancellationCheckpoint.check <- SpoonLaunchers$CancellationCheckpoint.step <- JDTBatchCompiler$4.worked",
+                "batch": "next batch built: 'server/src/test/java' (1321 file(s))",
+                "offsetMillis": 120975
+              }
+            ]
+          },
+          "runIds": [
+            "an_01M5FKVNHTH826GNXC5P98GMZQ",
+            "an_01M5FM11S03VR425ZWYYXPRYRS",
+            "an_01M5FM6EMJ7DF6DR1RGQMRYGEV"
+          ]
+        }
+      ]
+    }
+  ]
+}
