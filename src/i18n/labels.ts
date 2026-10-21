@@ -6,6 +6,7 @@ import type {
 import type {
   BuildSystem,
   CacheInvalidationReason,
+  CacheUnavailableCause,
   ChangeType,
   CommitClass,
   DependencyDirection,
@@ -372,3 +373,14 @@ export const cacheInvalidationReasonLabels = {
   SCHEMA_VERSION: "O formato do cache mudou nesta versão",
   WORKTREE_DIRTY: "Há alterações não registradas na árvore de trabalho",
 } as const satisfies Record<CacheInvalidationReason, string>;
+
+export const cacheUnavailableCauseLabels = {
+  LOCATION_INSIDE_REPOSITORY:
+    "A pasta onde o Strata guarda os caches fica dentro do repositório escolhido, e gravar nela seria escrever no próprio repositório",
+  LOCKED:
+    "Outro processo do Strata ainda está usando o cache deste repositório",
+  PRAGMA_REFUSED:
+    "O banco de dados do cache recusou a configuração de que o Strata precisa",
+  STORAGE:
+    "O sistema não deixou o Strata gravar o cache: falta espaço em disco, permissão ou o disco falhou",
+} as const satisfies Record<CacheUnavailableCause, string>;

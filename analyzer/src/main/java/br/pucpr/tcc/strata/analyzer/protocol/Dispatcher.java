@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -101,7 +102,10 @@ public final class Dispatcher {
             repositoryPath == null ? null : repositoryPath.textValue());
 
     try {
-      return new Outcome.Respond(Envelope.ok(request.id(), invoke(handler, request)));
+      final Object result = invoke(handler, request);
+      return result instanceof MethodHandler.Reply(Object replied, Runnable afterResponse)
+          ? new Outcome.Respond(Envelope.ok(request.id(), replied), afterResponse)
+          : new Outcome.Respond(Envelope.ok(request.id(), result));
     } catch (UnrecognizedPropertyException unknown) {
       return respondError(
           request.id(),
@@ -131,7 +135,19 @@ public final class Dispatcher {
 
   public sealed interface Outcome {
 
-    record Respond(Envelope envelope) implements Outcome {}
+    record Respond(Envelope envelope, Runnable afterEmit) implements Outcome {
+
+      public static final Runnable NOTHING = () -> {};
+
+      public Respond {
+        Objects.requireNonNull(envelope, "envelope");
+        Objects.requireNonNull(afterEmit, "afterEmit");
+      }
+
+      public Respond(Envelope envelope) {
+        this(envelope, NOTHING);
+      }
+    }
 
     record Discard(DiscardReason reason) implements Outcome {}
   }

@@ -23,7 +23,7 @@ import org.sqlite.SQLiteException;
 
 public final class CacheRecovery {
 
-  enum Verdict {
+  public enum Verdict {
     CORRUPT,
     ENVIRONMENT,
     BUG
@@ -59,7 +59,7 @@ public final class CacheRecovery {
     return classify(failure) == Verdict.CORRUPT;
   }
 
-  static Verdict classify(Throwable failure) {
+  public static Verdict classify(Throwable failure) {
     if (!(failure instanceof SQLiteException sqlite)) {
       return Verdict.BUG;
     }

@@ -114,7 +114,7 @@ describe("ticks atrasados", () => {
     handleFrame(
       forwarded("analysis.failed", {
         analysisId: AN,
-        error: { code: "ANALYSIS_CANCELLED", origin: "analyzer", params: {} },
+        error: { code: "INTERNAL_UNEXPECTED", origin: "analyzer", params: {} },
       }),
       queryClient
     );
@@ -128,7 +128,7 @@ describe("ticks atrasados", () => {
     handleFrame(
       forwarded("analysis.failed", {
         analysisId: AN,
-        error: { code: "ANALYSIS_CANCELLED", origin: "analyzer", params: {} },
+        error: { code: "INTERNAL_UNEXPECTED", origin: "analyzer", params: {} },
       }),
       queryClient
     );

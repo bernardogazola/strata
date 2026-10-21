@@ -1,3 +1,4 @@
+import type { CacheUnavailableCause } from "@/protocol/enums";
 import type {
   ErrorCode,
   ErrorParamsByCode,
@@ -5,6 +6,7 @@ import type {
 } from "@/protocol/errors";
 import { errorParamsSchemaByCode, isKnownErrorCode } from "@/protocol/errors";
 import { formatDuration, formatInteger } from "./format";
+import { cacheUnavailableCauseLabels } from "./labels";
 
 export type MessageSegment =
   | { kind: "chrome"; text: string }
@@ -27,7 +29,7 @@ interface ErrorEntry<K extends ErrorCode> {
   readonly format: (
     params: ErrorParamsByCode[K]
   ) => Pick<ErrorMessage, "title" | "body" | "hint">;
-  readonly retryable: boolean;
+  readonly retryable: boolean | ((params: ErrorParamsByCode[K]) => boolean);
   readonly severity: ErrorSeverity;
 }
 
@@ -38,31 +40,67 @@ const BYTES_PER_MIB = 1024 * 1024;
 const formatMib = (bytes: number): string =>
   `${formatInteger(Math.round(bytes / BYTES_PER_MIB))} MiB`;
 
+const CACHE_UNAVAILABLE_RETRYABLE = {
+  LOCATION_INSIDE_REPOSITORY: false,
+  LOCKED: true,
+  PRAGMA_REFUSED: false,
+  STORAGE: true,
+} as const satisfies Record<CacheUnavailableCause, boolean>;
+
+const CACHE_UNAVAILABLE_HINT = {
+  LOCATION_INSIDE_REPOSITORY:
+    "Abra um repositório que não contenha a pasta de dados do Strata.",
+  LOCKED:
+    "Feche outras janelas do Strata com este repositório aberto e tente de novo em instantes.",
+  PRAGMA_REFUSED: "Exporte um pacote de diagnóstico se o problema se repetir.",
+  STORAGE: "Libere espaço em disco ou confira as permissões e tente de novo.",
+} as const satisfies Record<CacheUnavailableCause, string>;
+
 const errorRegistry: ErrorRegistry = {
   ANALYSIS_ALREADY_RUNNING: {
     format: () => ({
-      body: [t("Já existe uma análise em andamento para este repositório.")],
+      body: [
+        t(
+          "Já existe uma análise em andamento, e o Strata faz uma de cada vez."
+        ),
+      ],
       hint: "Aguarde a conclusão ou cancele a análise atual.",
       title: "Análise em andamento",
     }),
     retryable: false,
     severity: "warning",
   },
-  ANALYSIS_CANCELLED: {
+  ANALYSIS_CACHE_CORRUPTED: {
     format: () => ({
       body: [
-        t("A análise foi cancelada e os resultados parciais não serão usados."),
+        t(
+          "O cache de análise deste repositório se danificou durante a análise. O Strata o recriou, e o que esta análise já tinha gravado se perdeu com ele."
+        ),
       ],
-      title: "Análise cancelada",
+      hint: "Analise de novo.",
+      title: "Cache danificado durante a análise",
     }),
     retryable: true,
-    severity: "warning",
+    severity: "error",
   },
   ANALYSIS_NOT_FOUND: {
     format: () => ({
       body: [t("A análise solicitada não existe mais.")],
       hint: "Analise o repositório novamente.",
       title: "Análise não encontrada",
+    }),
+    retryable: false,
+    severity: "error",
+  },
+  ANALYSIS_TOO_MANY_JAVA_SOURCES: {
+    format: (p) => ({
+      body: [
+        t(
+          `A seleção tem ${formatInteger(p.found)} arquivos Java, acima do limite de ${formatInteger(p.limit)} que o Strata analisa com segurança.`
+        ),
+      ],
+      hint: "Deixe os testes de fora ou escolha menos raízes de código.",
+      title: "Código demais para uma análise",
     }),
     retryable: false,
     severity: "error",
@@ -90,6 +128,18 @@ const errorRegistry: ErrorRegistry = {
     }),
     retryable: true,
     severity: "warning",
+  },
+  CACHE_UNAVAILABLE: {
+    format: (p) => ({
+      body: [
+        t("O Strata não conseguiu usar o cache de análise deste repositório. "),
+        t(`${cacheUnavailableCauseLabels[p.cause]}.`),
+      ],
+      hint: CACHE_UNAVAILABLE_HINT[p.cause],
+      title: "Cache de análise indisponível",
+    }),
+    retryable: (p) => CACHE_UNAVAILABLE_RETRYABLE[p.cause],
+    severity: "error",
   },
   INTERNAL_UNEXPECTED: {
     format: () => ({
@@ -264,9 +314,13 @@ const errorRegistry: ErrorRegistry = {
   },
   REPO_NOT_A_GIT_REPOSITORY: {
     format: () => ({
-      body: [t("A pasta selecionada não é um repositório Git.")],
-      hint: "Selecione a raiz de um repositório clonado.",
-      title: "Não é um repositório Git",
+      body: [
+        t(
+          "A pasta selecionada não é um repositório Git, ou guarda os objetos do Git de um jeito que o Strata não lê com segurança."
+        ),
+      ],
+      hint: "Selecione a raiz de um repositório clonado. Se ele já é um, compacte os objetos com git gc e tente de novo.",
+      title: "Repositório Git não suportado",
     }),
     retryable: false,
     severity: "error",
@@ -417,14 +471,16 @@ export const formatProtocolError = (error: ProtocolError): ErrorMessage => {
   }
 
   const entry = errorRegistry[error.code] as ErrorEntry<ErrorCode>;
-  const { title, body, hint } = entry.format(
-    parsed.data as ErrorParamsByCode[ErrorCode]
-  );
+  const params = parsed.data as ErrorParamsByCode[ErrorCode];
+  const { title, body, hint } = entry.format(params);
 
   return {
     body,
     hint,
-    retryable: entry.retryable,
+    retryable:
+      typeof entry.retryable === "function"
+        ? entry.retryable(params)
+        : entry.retryable,
     severity: entry.severity,
     title,
   };

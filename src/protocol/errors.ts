@@ -1,14 +1,20 @@
 import { z } from "zod";
+import {
+  type CacheUnavailableCause,
+  cacheUnavailableCauseSchema,
+} from "./enums";
 
 export const errorOriginSchema = z.enum(["analyzer", "shell", "frontend"]);
 export type ErrorOrigin = z.infer<typeof errorOriginSchema>;
 
 export interface ErrorParamsByCode {
   ANALYSIS_ALREADY_RUNNING: Record<string, never>;
-  ANALYSIS_CANCELLED: Record<string, never>;
+  ANALYSIS_CACHE_CORRUPTED: Record<string, never>;
   ANALYSIS_NOT_FOUND: Record<string, never>;
+  ANALYSIS_TOO_MANY_JAVA_SOURCES: { limit: number; found: number };
   CACHE_CORRUPT: Record<string, never>;
   CACHE_MIGRATION_FAILED: { fromVersion: number; toVersion: number };
+  CACHE_UNAVAILABLE: { cause: CacheUnavailableCause };
   INTERNAL_UNEXPECTED: Record<string, never>;
   PROC_ANALYZER_CRASHED: { exitCode: number | null };
   PROC_ANALYZER_NOT_FOUND: Record<string, never>;
@@ -41,13 +47,18 @@ export type ErrorCode = keyof ErrorParamsByCode;
 
 export const errorParamsSchemaByCode = {
   ANALYSIS_ALREADY_RUNNING: z.object({}),
-  ANALYSIS_CANCELLED: z.object({}),
+  ANALYSIS_CACHE_CORRUPTED: z.object({}),
   ANALYSIS_NOT_FOUND: z.object({}),
+  ANALYSIS_TOO_MANY_JAVA_SOURCES: z.object({
+    found: z.number().int().nonnegative(),
+    limit: z.number().int().positive(),
+  }),
   CACHE_CORRUPT: z.object({}),
   CACHE_MIGRATION_FAILED: z.object({
     fromVersion: z.number().int().nonnegative(),
     toVersion: z.number().int().nonnegative(),
   }),
+  CACHE_UNAVAILABLE: z.object({ cause: cacheUnavailableCauseSchema }),
   INTERNAL_UNEXPECTED: z.object({}),
   PROC_ANALYZER_CRASHED: z.object({ exitCode: z.number().int().nullable() }),
   PROC_ANALYZER_NOT_FOUND: z.object({}),

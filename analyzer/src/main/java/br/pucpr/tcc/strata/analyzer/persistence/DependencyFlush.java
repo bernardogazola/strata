@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.function.BooleanSupplier;
 import java.util.function.ToLongFunction;
 
 final class DependencyFlush {
@@ -38,6 +39,7 @@ final class DependencyFlush {
   private final Map<CodeElementId, Long> index;
   private final Map<CodeElementId, Long> externals;
   private final ToLongFunction<String> filePks;
+  private final BooleanSupplier cancelled;
 
   DependencyFlush(
       long analysisPk,
@@ -46,12 +48,24 @@ final class DependencyFlush {
       Map<CodeElementId, Long> index,
       Map<CodeElementId, Long> externals,
       ToLongFunction<String> filePks) {
+    this(analysisPk, numbered, methods, index, externals, filePks, () -> false);
+  }
+
+  DependencyFlush(
+      long analysisPk,
+      Map<CodeElementId, Long> numbered,
+      Map<CodeElementId, Long> methods,
+      Map<CodeElementId, Long> index,
+      Map<CodeElementId, Long> externals,
+      ToLongFunction<String> filePks,
+      BooleanSupplier cancelled) {
     this.analysisPk = analysisPk;
     this.numbered = numbered;
     this.methods = methods;
     this.index = index;
     this.externals = externals;
     this.filePks = filePks;
+    this.cancelled = cancelled;
   }
 
   Outcome write(Connection connection, List<DependencyDraft> pending, List<BatchStructure> batches)
@@ -188,7 +202,7 @@ final class DependencyFlush {
       inserted.put(id, next);
       rows.add(externalRow(next++, id));
     }
-    ElementDao.insert(connection, analysisPk, rows);
+    ElementDao.insert(connection, analysisPk, rows, cancelled);
     return inserted;
   }
 
@@ -255,8 +269,8 @@ final class DependencyFlush {
       }
       unnumberedCallees += draft.unnumberedCallees();
     }
-    DependencyDao.insert(connection, analysisPk, rows);
-    EvidenceDao.insert(connection, evidence);
+    DependencyDao.insert(connection, analysisPk, rows, cancelled);
+    EvidenceDao.insert(connection, evidence, cancelled);
     return unnumberedCallees;
   }
 
@@ -286,7 +300,7 @@ final class DependencyFlush {
               module.isStatic(),
               module.line() == 0 ? null : module.line()));
     }
-    ModuleDependencyDao.insert(connection, analysisPk, rows);
+    ModuleDependencyDao.insert(connection, analysisPk, rows, cancelled);
   }
 
   record Outcome(

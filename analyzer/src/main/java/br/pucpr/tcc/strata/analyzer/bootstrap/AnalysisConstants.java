@@ -84,6 +84,30 @@ public final class AnalysisConstants {
 
   public static final int DEPENDENCY_EVIDENCE_CAP = 20;
 
+  public static final int CPU_POOL_MAX_THREADS = 8;
+
+  public static final int PROGRESS_THROTTLE_MILLIS = 100;
+
+  public static final int RUN_STOP_WAIT_MILLIS = 2_500;
+
+  public static final int WALK_CHECK_STRIDE_ENTRIES = 1_024;
+
+  public static final int MAX_COMMITS_WALKED = 200_000;
+
+  public static final int MAX_SOURCE_WARNINGS_PER_CODE = 100;
+
+  public static final int MAX_GIT_ALTERNATES = 8;
+
+  public static final int MAX_GIT_ALTERNATES_DEPTH = 6;
+
+  public static final int MAX_OBJECT_STORE_ENTRIES = 200_000;
+
+  public static final long MAX_PACK_INDEX_BYTES = 268_435_456L;
+
+  public static final long MAX_PACK_INDEX_TOTAL_BYTES = 536_870_912L;
+
+  public static final long MAX_COMMIT_GRAPH_BYTES = 268_435_456L;
+
   private AnalysisConstants() {}
 
   public static Map<String, Object> asMetadata() {

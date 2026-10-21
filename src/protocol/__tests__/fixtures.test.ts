@@ -3,7 +3,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { z } from "zod";
-import { ERROR_CODES, errorParamsSchemaByCode } from "../errors";
+import {
+  ERROR_CODES,
+  errorParamsSchemaByCode,
+  isKnownErrorCode,
+} from "../errors";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../..");
@@ -26,12 +30,15 @@ const PAYLOAD_MUST_FAIL = new Set(["protocol.invalid-payload.jsonl"]);
 const ENVELOPE_MUST_FAIL = new Set(["protocol.discarded-frame.jsonl"]);
 
 const LIFECYCLE_TOPICS = new Set([
+  "analysis.cancel",
   "analysis.cancelled",
   "analysis.completed",
   "analysis.failed",
   "analysis.progress",
   "analysis.stage.completed",
+  "analysis.start",
   "analysis.started",
+  "analysis.status",
   "analysis.warning",
   "cache.invalidated",
   "protocol",
@@ -232,7 +239,18 @@ const OPEN_MAP_PATHS = new Set([
   "error.params",
   "payload.counters",
   "payload.error.params",
+  "payload.stages.[].counters",
 ]);
+
+const isOpenMap = (at: readonly (number | string)[]): boolean =>
+  OPEN_MAP_PATHS.has(
+    at
+      .map((segment) => (typeof segment === "number" ? "[]" : segment))
+      .join(".")
+  );
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
 
 const objectPaths = (
   value: unknown,
@@ -419,16 +437,15 @@ const composedFrameSchema = (
   if (topic === undefined || topic === RESERVED_TOPIC) {
     return null;
   }
-  const { kind } = frame.value;
+  const { event, kind } = frame.value;
   if (
     kind === "event" &&
     events !== undefined &&
     eventEnvelopeSchema !== undefined
   ) {
-    const payload = events[topic];
-    return payload === undefined
-      ? null
-      : eventEnvelopeSchema.extend({ payload });
+    return typeof event === "string" && Object.hasOwn(events, event)
+      ? eventEnvelopeSchema.extend({ payload: events[event] })
+      : null;
   }
   if (methods === undefined) {
     return null;
@@ -451,6 +468,91 @@ const composedFrameSchema = (
   return null;
 };
 
+const fixtureInMemory = (
+  name: string,
+  values: readonly Record<string, unknown>[]
+): Fixture => {
+  const stem = name.replace(JSONL_SUFFIX, "");
+  return {
+    frames: values.map((value, index) => ({
+      index,
+      line: canonicalize(value),
+      value,
+    })),
+    name,
+    stem,
+    topic: resolveTopic(stem, resolvableTopics),
+  };
+};
+
+const frameErrors = (frame: Frame): Record<string, unknown>[] => {
+  const { error, payload } = frame.value;
+  return [error, isRecord(payload) ? payload.error : undefined].filter(
+    isRecord
+  );
+};
+
+const catalogueViolation = (error: Record<string, unknown>): string | null => {
+  const code = String(error.code);
+  if (!isKnownErrorCode(code)) {
+    return `${code} não está em ERROR_CODES`;
+  }
+  return errorParamsSchemaByCode[code].safeParse(error.params ?? {}).success
+    ? null
+    : `params de ${code} não bastam para a frase`;
+};
+
+interface UnknownKeyMutation {
+  readonly accepted: readonly string[];
+  readonly mutants: number;
+}
+
+const unknownKeyMutation = (
+  fixture: Fixture,
+  frame: Frame
+): UnknownKeyMutation => {
+  const composed = composedFrameSchema(fixture, frame);
+  const schema = composed ?? (protocolMessageSchema as z.ZodType);
+  const sites =
+    composed === null
+      ? [[] as (number | string)[]]
+      : objectPaths(frame.value, [], []);
+  const closed = sites.filter((at) => !isOpenMap(at));
+  return {
+    accepted: closed
+      .filter((at) => schema.safeParse(injectAt(frame.value, at)).success)
+      .map(
+        (at) =>
+          `${fixture.name}:${frame.index + 1} aceitou ${UNKNOWN_KEY} em "${at.join(".")}"`
+      ),
+    mutants: closed.length,
+  };
+};
+
+interface OpenMapMutation {
+  readonly checked: number;
+  readonly refused: readonly string[];
+}
+
+const openMapMutation = (fixture: Fixture, frame: Frame): OpenMapMutation => {
+  const composed = composedFrameSchema(fixture, frame);
+  if (composed === null) {
+    return { checked: 0, refused: [] };
+  }
+  const open = objectPaths(frame.value, [], []).filter(isOpenMap);
+  return {
+    checked: open.length,
+    refused: open
+      .filter((at) => !composed.safeParse(injectAt(frame.value, at)).success)
+      .map(
+        (at) =>
+          `${fixture.name}: mapa aberto "${at.join(".")}" recusou uma chave nova`
+      ),
+  };
+};
+
+const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
+
 const coveredTopics = new Set(
   fixtures
     .map((fixture) => fixture.topic)
@@ -459,9 +561,6 @@ const coveredTopics = new Set(
 const coverageGap = coverageTopics.filter((topic) => !coveredTopics.has(topic));
 
 const EXPECTED_COVERAGE_GAP = [
-  "analysis.cancel",
-  "analysis.start",
-  "analysis.status",
   "archaeology.timeline",
   "diagnostics.report",
   "element.dependencies",
@@ -585,6 +684,46 @@ describe("validação", () => {
     expect(checked).toBeGreaterThan(0);
   });
 
+  test("um evento dentro da fixture de um método é conferido pelo schema do próprio evento", () => {
+    const tick = {
+      analysisId: AN,
+      completed: 0,
+      stage: "SOURCE_ANALYSIS",
+      total: 10,
+      unit: "JAVA_FILES",
+    };
+    const fixture = fixtureInMemory("analysis.start.ok.jsonl", [
+      { event: "analysis.progress", kind: "event", payload: tick, protocol: 1 },
+      {
+        event: "analysis.progress",
+        kind: "event",
+        payload: {
+          ...tick,
+          analysisId: "not-an-id",
+          completed: -5,
+          stage: "NOT_A_STAGE",
+        },
+        protocol: 1,
+      },
+    ]);
+    const [good, bad] = fixture.frames;
+
+    expect(fixture.topic).toBe("analysis.start");
+    expect(
+      (protocolMessageSchema as z.ZodType).safeParse(bad.value).success
+    ).toBe(true);
+    expect(
+      composedFrameSchema(fixture, good)?.safeParse(good.value).success
+    ).toBe(true);
+    expect(
+      composedFrameSchema(fixture, bad)?.safeParse(bad.value).success
+    ).toBe(false);
+    expect(unknownKeyMutation(fixture, good)).toStrictEqual({
+      accepted: [],
+      mutants: 2,
+    });
+  });
+
   test("a fixture de payload inválido reprova no schema do seu método", () => {
     expect(methods).toBeDefined();
     for (const fixture of fixtures) {
@@ -607,76 +746,121 @@ describe("validação", () => {
   });
 
   test("todo erro de fixture carrega um code que existe em ERROR_CODES", () => {
-    let checked = 0;
-    for (const { fixture, frame } of allFrames) {
-      const error = frame.value.error as Record<string, unknown> | undefined;
-      if (error === undefined) {
-        continue;
-      }
-      checked += 1;
-      const code = error.code as string;
-      expect(ERROR_CODES, `${fixture.name}: ${code}`).toContain(code);
-      const params = error.params ?? {};
-      const schema =
-        errorParamsSchemaByCode[code as keyof typeof errorParamsSchemaByCode];
+    const checked = allFrames.flatMap(({ fixture, frame }) =>
+      frameErrors(frame).map((error) => ({ error, fixture, frame }))
+    );
+    for (const { error, fixture, frame } of checked) {
       expect(
-        schema.safeParse(params).success,
-        `${fixture.name}: params de ${code}`
-      ).toBe(true);
+        catalogueViolation(error),
+        `${fixture.name}:${frame.index + 1}`
+      ).toBeNull();
     }
-    expect(checked).toBeGreaterThan(0);
+    expect(checked.length).toBeGreaterThan(0);
+  });
+
+  test("um code dentro do payload de um evento é conferido contra o catálogo", () => {
+    const failed = (
+      error: Record<string, unknown>
+    ): Record<string, unknown> => ({
+      event: "analysis.failed",
+      kind: "event",
+      payload: { analysisId: AN, error },
+      protocol: 1,
+    });
+    const fixture = fixtureInMemory("analysis.failed.bogus.jsonl", [
+      failed({ code: "NOT_IN_THE_CATALOGUE", origin: "analyzer", params: {} }),
+      failed({
+        code: "CACHE_UNAVAILABLE",
+        origin: "analyzer",
+        params: { cause: "DISK_ON_FIRE" },
+      }),
+      failed({ code: "INTERNAL_UNEXPECTED", origin: "analyzer", params: {} }),
+    ]);
+    const [unknown] = fixture.frames;
+
+    expect(
+      composedFrameSchema(fixture, unknown)?.safeParse(unknown.value).success
+    ).toBe(true);
+    expect(
+      fixture.frames.flatMap(frameErrors).map(catalogueViolation)
+    ).toStrictEqual([
+      "NOT_IN_THE_CATALOGUE não está em ERROR_CODES",
+      "params de CACHE_UNAVAILABLE não bastam para a frase",
+      null,
+    ]);
   });
 });
 
 describe("chave desconhecida", () => {
   test("uma chave a mais em qualquer objeto de qualquer quadro reprova", () => {
     expect(protocolMessageSchema).toBeDefined();
-    let mutants = 0;
-    for (const { fixture, frame } of allFrames) {
-      if (ENVELOPE_MUST_FAIL.has(fixture.name)) {
-        continue;
-      }
-      const composed = composedFrameSchema(fixture, frame);
-      const schema = composed ?? (protocolMessageSchema as z.ZodType);
-      const sites =
-        composed === null
-          ? [[] as (number | string)[]]
-          : objectPaths(frame.value, [], []);
-      for (const at of sites) {
-        if (OPEN_MAP_PATHS.has(at.join("."))) {
-          continue;
-        }
-        mutants += 1;
-        const mutated = injectAt(frame.value, at);
-        expect(
-          schema.safeParse(mutated).success,
-          `${fixture.name}:${frame.index + 1} aceitou ${UNKNOWN_KEY} em "${at.join(".")}"`
-        ).toBe(false);
-      }
-    }
-    expect(mutants).toBeGreaterThan(0);
+    const mutations = allFrames
+      .filter(({ fixture }) => !ENVELOPE_MUST_FAIL.has(fixture.name))
+      .map(({ fixture, frame }) => unknownKeyMutation(fixture, frame));
+
+    expect(mutations.flatMap((mutation) => mutation.accepted)).toStrictEqual(
+      []
+    );
+    expect(
+      mutations.reduce((sum, mutation) => sum + mutation.mutants, 0)
+    ).toBeGreaterThan(0);
   });
 
   test("uma chave a mais em um mapa aberto continua passando", () => {
-    let checked = 0;
-    for (const { fixture, frame } of allFrames) {
-      const composed = composedFrameSchema(fixture, frame);
-      if (composed === null) {
-        continue;
-      }
-      for (const at of objectPaths(frame.value, [], [])) {
-        if (!OPEN_MAP_PATHS.has(at.join("."))) {
-          continue;
-        }
-        checked += 1;
-        const mutated = injectAt(frame.value, at);
-        expect(
-          composed.safeParse(mutated).success,
-          `${fixture.name}: mapa aberto "${at.join(".")}" recusou uma chave nova`
-        ).toBe(true);
-      }
-    }
-    expect(checked).toBeGreaterThan(0);
+    const mutations = allFrames.map(({ fixture, frame }) =>
+      openMapMutation(fixture, frame)
+    );
+
+    expect(mutations.flatMap((mutation) => mutation.refused)).toStrictEqual([]);
+    expect(
+      mutations.reduce((sum, mutation) => sum + mutation.checked, 0)
+    ).toBeGreaterThan(0);
+  });
+
+  test("o `counters` de cada estágio do relatório de status é mapa aberto", () => {
+    const request = "req_01JQ8ZD3B2C3D4E5F6G7H8J9K2";
+    const fixture = fixtureInMemory("analysis.status.completed.jsonl", [
+      {
+        id: request,
+        kind: "response",
+        ok: true,
+        payload: {
+          analysisId: AN,
+          completeness: {
+            historyTruncatedAtCommits: null,
+            parseFailures: 0,
+            shallowClone: false,
+            skippedFiles: 0,
+            totalFiles: 3,
+          },
+          error: null,
+          finishedAt: "2026-10-21T12:00:01Z",
+          headCommitId: null,
+          stages: [
+            {
+              counters: { files: 3 },
+              durationMs: 0,
+              stage: "SOURCE_ANALYSIS",
+              startedAt: "2026-10-21T12:00:00Z",
+              status: "COMPLETED",
+            },
+          ],
+          startedAt: "2026-10-21T12:00:00Z",
+          status: "COMPLETED",
+        },
+        protocol: 1,
+      },
+    ]);
+    const [response] = fixture.frames;
+
+    expect(
+      composedFrameSchema(fixture, response)?.safeParse(response.value).success
+    ).toBe(true);
+    expect(unknownKeyMutation(fixture, response).accepted).toStrictEqual([]);
+    expect(openMapMutation(fixture, response)).toStrictEqual({
+      checked: 1,
+      refused: [],
+    });
   });
 
   test("todo objeto alcançável a partir do registro é estrito", () => {
@@ -875,6 +1059,6 @@ describe("estritude fora do fio", () => {
     expect(
       sample.safeParse({ method: "graph.slice", sobrando: 1 }).success
     ).toBe(true);
-    expect(ERROR_CODES).toHaveLength(31);
+    expect(ERROR_CODES).toHaveLength(33);
   });
 });

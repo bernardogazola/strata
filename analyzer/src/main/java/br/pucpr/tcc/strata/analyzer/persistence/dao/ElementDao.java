@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.function.BooleanSupplier;
 
 public final class ElementDao {
 
@@ -53,6 +54,12 @@ public final class ElementDao {
 
   public static void insert(Connection connection, long analysisPk, List<ElementRow> rows)
       throws SQLException {
+    insert(connection, analysisPk, rows, MultiRowInsert.NEVER_CANCELLED);
+  }
+
+  public static void insert(
+      Connection connection, long analysisPk, List<ElementRow> rows, BooleanSupplier cancelled)
+      throws SQLException {
     MultiRowInsert.insertRows(
         connection,
         INSERT_HEAD,
@@ -75,7 +82,8 @@ public final class ElementDao {
           statement.setObject(first + 13, row.filePk());
           statement.setObject(first + 14, row.startLine());
           statement.setObject(first + 15, row.endLine());
-        });
+        },
+        cancelled);
   }
 
   public static List<ElementRow> list(Connection connection, long analysisPk) throws SQLException {
@@ -139,5 +147,22 @@ public final class ElementDao {
   private static Integer nullableInt(ResultSet rows, String column) throws SQLException {
     final int value = rows.getInt(column);
     return rows.wasNull() ? null : value;
+  }
+
+  public static long countInternalTypes(Connection connection, long analysisPk)
+      throws SQLException {
+    final String countInternalTypes =
+        """
+        SELECT count(*)
+          FROM code_element
+         WHERE analysis_pk = ? AND kind = ? AND is_external = 0""";
+    try (PreparedStatement statement = connection.prepareStatement(countInternalTypes)) {
+      statement.setLong(1, analysisPk);
+      statement.setString(2, ElementKind.TYPE.name());
+      try (ResultSet rows = statement.executeQuery()) {
+        rows.next();
+        return rows.getLong(1);
+      }
+    }
   }
 }

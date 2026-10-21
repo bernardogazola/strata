@@ -10,6 +10,7 @@ import {
   sourceRootKindSchema,
   stageStatusSchema,
 } from "./enums";
+import { protocolErrorSchema } from "./errors";
 import {
   analysisIdSchema,
   commitIdSchema,
@@ -73,13 +74,31 @@ export const analysisStageReportSchema = z.strictObject({
 });
 export type AnalysisStageReport = z.infer<typeof analysisStageReportSchema>;
 
-export const analysisStatusReportSchema = z.strictObject({
-  analysisId: analysisIdSchema,
-  completeness: analysisCompletenessSchema,
-  finishedAt: timestampSchema.nullable(),
-  headCommitId: commitIdSchema.nullable(),
-  stages: z.array(analysisStageReportSchema),
-  startedAt: timestampSchema,
-  status: analysisStatusSchema,
-});
+export const analysisStatusReportSchema = z
+  .strictObject({
+    analysisId: analysisIdSchema,
+    completeness: analysisCompletenessSchema,
+    error: protocolErrorSchema.nullable(),
+    finishedAt: timestampSchema.nullable(),
+    headCommitId: commitIdSchema.nullable(),
+    stages: z.array(analysisStageReportSchema),
+    startedAt: timestampSchema,
+    status: analysisStatusSchema,
+  })
+  .superRefine(({ error, status }, ctx) => {
+    if (status === "FAILED" && error === null) {
+      ctx.addIssue({
+        code: "custom",
+        message: "um status de análise FAILED traz o seu erro",
+        path: ["error"],
+      });
+    }
+    if (status !== "FAILED" && error !== null) {
+      ctx.addIssue({
+        code: "custom",
+        message: "só um status de análise FAILED traz um erro",
+        path: ["error"],
+      });
+    }
+  });
 export type AnalysisStatusReport = z.infer<typeof analysisStatusReportSchema>;

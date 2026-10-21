@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 @AnalyzeClasses(packages = "br.pucpr.tcc.strata.analyzer")
 final class ArchitectureRulesTest {
 
+  private static final String PACOTE_DO_PIPELINE = "br.pucpr.tcc.strata.analyzer.analysis..";
+
   @ArchTest
   static final ArchRule nenhumaClasseUsaProcessBuilderOuRuntimeExec =
       noClasses()
@@ -66,6 +68,18 @@ final class ArchitectureRulesTest {
               "o extrator devolve valores por uma porta e a persistência os grava; o contrário"
                   + " acoplaria a visita ao modelo do Spoon ao SQLite");
 
+  @ArchTest
+  static final ArchRule nemAAnaliseDeFonteNemORepositorioDependemDoPipeline =
+      noClasses()
+          .that()
+          .resideInAnyPackage("..sourceanalysis..", "..repository..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAPackage(PACOTE_DO_PIPELINE)
+          .because(
+              "o pipeline compõe a análise de fonte e o repositório por tipos do JDK; o contrário"
+                  + " acoplaria a varredura e o Spoon ao registro de análises");
+
   private static ArchRule semDependencia(String origem, String destino) {
     return noClasses()
         .that()
@@ -97,7 +111,11 @@ final class ArchitectureRulesTest {
         .contains("br.pucpr.tcc.strata.analyzer.protocol.Envelope")
         .as("os dois lados da quinta regra")
         .contains("br.pucpr.tcc.strata.analyzer.sourceanalysis.ElementSink")
-        .contains("br.pucpr.tcc.strata.analyzer.persistence.ElementWriter");
+        .contains("br.pucpr.tcc.strata.analyzer.persistence.ElementWriter")
+        .as("os três pacotes da sexta regra")
+        .contains("br.pucpr.tcc.strata.analyzer.sourceanalysis.SpoonModelBuilder")
+        .contains("br.pucpr.tcc.strata.analyzer.repository.RepositoryWalker")
+        .contains("br.pucpr.tcc.strata.analyzer.analysis.CancellationToken");
   }
 
   @Test
@@ -130,5 +148,21 @@ final class ArchitectureRulesTest {
                 assertThat(detalhe)
                     .contains("br.pucpr.tcc.strata.analyzer.persistence.ElementWriter")
                     .contains("br.pucpr.tcc.strata.analyzer.sourceanalysis.ElementSink"));
+  }
+
+  @Test
+  void aFronteiraInvertidaReprovaNoRunInputs() {
+    final JavaClasses importadas = importar();
+
+    final EvaluationResult invertida =
+        semDependencia(PACOTE_DO_PIPELINE, "..repository..").evaluate(importadas);
+
+    assertThat(invertida.hasViolation()).isTrue();
+    assertThat(invertida.getFailureReport().getDetails())
+        .anySatisfy(
+            detalhe ->
+                assertThat(detalhe)
+                    .contains("br.pucpr.tcc.strata.analyzer.analysis.RunInputs")
+                    .contains("br.pucpr.tcc.strata.analyzer.repository.ValidatedRepository"));
   }
 }

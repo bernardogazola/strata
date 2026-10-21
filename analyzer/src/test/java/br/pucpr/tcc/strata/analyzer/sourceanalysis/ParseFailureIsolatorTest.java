@@ -291,33 +291,51 @@ final class ParseFailureIsolatorTest {
   }
 
   @Test
-  void doisArquivosQueDeclaramOMesmoTipoVaoParaLotesSeparadosSemNenhumaFalha() throws Exception {
+  void doisArquivosDoMesmoPedacoQueDeclaramOMesmoTipoSeSeparamAntesDoBuildEOCaminhoMenorVence()
+      throws Exception {
+    final String first = "src/main/java/p/First.java";
+    final String second = "src/main/java/p/Second.java";
+    final String user = "src/main/java/p/User.java";
     final ValidatedRepository repository =
         SourceTrees.repository(
             temp.resolve("twins"),
             Map.of(
-                "src/main/java/p/First.java", "package p;\n\nclass Twin {\n  int first;\n}\n",
-                "src/main/java/p/Second.java", "package p;\n\nclass Twin {\n  int second;\n}\n",
-                "src/main/java/p/User.java", "package p;\n\nclass User {\n  Twin twin;\n}\n"));
+                first, "package p;\n\nclass Twin {\n  int first;\n}\n",
+                second, "package p;\n\nclass Twin {\n  int second;\n}\n",
+                user, "package p;\n\nclass User {\n  Twin twin;\n}\n"));
+    final List<SourceRoot> roots = repository.layout().sourceRoots();
+    final RecordingElementSink sink = new RecordingElementSink();
+    final CodeElementExtractor extractor = new CodeElementExtractor(roots, sink);
     final List<List<String>> batches = new ArrayList<>();
+    final BatchVisitor visitor =
+        new BatchVisitor() {
+          @Override
+          public void begin(List<SourceFile> files) {
+            extractor.begin(files);
+          }
+
+          @Override
+          public void visit(ModeledBatch batch) {
+            batches.add(batch.files());
+            extractor.visit(batch);
+          }
+
+          @Override
+          public void end(SourceAnalysis analysis) {
+            extractor.end(analysis);
+          }
+        };
 
     final SourceAnalysis analysis =
-        new SpoonModelBuilder()
-            .analyze(
-                repository,
-                repository.layout().sourceRoots(),
-                batch -> batches.add(batch.files()),
-                SourceTrees.NEVER);
+        new SpoonModelBuilder().analyze(repository, roots, visitor, SourceTrees.NEVER);
 
     assertThat(analysis.parseFailures()).isZero();
     assertThat(analysis.issues()).isEmpty();
-    assertThat(analysis.diagnostics().quarantinedBatches()).isEqualTo(1);
-    assertThat(batches).hasSize(2);
-    assertThat(batches.stream().flatMap(List::stream))
-        .containsExactlyInAnyOrder(
-            "src/main/java/p/First.java",
-            "src/main/java/p/Second.java",
-            "src/main/java/p/User.java");
+    assertThat(analysis.diagnostics().quarantinedBatches()).isZero();
+    assertThat(analysis.diagnostics().builds()).isEqualTo(2);
+    assertThat(batches).containsExactly(List.of(first, user), List.of(second));
+    assertThat(sink.type("type:p.Twin").filePath()).isEqualTo(first);
+    assertThat(extractor.issues()).containsExactly(SourceIssue.duplicateElement(second, first));
   }
 
   private static void assertSplitsThePairWithAQuarantineOfOne(

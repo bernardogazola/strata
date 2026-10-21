@@ -8,6 +8,11 @@ STAGE="$REPO_ROOT/src-tauri/resources/analyzer"
 MODULES_FILE="$ANALYZER_DIR/runtime-modules.txt"
 JAVA_RELEASE=25
 MAIN_CLASS="br.pucpr.tcc.strata.analyzer.bootstrap.Main"
+SELF_CHECK_FIXTURE="fixtures/repositories/multi-module"
+SELF_CHECK_SIDECARS="expected.json README.md cloc-golden.txt"
+FIXTURE_NAME="Strata Fixture"
+FIXTURE_EMAIL="fixtures@strata.invalid"
+FIXTURE_DATE="2024-01-02T03:04:05+0000"
 SCRATCH=""
 
 usage() {
@@ -108,6 +113,41 @@ MSG
   exit 1
 }
 
+hermetic_git() {
+  local dir="$1"; shift
+  env -u EMAIL \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+    GIT_AUTHOR_NAME="$FIXTURE_NAME" GIT_AUTHOR_EMAIL="$FIXTURE_EMAIL" \
+    GIT_COMMITTER_NAME="$FIXTURE_NAME" GIT_COMMITTER_EMAIL="$FIXTURE_EMAIL" \
+    GIT_AUTHOR_DATE="$FIXTURE_DATE" GIT_COMMITTER_DATE="$FIXTURE_DATE" \
+    git -C "$dir" \
+      -c core.excludesFile=/dev/null -c core.attributesFile=/dev/null \
+      -c core.autocrlf=false -c core.eol=lf -c commit.gpgsign=false \
+      -c init.defaultBranch=main \
+      "$@"
+}
+
+scratch_repository() {
+  local target="$1" file relative sidecar skip copied=0
+  command -v git >/dev/null 2>&1 || die "o git é necessário para montar o repositório temporário da autoverificação"
+  mkdir -p "$target"
+  while IFS= read -r -d '' file; do
+    relative="${file#"$SELF_CHECK_FIXTURE"/}"
+    skip=no
+    for sidecar in $SELF_CHECK_SIDECARS; do
+      if [ "$relative" = "$sidecar" ]; then skip=yes; fi
+    done
+    if [ "$skip" = yes ]; then continue; fi
+    mkdir -p "$target/$(dirname -- "$relative")"
+    cp -- "$REPO_ROOT/$file" "$target/$relative"
+    case "$relative" in *.java) copied=$((copied + 1)) ;; esac
+  done < <(git -C "$REPO_ROOT" ls-files -z -- "$SELF_CHECK_FIXTURE")
+  [ "$copied" -gt 0 ] || fail "nenhum .java versionado em $SELF_CHECK_FIXTURE"
+  hermetic_git "$target" init -q
+  hermetic_git "$target" add -A
+  hermetic_git "$target" commit -q --no-verify -m "build-analyzer self-check"
+}
+
 self_check() {
   local modules="$1" stdout_file="$SCRATCH/stdout.jsonl" status=0 listed module
   listed="$("$STAGE/runtime/bin/java" --list-modules | sed 's/@.*//')"
@@ -115,7 +155,7 @@ self_check() {
     printf '%s\n' "$listed" | grep -qx "$module" || fail "falta o módulo $module no runtime preparado"
   done
   "$STAGE/runtime/bin/java" -Xss2m -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 \
-    --enable-native-access=ALL-UNNAMED \
+    -Djava.awt.headless=true --enable-native-access=ALL-UNNAMED \
     -cp "$STAGE/analyzer.jar:$STAGE/lib/*" "$MAIN_CLASS" "--data-dir=$SCRATCH/data" \
     < /dev/null > "$stdout_file" 2> "$SCRATCH/stderr.log" || status=$?
   if [ "$status" -ne 0 ]; then
@@ -125,6 +165,12 @@ self_check() {
   grep -q '"event":"protocol.ready"' "$stdout_file" \
     || { cat "$SCRATCH/stderr.log" >&2; fail "o runtime preparado não imprimiu protocol.ready"; }
   step "o runtime preparado tem os $(printf '%s' "$modules" | awk -F, '{ print NF }') módulos e responde ao handshake"
+
+  scratch_repository "$SCRATCH/repository"
+  bash "$REPO_ROOT/scripts/verify-analysis.sh" --no-latency --java "$STAGE/runtime/bin/java" \
+    --classpath "$STAGE/analyzer.jar:$STAGE/lib/*" "$SCRATCH/repository" \
+    || fail "o runtime preparado não concluiu uma análise da fixture multi-module (o relatório está acima)"
+  step "o runtime preparado conclui uma análise da fixture multi-module"
 }
 
 main() {
@@ -172,6 +218,7 @@ main() {
 
   SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/build-analyzer.XXXXXX")"
   trap cleanup EXIT
+  SCRATCH="$(CDPATH= cd -- "$SCRATCH" && pwd -P)"
   self_check "$modules"
 
   step "preparado: $(du -sh "$STAGE" | cut -f1) em src-tauri/resources/analyzer ($(find "$STAGE/lib" -name '*.jar' | wc -l | tr -d ' ') jars)"

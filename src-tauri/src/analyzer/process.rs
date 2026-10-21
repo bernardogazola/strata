@@ -213,6 +213,9 @@ pub fn analyzer_args(
         OsString::from("-Dstderr.encoding=UTF-8"),
         OsString::from("-Duser.language=en"),
         OsString::from("-Duser.country=US"),
+        // O Spoon lê campos estáticos das classes do JDK importadas; no macOS, SystemColor ou
+        // DragSource iniciariam o AppKit e mostrariam um ícone no Dock.
+        OsString::from("-Djava.awt.headless=true"),
         OsString::from("--enable-native-access=ALL-UNNAMED"),
     ];
     args.push(prefixed("-Djava.io.tmpdir=", data_dir));
@@ -391,6 +394,7 @@ mod tests {
             "-Dstderr.encoding=UTF-8",
             "-Duser.language=en",
             "-Duser.country=US",
+            "-Djava.awt.headless=true",
             "--enable-native-access=ALL-UNNAMED",
             "-Djava.io.tmpdir=/data",
             "-Dorg.sqlite.tmpdir=/data",
@@ -404,6 +408,10 @@ mod tests {
         assert!(
             index("--enable-native-access=ALL-UNNAMED") < index(super::MAIN_CLASS),
             "a flag de native-access é uma opção da JVM: {text:?}"
+        );
+        assert!(
+            index("-Djava.awt.headless=true") < index(super::MAIN_CLASS),
+            "a flag headless é uma opção da JVM: {text:?}"
         );
         assert!(!text.iter().any(|a| a.contains("HeapDump")));
     }

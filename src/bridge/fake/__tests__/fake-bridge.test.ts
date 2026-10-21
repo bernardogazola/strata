@@ -32,6 +32,9 @@ const protocolErrorOf = async (
 describe("a descoberta das transcrições", () => {
   test("o mapa de rotas é exatamente o esperado, e um mapa vazio não passa", () => {
     expect(fakeBridgeRoutes()).toStrictEqual({
+      "analysis.cancel": ["unknown"],
+      "analysis.start": ["ok"],
+      "analysis.status": ["completed"],
       "graph.search": ["hit"],
       "graph.slice": ["package", "type"],
       "outline.children": ["orders", "root"],

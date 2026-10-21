@@ -33,6 +33,7 @@ final class SpoonLaunchers {
     environment.setInputClassLoader(PLATFORM_ONLY);
     environment.setEncodingProvider((file, content) -> SourceCharsets.detect(content));
     environment.setSpoonProgress(new CancellationCheckpoint(cancelled));
+    environment.setModelChangeListener(new CancellationListener(cancelled));
     return launcher;
   }
 

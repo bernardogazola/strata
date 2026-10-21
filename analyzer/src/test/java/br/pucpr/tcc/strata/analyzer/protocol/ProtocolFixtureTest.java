@@ -2,11 +2,26 @@ package br.pucpr.tcc.strata.analyzer.protocol;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import br.pucpr.tcc.strata.analyzer.analysis.AnalysisConfiguration;
+import br.pucpr.tcc.strata.analyzer.analysis.AnalysisId;
+import br.pucpr.tcc.strata.analyzer.analysis.AnalysisRegistry;
+import br.pucpr.tcc.strata.analyzer.analysis.AnalysisStage;
+import br.pucpr.tcc.strata.analyzer.analysis.Completeness;
+import br.pucpr.tcc.strata.analyzer.analysis.HistoryScope;
+import br.pucpr.tcc.strata.analyzer.analysis.ProgressTick;
+import br.pucpr.tcc.strata.analyzer.analysis.ProgressUnit;
+import br.pucpr.tcc.strata.analyzer.analysis.RegistrySettings;
+import br.pucpr.tcc.strata.analyzer.analysis.StageCounters;
+import br.pucpr.tcc.strata.analyzer.analysis.StageStatus;
+import br.pucpr.tcc.strata.analyzer.analysis.StartResult;
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.bootstrap.Handlers;
 import br.pucpr.tcc.strata.analyzer.persistence.CacheInvalidation;
 import br.pucpr.tcc.strata.analyzer.persistence.CacheInvalidationReason;
+import br.pucpr.tcc.strata.analyzer.persistence.PersistenceRoot;
+import br.pucpr.tcc.strata.analyzer.repository.RepositoryIssue;
 import br.pucpr.tcc.strata.analyzer.repository.TestRepositories;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.SourceIssue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -14,6 +29,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.InstantSource;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,6 +40,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -39,6 +59,19 @@ final class ProtocolFixtureTest {
 
   private static final Set<String> DIRIGIDOS =
       Set.of(
+          "analysis.start.ok.jsonl",
+          "analysis.cancel.unknown.jsonl",
+          "analysis.status.not-found.jsonl",
+          "analysis.status.completed.jsonl",
+          "protocol.invalid-payload.jsonl",
+          "analysis.started.ok.jsonl",
+          "analysis.progress.known-total.jsonl",
+          "analysis.progress.unknown-total.jsonl",
+          "analysis.stage.completed.ok.jsonl",
+          "analysis.completed.partial.jsonl",
+          "analysis.cancelled.ok.jsonl",
+          "analysis.failed.no-java.jsonl",
+          "analysis.warning.parse-failed.jsonl",
           "cache.invalidated.corrupt.jsonl",
           "cache.invalidated.head-changed.jsonl",
           "cache.invalidated.schema-version.jsonl",
@@ -55,15 +88,6 @@ final class ProtocolFixtureTest {
 
   private static Map<String, String> criarBaseline() {
     final Map<String, String> m = new LinkedHashMap<>();
-    m.put("protocol.invalid-payload.jsonl", "ainda não implementado");
-    m.put("analysis.started.ok.jsonl", "ainda não implementado");
-    m.put("analysis.progress.known-total.jsonl", "ainda não implementado");
-    m.put("analysis.progress.unknown-total.jsonl", "ainda não implementado");
-    m.put("analysis.stage.completed.ok.jsonl", "ainda não implementado");
-    m.put("analysis.completed.partial.jsonl", "ainda não implementado");
-    m.put("analysis.cancelled.ok.jsonl", "ainda não implementado");
-    m.put("analysis.failed.no-java.jsonl", "ainda não implementado");
-    m.put("analysis.warning.parse-failed.jsonl", "ainda não implementado");
     m.put("graph.search.hit.jsonl", "ainda não implementado");
     m.put("graph.slice.package.jsonl", "ainda não implementado");
     m.put("graph.slice.type.jsonl", "ainda não implementado");
@@ -85,10 +109,54 @@ final class ProtocolFixtureTest {
     }
   }
 
+  private static final AnalysisId ID_DA_FIXTURE = new AnalysisId("an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W");
+
+  private static final Instant INSTANTE_DA_FIXTURE =
+      TestRepositories.FIXTURE_IDENT.getWhenAsInstant();
+
+  private static final Duration ESPERA = Duration.ofSeconds(60);
+
   private final AtomicBoolean encerrar = new AtomicBoolean(false);
   private final ObjectMapper inbound = JsonLines.strictInboundMapper();
-  private final Dispatcher dispatcher = Dispatcher.of(inbound, Handlers.all(() -> 0L, encerrar));
   private final CanonicalJson canonical = new CanonicalJson();
+  private final List<AnalysisRegistry> registrosQueRodam = new ArrayList<>();
+
+  @TempDir Path dados;
+
+  private Dispatcher dispatcher;
+
+  private static final FrameSink NENHUM_QUADRO =
+      envelope -> {
+        throw new AssertionError("nenhum quadro sai fora do despachante: " + envelope);
+      };
+
+  @BeforeEach
+  void montarDespachante() throws IOException {
+    dispatcher =
+        Dispatcher.of(
+            inbound,
+            Handlers.all(() -> 0L, encerrar, new AnalysisRegistry(configuracoes(NENHUM_QUADRO))));
+  }
+
+  @AfterEach
+  void fecharOsRegistros() {
+    for (final AnalysisRegistry registro : registrosQueRodam) {
+      registro.close();
+    }
+  }
+
+  private RegistrySettings configuracoes(FrameSink sink) throws IOException {
+    return RegistrySettings.production(PersistenceRoot.prepare(dados), sink, VERSAO_DA_FIXTURE)
+        .withClock(InstantSource.fixed(INSTANTE_DA_FIXTURE))
+        .withNanoClock(() -> 0L)
+        .withIds(() -> ID_DA_FIXTURE);
+  }
+
+  private AnalysisRegistry registroQueRoda(FrameSink sink) throws IOException {
+    final AnalysisRegistry registro = new AnalysisRegistry(configuracoes(sink));
+    registrosQueRodam.add(registro);
+    return registro;
+  }
 
   private String emitido(Envelope envelope) {
     return new String(canonical.toBytes(envelope), StandardCharsets.UTF_8);
@@ -101,7 +169,7 @@ final class ProtocolFixtureTest {
   @Test
   void aPastaDeFixturesExisteEFoiLida() throws IOException {
     assertThat(FIXTURES).isDirectory();
-    assertThat(arquivos()).contains("protocol.ready.mvp.jsonl").hasSize(25);
+    assertThat(arquivos()).contains("protocol.ready.mvp.jsonl").hasSize(29);
   }
 
   @Test
@@ -157,6 +225,11 @@ final class ProtocolFixtureTest {
   }
 
   private String despacharEmRepositorio(String arquivo, Path repositorio) throws IOException {
+    return despacharEmRepositorio(dispatcher, arquivo, repositorio);
+  }
+
+  private String despacharEmRepositorio(Dispatcher despachante, String arquivo, Path repositorio)
+      throws IOException {
     final List<String> l = linhas(arquivo);
     assertThat(l).as(arquivo + ": requisição e resposta").hasSize(2);
     final ObjectNode requisicao = (ObjectNode) inbound.readTree(l.get(0));
@@ -165,8 +238,8 @@ final class ProtocolFixtureTest {
         .isFalse();
     requisicao.put("repositoryPath", repositorio.toRealPath().toString());
     final Dispatcher.Outcome fora =
-        dispatcher.dispatch(
-            dispatcher.parse(
+        despachante.dispatch(
+            despachante.parse(
                 inbound.writeValueAsString(requisicao).getBytes(StandardCharsets.UTF_8)));
     assertThat(fora).isInstanceOf(Dispatcher.Outcome.Respond.class);
     return emitido(((Dispatcher.Outcome.Respond) fora).envelope());
@@ -259,6 +332,203 @@ final class ProtocolFixtureTest {
   }
 
   @Test
+  void analysisStartedBateByteAByte() throws IOException {
+    final String esperado = unicaLinha("analysis.started.ok.jsonl");
+
+    assertThat(emitido(AnalysisEvents.started(ID_DA_FIXTURE))).isEqualTo(esperado);
+  }
+
+  @Test
+  void analysisProgressComTotalBateByteAByte() throws IOException {
+    final String esperado = unicaLinha("analysis.progress.known-total.jsonl");
+
+    final String emitido =
+        emitido(
+            AnalysisEvents.progress(
+                ID_DA_FIXTURE,
+                new ProgressTick(
+                    AnalysisStage.SOURCE_ANALYSIS, ProgressUnit.JAVA_FILES, 1240, 3902L)));
+
+    assertThat(emitido).isEqualTo(esperado);
+  }
+
+  @Test
+  void analysisProgressSemTotalBateByteAByte() throws IOException {
+    final String esperado = unicaLinha("analysis.progress.unknown-total.jsonl");
+
+    final String emitido =
+        emitido(
+            AnalysisEvents.progress(
+                ID_DA_FIXTURE,
+                new ProgressTick(AnalysisStage.GIT_HISTORY_CHEAP, ProgressUnit.COMMITS, 0, null)));
+
+    assertThat(emitido).isEqualTo(esperado);
+  }
+
+  @Test
+  void analysisStageCompletedBateByteAByte() throws IOException {
+    final String esperado = unicaLinha("analysis.stage.completed.ok.jsonl");
+    final Map<String, Long> contadores = new LinkedHashMap<>();
+    contadores.put("types", 1284L);
+    contadores.put("files", 3902L);
+
+    final String emitido =
+        emitido(
+            AnalysisEvents.stageCompleted(
+                ID_DA_FIXTURE,
+                AnalysisStage.SOURCE_ANALYSIS,
+                StageStatus.COMPLETED,
+                18_450L,
+                StageCounters.of(contadores)));
+
+    assertThat(emitido).isEqualTo(esperado);
+  }
+
+  @Test
+  void analysisCompletedParcialBateByteAByte() throws IOException {
+    final String esperado = unicaLinha("analysis.completed.partial.jsonl");
+
+    final String emitido =
+        emitido(
+            AnalysisEvents.completed(ID_DA_FIXTURE, new Completeness(3902, 12, 3, false, null)));
+
+    assertThat(emitido).isEqualTo(esperado);
+  }
+
+  @Test
+  void analysisCancelledBateByteAByte() throws IOException {
+    final String esperado = unicaLinha("analysis.cancelled.ok.jsonl");
+
+    final String emitido =
+        emitido(AnalysisEvents.cancelled(ID_DA_FIXTURE, new Completeness(1204, 0, 0, false, null)));
+
+    assertThat(emitido).isEqualTo(esperado);
+  }
+
+  @Test
+  void analysisFailedSemJavaBateByteAByte() throws IOException {
+    final String esperado = unicaLinha("analysis.failed.no-java.jsonl");
+
+    final String emitido =
+        emitido(
+            AnalysisEvents.failed(
+                ID_DA_FIXTURE, ErrorCodes.repository(RepositoryIssue.noJavaSources())));
+
+    assertThat(emitido).isEqualTo(esperado);
+  }
+
+  @Test
+  void analysisWarningParseFailedBateByteAByte() throws IOException {
+    final String esperado = unicaLinha("analysis.warning.parse-failed.jsonl");
+
+    final String emitido =
+        emitido(
+            AnalysisEvents.warning(
+                ID_DA_FIXTURE,
+                ErrorCodes.source(
+                    SourceIssue.parseFailed("src/main/java/br/pucpr/orders/PaymentService.java"))));
+
+    assertThat(emitido).isEqualTo(esperado);
+  }
+
+  private String despacharFixture(String arquivo) throws IOException {
+    final List<String> l = linhas(arquivo);
+    assertThat(l).as(arquivo + ": requisição e resposta").hasSize(2);
+    final Dispatcher.Outcome fora = despachar(l.get(0));
+    assertThat(fora).isInstanceOf(Dispatcher.Outcome.Respond.class);
+    return emitido(((Dispatcher.Outcome.Respond) fora).envelope());
+  }
+
+  @Test
+  void analysisStartOkBateByteAByteSemRodarOGancho(@TempDir Path temp) throws Exception {
+    final Path repositorio = temp.toRealPath().resolve("multi-module");
+    TestRepositories.reproduceCorpusFixture("multi-module", repositorio);
+    final Dispatcher despachante =
+        Dispatcher.of(inbound, Handlers.all(() -> 0L, encerrar, registroQueRoda(NENHUM_QUADRO)));
+
+    assertThat(despacharEmRepositorio(despachante, "analysis.start.ok.jsonl", repositorio))
+        .isEqualTo(linhas("analysis.start.ok.jsonl").get(1));
+  }
+
+  @Test
+  void analysisCancelDeIdDesconhecidoBateByteAByte() throws IOException {
+    assertThat(despacharFixture("analysis.cancel.unknown.jsonl"))
+        .isEqualTo(linhas("analysis.cancel.unknown.jsonl").get(1));
+  }
+
+  @Test
+  void analysisStatusDeIdDesconhecidoBateByteAByte() throws IOException {
+    assertThat(despacharFixture("analysis.status.not-found.jsonl"))
+        .isEqualTo(linhas("analysis.status.not-found.jsonl").get(1));
+  }
+
+  @Test
+  void protocolInvalidPayloadBateByteAByte() throws IOException {
+    assertThat(despacharFixture("protocol.invalid-payload.jsonl"))
+        .isEqualTo(linhas("protocol.invalid-payload.jsonl").get(1));
+  }
+
+  private static final class EventosDaAnalise implements FrameSink {
+    private final List<JsonNode> eventos = new ArrayList<>();
+    private final CanonicalJson canonico = new CanonicalJson();
+    private final ObjectMapper leitor = new ObjectMapper();
+
+    @Override
+    public synchronized void emit(Envelope envelope) throws IOException {
+      eventos.add(leitor.readTree(canonico.toBytes(envelope)));
+      notifyAll();
+    }
+
+    synchronized JsonNode terminal() throws InterruptedException {
+      final long prazo = System.nanoTime() + ESPERA.toNanos();
+      while (true) {
+        for (final JsonNode evento : eventos) {
+          final String nome = evento.path("event").asText();
+          if (Set.of("analysis.completed", "analysis.cancelled", "analysis.failed")
+              .contains(nome)) {
+            return evento;
+          }
+        }
+        final long falta = prazo - System.nanoTime();
+        if (falta <= 0) {
+          throw new AssertionError("a análise da fixture não terminou: " + eventos);
+        }
+        wait(Math.max(1, falta / 1_000_000));
+      }
+    }
+  }
+
+  @Test
+  void analysisStatusCompletedBateByteAByte(@TempDir Path temp) throws Exception {
+    final Path repositorio = temp.toRealPath().resolve("multi-module");
+    final var commit = TestRepositories.reproduceCorpusFixture("multi-module", repositorio);
+    assertThat(commit.name()).isEqualTo(TestRepositories.corpusCommitId("multi-module"));
+    final EventosDaAnalise eventos = new EventosDaAnalise();
+    final AnalysisRegistry registro = registroQueRoda(eventos);
+    final Dispatcher despachante =
+        Dispatcher.of(inbound, Handlers.all(() -> 0L, encerrar, registro));
+
+    final StartResult partida =
+        registro.start(
+            repositorio.toString(),
+            repositorio,
+            new AnalysisConfiguration(false, HistoryScope.ALL, null, null, false));
+    assertThat(partida).isInstanceOf(StartResult.Started.class);
+    ((StartResult.Started) partida).launch().run();
+    final JsonNode terminal = eventos.terminal();
+    assertThat(terminal.path("event").asText())
+        .as(terminal.toString())
+        .isEqualTo("analysis.completed");
+
+    final List<String> l = linhas("analysis.status.completed.jsonl");
+    assertThat(l).hasSize(2);
+    final Dispatcher.Outcome fora =
+        despachante.dispatch(despachante.parse(l.get(0).getBytes(StandardCharsets.UTF_8)));
+    assertThat(fora).isInstanceOf(Dispatcher.Outcome.Respond.class);
+    assertThat(emitido(((Dispatcher.Outcome.Respond) fora).envelope())).isEqualTo(l.get(1));
+  }
+
+  @Test
   void todaFixtureOuEDirigidaOuEDeclaradaNaoDirigivel() throws IOException {
     final Set<String> uniao = new TreeSet<>(DIRIGIDOS);
     uniao.addAll(EXPECTADOS_NAO_DIRIGIVEIS.keySet());
@@ -267,26 +537,56 @@ final class ProtocolFixtureTest {
         .isEqualTo(arquivos());
   }
 
-  @Test
-  void nenhumaFixtureNaoDirigidaTemHandlerRegistrado() {
+  static List<String> puladasComHandler(
+      Map<String, String> primeiraLinhaPorArquivo, Set<String> registrados) throws IOException {
+    final ObjectMapper leitor = new ObjectMapper();
     final List<String> falhas = new ArrayList<>();
-    for (final String arquivo : EXPECTADOS_NAO_DIRIGIVEIS.keySet()) {
-      final String haste = arquivo.substring(0, arquivo.length() - ".jsonl".length());
-      for (final String metodo : dispatcher.registeredMethods()) {
-        if (haste.equals(metodo) || haste.startsWith(metodo + ".")) {
-          falhas.add(arquivo + " é pulada mas " + metodo + " está implementado");
-        }
+    for (final Map.Entry<String, String> fixture : primeiraLinhaPorArquivo.entrySet()) {
+      final JsonNode primeira = leitor.readTree(fixture.getValue());
+      final String metodo = primeira.path("method").asText(null);
+      if ("request".equals(primeira.path("kind").asText()) && registrados.contains(metodo)) {
+        falhas.add(fixture.getKey() + " é pulada mas pede " + metodo + ", que está implementado");
       }
     }
-    assertThat(falhas)
+    return falhas;
+  }
+
+  @Test
+  void nenhumaFixtureNaoDirigidaPedeUmMetodoRegistrado() throws IOException {
+    final Map<String, String> puladas = new LinkedHashMap<>();
+    for (final String arquivo : EXPECTADOS_NAO_DIRIGIVEIS.keySet()) {
+      puladas.put(arquivo, linhas(arquivo).get(0));
+    }
+
+    assertThat(puladasComHandler(puladas, dispatcher.registeredMethods()))
         .as("uma fixture não pode ser pulada por um método já implementado")
         .isEmpty();
   }
 
   @Test
-  void oDespachanteRegistraExatamenteOsTresMetodosJaImplementados() {
+  void aRegraLeOMetodoDaRequisicaoENaoAHasteDoArquivo() throws IOException {
+    final String arquivo = "protocol.invalid-payload.jsonl";
+    final Map<String, String> emMemoria = Map.of(arquivo, linhas(arquivo).get(0));
+    final Set<String> registrados = Set.of("analysis.cancel");
+
+    assertThat(puladasComHandler(emMemoria, registrados))
+        .containsExactly(arquivo + " é pulada mas pede analysis.cancel, que está implementado");
+    final String haste = arquivo.substring(0, arquivo.length() - ".jsonl".length());
+    assertThat(registrados.stream().anyMatch(m -> haste.equals(m) || haste.startsWith(m + ".")))
+        .as("a regra antiga, pela haste, era vacuidade para esta fixture")
+        .isFalse();
+  }
+
+  @Test
+  void oDespachanteRegistraExatamenteOsSeisMetodosJaImplementados() {
     assertThat(dispatcher.registeredMethods())
-        .containsExactlyInAnyOrder("system.ping", "system.shutdown", "repository.describe");
+        .containsExactlyInAnyOrder(
+            "system.ping",
+            "system.shutdown",
+            "repository.describe",
+            "analysis.start",
+            "analysis.cancel",
+            "analysis.status");
   }
 
   @Test

@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vitest";
+import { cacheUnavailableCauseSchema } from "@/protocol/enums";
 import { ERROR_CODES, errorParamsSchemaByCode } from "@/protocol/errors";
-import { formatProtocolError } from "../errors";
+import { type ErrorMessage, formatProtocolError } from "../errors";
 
 const EVERY_PARAM = {
+  cause: "LOCKED",
   exitCode: 1,
   expected: 1,
   filePath: "src/main/java/Exemplo.java",
@@ -17,6 +19,13 @@ const EVERY_PARAM = {
   timeoutMs: 30_000,
   toVersion: 4,
 };
+
+const plainText = (message: ErrorMessage): string =>
+  message.body
+    .map((segment) =>
+      segment.kind === "chrome" ? segment.text : segment.value
+    )
+    .join("");
 
 const UNTRUSTED_SENTINEL = "SENTINELA-DO-REPOSITORIO/Estranho.java";
 
@@ -92,9 +101,9 @@ describe("formatProtocolError", () => {
   });
 
   test("severidade e retryable vêm do registro, não do fio", () => {
-    const cancelled = formatProtocolError({ code: "ANALYSIS_CANCELLED" });
-    expect(cancelled.severity).toBe("warning");
-    expect(cancelled.retryable).toBe(true);
+    const rebuilt = formatProtocolError({ code: "CACHE_CORRUPT" });
+    expect(rebuilt.severity).toBe("warning");
+    expect(rebuilt.retryable).toBe(true);
 
     const bare = formatProtocolError({ code: "REPO_IS_BARE" });
     expect(bare.severity).toBe("error");
@@ -125,13 +134,102 @@ describe("formatProtocolError", () => {
       code: "REPO_TOO_MANY_FILES",
       params: { found: 200_001, limit: 200_000 },
     });
-    const text = message.body
-      .map((segment) =>
-        segment.kind === "chrome" ? segment.text : segment.value
-      )
-      .join("");
+    const text = plainText(message);
 
     expect(text).toContain("mais de 200.000 arquivos e pastas");
     expect(text).not.toContain("200.001");
+  });
+
+  test("ANALYSIS_TOO_MANY_JAVA_SOURCES imprime a contagem e o limite", () => {
+    const message = formatProtocolError({
+      code: "ANALYSIS_TOO_MANY_JAVA_SOURCES",
+      params: { found: 61_234, limit: 60_000 },
+    });
+
+    expect(message.title).toBe("Código demais para uma análise");
+    expect(plainText(message)).toBe(
+      "A seleção tem 61.234 arquivos Java, acima do limite de 60.000 que o Strata analisa com segurança."
+    );
+    expect(message.hint).toBe(
+      "Deixe os testes de fora ou escolha menos raízes de código."
+    );
+    expect(message.severity).toBe("error");
+    expect(message.retryable).toBe(false);
+  });
+
+  test("CACHE_UNAVAILABLE: cada causa tem a sua frase, a sua dica e a sua nova tentativa", () => {
+    const expectedRetryable = {
+      LOCATION_INSIDE_REPOSITORY: false,
+      LOCKED: true,
+      PRAGMA_REFUSED: false,
+      STORAGE: true,
+    } as const;
+    const bodies = new Set<string>();
+    const hints = new Set<string>();
+
+    expect(Object.keys(expectedRetryable).sort()).toStrictEqual(
+      [...cacheUnavailableCauseSchema.options].sort()
+    );
+    for (const cause of cacheUnavailableCauseSchema.options) {
+      const message = formatProtocolError({
+        code: "CACHE_UNAVAILABLE",
+        params: { cause },
+      });
+
+      expect(message.title, cause).toBe("Cache de análise indisponível");
+      expect(message.severity, cause).toBe("error");
+      expect(message.retryable, cause).toBe(expectedRetryable[cause]);
+      expect(message.hint ?? "", cause).not.toBe("");
+      bodies.add(plainText(message));
+      hints.add(message.hint ?? "");
+    }
+    expect(bodies.size).toBe(cacheUnavailableCauseSchema.options.length);
+    expect(hints.size).toBe(cacheUnavailableCauseSchema.options.length);
+  });
+
+  test("CACHE_UNAVAILABLE com uma causa que esta versão não conhece cai no fallback", () => {
+    const message = formatProtocolError({
+      code: "CACHE_UNAVAILABLE",
+      params: { cause: "DISK_ON_FIRE" },
+    });
+
+    expect(message.title).toBe("Erro não reconhecido");
+    expect(message.retryable).toBe(false);
+  });
+
+  test("ANALYSIS_ALREADY_RUNNING não promete uma análise por repositório", () => {
+    const message = formatProtocolError({ code: "ANALYSIS_ALREADY_RUNNING" });
+
+    expect(plainText(message)).toBe(
+      "Já existe uma análise em andamento, e o Strata faz uma de cada vez."
+    );
+    expect(plainText(message)).not.toContain("este repositório");
+  });
+
+  test("REPO_NOT_A_GIT_REPOSITORY tem a cópia exata, verdadeira também para o clone que a guarda recusa", () => {
+    const message = formatProtocolError({ code: "REPO_NOT_A_GIT_REPOSITORY" });
+
+    expect(message.title).toBe("Repositório Git não suportado");
+    expect(plainText(message)).toBe(
+      "A pasta selecionada não é um repositório Git, ou guarda os objetos do Git de um jeito que o Strata não lê com segurança."
+    );
+    expect(message.hint).toBe(
+      "Selecione a raiz de um repositório clonado. Se ele já é um, compacte os objetos com git gc e tente de novo."
+    );
+    expect(message.severity).toBe("error");
+    expect(message.retryable).toBe(false);
+  });
+
+  test("ANALYSIS_CACHE_CORRUPTED tem a cópia exata e não promete que nada se perdeu", () => {
+    const message = formatProtocolError({ code: "ANALYSIS_CACHE_CORRUPTED" });
+
+    expect(message.title).toBe("Cache danificado durante a análise");
+    expect(plainText(message)).toBe(
+      "O cache de análise deste repositório se danificou durante a análise. O Strata o recriou, e o que esta análise já tinha gravado se perdeu com ele."
+    );
+    expect(message.hint).toBe("Analise de novo.");
+    expect(message.severity).toBe("error");
+    expect(message.retryable).toBe(true);
+    expect(plainText(message)).not.toContain("Nenhum resultado foi perdido");
   });
 });

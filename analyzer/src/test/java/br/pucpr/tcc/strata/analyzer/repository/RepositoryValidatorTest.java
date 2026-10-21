@@ -1,12 +1,16 @@
 package br.pucpr.tcc.strata.analyzer.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -404,5 +408,80 @@ final class RepositoryValidatorTest {
     } finally {
       Files.setPosixFilePermissions(repo, Set.of(PosixFilePermission.values()));
     }
+  }
+
+  private Path repositorioComFontes(String nome, int arquivos) throws Exception {
+    final Path repo = real.resolve(nome);
+    TestRepositories.init(repo).close();
+    final Path pasta = Files.createDirectories(repo.resolve("src/main/java/p"));
+    for (int f = 0; f < arquivos; f++) {
+      Files.writeString(pasta.resolve("C" + f + ".java"), "package p; class C" + f + " {}");
+    }
+    return repo;
+  }
+
+  @Test
+  void aInspecaoCanceladaLancaCancellationExceptionENaoDevolveDesfecho() throws Exception {
+    final Path repo = repositorioComFontes("cancelada", 2_500);
+    final AtomicInteger consultas = new AtomicInteger();
+
+    assertThatThrownBy(
+            () ->
+                new RepositoryValidator()
+                    .inspect(
+                        repo,
+                        () -> {
+                          consultas.incrementAndGet();
+                          return true;
+                        },
+                        visto -> {}))
+        .as("a varredura do REPOSITORY_VALIDATION é o ponto de verificação, e não vira recusa")
+        .isInstanceOf(CancellationException.class);
+    assertThat(consultas).hasValue(1);
+  }
+
+  @Test
+  void aValidacaoCanceladaTambemLanca() throws Exception {
+    final Path repo = repositorioComFontes("validacao-cancelada", 2_500);
+
+    assertThatThrownBy(() -> new RepositoryValidator().validate(repo, () -> true, visto -> {}))
+        .isInstanceOf(CancellationException.class);
+  }
+
+  @Test
+  void oProgressoDaInspecaoTerminaNoTotalDoInventario() throws Exception {
+    final Path repo = repositorioComFontes("progresso", 2_500);
+    final List<Integer> vistos = new ArrayList<>();
+
+    final var accepted =
+        inspecionado(new RepositoryValidator().inspect(repo, () -> false, vistos::add));
+
+    assertThat(vistos).isNotEmpty().isSorted();
+    assertThat(vistos.getLast()).isEqualTo(accepted.value().inventory().javaSources().size());
+    assertThat(vistos).as("os passos do meio, e não só o fim").anyMatch(visto -> visto < 2_500);
+  }
+
+  @Test
+  void oProgressoDaValidacaoTerminaNoTotalDoInventario() throws Exception {
+    final Path repo = repositorioComFontes("progresso-validacao", 1_200);
+    final List<Integer> vistos = new ArrayList<>();
+
+    final var accepted = aceito(new RepositoryValidator().validate(repo, () -> false, vistos::add));
+
+    assertThat(vistos).isNotEmpty().isSorted();
+    assertThat(vistos.getLast())
+        .isEqualTo(accepted.value().snapshot().inventory().javaSources().size())
+        .isEqualTo(1_200);
+  }
+
+  @Test
+  void asFormasDeUmArgumentoSaoAsCancelaveisSemCancelamentoNemProgresso() throws Exception {
+    final Path repo = repositorioComUmCommit("uma-forma");
+    TestRepositories.symlink(repo.resolve("vazamento"), real.resolve("fora"));
+
+    assertThat(new RepositoryValidator().inspect(repo, () -> false, visto -> {}))
+        .isEqualTo(new RepositoryValidator().inspect(repo));
+    assertThat(new RepositoryValidator().validate(repo, () -> false, visto -> {}))
+        .isEqualTo(new RepositoryValidator().validate(repo));
   }
 }

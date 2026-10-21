@@ -1,5 +1,7 @@
 package br.pucpr.tcc.strata.analyzer.bootstrap;
 
+import br.pucpr.tcc.strata.analyzer.analysis.AnalysisRegistry;
+import br.pucpr.tcc.strata.analyzer.analysis.RegistrySettings;
 import br.pucpr.tcc.strata.analyzer.persistence.PersistenceRoot;
 import br.pucpr.tcc.strata.analyzer.protocol.CanonicalJson;
 import br.pucpr.tcc.strata.analyzer.protocol.Dispatcher;
@@ -28,6 +30,7 @@ public final class Main {
       return;
     }
     int exitCode = AnalysisConstants.EXIT_OK;
+    AnalysisRegistry analyses = null;
     try {
       final RuntimeArguments arguments = RuntimeArguments.parse(args);
       Log.info("pasta de dados: " + arguments.dataDir());
@@ -46,9 +49,12 @@ public final class Main {
           new JsonLines.Writer(
               capture.protocolStream(), new CanonicalJson(), AnalysisConstants.MAX_FRAME_BYTES);
 
-      writer.emit(Envelope.protocolReady(analyzerVersion()));
+      final String version = analyzerVersion();
+      writer.emit(Envelope.protocolReady(version));
 
-      final List<MethodHandler<?>> handlers = Handlers.all(Uptime.monotonic(), shutdownRequested);
+      analyses = new AnalysisRegistry(RegistrySettings.production(persistence, writer, version));
+      final List<MethodHandler<?>> handlers =
+          Handlers.all(Uptime.monotonic(), shutdownRequested, analyses);
       final Dispatcher dispatcher = Dispatcher.of(JsonLines.strictInboundMapper(), handlers);
 
       exitCode =
@@ -66,6 +72,7 @@ public final class Main {
       Log.error("o analisador terminou de forma anormal", fatal);
       exitCode = AnalysisConstants.EXIT_PROTOCOL_DESYNCHRONIZED;
     } finally {
+      closeAnalyses(analyses);
       try {
         capture.flush();
       } catch (IOException ignored) {
@@ -73,6 +80,17 @@ public final class Main {
       }
     }
     System.exit(exitCode);
+  }
+
+  private static void closeAnalyses(AnalysisRegistry analyses) {
+    if (analyses == null) {
+      return;
+    }
+    try {
+      analyses.close();
+    } catch (RuntimeException failed) {
+      Log.error("falha ao fechar as análises", failed);
+    }
   }
 
   private static String analyzerVersion() throws IOException {

@@ -93,4 +93,8 @@ describe("o teto da amostra de avisos", () => {
     expect(useAppStore.getState().warnings).toHaveLength(MAX_RETAINED_WARNINGS);
     useAppStore.setState(initial, true);
   });
+
+  test("o teto é 500", () => {
+    expect(MAX_RETAINED_WARNINGS).toBe(500);
+  });
 });

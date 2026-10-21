@@ -181,3 +181,11 @@ export const cacheInvalidationReasonSchema = z.enum([
 export type CacheInvalidationReason = z.infer<
   typeof cacheInvalidationReasonSchema
 >;
+
+export const cacheUnavailableCauseSchema = z.enum([
+  "LOCKED",
+  "LOCATION_INSIDE_REPOSITORY",
+  "PRAGMA_REFUSED",
+  "STORAGE",
+]);
+export type CacheUnavailableCause = z.infer<typeof cacheUnavailableCauseSchema>;

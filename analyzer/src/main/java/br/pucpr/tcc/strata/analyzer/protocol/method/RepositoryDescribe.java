@@ -9,7 +9,6 @@ import br.pucpr.tcc.strata.analyzer.repository.RepositoryIssue;
 import br.pucpr.tcc.strata.analyzer.repository.RepositoryOutcome;
 import br.pucpr.tcc.strata.analyzer.repository.RepositoryValidator;
 import br.pucpr.tcc.strata.analyzer.repository.ValidatedRepository;
-import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
@@ -36,7 +35,7 @@ public final class RepositoryDescribe implements MethodHandler<MethodHandler.Emp
 
   @Override
   public Object handle(MethodHandler.EmptyParams params, Envelope.Request request) {
-    final Path claimed = claimedRoot(request.repositoryPath());
+    final Path claimed = ClaimedRoot.of(METHOD, request.repositoryPath());
     return switch (validator.validate(claimed)) {
       case RepositoryOutcome.Rejected<ValidatedRepository> rejected -> {
         Log.info(METHOD + ": recusou " + claimed + " com " + rejected.reason().code());
@@ -47,26 +46,6 @@ public final class RepositoryDescribe implements MethodHandler<MethodHandler.Emp
         yield RepositoryDescription.of(accepted.value());
       }
     };
-  }
-
-  private static Path claimedRoot(String wire) {
-    if (wire == null) {
-      throw invalid("repositoryPath é obrigatório");
-    }
-    final Path claimed;
-    try {
-      claimed = Path.of(wire);
-    } catch (InvalidPathException malformed) {
-      throw invalid("repositoryPath não é um caminho válido");
-    }
-    if (!claimed.isAbsolute() || !claimed.equals(claimed.normalize())) {
-      throw invalid("repositoryPath deve ser absoluto e normalizado");
-    }
-    return claimed;
-  }
-
-  private static RequestRejected invalid(String detail) {
-    return new RequestRejected(ErrorCodes.invalidPayload(METHOD, detail));
   }
 
   private static void logWarnings(List<RepositoryIssue> warnings) {

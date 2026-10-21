@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 public final class EvidenceDao {
 
@@ -29,6 +30,12 @@ public final class EvidenceDao {
   private EvidenceDao() {}
 
   public static void insert(Connection connection, List<EvidenceRow> rows) throws SQLException {
+    insert(connection, rows, MultiRowInsert.NEVER_CANCELLED);
+  }
+
+  public static void insert(
+      Connection connection, List<EvidenceRow> rows, BooleanSupplier cancelled)
+      throws SQLException {
     MultiRowInsert.insertRows(
         connection,
         INSERT_HEAD,
@@ -41,7 +48,8 @@ public final class EvidenceDao {
           statement.setObject(first + 3, row.filePk());
           statement.setObject(first + 4, row.line());
           statement.setString(first + 5, row.resolution().name());
-        });
+        },
+        cancelled);
   }
 
   public static List<EvidenceRow> list(Connection connection, long analysisPk) throws SQLException {
