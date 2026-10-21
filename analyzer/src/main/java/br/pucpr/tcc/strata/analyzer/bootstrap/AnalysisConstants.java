@@ -98,7 +98,7 @@ public final class AnalysisConstants {
 
   public static final int MAX_GIT_ALTERNATES = 8;
 
-  public static final int MAX_GIT_ALTERNATES_DEPTH = 5;
+  public static final int MAX_GIT_ALTERNATES_DEPTH = 6;
 
   public static final int MAX_LOOSE_OBJECTS = 200_000;
 
