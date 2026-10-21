@@ -5,6 +5,8 @@ use serde_json::value::RawValue;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ErrorCode {
     HandleUnknown,
+    PathChanged,
+    RootUnreadable,
     AnalyzerNotFound,
     AnalyzerStartFailed,
     AnalyzerCrashed,
@@ -22,6 +24,8 @@ impl ErrorCode {
     pub const fn as_wire(self) -> &'static str {
         match self {
             Self::HandleUnknown => "REPO_HANDLE_UNKNOWN",
+            Self::PathChanged => "REPO_PATH_CHANGED",
+            Self::RootUnreadable => "REPO_ROOT_UNREADABLE",
             Self::AnalyzerNotFound => "PROC_ANALYZER_NOT_FOUND",
             Self::AnalyzerStartFailed => "PROC_ANALYZER_START_FAILED",
             Self::AnalyzerCrashed => "PROC_ANALYZER_CRASHED",
@@ -41,6 +45,10 @@ impl ErrorCode {
 pub enum ProtocolError {
     #[error("handle de repositório desconhecido")]
     HandleUnknown,
+    #[error("a pasta escolhida não pode mais ser resolvida: {detail}")]
+    PathChanged { detail: String },
+    #[error("a pasta escolhida não pode ser lida: {detail}")]
+    RootUnreadable { detail: String },
     #[error("runtime do analisador não encontrado")]
     AnalyzerNotFound { detail: String },
     #[error("o analisador não conseguiu iniciar")]
@@ -72,6 +80,8 @@ impl ProtocolError {
     pub fn code(&self) -> ErrorCode {
         match self {
             Self::HandleUnknown => ErrorCode::HandleUnknown,
+            Self::PathChanged { .. } => ErrorCode::PathChanged,
+            Self::RootUnreadable { .. } => ErrorCode::RootUnreadable,
             Self::AnalyzerNotFound { .. } => ErrorCode::AnalyzerNotFound,
             Self::AnalyzerStartFailed { .. } => ErrorCode::AnalyzerStartFailed,
             Self::AnalyzerCrashed { .. } => ErrorCode::AnalyzerCrashed,
@@ -89,6 +99,18 @@ impl ProtocolError {
     pub fn not_found(detail: impl Into<String>) -> Self {
         Self::AnalyzerNotFound {
             detail: detail.into(),
+        }
+    }
+
+    pub fn path_changed(source: &std::io::Error) -> Self {
+        Self::PathChanged {
+            detail: source.to_string(),
+        }
+    }
+
+    pub fn root_unreadable(source: &std::io::Error) -> Self {
+        Self::RootUnreadable {
+            detail: source.to_string(),
         }
     }
 
@@ -112,7 +134,10 @@ impl ProtocolError {
 
     const fn wire_detail(&self) -> Option<&String> {
         match self {
-            Self::AnalyzerNotFound { .. } | Self::AnalyzerStartFailed { .. } => None,
+            Self::AnalyzerNotFound { .. }
+            | Self::AnalyzerStartFailed { .. }
+            | Self::PathChanged { .. }
+            | Self::RootUnreadable { .. } => None,
             Self::MalformedMessage { detail } | Self::Internal { detail } => Some(detail),
             Self::HandleUnknown
             | Self::AnalyzerCrashed { .. }
@@ -177,6 +202,8 @@ impl Serialize for ProtocolError {
                 map.serialize_entry("params", &MethodParams { method })?;
             }
             Self::HandleUnknown
+            | Self::PathChanged { .. }
+            | Self::RootUnreadable { .. }
             | Self::AnalyzerNotFound { .. }
             | Self::AnalyzerStartFailed { .. }
             | Self::AnalyzerNotReady
