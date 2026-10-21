@@ -228,7 +228,9 @@ final class RootCommitsTest {
       primeiro = historia.commit("um");
       historia.apontarMain(historia.commit("dois", primeiro));
     }
-    Files.delete(loose(repo, primeiro));
+    final Path objeto = loose(repo, primeiro);
+    assertThat(objeto.toFile().setWritable(true)).isTrue();
+    Files.delete(objeto);
     final RepositorySnapshot snapshot = inspecionar(repo);
 
     final List<String> log =
