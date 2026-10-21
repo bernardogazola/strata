@@ -30,6 +30,7 @@ public final class Main {
       return;
     }
     int exitCode = AnalysisConstants.EXIT_OK;
+    AnalysisRegistry analyses = null;
     try {
       final RuntimeArguments arguments = RuntimeArguments.parse(args);
       Log.info("pasta de dados: " + arguments.dataDir());
@@ -51,8 +52,7 @@ public final class Main {
       final String version = analyzerVersion();
       writer.emit(Envelope.protocolReady(version));
 
-      final AnalysisRegistry analyses =
-          new AnalysisRegistry(RegistrySettings.production(persistence, writer, version));
+      analyses = new AnalysisRegistry(RegistrySettings.production(persistence, writer, version));
       final List<MethodHandler<?>> handlers =
           Handlers.all(Uptime.monotonic(), shutdownRequested, analyses);
       final Dispatcher dispatcher = Dispatcher.of(JsonLines.strictInboundMapper(), handlers);
@@ -72,6 +72,7 @@ public final class Main {
       Log.error("o analisador terminou de forma anormal", fatal);
       exitCode = AnalysisConstants.EXIT_PROTOCOL_DESYNCHRONIZED;
     } finally {
+      closeAnalyses(analyses);
       try {
         capture.flush();
       } catch (IOException ignored) {
@@ -79,6 +80,17 @@ public final class Main {
       }
     }
     System.exit(exitCode);
+  }
+
+  private static void closeAnalyses(AnalysisRegistry analyses) {
+    if (analyses == null) {
+      return;
+    }
+    try {
+      analyses.close();
+    } catch (RuntimeException failed) {
+      Log.error("falha ao fechar as análises", failed);
+    }
   }
 
   private static String analyzerVersion() throws IOException {
