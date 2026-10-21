@@ -112,12 +112,12 @@ export const elementKindLabels = {
 } as const satisfies Record<ElementKind, string>;
 
 export const stageStatusLabels = {
-  CANCELLED: "cancelado",
-  COMPLETED: "concluído",
+  CANCELLED: "cancelada",
+  COMPLETED: "concluída",
   FAILED: "falhou",
   PENDING: "pendente",
   RUNNING: "em andamento",
-  SKIPPED: "pulado",
+  SKIPPED: "pulada",
 } as const satisfies Record<StageStatus, string>;
 
 export const changeTypeLabels = {
