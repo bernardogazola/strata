@@ -216,7 +216,7 @@ describe("readGraphPalette", () => {
 
     expect(Object.keys(light)).toEqual([...GRAPH_TOKENS]);
     expect(Object.keys(dark)).toEqual([...GRAPH_TOKENS]);
-    expect(light["--graph-node"]).toBe("#d4d4d4");
+    expect(light["--graph-node"]).toBe("#e3e3e3");
     expect(dark["--graph-node"]).toBe("#404040");
   });
 
