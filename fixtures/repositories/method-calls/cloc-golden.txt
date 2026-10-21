@@ -1,0 +1,5 @@
+# cloc 2.10
+src/main/java/a/b/Order.java	5
+src/main/java/a/c/OrderRepository.java	11
+src/main/java/a/c/OrderService.java	28
+src/main/java/a/c/Task.java	4

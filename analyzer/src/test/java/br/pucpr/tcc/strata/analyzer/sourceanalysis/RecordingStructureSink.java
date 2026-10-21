@@ -1,5 +1,6 @@
 package br.pucpr.tcc.strata.analyzer.sourceanalysis;
 
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.CodeMetric;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.Dependency;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyEvidence;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ExtractedDependency;
@@ -68,6 +69,24 @@ final class RecordingStructureSink implements StructureSink {
     return accepted.stream()
         .flatMap(batch -> batch.dependencies().dependencies().stream())
         .toList();
+  }
+
+  List<CodeMetric> metrics() {
+    return accepted.stream().flatMap(batch -> batch.metrics().stream()).toList();
+  }
+
+  CodeMetric metric(String id) {
+    final List<CodeMetric> matching =
+        metrics().stream().filter(metric -> metric.element().value().equals(id)).toList();
+    if (matching.size() != 1) {
+      throw new AssertionError(
+          matching.size()
+              + " métricas para "
+              + id
+              + "; ids conhecidos: "
+              + metrics().stream().map(metric -> metric.element().value()).sorted().toList());
+    }
+    return matching.getFirst();
   }
 
   List<ModuleDependency> modules() {

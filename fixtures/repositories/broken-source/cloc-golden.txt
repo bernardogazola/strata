@@ -1,0 +1,5 @@
+# cloc 2.10
+src/main/java/br/pucpr/broken/Healthy.java	6
+src/main/java/br/pucpr/broken/Neighbour.java	5
+src/main/java/br/pucpr/broken/ReportPath.java	6
+src/main/java/br/pucpr/broken/package-info.java	1

@@ -1,0 +1,6 @@
+# cloc 2.10
+src/main/java/Bootstrap.java	7
+src/main/java/br/pucpr/Log.java	7
+src/main/java/br/pucpr/orders/Order.java	23
+src/main/java/br/pucpr/orders/OrderService.java	24
+src/main/java/br/pucpr/orders/package-info.java	1

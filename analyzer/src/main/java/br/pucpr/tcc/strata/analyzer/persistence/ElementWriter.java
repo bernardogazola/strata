@@ -2,6 +2,8 @@ package br.pucpr.tcc.strata.analyzer.persistence;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.bootstrap.Log;
+import br.pucpr.tcc.strata.analyzer.persistence.dao.CodeMetricDao;
+import br.pucpr.tcc.strata.analyzer.persistence.dao.CodeMetricRow;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.ElementDao;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.ElementRow;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.SourceFileDao;
@@ -18,6 +20,8 @@ import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.ElementSink;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SourceFile;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.StructureSink;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.CodeMetric;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.Complexity;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.FileElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.MethodElement;
@@ -29,6 +33,7 @@ import java.io.Serial;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -124,6 +129,7 @@ public final class ElementWriter implements ElementSink, StructureSink {
   public void end(List<SourceFile> files, List<FileElement> fileElements) {
     requireStage(Stage.BEGUN);
     final List<SourceFileRow> changed = changedStatuses(files);
+    final Map<String, Integer> locs = decodedLocs(files);
     final Flushed last =
         write(
             connection -> {
@@ -131,8 +137,9 @@ public final class ElementWriter implements ElementSink, StructureSink {
               for (final SourceFileRow file : changed) {
                 SourceFileDao.updateStatus(connection, file.pk(), file.status());
               }
-              insertFileElements(connection, fileElements, flushed.types());
+              insertFileElements(connection, fileElements, flushed.types(), locs);
               ElementDao.markTestPackages(connection, analysisPk);
+              CodeMetricDao.rollUpPackages(connection, analysisPk);
               return flushed;
             });
     learn(last);
@@ -227,18 +234,57 @@ public final class ElementWriter implements ElementSink, StructureSink {
         rows.add(methodRow(next++, element, parentPk(element.declaringTypeId(), types)));
       }
     }
+    final List<CodeMetricRow> metrics = metricRows(types, methods);
     ElementDao.insert(connection, analysisPk, rows);
+    CodeMetricDao.insert(connection, analysisPk, metrics);
     return new Numbered(types, methods);
   }
 
+  private List<CodeMetricRow> metricRows(
+      Map<CodeElementId, Long> types, Map<CodeElementId, Long> methods) {
+    final List<CodeMetricRow> rows = new ArrayList<>();
+    for (final BatchStructure batch : buffered) {
+      for (final CodeMetric metric : batch.metrics()) {
+        final Map<CodeElementId, Long> numbered =
+            metric.element().kind() == ElementKind.TYPE ? types : methods;
+        final Long pk = numbered.get(metric.element());
+        if (pk == null) {
+          throw new IllegalStateException(
+              "uma métrica cujo elemento este flush nunca numerou: " + metric.element());
+        }
+        rows.add(metricRow(pk, metric));
+      }
+    }
+    rows.sort(Comparator.comparingLong(CodeMetricRow::elementPk));
+    return rows;
+  }
+
+  private static CodeMetricRow metricRow(long pk, CodeMetric metric) {
+    final Complexity complexity = metric.complexity();
+    if (complexity == null) {
+      return new CodeMetricRow(pk, metric.loc(), 0, null, null, null);
+    }
+    final Integer p90 = metric.element().kind() == ElementKind.TYPE ? complexity.p90() : null;
+    return new CodeMetricRow(
+        pk, metric.loc(), complexity.units(), complexity.sum(), complexity.max(), p90);
+  }
+
   private void insertFileElements(
-      Connection connection, List<FileElement> fileElements, Map<CodeElementId, Long> numbered)
+      Connection connection,
+      List<FileElement> fileElements,
+      Map<CodeElementId, Long> numbered,
+      Map<String, Integer> locs)
       throws SQLException {
     final List<ElementRow> rows = new ArrayList<>(fileElements.size());
+    final List<CodeMetricRow> metrics = new ArrayList<>(fileElements.size());
     long next = ElementDao.nextId(connection);
     for (final FileElement element : fileElements) {
       final Long parent =
           element.packageId() == null ? null : parentPk(element.packageId(), numbered);
+      final Integer loc = locs.get(element.relativePath());
+      if (loc != null) {
+        metrics.add(new CodeMetricRow(next, loc, null, null, null, null));
+      }
       rows.add(
           new ElementRow(
               next++,
@@ -258,6 +304,17 @@ public final class ElementWriter implements ElementSink, StructureSink {
               null));
     }
     ElementDao.insert(connection, analysisPk, rows);
+    CodeMetricDao.insert(connection, analysisPk, metrics);
+  }
+
+  private static Map<String, Integer> decodedLocs(List<SourceFile> files) {
+    final Map<String, Integer> locs = new HashMap<>();
+    for (final SourceFile file : files) {
+      if (file.loc() != null) {
+        locs.put(file.relativePath(), file.loc());
+      }
+    }
+    return locs;
   }
 
   private List<SourceFileRow> changedStatuses(List<SourceFile> files) {

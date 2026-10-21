@@ -1507,16 +1507,18 @@ self_test() {
   gen "$tmp/keep" >/dev/null
   printf '{"version": 1}\n' > "$tmp/keep/cyclic/expected.json"
   printf '# cyclic\n' > "$tmp/keep/cyclic/README.md"
+  printf '# cloc 2.10\n' > "$tmp/keep/cyclic/cloc-golden.txt"
   printf 'stale\n' > "$tmp/keep/cyclic/src/main/java/Stale.java"
   bash "$SELF" --out "$tmp/keep" >/dev/null 2>&1
   if [ -f "$tmp/keep/cyclic/expected.json" ] && [ -f "$tmp/keep/cyclic/README.md" ] &&
+     [ -f "$tmp/keep/cyclic/cloc-golden.txt" ] &&
      [ ! -f "$tmp/keep/cyclic/src/main/java/Stale.java" ]; then
     ok "a regeneração mantém os sidecars e remove um fonte antigo"
   else
     no "a regeneração mantém os sidecars e remove um fonte antigo" "um sidecar sumiu ou o arquivo antigo sobreviveu"
   fi
 
-  if [ -z "$(cd "$tmp/keep/cyclic" && fixture_git . ls-files -- expected.json README.md)" ]; then
+  if [ -z "$(cd "$tmp/keep/cyclic" && fixture_git . ls-files -- expected.json README.md cloc-golden.txt)" ]; then
     ok "o histórico da própria fixture não versiona os sidecars"
   else
     no "o histórico da própria fixture não versiona os sidecars" "há um sidecar no índice interno"

@@ -22,12 +22,14 @@ public final class ModeledBatch {
 
   private final SourceRoot root;
   private final List<String> files;
+  private final Set<String> batchFiles;
   private final List<SourceFile> analysisFiles;
   private final SimpleNameIndex index;
   private final Map<String, CtCompilationUnit> unitsByFile = new TreeMap<>();
   private final Set<String> extractionFailures = new TreeSet<>();
   private final BooleanSupplier cancelled;
   private CtModel model;
+  private Map<String, byte[]> contents;
   private boolean open = true;
 
   ModeledBatch(
@@ -44,7 +46,8 @@ public final class ModeledBatch {
         repositoryRoot,
         analysisFiles,
         SimpleNameIndex.of(analysisFiles),
-        cancelled);
+        cancelled,
+        Map.of());
   }
 
   ModeledBatch(
@@ -54,12 +57,15 @@ public final class ModeledBatch {
       Path repositoryRoot,
       List<SourceFile> analysisFiles,
       SimpleNameIndex index,
-      BooleanSupplier cancelled) {
+      BooleanSupplier cancelled,
+      Map<String, byte[]> contents) {
     this.root = Objects.requireNonNull(root, "root");
     this.files = List.copyOf(Objects.requireNonNull(files, "files"));
+    this.batchFiles = Set.copyOf(this.files);
     this.analysisFiles = List.copyOf(Objects.requireNonNull(analysisFiles, "analysisFiles"));
     this.index = Objects.requireNonNull(index, "index");
     this.cancelled = Objects.requireNonNull(cancelled, "cancelled");
+    this.contents = Objects.requireNonNull(contents, "contents");
     this.model = Objects.requireNonNull(factory, "factory").getModel();
     final Map<Path, String> byAbsolutePath = new HashMap<>();
     for (final String file : this.files) {
@@ -127,6 +133,17 @@ public final class ModeledBatch {
     return index;
   }
 
+  char[] text(String relativePath) {
+    Objects.requireNonNull(relativePath, "relativePath");
+    ensureOpen();
+    final byte[] content = batchFiles.contains(relativePath) ? contents.get(relativePath) : null;
+    if (content == null) {
+      throw new IllegalArgumentException(
+          "nenhum conteúdo para " + relativePath + " no lote de " + root.relativePath());
+    }
+    return SourceCharsets.decode(content);
+  }
+
   Set<String> modeledFiles() {
     return Set.copyOf(unitsByFile.keySet());
   }
@@ -138,6 +155,7 @@ public final class ModeledBatch {
   void close() {
     open = false;
     model = null;
+    contents = null;
     unitsByFile.clear();
   }
 

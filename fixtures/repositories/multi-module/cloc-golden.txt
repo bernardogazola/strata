@@ -1,0 +1,11 @@
+# cloc 2.10
+api/src/main/java/br/pucpr/legacy/api/CatalogEndpoint.java	13
+api/src/main/java/br/pucpr/legacy/api/Main.java	11
+core/src/main/java/br/pucpr/legacy/core/Audited.java	3
+core/src/main/java/br/pucpr/legacy/core/Catalog.java	12
+core/src/main/java/br/pucpr/legacy/core/CatalogEntry.java	3
+core/src/main/java/br/pucpr/legacy/core/Kind.java	5
+core/src/main/java/br/pucpr/legacy/core/spi/MemoryStore.java	8
+core/src/main/java/br/pucpr/legacy/core/spi/Store.java	5
+core/src/test/java/br/pucpr/legacy/core/CatalogTest.java	10
+core/target/generated-sources/annotations/br/pucpr/legacy/core/gen/CatalogMetadata.java	6

@@ -1,0 +1,9 @@
+# cloc 2.10
+src/main/java/br/pucpr/ledger/Entry0.java	9
+src/main/java/br/pucpr/ledger/Entry1.java	9
+src/main/java/br/pucpr/ledger/Entry2.java	9
+src/main/java/br/pucpr/ledger/Entry3.java	9
+src/main/java/br/pucpr/ledger/Entry4.java	9
+src/main/java/br/pucpr/ledger/Entry5.java	9
+src/main/java/br/pucpr/ledger/Entry6.java	9
+src/main/java/br/pucpr/ledger/Entry7.java	9

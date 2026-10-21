@@ -6,6 +6,7 @@ import br.pucpr.tcc.strata.analyzer.repository.JavaSource;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRoot;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.ParseFailureIsolator.Attempt;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.metrics.LocCounter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -111,36 +112,41 @@ final class SourceAnalysisRun {
   private void preParseFile(SourceRoot root, JavaSource source, UnaryOperator<String> interner) {
     final String file = source.relativePath();
     if (source.sizeBytes() > MAX_SOURCE_FILE_BYTES) {
-      record(file, root, SourceFileStatus.SKIPPED_TOO_LARGE, null, null);
+      record(file, root, SourceFileStatus.SKIPPED_TOO_LARGE, null, null, null);
       return;
     }
     switch (readBounded(file)) {
       case Read.Content content -> preParseContent(root, file, content.bytes(), interner);
-      case Read.TooLarge _ -> record(file, root, SourceFileStatus.SKIPPED_TOO_LARGE, null, null);
+      case Read.TooLarge _ ->
+          record(file, root, SourceFileStatus.SKIPPED_TOO_LARGE, null, null, null);
       case Read.Unreadable _ ->
-          record(file, root, SourceFileStatus.PARSE_FAILED, ParseFailureCause.UNREADABLE, null);
+          record(
+              file, root, SourceFileStatus.PARSE_FAILED, ParseFailureCause.UNREADABLE, null, null);
     }
   }
 
   private void preParseContent(
       SourceRoot root, String file, byte[] content, UnaryOperator<String> interner) {
     final char[] text = SourceCharsets.decode(content);
+    final int loc = LocCounter.of(text).loc();
     if (tooDeep(file, text)) {
-      record(file, root, SourceFileStatus.PARSE_FAILED, ParseFailureCause.NESTING_TOO_DEEP, null);
+      record(
+          file, root, SourceFileStatus.PARSE_FAILED, ParseFailureCause.NESTING_TOO_DEEP, null, loc);
       return;
     }
     final Optional<SyntaxPreParser.PreParse> preParse = preParse(file, text, interner);
     if (preParse.isEmpty()) {
-      record(file, root, SourceFileStatus.PARSE_FAILED, ParseFailureCause.PRE_PARSE_CRASH, null);
+      record(
+          file, root, SourceFileStatus.PARSE_FAILED, ParseFailureCause.PRE_PARSE_CRASH, null, loc);
       return;
     }
     final SyntaxPreParser.PreParse parsed = preParse.get();
     if (parsed.syntaxError()) {
       Log.info(file + " tem um erro de sintaxe e não vai para o Spoon");
-      record(file, root, SourceFileStatus.PARSE_FAILED, ParseFailureCause.SYNTAX_ERROR, null);
+      record(file, root, SourceFileStatus.PARSE_FAILED, ParseFailureCause.SYNTAX_ERROR, null, loc);
       return;
     }
-    record(file, root, SourceFileStatus.ANALYZED, null, parsed.declarations());
+    record(file, root, SourceFileStatus.ANALYZED, null, parsed.declarations(), loc);
     if (parsed.moduleDescriptor()) {
       descriptors.get(root.id()).add(file);
     } else if (!parsed.empty()) {
@@ -353,7 +359,7 @@ final class SourceAnalysisRun {
     final ParseFailureIsolator<String, Factory> isolator =
         new ParseFailureIsolator<>(batch -> build(root, batch, contents));
     final ParseFailureIsolator.Isolation<String> isolation =
-        isolator.isolate(files, (batch, factory) -> visit(root, batch, factory));
+        isolator.isolate(files, (batch, factory) -> visit(root, batch, factory, contents));
     for (final String failed : isolation.failed()) {
       fail(failed, ParseFailureCause.MODEL_BUILD_CRASH);
     }
@@ -418,9 +424,11 @@ final class SourceAnalysisRun {
     }
   }
 
-  private void visit(SourceRoot root, List<String> files, Factory factory) {
+  private void visit(
+      SourceRoot root, List<String> files, Factory factory, Map<String, byte[]> contents) {
     final ModeledBatch batch =
-        new ModeledBatch(root, files, factory, repositoryRoot, preParsed, index, cancelled);
+        new ModeledBatch(
+            root, files, factory, repositoryRoot, preParsed, index, cancelled, contents);
     final Set<String> modeled = batch.modeledFiles();
     for (final String file : files) {
       if (!modeled.contains(file)) {
@@ -447,8 +455,9 @@ final class SourceAnalysisRun {
       SourceRoot root,
       SourceFileStatus status,
       ParseFailureCause cause,
-      SourceFile.Declarations declarations) {
-    final SourceFile outcome = new SourceFile(file, root.id(), status, cause, declarations);
+      SourceFile.Declarations declarations,
+      Integer loc) {
+    final SourceFile outcome = new SourceFile(file, root.id(), status, cause, declarations, loc);
     if (outcomes.putIfAbsent(file, outcome) != null) {
       throw new IllegalStateException(file + " recebeu um segundo desfecho");
     }
@@ -460,8 +469,17 @@ final class SourceAnalysisRun {
 
   private void reclassify(String file, SourceFileStatus status, ParseFailureCause cause) {
     final SourceFile current = outcomes.get(file);
+    final boolean notRead =
+        status == SourceFileStatus.SKIPPED_TOO_LARGE || cause == ParseFailureCause.UNREADABLE;
     outcomes.put(
-        file, new SourceFile(file, current.rootId(), status, cause, current.declarations()));
+        file,
+        new SourceFile(
+            file,
+            current.rootId(),
+            status,
+            cause,
+            current.declarations(),
+            notRead ? null : current.loc()));
   }
 
   private SourceAnalysis result() {

@@ -1,0 +1,7 @@
+# cloc 2.10
+src/main/java/com/x/app/Main.java	11
+src/main/java/com/x/billing/Invoice.java	9
+src/main/java/com/x/billing/Ledger.java	9
+src/main/java/com/x/billing/Posting.java	9
+src/main/java/com/x/orders/Order.java	10
+src/main/java/com/x/orders/dto/OrderDto.java	10

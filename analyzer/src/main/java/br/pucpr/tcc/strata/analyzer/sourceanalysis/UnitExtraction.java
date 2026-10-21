@@ -6,6 +6,7 @@ import br.pucpr.tcc.strata.analyzer.repository.SourceRootKind;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementExtractor.DeclaredType;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementExtractor.UnitElements;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.CodeElement;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.MethodElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.PackageElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.TypeElement;
@@ -15,13 +16,16 @@ import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import spoon.reflect.code.CtLambda;
 import spoon.reflect.declaration.CtCompilationUnit;
 import spoon.reflect.declaration.CtExecutable;
 import spoon.reflect.declaration.CtModifiable;
 import spoon.reflect.declaration.CtParameter;
 import spoon.reflect.declaration.CtType;
+import spoon.reflect.declaration.CtTypeParameter;
 import spoon.reflect.visitor.filter.TypeFilter;
 
 final class UnitExtraction {
@@ -39,9 +43,14 @@ final class UnitExtraction {
   }
 
   UnitElements extract(CtCompilationUnit unit) {
+    return walk(unit).elements();
+  }
+
+  Walked walk(CtCompilationUnit unit) {
     final Map<String, PackageElement> packages = new LinkedHashMap<>();
     final Map<String, SimpleNameIndex.Scope> scopes = new HashMap<>();
     final List<DeclaredType> types = new ArrayList<>();
+    final Sites sites = new Sites(new ArrayList<>(), new ArrayList<>());
     for (final CtType<?> top : unit.getDeclaredTypes()) {
       if (!ElementIds.isElementType(top)) {
         continue;
@@ -50,15 +59,22 @@ final class UnitExtraction {
       packages.computeIfAbsent(declaredPackage, UnitExtraction::packageElement);
       final SimpleNameIndex.Scope scope =
           scopes.computeIfAbsent(declaredPackage, own -> index.scopeOf(unit, own));
-      types.add(walk(top, scope));
+      types.add(walk(top, scope, sites));
     }
-    return new UnitElements(relativePath, List.copyOf(packages.values()), types);
+    return new Walked(
+        new UnitElements(relativePath, List.copyOf(packages.values()), types),
+        sites.types(),
+        sites.executables());
   }
 
-  private DeclaredType walk(CtType<?> top, SimpleNameIndex.Scope scope) {
+  private DeclaredType walk(CtType<?> top, SimpleNameIndex.Scope scope, Sites sites) {
     final Map<CtType<?>, TypeBuilder> builders = new IdentityHashMap<>();
     for (final CtType<?> type : top.getElements(new TypeFilter<CtType<?>>(CtType.class))) {
+      if (type instanceof CtTypeParameter) {
+        continue;
+      }
       if (!ElementIds.isElementType(type)) {
+        sites.types().add(new TypeSite(type, ownerOf(type, builders).type().id(), false));
         continue;
       }
       if (ElementIds.isModelLoss(type)) {
@@ -66,6 +82,7 @@ final class UnitExtraction {
       }
       final TypeBuilder builder = new TypeBuilder(typeElement(type));
       builders.put(type, builder);
+      sites.types().add(new TypeSite(type, builder.type().id(), true));
       final CtType<?> enclosing = type.getParent(CtType.class);
       if (enclosing != null) {
         builders.get(enclosing).nested().add(builder);
@@ -73,25 +90,39 @@ final class UnitExtraction {
     }
     for (final CtExecutable<?> executable :
         top.getElements(new TypeFilter<CtExecutable<?>>(CtExecutable.class))) {
-      offer(executable, builders, scope);
+      if (executable instanceof CtLambda<?>) {
+        continue;
+      }
+      final TypeBuilder owner = ownerOf(executable.getParent(CtType.class), builders);
+      final CodeElementId method = offer(executable, builders, scope);
+      sites.executables().add(new ExecutableSite(executable, owner.type().id(), method));
     }
     return builders.get(top).build();
   }
 
-  private void offer(
+  private static TypeBuilder ownerOf(CtType<?> type, Map<CtType<?>, TypeBuilder> builders) {
+    final CtType<?> nearest = ElementIds.nearestElementType(type);
+    return Objects.requireNonNull(
+        builders.get(nearest), () -> "nenhum tipo de elemento envolve " + type.getQualifiedName());
+  }
+
+  private CodeElementId offer(
       CtExecutable<?> executable,
       Map<CtType<?>, TypeBuilder> builders,
       SimpleNameIndex.Scope scope) {
     final Optional<String> name = ElementIds.methodName(executable);
     final CtType<?> owner = ElementIds.methodOwner(executable);
     if (name.isEmpty() || owner == null) {
-      return;
+      return null;
     }
     final TypeBuilder builder = builders.get(owner);
-    if (builder != null) {
-      final boolean own = owner == executable.getParent(CtType.class);
-      builder.offer(methodElement(executable, name.get(), builder.type(), scope), own);
+    if (builder == null) {
+      return null;
     }
+    final boolean own = owner == executable.getParent(CtType.class);
+    final MethodElement method = methodElement(executable, name.get(), builder.type(), scope);
+    builder.offer(method, own);
+    return method.id();
   }
 
   private TypeElement typeElement(CtType<?> type) {
@@ -164,4 +195,38 @@ final class UnitExtraction {
   }
 
   private record Offered(MethodElement method, boolean own) {}
+
+  private record Sites(List<TypeSite> types, List<ExecutableSite> executables) {}
+
+  record Walked(UnitElements elements, List<TypeSite> types, List<ExecutableSite> executables) {
+
+    Walked {
+      Objects.requireNonNull(elements, "elements");
+      types = List.copyOf(Objects.requireNonNull(types, "types"));
+      executables = List.copyOf(Objects.requireNonNull(executables, "executables"));
+    }
+  }
+
+  record TypeSite(CtType<?> type, CodeElementId owner, boolean element) {
+
+    TypeSite {
+      Objects.requireNonNull(type, "type");
+      Objects.requireNonNull(owner, "owner");
+      if (owner.kind() != ElementKind.TYPE) {
+        throw new IllegalArgumentException("o dono de um local de tipo é um TYPE: " + owner);
+      }
+    }
+  }
+
+  record ExecutableSite(CtExecutable<?> executable, CodeElementId owner, CodeElementId method) {
+
+    ExecutableSite {
+      Objects.requireNonNull(executable, "executable");
+      Objects.requireNonNull(owner, "owner");
+      if (owner.kind() != ElementKind.TYPE
+          || (method != null && method.kind() != ElementKind.METHOD)) {
+        throw new IllegalArgumentException("não é um método de um tipo: " + owner + " / " + method);
+      }
+    }
+  }
 }
