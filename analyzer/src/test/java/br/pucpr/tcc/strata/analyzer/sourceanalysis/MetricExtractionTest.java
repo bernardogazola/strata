@@ -18,6 +18,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.FutureTask;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -99,6 +100,8 @@ final class MetricExtractionTest {
 
   private static final int DEEP_CHAIN = 20_000;
 
+  private static final long SMALL_STACK_BYTES = 64 * 1024L;
+
   private static final int SAME_BATCH_ATTEMPTS = 20;
 
   @TempDir private Path temp;
@@ -143,7 +146,7 @@ final class MetricExtractionTest {
   }
 
   @Test
-  void aPassadaGuardaOsSitiosEORepresentanteDaRegra11() throws Exception {
+  void aPassadaGuardaCadaSitioComOIdQueElaJaCalculou() throws Exception {
     final ValidatedRepository repository =
         SourceTrees.repository(
             temp.resolve("repository"), Map.of("src/main/java/m/Worker.java", WORKER));
@@ -177,13 +180,13 @@ final class MetricExtractionTest {
     assertThat(sameElements).as("extract(unit) == walk(unit).elements()").containsExactly(true);
     assertThat(executables)
         .containsExactlyInAnyOrder(
-            "6 method:m.Worker#<clinit>() *",
-            "12 method:m.Worker#spawn(boolean) *",
+            "6 method:m.Worker#<clinit>()",
+            "12 method:m.Worker#spawn(boolean)",
             "0 -",
             "14 method:m.Worker#run()",
-            "23 method:m.Worker#run() *",
+            "23 method:m.Worker#run()",
             "30 method:m.Worker#<clinit>()",
-            "0 method:m.Worker#<init>() *");
+            "0 method:m.Worker#<init>()");
     assertThat(types).containsExactly("Worker type:m.Worker element", " type:m.Worker");
   }
 
@@ -351,14 +354,19 @@ final class MetricExtractionTest {
   }
 
   @Test
-  void umaCadeiaDeVinteMilAndNaoEstouraAPilha() {
+  void umaCadeiaDeVinteMilAndNaoEstouraUmaPilhaDe64KiB() throws Exception {
     final CodeFactory code = new Launcher().getFactory().Code();
     CtExpression<Boolean> chain = code.createLiteral(true);
     for (int index = 0; index < DEEP_CHAIN; index++) {
       chain = code.createBinaryOperator(chain, code.createLiteral(false), BinaryOperatorKind.AND);
     }
+    final CtExpression<Boolean> deep = chain;
+    final FutureTask<Integer> walk =
+        new FutureTask<>(() -> CyclomaticComplexity.decisionPoints(deep));
 
-    assertThat(CyclomaticComplexity.decisionPoints(chain)).isEqualTo(DEEP_CHAIN);
+    new Thread(null, walk, "cc", SMALL_STACK_BYTES).start();
+
+    assertThat(walk.get()).isEqualTo(DEEP_CHAIN);
   }
 
   private static void assertMetricsAreTheElements(RecordingStructureSink sink) {
@@ -376,8 +384,7 @@ final class MetricExtractionTest {
     assertThat(site.owner().value()).isEqualTo("type:m.Worker");
     return ElementIds.lines(site.executable()).start()
         + " "
-        + (site.method() == null ? "-" : site.method().value())
-        + (site.representative() ? " *" : "");
+        + (site.method() == null ? "-" : site.method().value());
   }
 
   private static String describe(UnitExtraction.TypeSite site) {

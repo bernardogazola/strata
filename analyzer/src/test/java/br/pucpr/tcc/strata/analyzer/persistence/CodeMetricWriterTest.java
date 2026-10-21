@@ -431,6 +431,48 @@ final class CodeMetricWriterTest {
   }
 
   @Test
+  void umArquivoSoComNomeNfdNoDiscoTemALinhaFileComOLocDoSeuSourceFile() throws Exception {
+    final CodeElementId id = CodeElementId.ofFile(CAFE_NFD);
+    final String qualificado = id.sortKey();
+    assertThat(Normalizer.isNormalized(CAFE_NFD, Normalizer.Form.NFC))
+        .as("o caminho do disco não é NFC: sem isso as duas chaves coincidem")
+        .isFalse();
+    assertThat(qualificado).isEqualTo(CAFE);
+    final FileElement arquivo =
+        new FileElement(
+            id,
+            qualificado.substring(qualificado.lastIndexOf('/') + 1),
+            qualificado,
+            CAFE_NFD,
+            MAIN.id(),
+            PACOTE_A.id(),
+            false);
+    final ElementWriter writer =
+        new ElementWriter(
+            connections,
+            novaAnalise("an_01"),
+            List.of(MAIN),
+            List.of(new JavaSource(CAFE_NFD, 100, 1_791_000_000_000L)),
+            Integer.MAX_VALUE);
+    writer.begin(
+        List.of(
+            new SourceFile(
+                CAFE_NFD,
+                MAIN.id(),
+                SourceFileStatus.ANALYZED,
+                null,
+                new SourceFile.Declarations("a", List.of()))));
+    writer.accept(
+        new BatchStructure(
+            new BatchElements(List.of(PACOTE_A), List.of(), List.of()), BatchDependencies.NONE));
+
+    writer.end(List.of(analisado(CAFE_NFD, "a", 5)), List.of(arquivo));
+
+    assertThat(metricas())
+        .containsExactly("file:" + CAFE + "|5|NULL|NULL|NULL|NULL", "pkg:a|5|0|0|0|NULL");
+  }
+
+  @Test
   void aSomaDosPacotesSaiIgualQuandoArquivosETiposDoPacoteCruzamDescargas() throws Exception {
     final ElementWriter writer = gravador(novaAnalise("an_01"), 1);
     writer.accept(LOTE_ORDER);

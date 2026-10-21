@@ -258,6 +258,32 @@ final class LocCounterTest {
     assertThat(contagem.loc()).isEqualTo(sozinho.branca() ? 2 : 3);
   }
 
+  @Test
+  void cadaCaractereSozinhoNumaLinhaTemOMesmoBrancoNoCodigoEDentroDeUmTextBlock() {
+    final List<String> divergentes = new ArrayList<>();
+    final List<Character> brancos = new ArrayList<>();
+    for (int valor = Character.MIN_VALUE; valor <= Character.MAX_VALUE; valor++) {
+      final char c = (char) valor;
+      if (c == '\n' || c == '\r') {
+        continue;
+      }
+      final int noCodigo = LocCounter.of(new char[] {c, '\n'}).loc(1, 1);
+      final int noTextBlock =
+          LocCounter.of(new char[] {'"', '"', '"', '\n', c, '\n', '"', '"', '"', ';', '\n'})
+              .loc(2, 2);
+      if (noCodigo != noTextBlock) {
+        divergentes.add(
+            "U+" + Integer.toHexString(valor) + ": " + noCodigo + " no CODE, " + noTextBlock);
+      }
+      if (noCodigo == 0) {
+        brancos.add(c);
+      }
+    }
+
+    assertThat(divergentes).as("o case do CODE e o isWhitespace, a mesma lista").isEmpty();
+    assertThat(brancos).as("só HT, FF e SP, em ordem de código").containsExactly('\t', '\f', ' ');
+  }
+
   private static final List<String> LINHAS_DOS_INTERVALOS =
       List.of("class A {", "  // c", "", "  int x;", "  /* a", "     b */", "  void m() {}", "}");
 
@@ -536,6 +562,19 @@ final class LocCounterTest {
               "      \"\"\";\n",
               "}\n"),
           caso(
+              "tb_vt_only_line_inside",
+              7,
+              6,
+              VT_NOT_WHITESPACE,
+              "class A {\n",
+              "  String s = \"\"\"\n",
+              "      a\n",
+              VT,
+              "\n",
+              "      b\n",
+              "      \"\"\";\n",
+              "}\n"),
+          caso(
               "tb_empty_line_inside",
               6,
               6,
@@ -606,6 +645,17 @@ final class LocCounterTest {
               "      x\n",
               "      \"\"\"; int after = 1;\n",
               "  // c\n",
+              "}\n"),
+          caso(
+              "tb_closing_alone_on_its_line",
+              6,
+              6,
+              MATCH,
+              "class A {\n",
+              "  String s = \"\"\"\n",
+              "      a\n",
+              "      \"\"\"\n",
+              "      .strip();\n",
               "}\n"),
           caso(
               "tb_close_and_reopen_same_line",
@@ -983,8 +1033,8 @@ final class LocCounterTest {
   }
 
   @Test
-  void aTabelaTemOs75CasosDaOndaDeAnaliseCadaUmComNomeProprio() {
-    assertThat(CASOS).hasSize(75);
+  void aTabelaTemOs75CasosDaOndaDeAnaliseEOsDoisDaRevisaoCadaUmComNomeProprio() {
+    assertThat(CASOS).hasSize(75 + 2);
     assertThat(CASOS).extracting(Caso::nome).doesNotHaveDuplicates();
   }
 

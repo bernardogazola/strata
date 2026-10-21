@@ -88,17 +88,14 @@ final class UnitExtraction {
         builders.get(enclosing).nested().add(builder);
       }
     }
-    final List<PendingSite> pending = new ArrayList<>();
     for (final CtExecutable<?> executable :
         top.getElements(new TypeFilter<CtExecutable<?>>(CtExecutable.class))) {
       if (executable instanceof CtLambda<?>) {
         continue;
       }
       final TypeBuilder owner = ownerOf(executable.getParent(CtType.class), builders);
-      pending.add(new PendingSite(executable, owner, offer(executable, builders, scope)));
-    }
-    for (final PendingSite site : pending) {
-      sites.executables().add(site.resolve());
+      final CodeElementId method = offer(executable, builders, scope);
+      sites.executables().add(new ExecutableSite(executable, owner.type().id(), method));
     }
     return builders.get(top).build();
   }
@@ -124,7 +121,7 @@ final class UnitExtraction {
     }
     final boolean own = owner == executable.getParent(CtType.class);
     final MethodElement method = methodElement(executable, name.get(), builder.type(), scope);
-    builder.offer(method, own, executable);
+    builder.offer(method, own);
     return method.id();
   }
 
@@ -182,16 +179,11 @@ final class UnitExtraction {
       this(type, new LinkedHashMap<>(), new ArrayList<>());
     }
 
-    void offer(MethodElement method, boolean own, CtExecutable<?> executable) {
+    void offer(MethodElement method, boolean own) {
       final Offered current = methods.get(method.id());
       if (current == null || (own && !current.own())) {
-        methods.put(method.id(), new Offered(method, own, executable));
+        methods.put(method.id(), new Offered(method, own));
       }
-    }
-
-    boolean represents(CodeElementId method, CtExecutable<?> executable) {
-      final Offered kept = methods.get(method);
-      return kept != null && kept.executable() == executable;
     }
 
     DeclaredType build() {
@@ -202,20 +194,9 @@ final class UnitExtraction {
     }
   }
 
-  private record Offered(MethodElement method, boolean own, CtExecutable<?> executable) {}
+  private record Offered(MethodElement method, boolean own) {}
 
   private record Sites(List<TypeSite> types, List<ExecutableSite> executables) {}
-
-  private record PendingSite(CtExecutable<?> executable, TypeBuilder owner, CodeElementId method) {
-
-    ExecutableSite resolve() {
-      return new ExecutableSite(
-          executable,
-          owner.type().id(),
-          method,
-          method != null && owner.represents(method, executable));
-    }
-  }
 
   record Walked(UnitElements elements, List<TypeSite> types, List<ExecutableSite> executables) {
 
@@ -237,11 +218,7 @@ final class UnitExtraction {
     }
   }
 
-  record ExecutableSite(
-      CtExecutable<?> executable,
-      CodeElementId owner,
-      CodeElementId method,
-      boolean representative) {
+  record ExecutableSite(CtExecutable<?> executable, CodeElementId owner, CodeElementId method) {
 
     ExecutableSite {
       Objects.requireNonNull(executable, "executable");
@@ -249,9 +226,6 @@ final class UnitExtraction {
       if (owner.kind() != ElementKind.TYPE
           || (method != null && method.kind() != ElementKind.METHOD)) {
         throw new IllegalArgumentException("não é um método de um tipo: " + owner + " / " + method);
-      }
-      if (representative && method == null) {
-        throw new IllegalArgumentException("só um local com id de METHOD pode representá-lo");
       }
     }
   }
