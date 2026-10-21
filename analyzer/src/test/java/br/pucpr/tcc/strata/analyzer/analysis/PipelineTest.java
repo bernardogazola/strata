@@ -52,6 +52,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
 import org.junit.jupiter.api.AfterEach;
@@ -747,12 +748,16 @@ final class PipelineTest {
     final AtomicReference<Thread.UncaughtExceptionHandler> instalado = new AtomicReference<>();
     final AtomicReference<Throwable> capturado = new AtomicReference<>();
     final CountDownLatch chegou = new CountDownLatch(1);
+    final AtomicBoolean jaLancou = new AtomicBoolean();
     final AnalysisRegistry registro =
         registro(
             com(
                 RunFixtures.lightPlan(),
                 STRUCTURAL_GRAPH,
                 context -> {
+                  if (!jaLancou.compareAndSet(false, true)) {
+                    return StageOutcome.skipped();
+                  }
                   final Thread atual = Thread.currentThread();
                   final Thread.UncaughtExceptionHandler original =
                       atual.getUncaughtExceptionHandler();
