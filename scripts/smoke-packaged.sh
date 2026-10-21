@@ -179,6 +179,10 @@ check_jvm_flags() {
     *HeapDumpOnOutOfMemoryError*) bad "o heap dump em OOM está ativo; ele levaria código-fonte" ;;
     *) good "sem heap dump em OOM" ;;
   esac
+  case "$args" in
+    *-Djava.awt.headless=true*) good "a JVM roda headless" ;;
+    *) bad "a JVM foi iniciada sem -Djava.awt.headless=true" ;;
+  esac
 }
 
 names_utf8() {
@@ -326,9 +330,11 @@ self_test() {
   PROBLEMS=0; check_analyzer_exe 'C:\S\STRATA\analyzer\runtime\bin\Java.exe' 'c:\s\strata\analyzer\runtime\bin\java.exe' nocase >/dev/null
   expect "o java.exe empacotado passa, qualquer que seja a caixa" "$PROBLEMS" "0"
 
-  PROBLEMS=0; check_jvm_flags "-Xmx2g -XX:+HeapDumpOnOutOfMemoryError" >/dev/null
+  PROBLEMS=0; check_jvm_flags "-Xmx2g -Djava.awt.headless=true -XX:+HeapDumpOnOutOfMemoryError" >/dev/null
   expect "uma flag de heap dump e a falta de ExitOnOOM falham duas vezes" "$PROBLEMS" "2"
-  PROBLEMS=0; check_jvm_flags "-Xmx2g -XX:+ExitOnOutOfMemoryError" >/dev/null
+  PROBLEMS=0; check_jvm_flags "-Xmx2g -XX:+ExitOnOutOfMemoryError -cp x Main" >/dev/null
+  expect "um argv do filho sem a flag headless falha" "$PROBLEMS" "1"
+  PROBLEMS=0; check_jvm_flags "-Xmx2g -XX:+ExitOnOutOfMemoryError -Djava.awt.headless=true" >/dev/null
   expect "as flags entregues passam" "$PROBLEMS" "0"
 
   local environ=$'HOME=/home/runner\nLANG=C.UTF-8\nTMPDIR=/tmp/s/dados-ção/br.pucpr.tcc.strata'

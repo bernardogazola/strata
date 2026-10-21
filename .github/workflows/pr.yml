@@ -158,6 +158,7 @@ jobs:
           bash scripts/make-fixtures.sh --self-test
           bash scripts/corpus.sh --self-test
           bash scripts/smoke-packaged.sh --self-test
+          bash scripts/verify-analysis.sh --self-test
 
       - name: Regenerate the fixture repositories and compare commit ids
         run: |
