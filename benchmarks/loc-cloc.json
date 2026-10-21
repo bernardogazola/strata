@@ -1,0 +1,339 @@
+{
+  "schema": 1,
+  "measuredAt": "2026-10-21T03:48:00Z",
+  "baseCommit": "e88d6c1",
+  "measure": "Every regular *.java file of the five corpus clones, .git pruned (the population of the cloc goldens and of RepositoryWalker): LocCounter.of(SourceCharsets.decode(bytes)).loc() against cloc 2.10's code count; a file cloc printed no row for is compared with 0. A disagreement's cause is 'cloc docstring-tracker desync' only when an emulation of cloc's docstring_rm_comments flag (cloc:8570) misreads a triple quote against the scanner's own line classification; any other is 'unexplained'.",
+  "cloc": {
+    "version": "2.10",
+    "command": "find . -name .git -prune -o -type f -name '*.java' -print | cloc --list-file=- --by-file --skip-uniqueness --timeout=0 --quiet --csv --csv-delimiter=TAB, inside each clone (scripts/loc-cloc-agreement.sh)",
+    "input": "analyzer/target/loc-cloc"
+  },
+  "environment": {
+    "os": "Mac OS X 27.0.1",
+    "arch": "aarch64",
+    "cpu": "Apple M4 Pro",
+    "logicalCores": 14,
+    "ramBytes": 25769803776,
+    "storage": "APPLE SSD AP1024Z internal NVMe SSD",
+    "runtime": "full JDK under Maven Surefire, not the jlink image the application ships",
+    "jvm": "Eclipse Adoptium 25.0.4.1+1-LTS",
+    "jvmFlags": ["-Xmx2g", "-Xss2m", "-XX:-HeapDumpOnOutOfMemoryError"],
+    "maxHeapBytes": 2147483648,
+    "garbageCollectors": [
+      "G1 Young Generation",
+      "G1 Concurrent GC",
+      "G1 Old Generation"
+    ],
+    "assertionsEnabled": false
+  },
+  "preRegistration": {
+    "files": 42834,
+    "agreeing": 42817,
+    "disagreeing": [
+      "broken-tree/src/test/java/org/apache/commons/lang3/time/FastDateParserTest.java",
+      "commons-lang/src/test/java/org/apache/commons/lang3/time/FastDateParserTest.java",
+      "elasticsearch/build-tools-internal/src/main/java/org/elasticsearch/gradle/internal/doc/RestTestsFromDocSnippetTask.java",
+      "elasticsearch/libs/x-content/src/test/java/org/elasticsearch/xcontent/ObjectParserTests.java",
+      "elasticsearch/server/src/test/java/org/elasticsearch/cluster/coordination/ClusterFormationFailureHelperTests.java",
+      "elasticsearch/test/fixtures/s3-fixture/src/test/java/fixture/s3/S3HttpHandlerTests.java",
+      "elasticsearch/x-pack/plugin/esql/qa/server/src/main/java/org/elasticsearch/xpack/esql/qa/rest/AbstractExternalSourceSpecTestCase.java",
+      "elasticsearch/x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/expression/function/scalar/math/CopySign.java",
+      "elasticsearch/x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/expression/function/scalar/spatial/StGeohash.java",
+      "elasticsearch/x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/expression/function/scalar/spatial/StGeohex.java",
+      "elasticsearch/x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/expression/function/scalar/spatial/StGeotile.java",
+      "elasticsearch/x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/expression/function/scalar/string/JsonExtract.java",
+      "elasticsearch/x-pack/plugin/sql/src/test/java/org/elasticsearch/xpack/sql/parser/SqlParserTests.java",
+      "elasticsearch/x-pack/plugin/text-structure/src/test/java/org/elasticsearch/xpack/textstructure/structurefinder/TimestampFormatFinderTests.java",
+      "junit5/junit-jupiter-params/src/main/java/org/junit/jupiter/params/provider/CsvSource.java",
+      "junit5/jupiter-tests/src/test/java/org/junit/jupiter/params/provider/CsvArgumentsProviderTests.java",
+      "spring-framework/spring-test/src/main/java/org/springframework/test/context/support/AbstractTestContextBootstrapper.java"
+    ],
+    "cause": "cloc docstring-tracker desync",
+    "deltaLines": 606,
+    "holds": true,
+    "differences": []
+  },
+  "totals": {
+    "files": 42834,
+    "agreeing": 42817,
+    "disagreeing": 17,
+    "clocNoRow": 6,
+    "locScanner": 6099335,
+    "locCloc": 6099941,
+    "locDelta": 606,
+    "decodeMillis": 173,
+    "scannerMillis": 437
+  },
+  "repositories": [
+    {
+      "name": "commons-lang",
+      "origin": "clone",
+      "commitId": "598dfc163b8b410fb3bb8794521206ec8dcec82a",
+      "files": 527,
+      "listDifferences": [],
+      "agreeing": 526,
+      "disagreeing": 1,
+      "locScanner": 98605,
+      "locCloc": 98613,
+      "locDelta": 8,
+      "decodeMillis": 17,
+      "scannerMillis": 13,
+      "clocNoRow": [],
+      "disagreements": [
+        {
+          "path": "src/test/java/org/apache/commons/lang3/time/FastDateParserTest.java",
+          "scanner": 570,
+          "cloc": 578,
+          "delta": 8,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 684,
+          "trigger": "''' toggles the tracker"
+        }
+      ]
+    },
+    {
+      "name": "broken-tree",
+      "origin": "derived",
+      "commitId": "961b02c3ce73d09e98efd9817e9639883c1e0dec",
+      "derivedFrom": "commons-lang",
+      "files": 528,
+      "listDifferences": [],
+      "agreeing": 527,
+      "disagreeing": 1,
+      "locScanner": 98511,
+      "locCloc": 98519,
+      "locDelta": 8,
+      "decodeMillis": 7,
+      "scannerMillis": 8,
+      "clocNoRow": [],
+      "disagreements": [
+        {
+          "path": "src/test/java/org/apache/commons/lang3/time/FastDateParserTest.java",
+          "scanner": 570,
+          "cloc": 578,
+          "delta": 8,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 684,
+          "trigger": "''' toggles the tracker"
+        }
+      ]
+    },
+    {
+      "name": "junit5",
+      "origin": "clone",
+      "commitId": "f59f60d2cebdf2224235d81f781b1f310cbc8138",
+      "files": 1728,
+      "listDifferences": [],
+      "agreeing": 1726,
+      "disagreeing": 2,
+      "locScanner": 133995,
+      "locCloc": 134175,
+      "locDelta": 180,
+      "decodeMillis": 8,
+      "scannerMillis": 11,
+      "clocNoRow": [],
+      "disagreements": [
+        {
+          "path": "junit-jupiter-params/src/main/java/org/junit/jupiter/params/provider/CsvSource.java",
+          "scanner": 39,
+          "cloc": 215,
+          "delta": 176,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 153,
+          "trigger": "\"\"\" on a comment-only line toggles"
+        },
+        {
+          "path": "jupiter-tests/src/test/java/org/junit/jupiter/params/provider/CsvArgumentsProviderTests.java",
+          "scanner": 377,
+          "cloc": 381,
+          "delta": 4,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 235,
+          "trigger": "''' toggles the tracker"
+        }
+      ]
+    },
+    {
+      "name": "spring-framework",
+      "origin": "clone",
+      "commitId": "82a6b40b9366ec181ededdad282b307ee5381a52",
+      "files": 9210,
+      "listDifferences": [],
+      "agreeing": 9209,
+      "disagreeing": 1,
+      "locScanner": 852612,
+      "locCloc": 852757,
+      "locDelta": 145,
+      "decodeMillis": 33,
+      "scannerMillis": 66,
+      "clocNoRow": [],
+      "disagreements": [
+        {
+          "path": "spring-test/src/main/java/org/springframework/test/context/support/AbstractTestContextBootstrapper.java",
+          "scanner": 421,
+          "cloc": 566,
+          "delta": 145,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 87,
+          "trigger": "closing \"\"\" after // or inside /* */"
+        }
+      ]
+    },
+    {
+      "name": "elasticsearch",
+      "origin": "clone",
+      "commitId": "b42549c72e6e040825b13e5d8ebf7ff63886b24d",
+      "files": 30841,
+      "listDifferences": [],
+      "agreeing": 30829,
+      "disagreeing": 12,
+      "locScanner": 4915612,
+      "locCloc": 4915877,
+      "locDelta": 265,
+      "decodeMillis": 108,
+      "scannerMillis": 339,
+      "clocNoRow": [
+        {
+          "path": "x-pack/plugin/esql/src/main/generated/org/elasticsearch/xpack/esql/expression/function/scalar/spatial/StEnvelopeFromDocValuesGeoEvaluator.java",
+          "bytes": 0,
+          "scanner": 0
+        },
+        {
+          "path": "x-pack/plugin/esql/src/main/generated/org/elasticsearch/xpack/esql/expression/function/scalar/spatial/StEnvelopeFromWKBGeoEvaluator.java",
+          "bytes": 0,
+          "scanner": 0
+        },
+        {
+          "path": "x-pack/plugin/esql/src/main/generated/org/elasticsearch/xpack/esql/expression/function/scalar/spatial/StXMaxFromWKBGeoEvaluator.java",
+          "bytes": 0,
+          "scanner": 0
+        },
+        {
+          "path": "x-pack/plugin/esql/src/main/generated/org/elasticsearch/xpack/esql/expression/function/scalar/spatial/StXMinFromWKBGeoEvaluator.java",
+          "bytes": 0,
+          "scanner": 0
+        },
+        {
+          "path": "x-pack/plugin/esql/src/main/generated/org/elasticsearch/xpack/esql/expression/function/scalar/spatial/StYMaxFromWKBGeoEvaluator.java",
+          "bytes": 0,
+          "scanner": 0
+        },
+        {
+          "path": "x-pack/plugin/esql/src/main/generated/org/elasticsearch/xpack/esql/expression/function/scalar/spatial/StYMinFromWKBGeoEvaluator.java",
+          "bytes": 0,
+          "scanner": 0
+        }
+      ],
+      "disagreements": [
+        {
+          "path": "build-tools-internal/src/main/java/org/elasticsearch/gradle/internal/doc/RestTestsFromDocSnippetTask.java",
+          "scanner": 413,
+          "cloc": 472,
+          "delta": 59,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 120,
+          "trigger": "\"\"\" on a comment-only line toggles"
+        },
+        {
+          "path": "libs/x-content/src/test/java/org/elasticsearch/xcontent/ObjectParserTests.java",
+          "scanner": 1065,
+          "cloc": 1085,
+          "delta": 20,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 191,
+          "trigger": "closing \"\"\" after // or inside /* */"
+        },
+        {
+          "path": "server/src/test/java/org/elasticsearch/cluster/coordination/ClusterFormationFailureHelperTests.java",
+          "scanner": 1147,
+          "cloc": 1150,
+          "delta": 3,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 118,
+          "trigger": "closing \"\"\" after // or inside /* */"
+        },
+        {
+          "path": "test/fixtures/s3-fixture/src/test/java/fixture/s3/S3HttpHandlerTests.java",
+          "scanner": 811,
+          "cloc": 814,
+          "delta": 3,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 547,
+          "trigger": "closing \"\"\" after // or inside /* */"
+        },
+        {
+          "path": "x-pack/plugin/esql/qa/server/src/main/java/org/elasticsearch/xpack/esql/qa/rest/AbstractExternalSourceSpecTestCase.java",
+          "scanner": 508,
+          "cloc": 594,
+          "delta": 86,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 663,
+          "trigger": "\"\"\" on a comment-only line toggles"
+        },
+        {
+          "path": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/expression/function/scalar/math/CopySign.java",
+          "scanner": 169,
+          "cloc": 174,
+          "delta": 5,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 70,
+          "trigger": "closing \"\"\" after // or inside /* */"
+        },
+        {
+          "path": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/expression/function/scalar/spatial/StGeohash.java",
+          "scanner": 226,
+          "cloc": 227,
+          "delta": 1,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 147,
+          "trigger": "closing \"\"\" after // or inside /* */"
+        },
+        {
+          "path": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/expression/function/scalar/spatial/StGeohex.java",
+          "scanner": 245,
+          "cloc": 246,
+          "delta": 1,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 148,
+          "trigger": "closing \"\"\" after // or inside /* */"
+        },
+        {
+          "path": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/expression/function/scalar/spatial/StGeotile.java",
+          "scanner": 231,
+          "cloc": 232,
+          "delta": 1,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 144,
+          "trigger": "closing \"\"\" after // or inside /* */"
+        },
+        {
+          "path": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/expression/function/scalar/string/JsonExtract.java",
+          "scanner": 391,
+          "cloc": 415,
+          "delta": 24,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 80,
+          "trigger": "closing \"\"\" after // or inside /* */"
+        },
+        {
+          "path": "x-pack/plugin/sql/src/test/java/org/elasticsearch/xpack/sql/parser/SqlParserTests.java",
+          "scanner": 441,
+          "cloc": 467,
+          "delta": 26,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 60,
+          "trigger": "''' toggles the tracker"
+        },
+        {
+          "path": "x-pack/plugin/text-structure/src/test/java/org/elasticsearch/xpack/textstructure/structurefinder/TimestampFormatFinderTests.java",
+          "scanner": 1674,
+          "cloc": 1710,
+          "delta": 36,
+          "cause": "cloc docstring-tracker desync",
+          "misreadLine": 824,
+          "trigger": "closing \"\"\" after // or inside /* */"
+        }
+      ]
+    }
+  ]
+}

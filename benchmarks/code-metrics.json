@@ -1,0 +1,2334 @@
+{
+  "schema": 1,
+  "measuredAt": "2026-10-21T04:11:46Z",
+  "baseCommit": "e88d6c1",
+  "measure": "The analysis pipeline, wired by hand, with the code metrics: RepositoryValidator, the selected roots in MAIN, GENERATED, TEST order, a fresh cache, one RUNNING analysis, then SpoonModelBuilder.analyze with a StructureExtractor over an ElementWriter that a delegating sink only times; every number is SQL over the rows read back after end(), against benchmarks/dependency-extraction.json for the same repository and selection. The LOC and CC times are StructureExtractor.metricTime(); the FILE loc, which the pre-parse computes outside that timer, is recounted after the analysis, outside every clock and the heap meter, over the same bytes. commons-lang ALL is measured a second time at the end and its two code_metric dumps compared byte for byte.",
+  "settings": {
+    "spoonVersion": "11.5.0",
+    "elementFlushRows": 32768,
+    "maxModelSourceBytes": 16777216,
+    "rootOrder": "MAIN, GENERATED, TEST",
+    "selections": {
+      "DEFAULT": "MAIN and GENERATED, no TEST: the analysis default and spoon-corpus.json's population",
+      "ALL": "every detected root"
+    },
+    "baseline": {
+      "file": "benchmarks/dependency-extraction.json",
+      "measuredAt": "2026-10-20T03:23:46Z",
+      "baseCommit": "ecec563"
+    },
+    "metricBudgetMillis": 5000,
+    "heapToleranceBytes": 67108864
+  },
+  "environment": {
+    "os": "Mac OS X 27.0.1",
+    "arch": "aarch64",
+    "cpu": "Apple M4 Pro",
+    "logicalCores": 14,
+    "ramBytes": 25769803776,
+    "storage": "APPLE SSD AP1024Z internal NVMe SSD",
+    "runtime": "full JDK under Maven Surefire, not the jlink image the application ships",
+    "jvm": "Eclipse Adoptium 25.0.4.1+1-LTS",
+    "jvmFlags": ["-Xmx2g", "-Xss2m", "-XX:-HeapDumpOnOutOfMemoryError"],
+    "maxHeapBytes": 2147483648,
+    "garbageCollectors": [
+      "G1 Young Generation",
+      "G1 Concurrent GC",
+      "G1 Old Generation"
+    ],
+    "assertionsEnabled": false
+  },
+  "determinism": {
+    "repository": "commons-lang",
+    "selection": "ALL",
+    "firstDump": "analyzer/target/code-metrics-spike/commons-lang-ALL-run1.tsv",
+    "secondDump": "analyzer/target/code-metrics-spike/commons-lang-ALL-run2.tsv",
+    "rows": 12060,
+    "firstSha256": "d1715b878a23e93bba0bca2d917e40169a8ff2b893bbffbe7042b098df83827a",
+    "secondSha256": "d1715b878a23e93bba0bca2d917e40169a8ff2b893bbffbe7042b098df83827a",
+    "identical": true
+  },
+  "repositories": [
+    {
+      "name": "commons-lang",
+      "origin": "clone",
+      "commitId": "598dfc163b8b410fb3bb8794521206ec8dcec82a",
+      "sourceRoots": {
+        "MAIN": 1,
+        "GENERATED": 0,
+        "TEST": 1
+      },
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "roots": {
+            "MAIN": 1,
+            "GENERATED": 0,
+            "TEST": 0
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 259,
+            "analyzed": 259,
+            "tooLarge": 0,
+            "parseFailed": 0,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 0,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 18,
+            "types": 364,
+            "methods": 4383,
+            "files": 259,
+            "externalTypes": 251,
+            "sourceFiles": 259,
+            "sourceRoots": 1,
+            "sourceFileStatuses": {
+              "ANALYZED": 259,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 0
+            }
+          },
+          "dependencies": {
+            "rows": 5366,
+            "occurrences": 19006,
+            "evidenceRows": 14551,
+            "moduleRows": 0
+          },
+          "baselineDifferences": [],
+          "metricRows": {
+            "PACKAGE": 18,
+            "TYPE": 364,
+            "METHOD": 4383,
+            "FILE": 259,
+            "external": 0
+          },
+          "violations": {
+            "missingPackage": 0,
+            "missingType": 0,
+            "missingMethod": 0,
+            "externalRows": 0,
+            "foreignAnalysis": 0,
+            "nullPattern": 0,
+            "typeBelowItsMethods": 0,
+            "packageNotItsSum": 0,
+            "locOutsideLines": 0,
+            "fileRowMissing": 0,
+            "fileRowUnexpected": 0,
+            "fileWithoutElement": 0,
+            "fileLocNotSourceFileLoc": 0,
+            "fileLocNotRecount": 0
+          },
+          "samples": {},
+          "methodsWithoutCc": {
+            "abstract": 24,
+            "implicit": 21,
+            "interfaceOrAnnotation": 112
+          },
+          "methodsWithoutCcOther": [],
+          "distributions": {
+            "typeCcSum": {
+              "count": 364,
+              "p50": 6,
+              "p90": 56,
+              "p99": 300,
+              "max": 1006
+            },
+            "typeLoc": {
+              "count": 364,
+              "p50": 24,
+              "p90": 194,
+              "p99": 913,
+              "max": 3056
+            },
+            "methodCcSum": {
+              "count": 4226,
+              "p50": 1,
+              "p90": 4,
+              "p99": 13,
+              "max": 64
+            },
+            "largestTypesByCcSum": [
+              {
+                "elementId": "type:org.apache.commons.lang3.ArrayUtils",
+                "file": "src/main/java/org/apache/commons/lang3/ArrayUtils.java",
+                "loc": 3056,
+                "unitCount": 377,
+                "ccSum": 1006,
+                "ccMax": 12,
+                "ccP90": 6
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.StringUtils",
+                "file": "src/main/java/org/apache/commons/lang3/StringUtils.java",
+                "loc": 2545,
+                "unitCount": 243,
+                "ccSum": 851,
+                "ccMax": 29,
+                "ccP90": 8
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.text.StrBuilder",
+                "file": "src/main/java/org/apache/commons/lang3/text/StrBuilder.java",
+                "loc": 1331,
+                "unitCount": 150,
+                "ccSum": 375,
+                "ccMax": 8,
+                "ccP90": 6
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.Conversion",
+                "file": "src/main/java/org/apache/commons/lang3/Conversion.java",
+                "loc": 760,
+                "unitCount": 43,
+                "ccSum": 300,
+                "ccMax": 23,
+                "ccP90": 20
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.reflect.TypeUtils",
+                "file": "src/main/java/org/apache/commons/lang3/reflect/TypeUtils.java",
+                "loc": 913,
+                "unitCount": 58,
+                "ccSum": 270,
+                "ccMax": 15,
+                "ccP90": 11
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.math.NumberUtils",
+                "file": "src/main/java/org/apache/commons/lang3/math/NumberUtils.java",
+                "loc": 720,
+                "unitCount": 68,
+                "ccSum": 265,
+                "ccMax": 64,
+                "ccP90": 4
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.SystemProperties",
+                "file": "src/main/java/org/apache/commons/lang3/SystemProperties.java",
+                "loc": 837,
+                "unitCount": 205,
+                "ccSum": 215,
+                "ccMax": 3,
+                "ccP90": 1
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.builder.ToStringStyle",
+                "file": "src/main/java/org/apache/commons/lang3/builder/ToStringStyle.java",
+                "loc": 894,
+                "unitCount": 113,
+                "ccSum": 199,
+                "ccMax": 28,
+                "ccP90": 3
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.ClassUtils",
+                "file": "src/main/java/org/apache/commons/lang3/ClassUtils.java",
+                "loc": 585,
+                "unitCount": 70,
+                "ccSum": 197,
+                "ccMax": 31,
+                "ccP90": 4
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.BooleanUtils",
+                "file": "src/main/java/org/apache/commons/lang3/BooleanUtils.java",
+                "loc": 360,
+                "unitCount": 47,
+                "ccSum": 164,
+                "ccMax": 56,
+                "ccP90": 6
+              }
+            ],
+            "largestMethodByCcSum": {
+              "elementId": "method:org.apache.commons.lang3.math.NumberUtils#createNumber(java.lang.String)",
+              "file": "src/main/java/org/apache/commons/lang3/math/NumberUtils.java",
+              "loc": 140,
+              "unitCount": 1,
+              "ccSum": 64,
+              "ccMax": 64,
+              "ccP90": null
+            }
+          },
+          "fileLocTotal": 31971,
+          "timing": {
+            "wallMillis": 2314,
+            "preParseMillis": 373,
+            "buildMillis": 1260,
+            "visitMillis": 542,
+            "sinkMillis": 109,
+            "baselineSinkMillis": 110,
+            "locMillis": 11,
+            "ccMillis": 32,
+            "fileLocMillis": 4,
+            "metricMillis": 47,
+            "baselineWallMillis": 2250
+          },
+          "heap": {
+            "peakLiveBytes": 117717048,
+            "peakUsedBytes": 267634656,
+            "baselinePeakLiveBytes": 123942672,
+            "baselinePeakUsedBytes": 257750584
+          },
+          "cacheBytes": 5074944,
+          "baselineCacheBytes": 4923392
+        },
+        {
+          "selection": "ALL",
+          "roots": {
+            "MAIN": 1,
+            "GENERATED": 0,
+            "TEST": 1
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 527,
+            "analyzed": 527,
+            "tooLarge": 0,
+            "parseFailed": 0,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 0,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 20,
+            "types": 958,
+            "methods": 10555,
+            "files": 527,
+            "externalTypes": 348,
+            "sourceFiles": 527,
+            "sourceRoots": 2,
+            "sourceFileStatuses": {
+              "ANALYZED": 527,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 0
+            }
+          },
+          "dependencies": {
+            "rows": 12041,
+            "occurrences": 94811,
+            "evidenceRows": 39832,
+            "moduleRows": 0
+          },
+          "baselineDifferences": [],
+          "metricRows": {
+            "PACKAGE": 20,
+            "TYPE": 958,
+            "METHOD": 10555,
+            "FILE": 527,
+            "external": 0
+          },
+          "violations": {
+            "missingPackage": 0,
+            "missingType": 0,
+            "missingMethod": 0,
+            "externalRows": 0,
+            "foreignAnalysis": 0,
+            "nullPattern": 0,
+            "typeBelowItsMethods": 0,
+            "packageNotItsSum": 0,
+            "locOutsideLines": 0,
+            "fileRowMissing": 0,
+            "fileRowUnexpected": 0,
+            "fileWithoutElement": 0,
+            "fileLocNotSourceFileLoc": 0,
+            "fileLocNotRecount": 0
+          },
+          "samples": {},
+          "methodsWithoutCc": {
+            "abstract": 64,
+            "implicit": 490,
+            "interfaceOrAnnotation": 165
+          },
+          "methodsWithoutCcOther": [],
+          "distributions": {
+            "typeCcSum": {
+              "count": 958,
+              "p50": 4,
+              "p90": 35,
+              "p99": 208,
+              "max": 1006
+            },
+            "typeLoc": {
+              "count": 958,
+              "p50": 23,
+              "p90": 256,
+              "p99": 1331,
+              "max": 5996
+            },
+            "methodCcSum": {
+              "count": 9836,
+              "p50": 1,
+              "p90": 3,
+              "p99": 10,
+              "max": 64
+            },
+            "largestTypesByCcSum": [
+              {
+                "elementId": "type:org.apache.commons.lang3.ArrayUtils",
+                "file": "src/main/java/org/apache/commons/lang3/ArrayUtils.java",
+                "loc": 3056,
+                "unitCount": 377,
+                "ccSum": 1006,
+                "ccMax": 12,
+                "ccP90": 6
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.StringUtils",
+                "file": "src/main/java/org/apache/commons/lang3/StringUtils.java",
+                "loc": 2545,
+                "unitCount": 243,
+                "ccSum": 851,
+                "ccMax": 29,
+                "ccP90": 8
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.ArrayUtilsTest",
+                "file": "src/test/java/org/apache/commons/lang3/ArrayUtilsTest.java",
+                "loc": 5996,
+                "unitCount": 365,
+                "ccSum": 381,
+                "ccMax": 2,
+                "ccP90": 1
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.text.StrBuilder",
+                "file": "src/main/java/org/apache/commons/lang3/text/StrBuilder.java",
+                "loc": 1331,
+                "unitCount": 150,
+                "ccSum": 375,
+                "ccMax": 8,
+                "ccP90": 6
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.Conversion",
+                "file": "src/main/java/org/apache/commons/lang3/Conversion.java",
+                "loc": 760,
+                "unitCount": 43,
+                "ccSum": 300,
+                "ccMax": 23,
+                "ccP90": 20
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.reflect.TypeUtils",
+                "file": "src/main/java/org/apache/commons/lang3/reflect/TypeUtils.java",
+                "loc": 913,
+                "unitCount": 58,
+                "ccSum": 270,
+                "ccMax": 15,
+                "ccP90": 11
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.math.NumberUtils",
+                "file": "src/main/java/org/apache/commons/lang3/math/NumberUtils.java",
+                "loc": 720,
+                "unitCount": 68,
+                "ccSum": 265,
+                "ccMax": 64,
+                "ccP90": 4
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.function.FailableTest",
+                "file": "src/test/java/org/apache/commons/lang3/function/FailableTest.java",
+                "loc": 2119,
+                "unitCount": 263,
+                "ccSum": 264,
+                "ccMax": 2,
+                "ccP90": 1
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.SystemProperties",
+                "file": "src/main/java/org/apache/commons/lang3/SystemProperties.java",
+                "loc": 837,
+                "unitCount": 205,
+                "ccSum": 215,
+                "ccMax": 3,
+                "ccP90": 1
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.StringUtilsTest",
+                "file": "src/test/java/org/apache/commons/lang3/StringUtilsTest.java",
+                "loc": 2529,
+                "unitCount": 159,
+                "ccSum": 208,
+                "ccMax": 14,
+                "ccP90": 1
+              }
+            ],
+            "largestMethodByCcSum": {
+              "elementId": "method:org.apache.commons.lang3.math.NumberUtils#createNumber(java.lang.String)",
+              "file": "src/main/java/org/apache/commons/lang3/math/NumberUtils.java",
+              "loc": 140,
+              "unitCount": 1,
+              "ccSum": 64,
+              "ccMax": 64,
+              "ccP90": null
+            }
+          },
+          "fileLocTotal": 98605,
+          "timing": {
+            "wallMillis": 13260,
+            "preParseMillis": 184,
+            "buildMillis": 11424,
+            "visitMillis": 1609,
+            "sinkMillis": 222,
+            "baselineSinkMillis": 210,
+            "locMillis": 17,
+            "ccMillis": 76,
+            "fileLocMillis": 8,
+            "metricMillis": 101,
+            "baselineWallMillis": 13007
+          },
+          "heap": {
+            "peakLiveBytes": 249313360,
+            "peakUsedBytes": 603209072,
+            "baselinePeakLiveBytes": 339707216,
+            "baselinePeakUsedBytes": 646040240
+          },
+          "cacheBytes": 12218368,
+          "baselineCacheBytes": 11886592,
+          "dump": {
+            "file": "analyzer/target/code-metrics-spike/commons-lang-ALL-run1.tsv",
+            "rows": 12060,
+            "sha256": "d1715b878a23e93bba0bca2d917e40169a8ff2b893bbffbe7042b098df83827a"
+          }
+        }
+      ]
+    },
+    {
+      "name": "broken-tree",
+      "origin": "derived",
+      "commitId": "961b02c3ce73d09e98efd9817e9639883c1e0dec",
+      "derivedFrom": "commons-lang",
+      "sourceRoots": {
+        "MAIN": 1,
+        "GENERATED": 0,
+        "TEST": 1
+      },
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "roots": {
+            "MAIN": 1,
+            "GENERATED": 0,
+            "TEST": 0
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 260,
+            "analyzed": 257,
+            "tooLarge": 0,
+            "parseFailed": 3,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 3,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 0,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 18,
+            "types": 362,
+            "methods": 4340,
+            "files": 260,
+            "externalTypes": 252,
+            "sourceFiles": 260,
+            "sourceRoots": 1,
+            "sourceFileStatuses": {
+              "ANALYZED": 257,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 3
+            }
+          },
+          "dependencies": {
+            "rows": 5294,
+            "occurrences": 18734,
+            "evidenceRows": 14306,
+            "moduleRows": 0
+          },
+          "baselineDifferences": [],
+          "metricRows": {
+            "PACKAGE": 18,
+            "TYPE": 362,
+            "METHOD": 4340,
+            "FILE": 260,
+            "external": 0
+          },
+          "violations": {
+            "missingPackage": 0,
+            "missingType": 0,
+            "missingMethod": 0,
+            "externalRows": 0,
+            "foreignAnalysis": 0,
+            "nullPattern": 0,
+            "typeBelowItsMethods": 0,
+            "packageNotItsSum": 0,
+            "locOutsideLines": 0,
+            "fileRowMissing": 0,
+            "fileRowUnexpected": 0,
+            "fileWithoutElement": 0,
+            "fileLocNotSourceFileLoc": 0,
+            "fileLocNotRecount": 0
+          },
+          "samples": {},
+          "methodsWithoutCc": {
+            "abstract": 24,
+            "implicit": 21,
+            "interfaceOrAnnotation": 112
+          },
+          "methodsWithoutCcOther": [],
+          "distributions": {
+            "typeCcSum": {
+              "count": 362,
+              "p50": 6,
+              "p90": 49,
+              "p99": 300,
+              "max": 1006
+            },
+            "typeLoc": {
+              "count": 362,
+              "p50": 24,
+              "p90": 190,
+              "p99": 913,
+              "max": 3056
+            },
+            "methodCcSum": {
+              "count": 4183,
+              "p50": 1,
+              "p90": 4,
+              "p99": 13,
+              "max": 64
+            },
+            "largestTypesByCcSum": [
+              {
+                "elementId": "type:org.apache.commons.lang3.ArrayUtils",
+                "file": "src/main/java/org/apache/commons/lang3/ArrayUtils.java",
+                "loc": 3056,
+                "unitCount": 377,
+                "ccSum": 1006,
+                "ccMax": 12,
+                "ccP90": 6
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.StringUtils",
+                "file": "src/main/java/org/apache/commons/lang3/StringUtils.java",
+                "loc": 2545,
+                "unitCount": 243,
+                "ccSum": 851,
+                "ccMax": 29,
+                "ccP90": 8
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.text.StrBuilder",
+                "file": "src/main/java/org/apache/commons/lang3/text/StrBuilder.java",
+                "loc": 1331,
+                "unitCount": 150,
+                "ccSum": 375,
+                "ccMax": 8,
+                "ccP90": 6
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.Conversion",
+                "file": "src/main/java/org/apache/commons/lang3/Conversion.java",
+                "loc": 760,
+                "unitCount": 43,
+                "ccSum": 300,
+                "ccMax": 23,
+                "ccP90": 20
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.reflect.TypeUtils",
+                "file": "src/main/java/org/apache/commons/lang3/reflect/TypeUtils.java",
+                "loc": 913,
+                "unitCount": 58,
+                "ccSum": 270,
+                "ccMax": 15,
+                "ccP90": 11
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.math.NumberUtils",
+                "file": "src/main/java/org/apache/commons/lang3/math/NumberUtils.java",
+                "loc": 720,
+                "unitCount": 68,
+                "ccSum": 265,
+                "ccMax": 64,
+                "ccP90": 4
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.SystemProperties",
+                "file": "src/main/java/org/apache/commons/lang3/SystemProperties.java",
+                "loc": 837,
+                "unitCount": 205,
+                "ccSum": 215,
+                "ccMax": 3,
+                "ccP90": 1
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.builder.ToStringStyle",
+                "file": "src/main/java/org/apache/commons/lang3/builder/ToStringStyle.java",
+                "loc": 894,
+                "unitCount": 113,
+                "ccSum": 199,
+                "ccMax": 28,
+                "ccP90": 3
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.ClassUtils",
+                "file": "src/main/java/org/apache/commons/lang3/ClassUtils.java",
+                "loc": 585,
+                "unitCount": 70,
+                "ccSum": 197,
+                "ccMax": 31,
+                "ccP90": 4
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.BooleanUtils",
+                "file": "src/main/java/org/apache/commons/lang3/BooleanUtils.java",
+                "loc": 360,
+                "unitCount": 47,
+                "ccSum": 164,
+                "ccMax": 56,
+                "ccP90": 6
+              }
+            ],
+            "largestMethodByCcSum": {
+              "elementId": "method:org.apache.commons.lang3.math.NumberUtils#createNumber(java.lang.String)",
+              "file": "src/main/java/org/apache/commons/lang3/math/NumberUtils.java",
+              "loc": 140,
+              "unitCount": 1,
+              "ccSum": 64,
+              "ccMax": 64,
+              "ccP90": null
+            }
+          },
+          "fileLocTotal": 31877,
+          "timing": {
+            "wallMillis": 1028,
+            "preParseMillis": 116,
+            "buildMillis": 447,
+            "visitMillis": 367,
+            "sinkMillis": 82,
+            "baselineSinkMillis": 92,
+            "locMillis": 7,
+            "ccMillis": 16,
+            "fileLocMillis": 4,
+            "metricMillis": 27,
+            "baselineWallMillis": 974
+          },
+          "heap": {
+            "peakLiveBytes": 121011424,
+            "peakUsedBytes": 256925008,
+            "baselinePeakLiveBytes": 119088064,
+            "baselinePeakUsedBytes": 271202048
+          },
+          "cacheBytes": 5009408,
+          "baselineCacheBytes": 4866048
+        },
+        {
+          "selection": "ALL",
+          "roots": {
+            "MAIN": 1,
+            "GENERATED": 0,
+            "TEST": 1
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 528,
+            "analyzed": 525,
+            "tooLarge": 0,
+            "parseFailed": 3,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 3,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 0,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 20,
+            "types": 956,
+            "methods": 10512,
+            "files": 528,
+            "externalTypes": 351,
+            "sourceFiles": 528,
+            "sourceRoots": 2,
+            "sourceFileStatuses": {
+              "ANALYZED": 525,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 3
+            }
+          },
+          "dependencies": {
+            "rows": 11969,
+            "occurrences": 94539,
+            "evidenceRows": 39587,
+            "moduleRows": 0
+          },
+          "baselineDifferences": [],
+          "metricRows": {
+            "PACKAGE": 20,
+            "TYPE": 956,
+            "METHOD": 10512,
+            "FILE": 528,
+            "external": 0
+          },
+          "violations": {
+            "missingPackage": 0,
+            "missingType": 0,
+            "missingMethod": 0,
+            "externalRows": 0,
+            "foreignAnalysis": 0,
+            "nullPattern": 0,
+            "typeBelowItsMethods": 0,
+            "packageNotItsSum": 0,
+            "locOutsideLines": 0,
+            "fileRowMissing": 0,
+            "fileRowUnexpected": 0,
+            "fileWithoutElement": 0,
+            "fileLocNotSourceFileLoc": 0,
+            "fileLocNotRecount": 0
+          },
+          "samples": {},
+          "methodsWithoutCc": {
+            "abstract": 64,
+            "implicit": 490,
+            "interfaceOrAnnotation": 165
+          },
+          "methodsWithoutCcOther": [],
+          "distributions": {
+            "typeCcSum": {
+              "count": 956,
+              "p50": 4,
+              "p90": 33,
+              "p99": 208,
+              "max": 1006
+            },
+            "typeLoc": {
+              "count": 956,
+              "p50": 23,
+              "p90": 246,
+              "p99": 1331,
+              "max": 5996
+            },
+            "methodCcSum": {
+              "count": 9793,
+              "p50": 1,
+              "p90": 3,
+              "p99": 10,
+              "max": 64
+            },
+            "largestTypesByCcSum": [
+              {
+                "elementId": "type:org.apache.commons.lang3.ArrayUtils",
+                "file": "src/main/java/org/apache/commons/lang3/ArrayUtils.java",
+                "loc": 3056,
+                "unitCount": 377,
+                "ccSum": 1006,
+                "ccMax": 12,
+                "ccP90": 6
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.StringUtils",
+                "file": "src/main/java/org/apache/commons/lang3/StringUtils.java",
+                "loc": 2545,
+                "unitCount": 243,
+                "ccSum": 851,
+                "ccMax": 29,
+                "ccP90": 8
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.ArrayUtilsTest",
+                "file": "src/test/java/org/apache/commons/lang3/ArrayUtilsTest.java",
+                "loc": 5996,
+                "unitCount": 365,
+                "ccSum": 381,
+                "ccMax": 2,
+                "ccP90": 1
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.text.StrBuilder",
+                "file": "src/main/java/org/apache/commons/lang3/text/StrBuilder.java",
+                "loc": 1331,
+                "unitCount": 150,
+                "ccSum": 375,
+                "ccMax": 8,
+                "ccP90": 6
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.Conversion",
+                "file": "src/main/java/org/apache/commons/lang3/Conversion.java",
+                "loc": 760,
+                "unitCount": 43,
+                "ccSum": 300,
+                "ccMax": 23,
+                "ccP90": 20
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.reflect.TypeUtils",
+                "file": "src/main/java/org/apache/commons/lang3/reflect/TypeUtils.java",
+                "loc": 913,
+                "unitCount": 58,
+                "ccSum": 270,
+                "ccMax": 15,
+                "ccP90": 11
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.math.NumberUtils",
+                "file": "src/main/java/org/apache/commons/lang3/math/NumberUtils.java",
+                "loc": 720,
+                "unitCount": 68,
+                "ccSum": 265,
+                "ccMax": 64,
+                "ccP90": 4
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.function.FailableTest",
+                "file": "src/test/java/org/apache/commons/lang3/function/FailableTest.java",
+                "loc": 2119,
+                "unitCount": 263,
+                "ccSum": 264,
+                "ccMax": 2,
+                "ccP90": 1
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.SystemProperties",
+                "file": "src/main/java/org/apache/commons/lang3/SystemProperties.java",
+                "loc": 837,
+                "unitCount": 205,
+                "ccSum": 215,
+                "ccMax": 3,
+                "ccP90": 1
+              },
+              {
+                "elementId": "type:org.apache.commons.lang3.StringUtilsTest",
+                "file": "src/test/java/org/apache/commons/lang3/StringUtilsTest.java",
+                "loc": 2529,
+                "unitCount": 159,
+                "ccSum": 208,
+                "ccMax": 14,
+                "ccP90": 1
+              }
+            ],
+            "largestMethodByCcSum": {
+              "elementId": "method:org.apache.commons.lang3.math.NumberUtils#createNumber(java.lang.String)",
+              "file": "src/main/java/org/apache/commons/lang3/math/NumberUtils.java",
+              "loc": 140,
+              "unitCount": 1,
+              "ccSum": 64,
+              "ccMax": 64,
+              "ccP90": null
+            }
+          },
+          "fileLocTotal": 98511,
+          "timing": {
+            "wallMillis": 12537,
+            "preParseMillis": 164,
+            "buildMillis": 10802,
+            "visitMillis": 1529,
+            "sinkMillis": 210,
+            "baselineSinkMillis": 197,
+            "locMillis": 15,
+            "ccMillis": 76,
+            "fileLocMillis": 8,
+            "metricMillis": 99,
+            "baselineWallMillis": 12831
+          },
+          "heap": {
+            "peakLiveBytes": 249691536,
+            "peakUsedBytes": 589277672,
+            "baselinePeakLiveBytes": 245760096,
+            "baselinePeakUsedBytes": 565606560
+          },
+          "cacheBytes": 12156928,
+          "baselineCacheBytes": 11825152
+        }
+      ]
+    },
+    {
+      "name": "junit5",
+      "origin": "clone",
+      "commitId": "f59f60d2cebdf2224235d81f781b1f310cbc8138",
+      "sourceRoots": {
+        "MAIN": 25,
+        "GENERATED": 0,
+        "TEST": 20
+      },
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "roots": {
+            "MAIN": 25,
+            "GENERATED": 0,
+            "TEST": 0
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 914,
+            "analyzed": 914,
+            "tooLarge": 0,
+            "parseFailed": 0,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 0,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 76,
+            "types": 1110,
+            "methods": 6461,
+            "files": 914,
+            "externalTypes": 439,
+            "sourceFiles": 914,
+            "sourceRoots": 25,
+            "sourceFileStatuses": {
+              "ANALYZED": 914,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 0
+            }
+          },
+          "dependencies": {
+            "rows": 23143,
+            "occurrences": 44665,
+            "evidenceRows": 42639,
+            "moduleRows": 80
+          },
+          "baselineDifferences": [],
+          "metricRows": {
+            "PACKAGE": 76,
+            "TYPE": 1110,
+            "METHOD": 6461,
+            "FILE": 914,
+            "external": 0
+          },
+          "violations": {
+            "missingPackage": 0,
+            "missingType": 0,
+            "missingMethod": 0,
+            "externalRows": 0,
+            "foreignAnalysis": 0,
+            "nullPattern": 0,
+            "typeBelowItsMethods": 0,
+            "packageNotItsSum": 0,
+            "locOutsideLines": 0,
+            "fileRowMissing": 0,
+            "fileRowUnexpected": 0,
+            "fileWithoutElement": 0,
+            "fileLocNotSourceFileLoc": 0,
+            "fileLocNotRecount": 0
+          },
+          "samples": {},
+          "methodsWithoutCc": {
+            "abstract": 47,
+            "implicit": 303,
+            "interfaceOrAnnotation": 587
+          },
+          "methodsWithoutCcOther": [],
+          "distributions": {
+            "typeCcSum": {
+              "count": 1110,
+              "p50": 3,
+              "p90": 18,
+              "p99": 52,
+              "max": 291
+            },
+            "typeLoc": {
+              "count": 1110,
+              "p50": 20,
+              "p90": 99,
+              "p99": 240,
+              "max": 1117
+            },
+            "methodCcSum": {
+              "count": 5524,
+              "p50": 1,
+              "p90": 2,
+              "p99": 6,
+              "max": 24
+            },
+            "largestTypesByCcSum": [
+              {
+                "elementId": "type:org.junit.jupiter.api.Assertions",
+                "file": "junit-jupiter-api/src/main/java/org/junit/jupiter/api/Assertions.java",
+                "loc": 1117,
+                "unitCount": 291,
+                "ccSum": 291,
+                "ccMax": 1,
+                "ccP90": 1
+              },
+              {
+                "elementId": "type:org.junit.platform.commons.util.ReflectionUtils",
+                "file": "junit-platform-commons/src/main/java/org/junit/platform/commons/util/ReflectionUtils.java",
+                "loc": 1020,
+                "unitCount": 127,
+                "ccSum": 252,
+                "ccMax": 20,
+                "ccP90": 4
+              },
+              {
+                "elementId": "type:org.junit.jupiter.api.AssertArrayEquals",
+                "file": "junit-jupiter-api/src/main/java/org/junit/jupiter/api/AssertArrayEquals.java",
+                "loc": 413,
+                "unitCount": 53,
+                "ccSum": 133,
+                "ccMax": 24,
+                "ccP90": 6
+              },
+              {
+                "elementId": "type:org.junit.platform.engine.support.hierarchical.WorkerThreadPoolHierarchicalTestExecutorService$WorkerThread",
+                "file": "junit-platform-engine/src/main/java/org/junit/platform/engine/support/hierarchical/WorkerThreadPoolHierarchicalTestExecutorService.java",
+                "loc": 324,
+                "unitCount": 26,
+                "ccSum": 68,
+                "ccMax": 6,
+                "ccP90": 5
+              },
+              {
+                "elementId": "type:org.junit.platform.commons.util.AnnotationUtils",
+                "file": "junit-platform-commons/src/main/java/org/junit/platform/commons/util/AnnotationUtils.java",
+                "loc": 236,
+                "unitCount": 22,
+                "ccSum": 67,
+                "ccMax": 12,
+                "ccP90": 7
+              },
+              {
+                "elementId": "type:org.junit.jupiter.engine.descriptor.ClassBasedTestDescriptor",
+                "file": "junit-jupiter-engine/src/main/java/org/junit/jupiter/engine/descriptor/ClassBasedTestDescriptor.java",
+                "loc": 373,
+                "unitCount": 42,
+                "ccSum": 66,
+                "ccMax": 8,
+                "ccP90": 3
+              },
+              {
+                "elementId": "type:org.junit.jupiter.params.ResolverFacade",
+                "file": "junit-jupiter-params/src/main/java/org/junit/jupiter/params/ResolverFacade.java",
+                "loc": 556,
+                "unitCount": 31,
+                "ccSum": 65,
+                "ccMax": 6,
+                "ccP90": 4
+              },
+              {
+                "elementId": "type:org.junit.platform.engine.discovery.DiscoverySelectors",
+                "file": "junit-platform-engine/src/main/java/org/junit/platform/engine/discovery/DiscoverySelectors.java",
+                "loc": 352,
+                "unitCount": 59,
+                "ccSum": 63,
+                "ccMax": 2,
+                "ccP90": 1
+              },
+              {
+                "elementId": "type:org.junit.platform.console.options.TestDiscoveryOptions",
+                "file": "junit-platform-console/src/main/java/org/junit/platform/console/options/TestDiscoveryOptions.java",
+                "loc": 211,
+                "unitCount": 56,
+                "ccSum": 56,
+                "ccMax": 1,
+                "ccP90": 1
+              },
+              {
+                "elementId": "type:org.junit.vintage.engine.execution.RunListenerAdapter",
+                "file": "junit-vintage-engine/src/main/java/org/junit/vintage/engine/execution/RunListenerAdapter.java",
+                "loc": 192,
+                "unitCount": 33,
+                "ccSum": 55,
+                "ccMax": 6,
+                "ccP90": 3
+              }
+            ],
+            "largestMethodByCcSum": {
+              "elementId": "method:org.junit.jupiter.api.AssertArrayEquals#assertArrayElementsEqual(java.lang.Object,java.lang.Object,java.util.Deque,java.lang.Object)",
+              "file": "junit-jupiter-api/src/main/java/org/junit/jupiter/api/AssertArrayEquals.java",
+              "loc": 41,
+              "unitCount": 1,
+              "ccSum": 24,
+              "ccMax": 24,
+              "ccP90": null
+            }
+          },
+          "fileLocTotal": 49456,
+          "timing": {
+            "wallMillis": 2645,
+            "preParseMillis": 222,
+            "buildMillis": 1533,
+            "visitMillis": 810,
+            "sinkMillis": 245,
+            "baselineSinkMillis": 242,
+            "locMillis": 8,
+            "ccMillis": 23,
+            "fileLocMillis": 4,
+            "metricMillis": 35,
+            "baselineWallMillis": 2657
+          },
+          "heap": {
+            "peakLiveBytes": 120872328,
+            "peakUsedBytes": 320510440,
+            "baselinePeakLiveBytes": 126037056,
+            "baselinePeakUsedBytes": 352318872
+          },
+          "cacheBytes": 12488704,
+          "baselineCacheBytes": 12255232
+        },
+        {
+          "selection": "ALL",
+          "roots": {
+            "MAIN": 25,
+            "GENERATED": 0,
+            "TEST": 20
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 1712,
+            "analyzed": 1712,
+            "tooLarge": 0,
+            "parseFailed": 0,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 0,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 114,
+            "types": 3751,
+            "methods": 17581,
+            "files": 1712,
+            "externalTypes": 598,
+            "sourceFiles": 1712,
+            "sourceRoots": 45,
+            "sourceFileStatuses": {
+              "ANALYZED": 1712,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 0
+            }
+          },
+          "dependencies": {
+            "rows": 49242,
+            "occurrences": 116716,
+            "evidenceRows": 101234,
+            "moduleRows": 80
+          },
+          "baselineDifferences": [],
+          "metricRows": {
+            "PACKAGE": 114,
+            "TYPE": 3751,
+            "METHOD": 17581,
+            "FILE": 1712,
+            "external": 0
+          },
+          "violations": {
+            "missingPackage": 0,
+            "missingType": 0,
+            "missingMethod": 0,
+            "externalRows": 0,
+            "foreignAnalysis": 0,
+            "nullPattern": 0,
+            "typeBelowItsMethods": 0,
+            "packageNotItsSum": 0,
+            "locOutsideLines": 0,
+            "fileRowMissing": 0,
+            "fileRowUnexpected": 0,
+            "fileWithoutElement": 0,
+            "fileLocNotSourceFileLoc": 0,
+            "fileLocNotRecount": 0
+          },
+          "samples": {},
+          "methodsWithoutCc": {
+            "abstract": 60,
+            "implicit": 2586,
+            "interfaceOrAnnotation": 629
+          },
+          "methodsWithoutCcOther": [],
+          "distributions": {
+            "typeCcSum": {
+              "count": 3751,
+              "p50": 2,
+              "p90": 12,
+              "p99": 40,
+              "max": 291
+            },
+            "typeLoc": {
+              "count": 3751,
+              "p50": 13,
+              "p90": 86,
+              "p99": 461,
+              "max": 2146
+            },
+            "methodCcSum": {
+              "count": 14306,
+              "p50": 1,
+              "p90": 2,
+              "p99": 5,
+              "max": 24
+            },
+            "largestTypesByCcSum": [
+              {
+                "elementId": "type:org.junit.jupiter.api.Assertions",
+                "file": "junit-jupiter-api/src/main/java/org/junit/jupiter/api/Assertions.java",
+                "loc": 1117,
+                "unitCount": 291,
+                "ccSum": 291,
+                "ccMax": 1,
+                "ccP90": 1
+              },
+              {
+                "elementId": "type:org.junit.jupiter.api.AssertArrayEqualsAssertionsTests",
+                "file": "jupiter-tests/src/test/java/org/junit/jupiter/api/AssertArrayEqualsAssertionsTests.java",
+                "loc": 1790,
+                "unitCount": 122,
+                "ccSum": 283,
+                "ccMax": 5,
+                "ccP90": 3
+              },
+              {
+                "elementId": "type:org.junit.platform.commons.util.ReflectionUtils",
+                "file": "junit-platform-commons/src/main/java/org/junit/platform/commons/util/ReflectionUtils.java",
+                "loc": 1020,
+                "unitCount": 127,
+                "ccSum": 252,
+                "ccMax": 20,
+                "ccP90": 4
+              },
+              {
+                "elementId": "type:org.junit.jupiter.api.AssertArrayEquals",
+                "file": "junit-jupiter-api/src/main/java/org/junit/jupiter/api/AssertArrayEquals.java",
+                "loc": 413,
+                "unitCount": 53,
+                "ccSum": 133,
+                "ccMax": 24,
+                "ccP90": 6
+              },
+              {
+                "elementId": "type:org.junit.jupiter.api.AssertEqualsAssertionsTests",
+                "file": "jupiter-tests/src/test/java/org/junit/jupiter/api/AssertEqualsAssertionsTests.java",
+                "loc": 639,
+                "unitCount": 49,
+                "ccSum": 77,
+                "ccMax": 2,
+                "ccP90": 2
+              },
+              {
+                "elementId": "type:org.junit.platform.launcher.core.DefaultLauncherTests",
+                "file": "platform-tests/src/test/java/org/junit/platform/launcher/core/DefaultLauncherTests.java",
+                "loc": 825,
+                "unitCount": 75,
+                "ccSum": 76,
+                "ccMax": 2,
+                "ccP90": 1
+              },
+              {
+                "elementId": "type:org.junit.platform.commons.util.AnnotationUtilsTests",
+                "file": "platform-tests/src/test/java/org/junit/platform/commons/util/AnnotationUtilsTests.java",
+                "loc": 715,
+                "unitCount": 75,
+                "ccSum": 75,
+                "ccMax": 1,
+                "ccP90": 1
+              },
+              {
+                "elementId": "type:org.junit.platform.engine.support.hierarchical.WorkerThreadPoolHierarchicalTestExecutorService$WorkerThread",
+                "file": "junit-platform-engine/src/main/java/org/junit/platform/engine/support/hierarchical/WorkerThreadPoolHierarchicalTestExecutorService.java",
+                "loc": 324,
+                "unitCount": 26,
+                "ccSum": 68,
+                "ccMax": 6,
+                "ccP90": 5
+              },
+              {
+                "elementId": "type:org.junit.platform.commons.util.AnnotationUtils",
+                "file": "junit-platform-commons/src/main/java/org/junit/platform/commons/util/AnnotationUtils.java",
+                "loc": 236,
+                "unitCount": 22,
+                "ccSum": 67,
+                "ccMax": 12,
+                "ccP90": 7
+              },
+              {
+                "elementId": "type:org.junit.jupiter.engine.descriptor.ClassBasedTestDescriptor",
+                "file": "junit-jupiter-engine/src/main/java/org/junit/jupiter/engine/descriptor/ClassBasedTestDescriptor.java",
+                "loc": 373,
+                "unitCount": 42,
+                "ccSum": 66,
+                "ccMax": 8,
+                "ccP90": 3
+              }
+            ],
+            "largestMethodByCcSum": {
+              "elementId": "method:org.junit.jupiter.api.AssertArrayEquals#assertArrayElementsEqual(java.lang.Object,java.lang.Object,java.util.Deque,java.lang.Object)",
+              "file": "junit-jupiter-api/src/main/java/org/junit/jupiter/api/AssertArrayEquals.java",
+              "loc": 41,
+              "unitCount": 1,
+              "ccSum": 24,
+              "ccMax": 24,
+              "ccP90": null
+            }
+          },
+          "fileLocTotal": 133861,
+          "timing": {
+            "wallMillis": 5943,
+            "preParseMillis": 276,
+            "buildMillis": 3240,
+            "visitMillis": 2322,
+            "sinkMillis": 600,
+            "baselineSinkMillis": 578,
+            "locMillis": 18,
+            "ccMillis": 67,
+            "fileLocMillis": 9,
+            "metricMillis": 94,
+            "baselineWallMillis": 5962
+          },
+          "heap": {
+            "peakLiveBytes": 202965440,
+            "peakUsedBytes": 438367904,
+            "baselinePeakLiveBytes": 198159400,
+            "baselinePeakUsedBytes": 455282384
+          },
+          "cacheBytes": 31739904,
+          "baselineCacheBytes": 31068160
+        }
+      ]
+    },
+    {
+      "name": "spring-framework",
+      "origin": "clone",
+      "commitId": "82a6b40b9366ec181ededdad282b307ee5381a52",
+      "sourceRoots": {
+        "MAIN": 30,
+        "GENERATED": 0,
+        "TEST": 30
+      },
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "roots": {
+            "MAIN": 30,
+            "GENERATED": 0,
+            "TEST": 0
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 5459,
+            "analyzed": 5459,
+            "tooLarge": 0,
+            "parseFailed": 0,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 0,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 571,
+            "types": 6923,
+            "methods": 49380,
+            "files": 5459,
+            "externalTypes": 2143,
+            "sourceFiles": 5459,
+            "sourceRoots": 30,
+            "sourceFileStatuses": {
+              "ANALYZED": 5459,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 0
+            }
+          },
+          "dependencies": {
+            "rows": 153274,
+            "occurrences": 314051,
+            "evidenceRows": 298521,
+            "moduleRows": 0
+          },
+          "baselineDifferences": [],
+          "metricRows": {
+            "PACKAGE": 571,
+            "TYPE": 6923,
+            "METHOD": 49380,
+            "FILE": 5459,
+            "external": 0
+          },
+          "violations": {
+            "missingPackage": 0,
+            "missingType": 0,
+            "missingMethod": 0,
+            "externalRows": 0,
+            "foreignAnalysis": 0,
+            "nullPattern": 0,
+            "typeBelowItsMethods": 0,
+            "packageNotItsSum": 0,
+            "locOutsideLines": 0,
+            "fileRowMissing": 0,
+            "fileRowUnexpected": 0,
+            "fileWithoutElement": 0,
+            "fileLocNotSourceFileLoc": 0,
+            "fileLocNotRecount": 0
+          },
+          "samples": {},
+          "methodsWithoutCc": {
+            "abstract": 478,
+            "implicit": 2231,
+            "interfaceOrAnnotation": 4351
+          },
+          "methodsWithoutCcOther": [],
+          "distributions": {
+            "typeCcSum": {
+              "count": 6923,
+              "p50": 5,
+              "p90": 29,
+              "p99": 109,
+              "max": 910
+            },
+            "typeLoc": {
+              "count": 6923,
+              "p50": 26,
+              "p90": 142,
+              "p99": 516,
+              "max": 2703
+            },
+            "methodCcSum": {
+              "count": 42320,
+              "p50": 1,
+              "p90": 4,
+              "p99": 13,
+              "max": 532
+            },
+            "largestTypesByCcSum": [
+              {
+                "elementId": "type:org.springframework.asm.ClassReader",
+                "file": "spring-core/src/main/java/org/springframework/asm/ClassReader.java",
+                "loc": 2703,
+                "unitCount": 52,
+                "ccSum": 910,
+                "ccMax": 532,
+                "ccP90": 25
+              },
+              {
+                "elementId": "type:org.springframework.beans.factory.support.DefaultListableBeanFactory",
+                "file": "spring-beans/src/main/java/org/springframework/beans/factory/support/DefaultListableBeanFactory.java",
+                "loc": 1985,
+                "unitCount": 126,
+                "ccSum": 507,
+                "ccMax": 33,
+                "ccP90": 10
+              },
+              {
+                "elementId": "type:org.springframework.asm.MethodWriter",
+                "file": "spring-core/src/main/java/org/springframework/asm/MethodWriter.java",
+                "loc": 1684,
+                "unitCount": 50,
+                "ccSum": 368,
+                "ccMax": 43,
+                "ccP90": 18
+              },
+              {
+                "elementId": "type:org.springframework.beans.factory.support.AbstractBeanFactory",
+                "file": "spring-beans/src/main/java/org/springframework/beans/factory/support/AbstractBeanFactory.java",
+                "loc": 1290,
+                "unitCount": 92,
+                "ccSum": 361,
+                "ccMax": 57,
+                "ccP90": 9
+              },
+              {
+                "elementId": "type:org.springframework.asm.Frame",
+                "file": "spring-core/src/main/java/org/springframework/asm/Frame.java",
+                "loc": 1009,
+                "unitCount": 23,
+                "ccSum": 349,
+                "ccMax": 191,
+                "ccP90": 20
+              },
+              {
+                "elementId": "type:org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory",
+                "file": "spring-beans/src/main/java/org/springframework/beans/factory/support/AbstractAutowireCapableBeanFactory.java",
+                "loc": 1216,
+                "unitCount": 66,
+                "ccSum": 332,
+                "ccMax": 30,
+                "ccP90": 14
+              },
+              {
+                "elementId": "type:org.springframework.web.util.WhatWgUrlParser",
+                "file": "spring-web/src/main/java/org/springframework/web/util/WhatWgUrlParser.java",
+                "loc": 2131,
+                "unitCount": 47,
+                "ccSum": 289,
+                "ccMax": 44,
+                "ccP90": 16
+              },
+              {
+                "elementId": "type:org.springframework.beans.factory.support.ConstructorResolver",
+                "file": "spring-beans/src/main/java/org/springframework/beans/factory/support/ConstructorResolver.java",
+                "loc": 1090,
+                "unitCount": 34,
+                "ccSum": 269,
+                "ccMax": 65,
+                "ccP90": 14
+              },
+              {
+                "elementId": "type:org.springframework.core.ResolvableType",
+                "file": "spring-core/src/main/java/org/springframework/core/ResolvableType.java",
+                "loc": 966,
+                "unitCount": 80,
+                "ccSum": 268,
+                "ccMax": 38,
+                "ccP90": 7
+              },
+              {
+                "elementId": "type:org.springframework.web.util.WhatWgUrlParser$State",
+                "file": "spring-web/src/main/java/org/springframework/web/util/WhatWgUrlParser.java",
+                "loc": 695,
+                "unitCount": 20,
+                "ccSum": 264,
+                "ccMax": 36,
+                "ccP90": 23
+              }
+            ],
+            "largestMethodByCcSum": {
+              "elementId": "method:org.springframework.asm.ClassReader#readCode(org.springframework.asm.MethodVisitor,org.springframework.asm.Context,int)",
+              "file": "spring-core/src/main/java/org/springframework/asm/ClassReader.java",
+              "loc": 979,
+              "unitCount": 1,
+              "ccSum": 532,
+              "ccMax": 532,
+              "ccP90": null
+            }
+          },
+          "fileLocTotal": 406372,
+          "timing": {
+            "wallMillis": 12834,
+            "preParseMillis": 1093,
+            "buildMillis": 5363,
+            "visitMillis": 5995,
+            "sinkMillis": 1854,
+            "baselineSinkMillis": 1815,
+            "locMillis": 60,
+            "ccMillis": 202,
+            "fileLocMillis": 35,
+            "metricMillis": 297,
+            "baselineWallMillis": 12318
+          },
+          "heap": {
+            "peakLiveBytes": 250891160,
+            "peakUsedBytes": 533692944,
+            "baselinePeakLiveBytes": 260767240,
+            "baselinePeakUsedBytes": 541137712
+          },
+          "cacheBytes": 90574848,
+          "baselineCacheBytes": 88846336
+        },
+        {
+          "selection": "ALL",
+          "roots": {
+            "MAIN": 30,
+            "GENERATED": 0,
+            "TEST": 30
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 9202,
+            "analyzed": 9202,
+            "tooLarge": 0,
+            "parseFailed": 0,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 0,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 0,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 817,
+            "types": 18468,
+            "methods": 103864,
+            "files": 9202,
+            "externalTypes": 2709,
+            "sourceFiles": 9202,
+            "sourceRoots": 60,
+            "sourceFileStatuses": {
+              "ANALYZED": 9202,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 0
+            }
+          },
+          "dependencies": {
+            "rows": 280542,
+            "occurrences": 710899,
+            "evidenceRows": 605847,
+            "moduleRows": 0
+          },
+          "baselineDifferences": [],
+          "metricRows": {
+            "PACKAGE": 817,
+            "TYPE": 18468,
+            "METHOD": 103864,
+            "FILE": 9202,
+            "external": 0
+          },
+          "violations": {
+            "missingPackage": 0,
+            "missingType": 0,
+            "missingMethod": 0,
+            "externalRows": 0,
+            "foreignAnalysis": 0,
+            "nullPattern": 0,
+            "typeBelowItsMethods": 0,
+            "packageNotItsSum": 0,
+            "locOutsideLines": 0,
+            "fileRowMissing": 0,
+            "fileRowUnexpected": 0,
+            "fileWithoutElement": 0,
+            "fileLocNotSourceFileLoc": 0,
+            "fileLocNotRecount": 0
+          },
+          "samples": {},
+          "methodsWithoutCc": {
+            "abstract": 636,
+            "implicit": 11298,
+            "interfaceOrAnnotation": 5936
+          },
+          "methodsWithoutCcOther": [],
+          "distributions": {
+            "typeCcSum": {
+              "count": 18468,
+              "p50": 2,
+              "p90": 18,
+              "p99": 77,
+              "max": 910
+            },
+            "typeLoc": {
+              "count": 18468,
+              "p50": 14,
+              "p90": 119,
+              "p99": 528,
+              "max": 5936
+            },
+            "methodCcSum": {
+              "count": 85994,
+              "p50": 1,
+              "p90": 3,
+              "p99": 10,
+              "max": 532
+            },
+            "largestTypesByCcSum": [
+              {
+                "elementId": "type:org.springframework.asm.ClassReader",
+                "file": "spring-core/src/main/java/org/springframework/asm/ClassReader.java",
+                "loc": 2703,
+                "unitCount": 52,
+                "ccSum": 910,
+                "ccMax": 532,
+                "ccP90": 25
+              },
+              {
+                "elementId": "type:org.springframework.beans.factory.support.DefaultListableBeanFactory",
+                "file": "spring-beans/src/main/java/org/springframework/beans/factory/support/DefaultListableBeanFactory.java",
+                "loc": 1985,
+                "unitCount": 126,
+                "ccSum": 507,
+                "ccMax": 33,
+                "ccP90": 10
+              },
+              {
+                "elementId": "type:org.springframework.asm.MethodWriter",
+                "file": "spring-core/src/main/java/org/springframework/asm/MethodWriter.java",
+                "loc": 1684,
+                "unitCount": 50,
+                "ccSum": 368,
+                "ccMax": 43,
+                "ccP90": 18
+              },
+              {
+                "elementId": "type:org.springframework.beans.factory.support.AbstractBeanFactory",
+                "file": "spring-beans/src/main/java/org/springframework/beans/factory/support/AbstractBeanFactory.java",
+                "loc": 1290,
+                "unitCount": 92,
+                "ccSum": 361,
+                "ccMax": 57,
+                "ccP90": 9
+              },
+              {
+                "elementId": "type:org.springframework.asm.Frame",
+                "file": "spring-core/src/main/java/org/springframework/asm/Frame.java",
+                "loc": 1009,
+                "unitCount": 23,
+                "ccSum": 349,
+                "ccMax": 191,
+                "ccP90": 20
+              },
+              {
+                "elementId": "type:org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory",
+                "file": "spring-beans/src/main/java/org/springframework/beans/factory/support/AbstractAutowireCapableBeanFactory.java",
+                "loc": 1216,
+                "unitCount": 66,
+                "ccSum": 332,
+                "ccMax": 30,
+                "ccP90": 14
+              },
+              {
+                "elementId": "type:org.springframework.web.util.WhatWgUrlParser",
+                "file": "spring-web/src/main/java/org/springframework/web/util/WhatWgUrlParser.java",
+                "loc": 2131,
+                "unitCount": 47,
+                "ccSum": 289,
+                "ccMax": 44,
+                "ccP90": 16
+              },
+              {
+                "elementId": "type:org.springframework.beans.factory.support.ConstructorResolver",
+                "file": "spring-beans/src/main/java/org/springframework/beans/factory/support/ConstructorResolver.java",
+                "loc": 1090,
+                "unitCount": 34,
+                "ccSum": 269,
+                "ccMax": 65,
+                "ccP90": 14
+              },
+              {
+                "elementId": "type:org.springframework.core.ResolvableType",
+                "file": "spring-core/src/main/java/org/springframework/core/ResolvableType.java",
+                "loc": 966,
+                "unitCount": 80,
+                "ccSum": 268,
+                "ccMax": 38,
+                "ccP90": 7
+              },
+              {
+                "elementId": "type:org.springframework.web.util.WhatWgUrlParser$State",
+                "file": "spring-web/src/main/java/org/springframework/web/util/WhatWgUrlParser.java",
+                "loc": 695,
+                "unitCount": 20,
+                "ccSum": 264,
+                "ccMax": 36,
+                "ccP90": 23
+              }
+            ],
+            "largestMethodByCcSum": {
+              "elementId": "method:org.springframework.asm.ClassReader#readCode(org.springframework.asm.MethodVisitor,org.springframework.asm.Context,int)",
+              "file": "spring-core/src/main/java/org/springframework/asm/ClassReader.java",
+              "loc": 979,
+              "unitCount": 1,
+              "ccSum": 532,
+              "ccMax": 532,
+              "ccP90": null
+            }
+          },
+          "fileLocTotal": 851937,
+          "timing": {
+            "wallMillis": 29238,
+            "preParseMillis": 1613,
+            "buildMillis": 13070,
+            "visitMillis": 13683,
+            "sinkMillis": 3951,
+            "baselineSinkMillis": 3761,
+            "locMillis": 99,
+            "ccMillis": 460,
+            "fileLocMillis": 63,
+            "metricMillis": 622,
+            "baselineWallMillis": 27174
+          },
+          "heap": {
+            "peakLiveBytes": 285976760,
+            "peakUsedBytes": 610001096,
+            "baselinePeakLiveBytes": 307320848,
+            "baselinePeakUsedBytes": 609836904
+          },
+          "cacheBytes": 188379136,
+          "baselineCacheBytes": 184455168
+        }
+      ]
+    },
+    {
+      "name": "elasticsearch",
+      "origin": "clone",
+      "commitId": "b42549c72e6e040825b13e5d8ebf7ff63886b24d",
+      "sourceRoots": {
+        "MAIN": 292,
+        "GENERATED": 0,
+        "TEST": 235
+      },
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "roots": {
+            "MAIN": 292,
+            "GENERATED": 0,
+            "TEST": 0
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 16848,
+            "analyzed": 16847,
+            "tooLarge": 0,
+            "parseFailed": 1,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 1,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 0,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 2007,
+            "types": 26883,
+            "methods": 202690,
+            "files": 16848,
+            "externalTypes": 5274,
+            "sourceFiles": 16848,
+            "sourceRoots": 292,
+            "sourceFileStatuses": {
+              "ANALYZED": 16847,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 1
+            }
+          },
+          "dependencies": {
+            "rows": 758143,
+            "occurrences": 1571606,
+            "evidenceRows": 1460020,
+            "moduleRows": 778
+          },
+          "baselineDifferences": [],
+          "metricRows": {
+            "PACKAGE": 2007,
+            "TYPE": 26883,
+            "METHOD": 202690,
+            "FILE": 16848,
+            "external": 0
+          },
+          "violations": {
+            "missingPackage": 0,
+            "missingType": 0,
+            "missingMethod": 0,
+            "externalRows": 0,
+            "foreignAnalysis": 0,
+            "nullPattern": 0,
+            "typeBelowItsMethods": 0,
+            "packageNotItsSum": 0,
+            "locOutsideLines": 0,
+            "fileRowMissing": 0,
+            "fileRowUnexpected": 0,
+            "fileWithoutElement": 0,
+            "fileLocNotSourceFileLoc": 0,
+            "fileLocNotRecount": 0
+          },
+          "samples": {},
+          "methodsWithoutCc": {
+            "abstract": 2575,
+            "implicit": 11477,
+            "interfaceOrAnnotation": 5923,
+            "native": 36
+          },
+          "methodsWithoutCcOther": [],
+          "distributions": {
+            "typeCcSum": {
+              "count": 26883,
+              "p50": 7,
+              "p90": 32,
+              "p99": 128,
+              "max": 913
+            },
+            "typeLoc": {
+              "count": 26883,
+              "p50": 37,
+              "p90": 193,
+              "p99": 760,
+              "max": 10709
+            },
+            "methodCcSum": {
+              "count": 182679,
+              "p50": 1,
+              "p90": 4,
+              "p99": 14,
+              "max": 296
+            },
+            "largestTypesByCcSum": [
+              {
+                "elementId": "type:org.elasticsearch.xpack.sql.parser.SqlBaseParser",
+                "file": "x-pack/plugin/sql/src/main/java/org/elasticsearch/xpack/sql/parser/SqlBaseParser.java",
+                "loc": 8657,
+                "unitCount": 80,
+                "ccSum": 913,
+                "ccMax": 260,
+                "ccP90": 16
+              },
+              {
+                "elementId": "type:org.elasticsearch.index.shard.IndexShard",
+                "file": "server/src/main/java/org/elasticsearch/index/shard/IndexShard.java",
+                "loc": 3542,
+                "unitCount": 295,
+                "ccSum": 784,
+                "ccMax": 51,
+                "ccP90": 5
+              },
+              {
+                "elementId": "type:org.elasticsearch.xpack.esql.datasource.csv.CsvFormatReader$CsvBatchIterator",
+                "file": "x-pack/plugin/esql-datasource-csv/src/main/java/org/elasticsearch/xpack/esql/datasource/csv/CsvFormatReader.java",
+                "loc": 2394,
+                "unitCount": 81,
+                "ccSum": 752,
+                "ccMax": 76,
+                "ccP90": 25
+              },
+              {
+                "elementId": "type:org.elasticsearch.xpack.esql.parser.EsqlBaseParser",
+                "file": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/parser/EsqlBaseParser.java",
+                "loc": 10709,
+                "unitCount": 148,
+                "ccSum": 714,
+                "ccMax": 36,
+                "ccP90": 10
+              },
+              {
+                "elementId": "type:org.elasticsearch.index.engine.InternalEngine",
+                "file": "server/src/main/java/org/elasticsearch/index/engine/InternalEngine.java",
+                "loc": 3219,
+                "unitCount": 200,
+                "ccSum": 704,
+                "ccMax": 43,
+                "ccP90": 9
+              },
+              {
+                "elementId": "type:org.elasticsearch.xpack.esql.datasource.parquet.ParquetPushedExpressions",
+                "file": "x-pack/plugin/esql-datasource-parquet/src/main/java/org/elasticsearch/xpack/esql/datasource/parquet/ParquetPushedExpressions.java",
+                "loc": 1564,
+                "unitCount": 79,
+                "ccSum": 591,
+                "ccMax": 63,
+                "ccP90": 15
+              },
+              {
+                "elementId": "type:org.elasticsearch.painless.phase.DefaultSemanticAnalysisPhase",
+                "file": "modules/lang-painless/src/main/java/org/elasticsearch/painless/phase/DefaultSemanticAnalysisPhase.java",
+                "loc": 2470,
+                "unitCount": 49,
+                "ccSum": 563,
+                "ccMax": 90,
+                "ccP90": 25
+              },
+              {
+                "elementId": "type:org.elasticsearch.test.rest.ESRestTestCase",
+                "file": "test/framework/src/main/java/org/elasticsearch/test/rest/ESRestTestCase.java",
+                "loc": 2378,
+                "unitCount": 202,
+                "ccSum": 545,
+                "ccMax": 44,
+                "ccP90": 5
+              },
+              {
+                "elementId": "type:org.elasticsearch.xpack.esql.datasource.csv.CsvFormatReader",
+                "file": "x-pack/plugin/esql-datasource-csv/src/main/java/org/elasticsearch/xpack/esql/datasource/csv/CsvFormatReader.java",
+                "loc": 4195,
+                "unitCount": 95,
+                "ccSum": 529,
+                "ccMax": 54,
+                "ccP90": 12
+              },
+              {
+                "elementId": "type:org.elasticsearch.painless.antlr.PainlessParser",
+                "file": "modules/lang-painless/src/main/java/org/elasticsearch/painless/antlr/PainlessParser.java",
+                "loc": 5176,
+                "unitCount": 56,
+                "ccSum": 514,
+                "ccMax": 92,
+                "ccP90": 28
+              }
+            ],
+            "largestMethodByCcSum": {
+              "elementId": "method:org.elasticsearch.painless.AnalyzerCaster#getLegalCast(org.elasticsearch.painless.Location,java.lang.Class,java.lang.Class,boolean,boolean)",
+              "file": "modules/lang-painless/src/main/java/org/elasticsearch/painless/AnalyzerCaster.java",
+              "loc": 374,
+              "unitCount": 1,
+              "ccSum": 296,
+              "ccMax": 296,
+              "ccP90": null
+            }
+          },
+          "fileLocTotal": 2148143,
+          "timing": {
+            "wallMillis": 85621,
+            "preParseMillis": 4059,
+            "buildMillis": 48760,
+            "visitMillis": 30834,
+            "sinkMillis": 9178,
+            "baselineSinkMillis": 8549,
+            "locMillis": 221,
+            "ccMillis": 1072,
+            "fileLocMillis": 138,
+            "metricMillis": 1431,
+            "baselineWallMillis": 81104
+          },
+          "heap": {
+            "peakLiveBytes": 810332160,
+            "peakUsedBytes": 1325568704,
+            "baselinePeakLiveBytes": 814639696,
+            "baselinePeakUsedBytes": 1295936080
+          },
+          "cacheBytes": 412045312,
+          "baselineCacheBytes": 404484096
+        },
+        {
+          "selection": "ALL",
+          "roots": {
+            "MAIN": 292,
+            "GENERATED": 0,
+            "TEST": 235
+          },
+          "outcome": "COMPLETED",
+          "files": {
+            "total": 26782,
+            "analyzed": 26779,
+            "tooLarge": 0,
+            "parseFailed": 3,
+            "parseFailedByCause": {
+              "SYNTAX_ERROR": 0,
+              "NESTING_TOO_DEEP": 0,
+              "PRE_PARSE_CRASH": 0,
+              "MODEL_BUILD_CRASH": 3,
+              "DROPPED_BY_SPOON": 0,
+              "EXTRACTION_CRASH": 0,
+              "UNREADABLE": 0
+            }
+          },
+          "elements": {
+            "packages": 2129,
+            "types": 39364,
+            "methods": 328022,
+            "files": 26782,
+            "externalTypes": 6424,
+            "sourceFiles": 26782,
+            "sourceRoots": 527,
+            "sourceFileStatuses": {
+              "ANALYZED": 26779,
+              "SKIPPED_TOO_LARGE": 0,
+              "PARSE_FAILED": 3
+            }
+          },
+          "dependencies": {
+            "rows": 1181559,
+            "occurrences": 3338510,
+            "evidenceRows": 2636122,
+            "moduleRows": 778
+          },
+          "baselineDifferences": [],
+          "metricRows": {
+            "PACKAGE": 2129,
+            "TYPE": 39364,
+            "METHOD": 328022,
+            "FILE": 26782,
+            "external": 0
+          },
+          "violations": {
+            "missingPackage": 0,
+            "missingType": 0,
+            "missingMethod": 0,
+            "externalRows": 0,
+            "foreignAnalysis": 0,
+            "nullPattern": 0,
+            "typeBelowItsMethods": 0,
+            "packageNotItsSum": 0,
+            "locOutsideLines": 0,
+            "fileRowMissing": 0,
+            "fileRowUnexpected": 0,
+            "fileWithoutElement": 0,
+            "fileLocNotSourceFileLoc": 0,
+            "fileLocNotRecount": 0
+          },
+          "samples": {},
+          "methodsWithoutCc": {
+            "abstract": 3027,
+            "implicit": 22185,
+            "interfaceOrAnnotation": 6161,
+            "native": 41,
+            "other": 1
+          },
+          "methodsWithoutCcOther": [
+            "method:org.elasticsearch.repositories.s3.S3BlobContainerRetriesTests#addHandler(java.lang.String,java.lang.Integer[]) @ modules/repository-s3/src/test/java/org/elasticsearch/repositories/s3/S3BlobContainerRetriesTests.java:1104-1104 [] in CLASS"
+          ],
+          "distributions": {
+            "typeCcSum": {
+              "count": 39364,
+              "p50": 7,
+              "p90": 33,
+              "p99": 121,
+              "max": 913
+            },
+            "typeLoc": {
+              "count": 39364,
+              "p50": 42,
+              "p90": 238,
+              "p99": 974,
+              "max": 10709
+            },
+            "methodCcSum": {
+              "count": 296607,
+              "p50": 1,
+              "p90": 4,
+              "p99": 12,
+              "max": 296
+            },
+            "largestTypesByCcSum": [
+              {
+                "elementId": "type:org.elasticsearch.xpack.sql.parser.SqlBaseParser",
+                "file": "x-pack/plugin/sql/src/main/java/org/elasticsearch/xpack/sql/parser/SqlBaseParser.java",
+                "loc": 8657,
+                "unitCount": 80,
+                "ccSum": 913,
+                "ccMax": 260,
+                "ccP90": 16
+              },
+              {
+                "elementId": "type:org.elasticsearch.index.shard.IndexShard",
+                "file": "server/src/main/java/org/elasticsearch/index/shard/IndexShard.java",
+                "loc": 3542,
+                "unitCount": 295,
+                "ccSum": 784,
+                "ccMax": 51,
+                "ccP90": 5
+              },
+              {
+                "elementId": "type:org.elasticsearch.xpack.esql.datasource.csv.CsvFormatReader$CsvBatchIterator",
+                "file": "x-pack/plugin/esql-datasource-csv/src/main/java/org/elasticsearch/xpack/esql/datasource/csv/CsvFormatReader.java",
+                "loc": 2394,
+                "unitCount": 81,
+                "ccSum": 752,
+                "ccMax": 76,
+                "ccP90": 25
+              },
+              {
+                "elementId": "type:org.elasticsearch.index.engine.InternalEngineTests",
+                "file": "server/src/test/java/org/elasticsearch/index/engine/InternalEngineTests.java",
+                "loc": 7374,
+                "unitCount": 223,
+                "ccSum": 732,
+                "ccMax": 37,
+                "ccP90": 7
+              },
+              {
+                "elementId": "type:org.elasticsearch.xpack.esql.parser.EsqlBaseParser",
+                "file": "x-pack/plugin/esql/src/main/java/org/elasticsearch/xpack/esql/parser/EsqlBaseParser.java",
+                "loc": 10709,
+                "unitCount": 148,
+                "ccSum": 714,
+                "ccMax": 36,
+                "ccP90": 10
+              },
+              {
+                "elementId": "type:org.elasticsearch.index.engine.InternalEngine",
+                "file": "server/src/main/java/org/elasticsearch/index/engine/InternalEngine.java",
+                "loc": 3219,
+                "unitCount": 200,
+                "ccSum": 704,
+                "ccMax": 43,
+                "ccP90": 9
+              },
+              {
+                "elementId": "type:org.elasticsearch.xpack.esql.datasource.csv.CsvFormatReaderTests",
+                "file": "x-pack/plugin/esql-datasource-csv/src/test/java/org/elasticsearch/xpack/esql/datasource/csv/CsvFormatReaderTests.java",
+                "loc": 6813,
+                "unitCount": 482,
+                "ccSum": 674,
+                "ccMax": 13,
+                "ccP90": 2
+              },
+              {
+                "elementId": "type:org.elasticsearch.xpack.esql.datasource.parquet.ParquetPushedExpressions",
+                "file": "x-pack/plugin/esql-datasource-parquet/src/main/java/org/elasticsearch/xpack/esql/datasource/parquet/ParquetPushedExpressions.java",
+                "loc": 1564,
+                "unitCount": 79,
+                "ccSum": 591,
+                "ccMax": 63,
+                "ccP90": 15
+              },
+              {
+                "elementId": "type:org.elasticsearch.painless.phase.DefaultSemanticAnalysisPhase",
+                "file": "modules/lang-painless/src/main/java/org/elasticsearch/painless/phase/DefaultSemanticAnalysisPhase.java",
+                "loc": 2470,
+                "unitCount": 49,
+                "ccSum": 563,
+                "ccMax": 90,
+                "ccP90": 25
+              },
+              {
+                "elementId": "type:org.elasticsearch.test.rest.ESRestTestCase",
+                "file": "test/framework/src/main/java/org/elasticsearch/test/rest/ESRestTestCase.java",
+                "loc": 2378,
+                "unitCount": 202,
+                "ccSum": 545,
+                "ccMax": 44,
+                "ccP90": 5
+              }
+            ],
+            "largestMethodByCcSum": {
+              "elementId": "method:org.elasticsearch.painless.AnalyzerCaster#getLegalCast(org.elasticsearch.painless.Location,java.lang.Class,java.lang.Class,boolean,boolean)",
+              "file": "modules/lang-painless/src/main/java/org/elasticsearch/painless/AnalyzerCaster.java",
+              "loc": 374,
+              "unitCount": 1,
+              "ccSum": 296,
+              "ccMax": 296,
+              "ccP90": null
+            }
+          },
+          "fileLocTotal": 4102616,
+          "timing": {
+            "wallMillis": 195718,
+            "preParseMillis": 5711,
+            "buildMillis": 124679,
+            "visitMillis": 61598,
+            "sinkMillis": 16636,
+            "baselineSinkMillis": 14991,
+            "locMillis": 416,
+            "ccMillis": 2362,
+            "fileLocMillis": 259,
+            "metricMillis": 3037,
+            "baselineWallMillis": 185379
+          },
+          "heap": {
+            "peakLiveBytes": 1201611392,
+            "peakUsedBytes": 1953979400,
+            "baselinePeakLiveBytes": 1141662832,
+            "baselinePeakUsedBytes": 1903978248
+          },
+          "cacheBytes": 684036096,
+          "baselineCacheBytes": 671961088
+        }
+      ]
+    }
+  ]
+}
