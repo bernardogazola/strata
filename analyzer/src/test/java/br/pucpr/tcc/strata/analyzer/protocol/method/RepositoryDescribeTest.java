@@ -2,7 +2,10 @@ package br.pucpr.tcc.strata.analyzer.protocol.method;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import br.pucpr.tcc.strata.analyzer.analysis.AnalysisRegistry;
+import br.pucpr.tcc.strata.analyzer.analysis.RegistrySettings;
 import br.pucpr.tcc.strata.analyzer.bootstrap.Handlers;
+import br.pucpr.tcc.strata.analyzer.persistence.PersistenceRoot;
 import br.pucpr.tcc.strata.analyzer.protocol.CanonicalJson;
 import br.pucpr.tcc.strata.analyzer.protocol.Dispatcher;
 import br.pucpr.tcc.strata.analyzer.protocol.JsonLines;
@@ -10,8 +13,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -20,8 +26,23 @@ final class RepositoryDescribeTest {
   private static final String ID = "req_01JQ8ZG1B2C3D4E5F6G7H8J9K0";
 
   private final ObjectMapper inbound = JsonLines.strictInboundMapper();
-  private final Dispatcher dispatcher =
-      Dispatcher.of(inbound, Handlers.all(() -> 0L, new AtomicBoolean(false)));
+
+  @TempDir Path dados;
+
+  private Dispatcher dispatcher;
+
+  @BeforeEach
+  void montarDespachante() throws IOException {
+    final AnalysisRegistry analises =
+        new AnalysisRegistry(
+            RegistrySettings.production(
+                PersistenceRoot.prepare(dados),
+                envelope -> {
+                  throw new AssertionError("o describe não emite quadro fora da resposta");
+                },
+                "0.0.0-test"));
+    dispatcher = Dispatcher.of(inbound, Handlers.all(() -> 0L, new AtomicBoolean(false), analises));
+  }
 
   private String despachar(String repositoryPath) throws IOException {
     final ObjectNode frame = inbound.createObjectNode();

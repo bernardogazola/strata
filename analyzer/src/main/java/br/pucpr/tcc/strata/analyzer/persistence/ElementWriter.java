@@ -40,16 +40,21 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public final class ElementWriter implements ElementSink, StructureSink {
+
+  private static final BooleanSupplier NEVER_CANCELLED = () -> false;
 
   private final SqliteConnections connections;
   private final long analysisPk;
   private final List<SourceRoot> roots;
   private final List<JavaSource> sources;
   private final int flushRows;
+
+  private final BooleanSupplier cancelled;
 
   private final Map<SourceRootId, Long> rootPks = new HashMap<>();
 
@@ -72,7 +77,16 @@ public final class ElementWriter implements ElementSink, StructureSink {
       long analysisPk,
       List<SourceRoot> roots,
       List<JavaSource> sources) {
-    this(connections, analysisPk, roots, sources, AnalysisConstants.ELEMENT_FLUSH_ROWS);
+    this(connections, analysisPk, roots, sources, NEVER_CANCELLED);
+  }
+
+  public ElementWriter(
+      SqliteConnections connections,
+      long analysisPk,
+      List<SourceRoot> roots,
+      List<JavaSource> sources,
+      BooleanSupplier cancelled) {
+    this(connections, analysisPk, roots, sources, AnalysisConstants.ELEMENT_FLUSH_ROWS, cancelled);
   }
 
   ElementWriter(
@@ -81,6 +95,16 @@ public final class ElementWriter implements ElementSink, StructureSink {
       List<SourceRoot> roots,
       List<JavaSource> sources,
       int flushRows) {
+    this(connections, analysisPk, roots, sources, flushRows, NEVER_CANCELLED);
+  }
+
+  ElementWriter(
+      SqliteConnections connections,
+      long analysisPk,
+      List<SourceRoot> roots,
+      List<JavaSource> sources,
+      int flushRows,
+      BooleanSupplier cancelled) {
     if (flushRows < 1) {
       throw new IllegalArgumentException("um flush tem pelo menos uma linha: " + flushRows);
     }
@@ -89,6 +113,7 @@ public final class ElementWriter implements ElementSink, StructureSink {
     this.roots = List.copyOf(Objects.requireNonNull(roots, "roots"));
     this.sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
     this.flushRows = flushRows;
+    this.cancelled = Objects.requireNonNull(cancelled, "cancelled");
   }
 
   @Override

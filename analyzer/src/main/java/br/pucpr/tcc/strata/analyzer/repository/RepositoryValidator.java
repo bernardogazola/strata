@@ -13,6 +13,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
+import java.util.function.IntConsumer;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
@@ -21,6 +23,9 @@ import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.util.FS;
 
 public final class RepositoryValidator {
+
+  private static final BooleanSupplier NEVER_CANCELLED = () -> false;
+  private static final IntConsumer IGNORE_JAVA_FILES_SEEN = seen -> {};
 
   private final RepositoryLimits limits;
   private final ProjectLayoutDetector layoutDetector;
@@ -43,7 +48,14 @@ public final class RepositoryValidator {
   }
 
   public RepositoryOutcome<RepositorySnapshot> inspect(Path claimedRoot) {
+    return inspect(claimedRoot, NEVER_CANCELLED, IGNORE_JAVA_FILES_SEEN);
+  }
+
+  public RepositoryOutcome<RepositorySnapshot> inspect(
+      Path claimedRoot, BooleanSupplier cancelled, IntConsumer javaFilesSeen) {
     Objects.requireNonNull(claimedRoot, "claimedRoot");
+    Objects.requireNonNull(cancelled, "cancelled");
+    Objects.requireNonNull(javaFilesSeen, "javaFilesSeen");
     if (!claimedRoot.isAbsolute()) {
       Log.warn("o caminho do repositório " + claimedRoot + " não é absoluto");
       return rejected(RepositoryIssue.pathChanged());
@@ -75,14 +87,28 @@ public final class RepositoryValidator {
   }
 
   public RepositoryOutcome<ValidatedRepository> validate(Path claimedRoot) {
-    return switch (inspect(claimedRoot)) {
+    return validate(claimedRoot, NEVER_CANCELLED, IGNORE_JAVA_FILES_SEEN);
+  }
+
+  public RepositoryOutcome<ValidatedRepository> validate(
+      Path claimedRoot, BooleanSupplier cancelled, IntConsumer javaFilesSeen) {
+    return switch (inspect(claimedRoot, cancelled, javaFilesSeen)) {
       case RepositoryOutcome.Rejected<RepositorySnapshot>(RepositoryIssue reason) ->
           rejected(reason);
       case RepositoryOutcome.Accepted<RepositorySnapshot>(
               RepositorySnapshot snapshot,
               List<RepositoryIssue> warnings) ->
-          withLayout(snapshot, warnings);
+          withWarnings(discoverLayout(snapshot), warnings);
     };
+  }
+
+  public RepositoryOutcome<ValidatedRepository> discoverLayout(RepositorySnapshot snapshot) {
+    Objects.requireNonNull(snapshot, "snapshot");
+    final ProjectLayout layout = layoutDetector.detect(snapshot.root(), snapshot.inventory());
+    if (layout.sourceRoots().isEmpty()) {
+      return rejected(RepositoryIssue.noJavaSources());
+    }
+    return new RepositoryOutcome.Accepted<>(new ValidatedRepository(snapshot, layout), List.of());
   }
 
   private static boolean isListable(Path real) {
@@ -157,13 +183,14 @@ public final class RepositoryValidator {
     };
   }
 
-  private RepositoryOutcome<ValidatedRepository> withLayout(
-      RepositorySnapshot snapshot, List<RepositoryIssue> warnings) {
-    final ProjectLayout layout = layoutDetector.detect(snapshot.root(), snapshot.inventory());
-    if (layout.sourceRoots().isEmpty()) {
-      return rejected(RepositoryIssue.noJavaSources());
-    }
-    return new RepositoryOutcome.Accepted<>(new ValidatedRepository(snapshot, layout), warnings);
+  private static RepositoryOutcome<ValidatedRepository> withWarnings(
+      RepositoryOutcome<ValidatedRepository> layout, List<RepositoryIssue> warnings) {
+    return switch (layout) {
+      case RepositoryOutcome.Rejected<ValidatedRepository>(RepositoryIssue reason) ->
+          rejected(reason);
+      case RepositoryOutcome.Accepted<ValidatedRepository>(ValidatedRepository validated, var _) ->
+          new RepositoryOutcome.Accepted<>(validated, warnings);
+    };
   }
 
   private List<RepositoryIssue> capped(

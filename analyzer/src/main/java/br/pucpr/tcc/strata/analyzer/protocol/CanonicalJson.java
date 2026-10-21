@@ -14,6 +14,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,7 +46,24 @@ public final class CanonicalJson {
   }
 
   public void writeTo(Envelope envelope, OutputStream out) throws IOException {
-    final JsonNode node = EnvelopeCodec.toNode(mapper, envelope);
+    write(EnvelopeCodec.toNode(mapper, envelope), out);
+  }
+
+  public byte[] valueToBytes(Object value) {
+    final ByteArrayOutputStream buffer = new ByteArrayOutputStream(128);
+    try {
+      write(mapper.valueToTree(value), buffer);
+    } catch (IOException impossible) {
+      throw new UncheckedIOException("ByteArrayOutputStream não falha", impossible);
+    }
+    return buffer.toByteArray();
+  }
+
+  public String valueToString(Object value) {
+    return new String(valueToBytes(value), StandardCharsets.UTF_8);
+  }
+
+  private void write(JsonNode node, OutputStream out) throws IOException {
     final JsonGenerator generator = factory.createGenerator(out, JsonEncoding.UTF8);
     writeNode(node, generator);
     generator.flush();

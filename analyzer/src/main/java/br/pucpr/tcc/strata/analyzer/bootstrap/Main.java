@@ -1,5 +1,7 @@
 package br.pucpr.tcc.strata.analyzer.bootstrap;
 
+import br.pucpr.tcc.strata.analyzer.analysis.AnalysisRegistry;
+import br.pucpr.tcc.strata.analyzer.analysis.RegistrySettings;
 import br.pucpr.tcc.strata.analyzer.persistence.PersistenceRoot;
 import br.pucpr.tcc.strata.analyzer.protocol.CanonicalJson;
 import br.pucpr.tcc.strata.analyzer.protocol.Dispatcher;
@@ -46,9 +48,13 @@ public final class Main {
           new JsonLines.Writer(
               capture.protocolStream(), new CanonicalJson(), AnalysisConstants.MAX_FRAME_BYTES);
 
-      writer.emit(Envelope.protocolReady(analyzerVersion()));
+      final String version = analyzerVersion();
+      writer.emit(Envelope.protocolReady(version));
 
-      final List<MethodHandler<?>> handlers = Handlers.all(Uptime.monotonic(), shutdownRequested);
+      final AnalysisRegistry analyses =
+          new AnalysisRegistry(RegistrySettings.production(persistence, writer, version));
+      final List<MethodHandler<?>> handlers =
+          Handlers.all(Uptime.monotonic(), shutdownRequested, analyses);
       final Dispatcher dispatcher = Dispatcher.of(JsonLines.strictInboundMapper(), handlers);
 
       exitCode =

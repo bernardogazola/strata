@@ -62,7 +62,9 @@ public final class Lifecycle {
               }
             }
             case Dispatcher.Outcome.Respond respond -> {
-              emit(respond.envelope());
+              if (emit(respond.envelope())) {
+                runAfterEmit(respond.afterEmit());
+              }
               if (shutdownRequested.get()) {
                 return AnalysisConstants.EXIT_OK;
               }
@@ -77,9 +79,10 @@ public final class Lifecycle {
     return malformed;
   }
 
-  private void emit(Envelope envelope) throws IOException {
+  private boolean emit(Envelope envelope) throws IOException {
     try {
       sink.emit(envelope);
+      return true;
     } catch (JsonLines.FrameTooLargeException tooLarge) {
       if (envelope instanceof Envelope.OkResponse response) {
         sink.emit(
@@ -89,6 +92,15 @@ public final class Lifecycle {
       } else {
         Log.error("descartando um frame grande demais que não traz id para responder", tooLarge);
       }
+      return false;
+    }
+  }
+
+  private static void runAfterEmit(Runnable afterEmit) {
+    try {
+      afterEmit.run();
+    } catch (RuntimeException failed) {
+      Log.error("o gancho de uma resposta emitida falhou", failed);
     }
   }
 

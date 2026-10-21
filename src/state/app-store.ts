@@ -32,7 +32,7 @@ export interface AnalysisWarning {
   readonly error: ProtocolError;
 }
 
-export const MAX_RETAINED_WARNINGS = 200;
+export const MAX_RETAINED_WARNINGS = 500;
 
 interface AppState {
   readonly activeElementId: string | null;

@@ -2,7 +2,9 @@ package br.pucpr.tcc.strata.analyzer.protocol;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.bootstrap.UntrustedText;
+import br.pucpr.tcc.strata.analyzer.persistence.CacheUnavailableException;
 import br.pucpr.tcc.strata.analyzer.repository.RepositoryIssue;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.SourceIssue;
 import java.util.Map;
 
 public final class ErrorCodes {
@@ -13,6 +15,10 @@ public final class ErrorCodes {
   public static final String INTERNAL_UNEXPECTED = "INTERNAL_UNEXPECTED";
   public static final String CACHE_CORRUPT = "CACHE_CORRUPT";
   public static final String CACHE_MIGRATION_FAILED = "CACHE_MIGRATION_FAILED";
+  public static final String CACHE_UNAVAILABLE = "CACHE_UNAVAILABLE";
+  public static final String ANALYSIS_ALREADY_RUNNING = "ANALYSIS_ALREADY_RUNNING";
+  public static final String ANALYSIS_NOT_FOUND = "ANALYSIS_NOT_FOUND";
+  public static final String ANALYSIS_TOO_MANY_JAVA_SOURCES = "ANALYSIS_TOO_MANY_JAVA_SOURCES";
 
   public static final String ORIGIN_ANALYZER = "analyzer";
 
@@ -85,6 +91,60 @@ public final class ErrorCodes {
           case REPO_UNREADABLE -> "uma entrada sob a raiz do repositório foi ignorada sem ser lida";
           case REPO_NO_HISTORY ->
               "o HEAD ainda não aponta para nenhum commit; a análise estrutural roda e os estágios de histórico são pulados";
+        };
+    return new ProtocolError(issue.code().name(), detail, ORIGIN_ANALYZER, issue.params());
+  }
+
+  public static ProtocolError analysisAlreadyRunning() {
+    return new ProtocolError(
+        ANALYSIS_ALREADY_RUNNING,
+        "já há uma análise rodando neste processo do analisador",
+        ORIGIN_ANALYZER,
+        Map.of());
+  }
+
+  public static ProtocolError analysisNotFound() {
+    return new ProtocolError(
+        ANALYSIS_NOT_FOUND,
+        "nenhuma análise com este id está disponível neste processo do analisador",
+        ORIGIN_ANALYZER,
+        Map.of());
+  }
+
+  public static ProtocolError tooManyJavaSources(int limit, int found) {
+    return new ProtocolError(
+        ANALYSIS_TOO_MANY_JAVA_SOURCES,
+        "as raízes de código selecionadas têm mais arquivos Java que o teto de arquivos analisados",
+        ORIGIN_ANALYZER,
+        Map.of("limit", limit, "found", found));
+  }
+
+  public static ProtocolError cacheUnavailable(CacheUnavailableException.Kind kind) {
+    final String detail =
+        switch (kind) {
+          case LOCKED ->
+              "outro processo segura o lock do cache da análise além do tempo de espera pelo lock";
+          case LOCATION_INSIDE_REPOSITORY ->
+              "o diretório do cache fica dentro do repositório analisado, que nunca é escrito";
+          case PRAGMA_REFUSED ->
+              "a conexão com o cache da análise não aceitou um pragma obrigatório";
+          case STORAGE -> "o armazenamento do cache da análise falhou: permissão, espaço ou E/S";
+        };
+    return new ProtocolError(
+        CACHE_UNAVAILABLE, detail, ORIGIN_ANALYZER, Map.of("cause", kind.name()));
+  }
+
+  public static ProtocolError source(SourceIssue issue) {
+    final String detail =
+        switch (issue.code()) {
+          case SOURCE_PARSE_FAILED ->
+              "o arquivo não pôde ser modelado e ficou de fora da análise estrutural";
+          case SOURCE_FILE_TOO_LARGE ->
+              "o arquivo passa do teto de tamanho de arquivo-fonte e ficou de fora da análise";
+          case SOURCE_DUPLICATE_ELEMENT ->
+              "um elemento que outro arquivo já declarou ficou de fora, com tudo o que ele contém";
+          case SOURCE_ELEMENT_ID_TOO_LONG ->
+              "um elemento cujo id passa do teto de tamanho de id ficou de fora da análise";
         };
     return new ProtocolError(issue.code().name(), detail, ORIGIN_ANALYZER, issue.params());
   }
