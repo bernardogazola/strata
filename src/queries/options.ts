@@ -1,6 +1,7 @@
 import {
   infiniteQueryOptions,
   keepPreviousData,
+  mutationOptions,
   queryOptions,
 } from "@tanstack/react-query";
 import {
@@ -36,6 +37,29 @@ export const repositoryQueryOptions = <M extends RepositoryMethod>(
   queryOptions<MethodResult<M>>({
     queryFn: () => repositoryRequest(method, payload, handle),
     queryKey,
+  });
+
+export const repositoryDescribeQueryOptions = (handle: string) =>
+  repositoryQueryOptions(
+    queryKeys.repository.describe(handle),
+    "repository.describe",
+    {},
+    handle
+  );
+
+export const analysisStatusQueryOptions = (analysisId: string) =>
+  analyzerQueryOptions(
+    queryKeys.analysisStatus(analysisId),
+    "analysis.status",
+    {
+      analysisId,
+    }
+  );
+
+export const analysisStartMutationOptions = (handle: string) =>
+  mutationOptions({
+    mutationFn: (config: MethodInput<"analysis.start">) =>
+      repositoryRequest("analysis.start", config, handle),
   });
 
 export interface GraphViewParams {

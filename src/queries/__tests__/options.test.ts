@@ -1,4 +1,5 @@
 import {
+  MutationObserver,
   QueryClientProvider,
   useInfiniteQuery,
   useQuery,
@@ -14,21 +15,26 @@ import {
 } from "@/features/graph/adapter";
 import { GRAPH_PERF } from "@/features/graph/perf";
 import type { GraphSlice } from "@/protocol/graph";
+import type { AnalysisConfiguration } from "@/protocol/repository";
 import { createQueryClient } from "@/queries/client";
 import { queryKeys } from "@/queries/keys";
 import {
+  analysisStartMutationOptions,
+  analysisStatusQueryOptions,
   analyzerQueryOptions,
   type GraphViewParams,
   graphSearchQueryOptions,
   graphSliceQueryOptions,
   OUTLINE_PAGE_LIMIT,
   outlineChildrenQueryOptions,
+  repositoryDescribeQueryOptions,
   repositoryQueryOptions,
   SEARCH_KINDS,
 } from "@/queries/options";
 
 const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 const ORDERS = "pkg:br.pucpr.orders";
+const HANDLE = "repo_AAAAAAAAAAAAAAAAAAAAAQ";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -236,17 +242,16 @@ describe("as fábricas genéricas", () => {
 
   test("repositoryQueryOptions manda o handle junto ao pedido", async () => {
     const request = vi.spyOn(transport, "request");
-    const handle = "repo_AAAAAAAAAAAAAAAAAAAAAQ";
     const options = repositoryQueryOptions(
-      queryKeys.repository.describe(handle),
+      queryKeys.repository.describe(HANDLE),
       "repository.describe",
       {},
-      handle
+      HANDLE
     );
 
     const description = await createQueryClient().fetchQuery(options);
 
-    expect(request).toHaveBeenCalledWith("repository.describe", {}, handle);
+    expect(request).toHaveBeenCalledWith("repository.describe", {}, HANDLE);
     expect(description).toHaveProperty("buildSystem");
   });
 });
@@ -255,6 +260,106 @@ const wrapperFor =
   (queryClient: ReturnType<typeof createQueryClient>) =>
   ({ children }: { readonly children: ReactNode }) =>
     createElement(QueryClientProvider, { client: queryClient }, children);
+
+describe("as queries de abrir e analisar", () => {
+  test("o status fica sob o prefixo da análise, que os três terminais invalidam", () => {
+    const { queryKey } = analysisStatusQueryOptions(AN);
+
+    expect(queryKey).toStrictEqual(queryKeys.analysisStatus(AN));
+    expect(queryKey.slice(0, 2)).toStrictEqual(queryKeys.analysis(AN));
+  });
+
+  test("a descrição fica sob o handle, fora de qualquer análise", () => {
+    const { queryKey } = repositoryDescribeQueryOptions(HANDLE);
+
+    expect(queryKey).toStrictEqual(queryKeys.repository.describe(HANDLE));
+    expect(queryKey.slice(0, 1)).toStrictEqual(queryKeys.repository.all);
+  });
+
+  test("a descrição manda o handle junto ao pedido", async () => {
+    const request = vi.spyOn(transport, "request");
+
+    const description = await createQueryClient().fetchQuery(
+      repositoryDescribeQueryOptions(HANDLE)
+    );
+
+    expect(request).toHaveBeenCalledWith("repository.describe", {}, HANDLE);
+    expect(description).toHaveProperty("sourceRoots");
+  });
+
+  test("o status pede analysis.status pelo id, sem handle", async () => {
+    const request = vi.spyOn(transport, "request");
+
+    const report = await createQueryClient().fetchQuery(
+      analysisStatusQueryOptions(AN)
+    );
+
+    expect(request).toHaveBeenCalledWith("analysis.status", { analysisId: AN });
+    expect(report.analysisId).toBe(AN);
+  });
+
+  test("uma invalidação do prefixo da análise alcança o status em cache", async () => {
+    const queryClient = createQueryClient();
+    await queryClient.fetchQuery(analysisStatusQueryOptions(AN));
+
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.analysis(AN),
+      refetchType: "none",
+    });
+
+    expect(
+      queryClient.getQueryState(queryKeys.analysisStatus(AN))?.isInvalidated
+    ).toBe(true);
+  });
+});
+
+describe("analysisStartMutationOptions", () => {
+  const config: AnalysisConfiguration = {
+    historyScope: "ALL",
+    historyScopeCommits: null,
+    includeTests: false,
+    rebuildCache: false,
+    sourceRootIds: null,
+  };
+
+  const start = (queryClient = createQueryClient()) =>
+    new MutationObserver(
+      queryClient,
+      analysisStartMutationOptions(HANDLE)
+    ).mutate(config);
+
+  test("manda as cinco chaves e o handle, e devolve o id da análise", async () => {
+    const request = vi.spyOn(transport, "request");
+
+    const started = await start();
+
+    expect(started.analysisId).toBe(AN);
+    expect(request).toHaveBeenCalledTimes(1);
+    const [method, payload, handle] = request.mock.calls[0] ?? [];
+    expect(method).toBe("analysis.start");
+    expect(handle).toBe(HANDLE);
+    expect(Object.keys(payload ?? {}).sort()).toStrictEqual([
+      "historyScope",
+      "historyScopeCommits",
+      "includeTests",
+      "rebuildCache",
+      "sourceRootIds",
+    ]);
+    expect(payload).toStrictEqual(config);
+  });
+
+  test("não semeia a análise corrente do repositório", async () => {
+    const queryClient = createQueryClient();
+
+    await start(queryClient);
+
+    expect(
+      queryClient
+        .getQueryCache()
+        .find({ queryKey: queryKeys.repository.currentAnalysis(HANDLE) })
+    ).toBeUndefined();
+  });
+});
 
 describe("outlineChildrenQueryOptions", () => {
   test("a chave fica sob structure.all e não carrega cursor", () => {

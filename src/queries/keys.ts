@@ -3,6 +3,9 @@ import type { DependencyDirection } from "@/protocol/enums";
 export const queryKeys = {
   analysis: (analysisId: string) => ["analysis", analysisId] as const,
 
+  analysisStatus: (analysisId: string) =>
+    ["analysis", analysisId, "status"] as const,
+
   diagnostics: (analysisId: string) =>
     ["analysis", analysisId, "diagnostics"] as const,
 

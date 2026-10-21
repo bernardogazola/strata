@@ -68,10 +68,26 @@ export const changesView = (
   prev: RepositorySearch,
   next: RepositorySearch
 ): boolean => {
+  if (prev.analysis !== next.analysis) {
+    return true;
+  }
   const before = resolveGraphView(prev);
   const after = resolveGraphView(next);
   return before.level !== after.level || before.parentId !== after.parentId;
 };
+
+export const startAnalysis =
+  (analysisId: string): SearchTransition =>
+  () => ({
+    ...REPOSITORY_SEARCH_DEFAULTS,
+    analysis: analysisId,
+    level: "PACKAGE",
+  });
+
+export const leaveAnalysis: SearchTransition = () => ({
+  ...REPOSITORY_SEARCH_DEFAULTS,
+  level: "PACKAGE",
+});
 
 export const selectElement =
   (elementId: string | null): SearchTransition =>
