@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 public final class ModuleDependencyDao {
 
@@ -34,6 +35,15 @@ public final class ModuleDependencyDao {
 
   public static void insert(Connection connection, long analysisPk, List<ModuleDependencyRow> rows)
       throws SQLException {
+    insert(connection, analysisPk, rows, MultiRowInsert.NEVER_CANCELLED);
+  }
+
+  public static void insert(
+      Connection connection,
+      long analysisPk,
+      List<ModuleDependencyRow> rows,
+      BooleanSupplier cancelled)
+      throws SQLException {
     MultiRowInsert.insertRows(
         connection,
         INSERT_HEAD,
@@ -48,7 +58,8 @@ public final class ModuleDependencyDao {
           statement.setInt(first + 5, row.transitive() ? 1 : 0);
           statement.setInt(first + 6, row.isStatic() ? 1 : 0);
           statement.setObject(first + 7, row.line());
-        });
+        },
+        cancelled);
   }
 
   public static List<ModuleDependencyRow> list(Connection connection, long analysisPk)

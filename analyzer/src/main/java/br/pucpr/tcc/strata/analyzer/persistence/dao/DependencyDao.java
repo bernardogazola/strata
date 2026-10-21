@@ -8,6 +8,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 public final class DependencyDao {
 
@@ -36,6 +37,12 @@ public final class DependencyDao {
 
   public static void insert(Connection connection, long analysisPk, List<DependencyRow> rows)
       throws SQLException {
+    insert(connection, analysisPk, rows, MultiRowInsert.NEVER_CANCELLED);
+  }
+
+  public static void insert(
+      Connection connection, long analysisPk, List<DependencyRow> rows, BooleanSupplier cancelled)
+      throws SQLException {
     MultiRowInsert.insertRows(
         connection,
         INSERT_HEAD,
@@ -51,7 +58,8 @@ public final class DependencyDao {
           statement.setInt(first + 6, row.occurrences());
           statement.setInt(first + 7, row.weight());
           statement.setInt(first + 8, row.ambiguous() ? 1 : 0);
-        });
+        },
+        cancelled);
   }
 
   public static List<DependencyRow> list(Connection connection, long analysisPk)

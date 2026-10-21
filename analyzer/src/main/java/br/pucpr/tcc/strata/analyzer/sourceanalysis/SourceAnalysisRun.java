@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,7 +25,9 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 import spoon.Launcher;
 import spoon.compiler.Environment;
 import spoon.reflect.factory.Factory;
@@ -34,6 +37,8 @@ final class SourceAnalysisRun {
 
   private static final int MAX_SOURCE_FILE_BYTES = AnalysisConstants.MAX_SOURCE_FILE_BYTES;
   private static final long MAX_MODEL_SOURCE_BYTES = AnalysisConstants.MAX_MODEL_SOURCE_BYTES;
+  private static final int MAX_FILE_LINES_PER_CAUSE =
+      AnalysisConstants.MAX_SOURCE_WARNINGS_PER_CODE;
 
   private final Path repositoryRoot;
   private final Path emptyClasspath;
@@ -53,6 +58,8 @@ final class SourceAnalysisRun {
   private final Map<SourceRootId, List<List<String>>> plannedChunks = new LinkedHashMap<>();
 
   private int assignedFiles;
+
+  private final Map<FileLine, Integer> fileLines = new EnumMap<>(FileLine.class);
 
   private List<SourceFile> preParsed = List.of();
   private SimpleNameIndex index;
@@ -88,12 +95,14 @@ final class SourceAnalysisRun {
     preParsed = List.copyOf(outcomes.values());
     index = buildIndex(assigned.keySet());
     preParseNanos = System.nanoTime() - started;
+    checkCancelled();
     final long beginStarted = System.nanoTime();
     visitor.begin(preParsed);
     visitNanos += System.nanoTime() - beginStarted;
     for (final SourceRoot root : assigned.keySet()) {
       modelRoot(root);
     }
+    logSilencedFileLines();
     final SourceAnalysis analysis = result();
     visitor.end(analysis);
     return analysis;
@@ -142,7 +151,10 @@ final class SourceAnalysisRun {
     }
     final SyntaxPreParser.PreParse parsed = preParse.get();
     if (parsed.syntaxError()) {
-      Log.info(file + " tem um erro de sintaxe e não vai para o Spoon");
+      logFile(
+          FileLine.SYNTAX_ERROR,
+          Log::info,
+          file + " tem um erro de sintaxe e não vai para o Spoon");
       record(file, root, SourceFileStatus.PARSE_FAILED, ParseFailureCause.SYNTAX_ERROR, null, loc);
       return;
     }
@@ -156,12 +168,14 @@ final class SourceAnalysisRun {
     }
   }
 
-  private static boolean tooDeep(String file, char[] text) {
+  private boolean tooDeep(String file, char[] text) {
     final NestingScreen.Nesting nesting = NestingScreen.measure(text);
     if (!nesting.tooDeep()) {
       return false;
     }
-    Log.warn(
+    logFile(
+        FileLine.NESTING_TOO_DEEP,
+        Log::warn,
         file
             + " aninha "
             + nesting.bracketDepth()
@@ -173,14 +187,16 @@ final class SourceAnalysisRun {
     return true;
   }
 
-  private static Optional<SyntaxPreParser.PreParse> preParse(
+  private Optional<SyntaxPreParser.PreParse> preParse(
       String file, char[] text, UnaryOperator<String> interner) {
     try {
       return Optional.of(SyntaxPreParser.parse(file, text, interner));
     } catch (CancellationException cancellation) {
       throw cancellation;
     } catch (RuntimeException | StackOverflowError crash) {
-      Log.warn(
+      logFile(
+          FileLine.PRE_PARSE_CRASH,
+          Log::warn,
           "o pré-parse de "
               + file
               + " lançou "
@@ -199,14 +215,16 @@ final class SourceAnalysisRun {
       try (InputStream input = Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS)) {
         final byte[] content = input.readNBytes(MAX_SOURCE_FILE_BYTES + 1);
         if (content.length > MAX_SOURCE_FILE_BYTES) {
-          Log.warn(
+          logFile(
+              FileLine.GREW_PAST_CEILING,
+              Log::warn,
               file + " cresceu além de " + MAX_SOURCE_FILE_BYTES + " bytes depois da varredura");
           return new Read.TooLarge();
         }
         return new Read.Content(content);
       }
     } catch (IOException unreadable) {
-      Log.warn("não foi possível ler " + path + ": " + unreadable);
+      logFile(FileLine.UNREADABLE, Log::warn, "não foi possível ler " + path + ": " + unreadable);
       return new Read.Unreadable();
     }
   }
@@ -225,7 +243,10 @@ final class SourceAnalysisRun {
     final IndexBuilder builder = SimpleNameIndex.builder();
     int units = 0;
     for (final SourceRoot root : roots) {
-      final List<List<String>> chunks = chunks(typeFiles.get(root.id()));
+      final List<List<String>> bySize = chunks(typeFiles.get(root.id()));
+      splitBatches += Math.max(0, bySize.size() - 1);
+      final List<List<String>> chunks =
+          bySize.stream().flatMap(chunk -> apart(chunk).stream()).toList();
       plannedChunks.put(root.id(), chunks);
       for (final List<String> chunk : chunks) {
         for (final String file : chunk) {
@@ -254,7 +275,6 @@ final class SourceAnalysisRun {
     final int buildsBefore = builds;
     final int batchesBefore = batches;
     final List<List<String>> chunks = plannedChunks.get(root.id());
-    splitBatches += Math.max(0, chunks.size() - 1);
     for (final List<String> chunk : chunks) {
       readAndModel(root, chunk);
     }
@@ -292,6 +312,38 @@ final class SourceAnalysisRun {
       }
     }
     return chunks.done();
+  }
+
+  private List<List<String>> apart(List<String> chunk) {
+    final Map<String, Integer> lastBatchOf = new HashMap<>();
+    final List<List<String>> batches = new ArrayList<>();
+    for (final String file : chunk) {
+      final Set<String> names = topLevelNames(file);
+      int batch = 0;
+      for (final String name : names) {
+        final Integer earlier = lastBatchOf.get(name);
+        if (earlier != null) {
+          batch = Math.max(batch, earlier + 1);
+        }
+      }
+      for (final String name : names) {
+        lastBatchOf.put(name, batch);
+      }
+      if (batch == batches.size()) {
+        batches.add(new ArrayList<>());
+      }
+      batches.get(batch).add(file);
+    }
+    return batches.stream().map(List::copyOf).toList();
+  }
+
+  private Set<String> topLevelNames(String file) {
+    final SourceFile.Declarations declarations = outcomes.get(file).declarations();
+    final String prefix =
+        declarations.packageName().isEmpty() ? "" : declarations.packageName() + ".";
+    return declarations.topLevelTypes().stream()
+        .map(type -> prefix + type)
+        .collect(Collectors.toSet());
   }
 
   private static String parentOf(String file) {
@@ -384,7 +436,9 @@ final class SourceAnalysisRun {
       throw cancellation;
     } catch (RuntimeException | StackOverflowError failure) {
       checkCancelled();
-      Log.warn(
+      logFile(
+          FileLine.MODEL_BUILD_FAILED,
+          Log::warn,
           "o build do modelo de "
               + files.size()
               + " arquivo(s) de '"
@@ -432,7 +486,9 @@ final class SourceAnalysisRun {
     final Set<String> modeled = batch.modeledFiles();
     for (final String file : files) {
       if (!modeled.contains(file)) {
-        Log.warn(
+        logFile(
+            FileLine.DROPPED_BY_SPOON,
+            Log::warn,
             file
                 + " era válido e não vazio, e o Spoon não montou nenhuma unidade de compilação para ele");
         fail(file, ParseFailureCause.DROPPED_BY_SPOON);
@@ -509,6 +565,36 @@ final class SourceAnalysisRun {
             longestBuildNanos / 1_000_000,
             longestBuildRoot,
             visitNanos / 1_000_000));
+  }
+
+  private enum FileLine {
+    SYNTAX_ERROR,
+    NESTING_TOO_DEEP,
+    PRE_PARSE_CRASH,
+    GREW_PAST_CEILING,
+    UNREADABLE,
+    DROPPED_BY_SPOON,
+    MODEL_BUILD_FAILED
+  }
+
+  private void logFile(FileLine cause, Consumer<String> level, String message) {
+    if (fileLines.merge(cause, 1, Integer::sum) <= MAX_FILE_LINES_PER_CAUSE) {
+      level.accept(message);
+    }
+  }
+
+  private void logSilencedFileLines() {
+    fileLines.forEach(
+        (cause, lines) -> {
+          if (lines > MAX_FILE_LINES_PER_CAUSE) {
+            Log.warn(
+                "outras "
+                    + (lines - MAX_FILE_LINES_PER_CAUSE)
+                    + " linhas de log por arquivo de "
+                    + cause
+                    + " foram silenciadas");
+          }
+        });
   }
 
   private void checkCancelled() {

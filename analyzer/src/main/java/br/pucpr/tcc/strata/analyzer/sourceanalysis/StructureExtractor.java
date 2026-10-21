@@ -100,6 +100,14 @@ public final class StructureExtractor implements BatchVisitor {
     return elements.issues();
   }
 
+  public long duplicateElements() {
+    return elements.duplicateElements();
+  }
+
+  public long elementIdsTooLong() {
+    return elements.elementIdsTooLong();
+  }
+
   public ResolutionCounts resolutionCounts() {
     return counts;
   }

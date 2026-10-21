@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
 public final class CodeMetricDao {
 
@@ -54,6 +55,12 @@ public final class CodeMetricDao {
 
   public static void insert(Connection connection, long analysisPk, List<CodeMetricRow> rows)
       throws SQLException {
+    insert(connection, analysisPk, rows, MultiRowInsert.NEVER_CANCELLED);
+  }
+
+  public static void insert(
+      Connection connection, long analysisPk, List<CodeMetricRow> rows, BooleanSupplier cancelled)
+      throws SQLException {
     MultiRowInsert.insertRows(
         connection,
         INSERT_HEAD,
@@ -67,7 +74,8 @@ public final class CodeMetricDao {
           statement.setObject(first + 4, row.ccSum());
           statement.setObject(first + 5, row.ccMax());
           statement.setObject(first + 6, row.ccP90());
-        });
+        },
+        cancelled);
   }
 
   public static int rollUpPackages(Connection connection, long analysisPk) throws SQLException {

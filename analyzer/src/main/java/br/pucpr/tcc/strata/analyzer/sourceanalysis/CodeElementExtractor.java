@@ -1,6 +1,7 @@
 package br.pucpr.tcc.strata.analyzer.sourceanalysis;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
+import br.pucpr.tcc.strata.analyzer.bootstrap.Log;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRoot;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootId;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRootKind;
@@ -10,13 +11,16 @@ import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.MethodElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.PackageElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.TypeElement;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import spoon.reflect.declaration.CtCompilationUnit;
 
 public final class CodeElementExtractor implements BatchVisitor {
@@ -29,11 +33,16 @@ public final class CodeElementExtractor implements BatchVisitor {
   private final Map<CodeElementId, String> claimedTypes = new HashMap<>();
 
   private final Set<CodeElementId> emittedPackages = new HashSet<>();
-  private final Map<String, List<SourceIssue>> issuesByFile = new LinkedHashMap<>();
+
+  private final Map<SourceIssue.Code, KeptIssues> issuesByCode =
+      new EnumMap<>(SourceIssue.Code.class);
+
+  private final Map<String, Integer> fileRanks = new HashMap<>();
+
   private final Set<DuplicatePair> reportedDuplicates = new HashSet<>();
   private final Set<String> filesWithTooLongIds = new HashSet<>();
   private SimpleNameIndex index;
-  private List<String> fileOrder = List.of();
+  private long issueSequence;
 
   public CodeElementExtractor(List<SourceRoot> roots, ElementSink sink) {
     for (final SourceRoot root : List.copyOf(Objects.requireNonNull(roots, "roots"))) {
@@ -44,7 +53,9 @@ public final class CodeElementExtractor implements BatchVisitor {
 
   @Override
   public void begin(List<SourceFile> files) {
-    fileOrder = files.stream().map(SourceFile::relativePath).toList();
+    for (final SourceFile file : files) {
+      fileRanks.putIfAbsent(file.relativePath(), fileRanks.size());
+    }
     sink.begin(files);
   }
 
@@ -72,6 +83,19 @@ public final class CodeElementExtractor implements BatchVisitor {
       }
       fileElements.add(fileElement(file, id));
     }
+    issuesByCode.forEach(
+        (code, issues) -> {
+          if (issues.dropped() > 0) {
+            Log.warn(
+                "mantidos os primeiros "
+                    + issues.kept().size()
+                    + " avisos "
+                    + code
+                    + "; outros "
+                    + issues.dropped()
+                    + " foram descartados");
+          }
+        });
     sink.end(analysis.files(), fileElements);
   }
 
@@ -112,18 +136,22 @@ public final class CodeElementExtractor implements BatchVisitor {
   }
 
   public List<SourceIssue> issues() {
-    final List<SourceIssue> ordered = new ArrayList<>();
-    for (final String file : fileOrder) {
-      ordered.addAll(issuesByFile.getOrDefault(file, List.of()));
-    }
-    final Set<String> known = Set.copyOf(fileOrder);
-    issuesByFile.forEach(
-        (file, issues) -> {
-          if (!known.contains(file)) {
-            ordered.addAll(issues);
-          }
-        });
-    return List.copyOf(ordered);
+    final Map<IssueRank, SourceIssue> ordered = new TreeMap<>(IssueRank.ORDER);
+    issuesByCode.values().forEach(issues -> ordered.putAll(issues.kept()));
+    return List.copyOf(ordered.values());
+  }
+
+  public long duplicateElements() {
+    return produced(SourceIssue.Code.SOURCE_DUPLICATE_ELEMENT);
+  }
+
+  public long elementIdsTooLong() {
+    return produced(SourceIssue.Code.SOURCE_ELEMENT_ID_TOO_LONG);
+  }
+
+  private long produced(SourceIssue.Code code) {
+    final KeptIssues issues = issuesByCode.get(code);
+    return issues == null ? 0 : issues.produced();
   }
 
   private void collect(
@@ -170,7 +198,10 @@ public final class CodeElementExtractor implements BatchVisitor {
   }
 
   private void issue(String path, SourceIssue issue) {
-    issuesByFile.computeIfAbsent(path, file -> new ArrayList<>()).add(issue);
+    final int file = fileRanks.computeIfAbsent(path, unlisted -> fileRanks.size());
+    issuesByCode
+        .computeIfAbsent(issue.code(), code -> new KeptIssues())
+        .add(new IssueRank(file, issueSequence++), issue);
   }
 
   private static CodeElementId fileId(String path) {
@@ -225,4 +256,36 @@ public final class CodeElementExtractor implements BatchVisitor {
       List<PackageElement> packages, List<TypeElement> types, List<MethodElement> methods) {}
 
   private record DuplicatePair(String filePath, String firstFilePath) {}
+
+  private record IssueRank(int file, long sequence) {
+
+    private static final Comparator<IssueRank> ORDER =
+        Comparator.comparingInt(IssueRank::file).thenComparingLong(IssueRank::sequence);
+  }
+
+  private static final class KeptIssues {
+
+    private final NavigableMap<IssueRank, SourceIssue> kept = new TreeMap<>(IssueRank.ORDER);
+    private long produced;
+
+    private void add(IssueRank rank, SourceIssue issue) {
+      produced++;
+      kept.put(rank, issue);
+      if (kept.size() > AnalysisConstants.MAX_SOURCE_WARNINGS_PER_CODE) {
+        kept.pollLastEntry();
+      }
+    }
+
+    private Map<IssueRank, SourceIssue> kept() {
+      return kept;
+    }
+
+    private long produced() {
+      return produced;
+    }
+
+    private long dropped() {
+      return produced - kept.size();
+    }
+  }
 }
