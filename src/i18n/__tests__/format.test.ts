@@ -3,6 +3,7 @@ import {
   formatDuration,
   formatInteger,
   formatPercent,
+  formatPreciseDuration,
   formatRelativeTime,
   hasLocaleData,
   interpolate,
@@ -28,6 +29,32 @@ describe("formatDuration", () => {
 
   test("usa horas e minutos acima de uma hora", () => {
     expect(formatDuration(3_900_000)).toBe("1 h 5 min");
+  });
+});
+
+describe("formatPreciseDuration", () => {
+  test("mostra milissegundos abaixo de um segundo", () => {
+    expect(formatPreciseDuration(0)).toBe("0 ms");
+    expect(formatPreciseDuration(24)).toBe("24 ms");
+    expect(formatPreciseDuration(999)).toBe("999 ms");
+  });
+
+  test("passa a segundos quando o arredondamento chega a 1 000 ms", () => {
+    expect(formatPreciseDuration(999.6)).toBe("1 s");
+    expect(formatPreciseDuration(1000)).toBe("1 s");
+  });
+
+  test("mostra um décimo de segundo com vírgula, sem zero à direita", () => {
+    expect(formatPreciseDuration(1400)).toBe("1,4 s");
+    expect(formatPreciseDuration(4560)).toBe("4,6 s");
+    expect(formatPreciseDuration(12_000)).toBe("12 s");
+  });
+
+  test("cai em formatDuration a partir de 60 s, nunca produzindo 60 s", () => {
+    expect(formatPreciseDuration(59_949)).toBe("59,9 s");
+    expect(formatPreciseDuration(59_950)).toBe("1 min 0 s");
+    expect(formatPreciseDuration(60_000)).toBe("1 min 0 s");
+    expect(formatPreciseDuration(3_900_000)).toBe("1 h 5 min");
   });
 });
 

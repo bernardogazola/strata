@@ -104,6 +104,28 @@ export const formatDuration = (milliseconds: number): string => {
   return `${minutes} min ${seconds} s`;
 };
 
+const MS_PER_TENTH = 100;
+const TENTHS_PER_SECOND = MS_PER_SECOND / MS_PER_TENTH;
+const TENTHS_PER_MINUTE = SECONDS_PER_MINUTE * TENTHS_PER_SECOND;
+
+const tenthFormatter = new Intl.NumberFormat(LOCALE, {
+  maximumFractionDigits: 1,
+});
+
+export const formatPreciseDuration = (milliseconds: number): string => {
+  const wholeMilliseconds = Math.round(milliseconds);
+  if (wholeMilliseconds < MS_PER_SECOND) {
+    return `${wholeMilliseconds} ms`;
+  }
+
+  const tenths = Math.round(milliseconds / MS_PER_TENTH);
+  if (tenths >= TENTHS_PER_MINUTE) {
+    return formatDuration(milliseconds);
+  }
+
+  return `${tenthFormatter.format(tenths / TENTHS_PER_SECOND)} s`;
+};
+
 export const plural = (
   count: number,
   forms: { one: string; other: string; zero?: string }

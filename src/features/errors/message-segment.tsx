@@ -29,7 +29,7 @@ export function MessageSegments({ segments }: MessageSegmentsProps) {
           <span key={key}>{segment.text}</span>
         ) : (
           <bdi
-            className="rounded-sm bg-muted px-1 font-mono text-muted-foreground text-xs [overflow-wrap:anywhere]"
+            className="wrap-anywhere rounded-sm bg-muted box-decoration-clone px-1 font-mono text-muted-foreground text-xs"
             key={key}
             lang=""
             translate="no"
