@@ -80,6 +80,11 @@ public final class CodeElementExtractor implements BatchVisitor {
     return new UnitExtraction(batch.root(), relativePath, index).extract(unit);
   }
 
+  UnitExtraction.Walked walk(ModeledBatch batch, String relativePath, CtCompilationUnit unit) {
+    index = batch.index();
+    return new UnitExtraction(batch.root(), relativePath, index).walk(unit);
+  }
+
   public void collect(ModeledBatch batch, List<UnitElements> units) {
     sink.accept(dedupe(units));
   }

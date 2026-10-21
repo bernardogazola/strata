@@ -4,9 +4,13 @@ import br.pucpr.tcc.strata.analyzer.bootstrap.Log;
 import br.pucpr.tcc.strata.analyzer.repository.SourceRoot;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementExtractor.UnitElements;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.DependencyExtractor.UnitDependencies;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.MetricExtraction.UnitMetrics;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.CodeMetric;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ExtractedDependency;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.MethodElement;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ModuleDependency;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.TypeElement;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -20,6 +24,7 @@ public final class StructureExtractor implements BatchVisitor {
 
   private final StructureSink sink;
   private final CodeElementExtractor elements;
+  private final MetricExtraction metrics = new MetricExtraction();
   private final Map<DropReason, Long> drops = new EnumMap<>(DropReason.class);
   private final JavaLangTypes javaLang = new JavaLangTypes();
   private ResolutionCounts counts = ResolutionCounts.NONE;
@@ -51,16 +56,24 @@ public final class StructureExtractor implements BatchVisitor {
         new DependencyExtractor(batch.index(), batchTopLevelTypes(batch), javaLang);
     final List<UnitFacts> units =
         batch.perCompilationUnit(
-            (path, unit) ->
-                new UnitFacts(
-                    elements.extract(batch, path, unit), dependencies.extract(path, unit)));
+            (path, unit) -> {
+              final UnitExtraction.Walked walked = elements.walk(batch, path, unit);
+              return new UnitFacts(
+                  walked.elements(),
+                  dependencies.extract(path, unit),
+                  metrics.extract(batch, path, walked));
+            });
     final BatchElements batchElements =
         elements.dedupe(units.stream().map(UnitFacts::elements).toList());
     final List<UnitDependencies> unitDependencies =
         units.stream().map(UnitFacts::dependencies).toList();
     final Map<CodeElementId, String> declaredIn = declaredIn(batchElements);
     count(unitDependencies, declaredIn);
-    sink.accept(new BatchStructure(batchElements, survivors(unitDependencies, declaredIn)));
+    sink.accept(
+        new BatchStructure(
+            batchElements,
+            survivors(unitDependencies, declaredIn),
+            survivingMetrics(units.stream().map(UnitFacts::metrics).toList(), declaredIn)));
   }
 
   @Override
@@ -95,6 +108,11 @@ public final class StructureExtractor implements BatchVisitor {
     return Collections.unmodifiableMap(new EnumMap<>(drops));
   }
 
+  public MetricTime metricTime() {
+    return new MetricTime(
+        Duration.ofNanos(metrics.locNanos()), Duration.ofNanos(metrics.ccNanos()));
+  }
+
   private Set<String> batchTopLevelTypes(ModeledBatch batch) {
     final List<SourceFile> files = new ArrayList<>();
     for (final String path : batch.files()) {
@@ -111,7 +129,23 @@ public final class StructureExtractor implements BatchVisitor {
     for (final TypeElement type : batchElements.types()) {
       declaredIn.put(type.id(), type.filePath());
     }
+    for (final MethodElement method : batchElements.methods()) {
+      declaredIn.put(method.id(), method.filePath());
+    }
     return declaredIn;
+  }
+
+  private static List<CodeMetric> survivingMetrics(
+      List<UnitMetrics> units, Map<CodeElementId, String> declaredIn) {
+    final List<CodeMetric> survivors = new ArrayList<>();
+    for (final UnitMetrics unit : units) {
+      for (final CodeMetric metric : unit.metrics()) {
+        if (unit.relativePath().equals(declaredIn.get(metric.element()))) {
+          survivors.add(metric);
+        }
+      }
+    }
+    return survivors;
   }
 
   private static BatchDependencies survivors(
@@ -165,5 +199,14 @@ public final class StructureExtractor implements BatchVisitor {
     CALL_WITHOUT_TARGET
   }
 
-  private record UnitFacts(UnitElements elements, UnitDependencies dependencies) {}
+  public record MetricTime(Duration loc, Duration cc) {
+
+    public MetricTime {
+      Objects.requireNonNull(loc, "loc");
+      Objects.requireNonNull(cc, "cc");
+    }
+  }
+
+  private record UnitFacts(
+      UnitElements elements, UnitDependencies dependencies, UnitMetrics metrics) {}
 }
