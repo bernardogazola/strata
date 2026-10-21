@@ -205,4 +205,17 @@ describe("formatProtocolError", () => {
     );
     expect(plainText(message)).not.toContain("este repositório");
   });
+
+  test("ANALYSIS_CACHE_CORRUPTED tem a cópia exata e não promete que nada se perdeu", () => {
+    const message = formatProtocolError({ code: "ANALYSIS_CACHE_CORRUPTED" });
+
+    expect(message.title).toBe("Cache danificado durante a análise");
+    expect(plainText(message)).toBe(
+      "O cache de análise deste repositório se danificou durante a análise. O Strata o recriou, e o que esta análise já tinha gravado se perdeu com ele."
+    );
+    expect(message.hint).toBe("Analise de novo.");
+    expect(message.severity).toBe("error");
+    expect(message.retryable).toBe(true);
+    expect(plainText(message)).not.toContain("Nenhum resultado foi perdido");
+  });
 });

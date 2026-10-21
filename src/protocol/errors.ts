@@ -9,6 +9,7 @@ export type ErrorOrigin = z.infer<typeof errorOriginSchema>;
 
 export interface ErrorParamsByCode {
   ANALYSIS_ALREADY_RUNNING: Record<string, never>;
+  ANALYSIS_CACHE_CORRUPTED: Record<string, never>;
   ANALYSIS_NOT_FOUND: Record<string, never>;
   ANALYSIS_TOO_MANY_JAVA_SOURCES: { limit: number; found: number };
   CACHE_CORRUPT: Record<string, never>;
@@ -46,6 +47,7 @@ export type ErrorCode = keyof ErrorParamsByCode;
 
 export const errorParamsSchemaByCode = {
   ANALYSIS_ALREADY_RUNNING: z.object({}),
+  ANALYSIS_CACHE_CORRUPTED: z.object({}),
   ANALYSIS_NOT_FOUND: z.object({}),
   ANALYSIS_TOO_MANY_JAVA_SOURCES: z.object({
     found: z.number().int().nonnegative(),

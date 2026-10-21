@@ -70,6 +70,19 @@ const errorRegistry: ErrorRegistry = {
     retryable: false,
     severity: "warning",
   },
+  ANALYSIS_CACHE_CORRUPTED: {
+    format: () => ({
+      body: [
+        t(
+          "O cache de análise deste repositório se danificou durante a análise. O Strata o recriou, e o que esta análise já tinha gravado se perdeu com ele."
+        ),
+      ],
+      hint: "Analise de novo.",
+      title: "Cache danificado durante a análise",
+    }),
+    retryable: true,
+    severity: "error",
+  },
   ANALYSIS_NOT_FOUND: {
     format: () => ({
       body: [t("A análise solicitada não existe mais.")],

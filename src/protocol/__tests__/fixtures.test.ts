@@ -1059,6 +1059,6 @@ describe("estritude fora do fio", () => {
     expect(
       sample.safeParse({ method: "graph.slice", sobrando: 1 }).success
     ).toBe(true);
-    expect(ERROR_CODES).toHaveLength(32);
+    expect(ERROR_CODES).toHaveLength(33);
   });
 });

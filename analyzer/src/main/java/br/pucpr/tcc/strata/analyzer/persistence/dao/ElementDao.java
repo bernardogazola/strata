@@ -148,4 +148,21 @@ public final class ElementDao {
     final int value = rows.getInt(column);
     return rows.wasNull() ? null : value;
   }
+
+  public static long countInternalTypes(Connection connection, long analysisPk)
+      throws SQLException {
+    final String countInternalTypes =
+        """
+        SELECT count(*)
+          FROM code_element
+         WHERE analysis_pk = ? AND kind = ? AND is_external = 0""";
+    try (PreparedStatement statement = connection.prepareStatement(countInternalTypes)) {
+      statement.setLong(1, analysisPk);
+      statement.setString(2, ElementKind.TYPE.name());
+      try (ResultSet rows = statement.executeQuery()) {
+        rows.next();
+        return rows.getLong(1);
+      }
+    }
+  }
 }

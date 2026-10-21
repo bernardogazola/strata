@@ -77,6 +77,20 @@ final class ErrorCodesTest {
   }
 
   @Test
+  void analysisCacheCorruptedTemCodigoProprioSemParametrosEFraseFixa() {
+    final ProtocolError error = ErrorCodes.analysisCacheCorrupted();
+
+    assertFixedAnalyzerError(error, "ANALYSIS_CACHE_CORRUPTED");
+    assertThat(error.code()).isEqualTo(ErrorCodes.ANALYSIS_CACHE_CORRUPTED);
+    assertThat(error.params()).isEmpty();
+    assertThat(error.detail())
+        .isEqualTo(
+            "o cache da análise foi danificado durante a análise e foi reconstruído; as linhas"
+                + " desta análise se perderam com ele")
+        .isNotEqualTo(ErrorCodes.cacheCorrupt().detail());
+  }
+
+  @Test
   void cacheUnavailableMapeiaTodoKindComFraseDistinta() {
     final Set<String> frases = new HashSet<>();
     for (final CacheUnavailableException.Kind kind : CacheUnavailableException.Kind.values()) {

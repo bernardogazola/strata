@@ -19,6 +19,7 @@ public final class ErrorCodes {
   public static final String ANALYSIS_ALREADY_RUNNING = "ANALYSIS_ALREADY_RUNNING";
   public static final String ANALYSIS_NOT_FOUND = "ANALYSIS_NOT_FOUND";
   public static final String ANALYSIS_TOO_MANY_JAVA_SOURCES = "ANALYSIS_TOO_MANY_JAVA_SOURCES";
+  public static final String ANALYSIS_CACHE_CORRUPTED = "ANALYSIS_CACHE_CORRUPTED";
 
   public static final String ORIGIN_ANALYZER = "analyzer";
 
@@ -117,6 +118,15 @@ public final class ErrorCodes {
         "as raízes de código selecionadas têm mais arquivos Java que o teto de arquivos analisados",
         ORIGIN_ANALYZER,
         Map.of("limit", limit, "found", found));
+  }
+
+  public static ProtocolError analysisCacheCorrupted() {
+    return new ProtocolError(
+        ANALYSIS_CACHE_CORRUPTED,
+        "o cache da análise foi danificado durante a análise e foi reconstruído; as linhas"
+            + " desta análise se perderam com ele",
+        ORIGIN_ANALYZER,
+        Map.of());
   }
 
   public static ProtocolError cacheUnavailable(CacheUnavailableException.Kind kind) {
