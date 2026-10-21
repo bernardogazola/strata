@@ -3,12 +3,16 @@ package br.pucpr.tcc.strata.analyzer.analysis;
 import br.pucpr.tcc.strata.analyzer.analysis.RunSnapshot.StageSnapshot;
 import br.pucpr.tcc.strata.analyzer.bootstrap.Log;
 import br.pucpr.tcc.strata.analyzer.persistence.CacheUnavailableException;
+import br.pucpr.tcc.strata.analyzer.persistence.SqliteConnections;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.AnalysisDao;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.StageDao;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.StageRecord;
 import br.pucpr.tcc.strata.analyzer.protocol.ErrorCodes;
 import br.pucpr.tcc.strata.analyzer.protocol.ProtocolError;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
@@ -53,25 +57,28 @@ final class AnalysisRunner {
   void run(Run run) {
     final AtomicReference<Throwable> siblingFailure = new AtomicReference<>();
     try {
-      run.events().started();
-      final RunInputs inputs = prologue.run(run);
-      runPair(run, inputs, siblingFailure);
-      for (final AnalysisStage stage : SEQUENTIAL) {
+      try {
+        run.events().started();
+        final RunInputs inputs = prologue.run(run);
+        runPair(run, inputs, siblingFailure);
+        for (final AnalysisStage stage : SEQUENTIAL) {
+          run.token().throwIfCancelled();
+          runStage(run, inputs, stage, run.token(), false);
+        }
         run.token().throwIfCancelled();
-        runStage(run, inputs, stage, run.token(), false);
+        final long finishedAt = runStage(run, inputs, AnalysisStage.PERSISTENCE, run.token(), true);
+        completed(run, finishedAt);
+      } catch (RuntimeException | SQLException | IOException | CacheUnavailableException stopped) {
+        if (siblingFailure.get() instanceof Error fatal) {
+          throw fatal;
+        }
+        interrupted(run, stopped, siblingFailure.get());
       }
-      run.token().throwIfCancelled();
-      final long finishedAt = runStage(run, inputs, AnalysisStage.PERSISTENCE, run.token(), true);
-      completed(run, finishedAt);
-    } catch (RuntimeException | SQLException | IOException | CacheUnavailableException stopped) {
-      if (siblingFailure.get() instanceof Error fatal) {
-        died(run, fatal);
-        throw fatal;
-      }
-      interrupted(run, stopped, siblingFailure.get());
-    } catch (Error fatal) {
+    } catch (Throwable fatal) {
       died(run, fatal);
       throw fatal;
+    } finally {
+      registry.release(run);
     }
   }
 
@@ -229,72 +236,100 @@ final class AnalysisRunner {
     final boolean runCancelled = run.endPhase() || run.token().isCancelled();
     final RunFailures.Verdict verdict =
         RunFailures.classify(original, runCancelled, siblingFailure);
-    if (verdict.corruptCache()) {
-      registry.rebuild(run);
-    }
+    final AnalysisRegistry.Rebuild rebuild = verdict.corruptCache() ? registry.rebuild(run) : null;
     final long finishedAt = finishInstant(run);
     switch (verdict) {
-      case RunFailures.Cancelled cancelled -> {
+      case RunFailures.Cancelled _ -> {
         if (!(original instanceof CancellationException)) {
           Log.warn("a análise " + run.id().value() + " falhou depois de cancelada: " + original);
         }
-        if (!cancelled.corruptCache()) {
-          finishQuietly(run, AnalysisStatus.CANCELLED, finishedAt, null);
-        }
+        finishInterrupted(run, rebuild, AnalysisStatus.CANCELLED, finishedAt, null);
         run.ended(AnalysisStatus.CANCELLED, finishedAt, null);
         final Completeness completeness = run.snapshot().completeness();
         release(run);
         run.events().cancelled(completeness);
         Log.info("análise " + run.id().value() + " CANCELLED");
       }
-      case RunFailures.Failed(ProtocolError error, boolean corruptCache) -> {
+      case RunFailures.Failed(ProtocolError classified, boolean corruptCache) -> {
+        final ProtocolError error =
+            corruptCache && rebuild != AnalysisRegistry.Rebuild.REBUILT
+                ? ErrorCodes.cacheUnavailable(CacheUnavailableException.Kind.STORAGE)
+                : classified;
         if (original instanceof StageFailedException) {
           Log.warn("análise " + run.id().value() + " FAILED: " + error.code());
         } else {
           Log.error("análise " + run.id().value() + " FAILED com " + error.code(), original);
         }
-        if (!corruptCache) {
-          finishQuietly(run, AnalysisStatus.FAILED, finishedAt, error);
-        }
+        finishInterrupted(run, rebuild, AnalysisStatus.FAILED, finishedAt, error);
         failed(run, finishedAt, error);
       }
     }
   }
 
-  private void died(Run run, Error fatal) {
+  private void died(Run run, Throwable fatal) {
     try {
-      run.endPhase();
-      final long now = finishInstant(run);
-      final Run.Binding bound = run.binding();
-      for (final Map.Entry<AnalysisStage, StageSnapshot> entry :
-          run.snapshot().stages().entrySet()) {
-        final StageSnapshot stage = entry.getValue();
-        if (stage.status() == StageStatus.RUNNING) {
-          final long elapsed = Math.max(0, now - stage.startedAtMillis());
-          if (bound != null && bound.hasRow()) {
-            writeQuietly(
-                bound,
-                new StageRecord(
-                    entry.getKey(),
-                    StageStatus.FAILED,
-                    stage.startedAtMillis(),
-                    elapsed,
-                    EMPTY_COUNTERS));
-          }
-          run.stageEnded(
-              entry.getKey(),
-              StageStatus.FAILED,
-              stage.startedAtMillis(),
-              elapsed,
-              StageCounters.none());
-        }
+      if (run.snapshot().status() == AnalysisStatus.RUNNING) {
+        decide(run, fatal);
       }
-      final ProtocolError error = ErrorCodes.internalUnexpected(fatal.getClass().getName());
-      finishQuietly(run, AnalysisStatus.FAILED, now, error);
-      failed(run, now, error);
-    } catch (RuntimeException secondary) {
+    } catch (RuntimeException | Error secondary) {
+      suppress(fatal, secondary);
+    }
+    try {
+      if (!run.events().terminalEmitted()) {
+        release(run);
+        emitTerminal(run);
+      }
+    } catch (RuntimeException | Error secondary) {
+      suppress(fatal, secondary);
+    }
+  }
+
+  private void decide(Run run, Throwable fatal) {
+    final boolean cancelAccepted = run.endPhase();
+    final AnalysisStatus outcome =
+        cancelAccepted ? AnalysisStatus.CANCELLED : AnalysisStatus.FAILED;
+    final ProtocolError error =
+        cancelAccepted ? null : ErrorCodes.internalUnexpected(fatal.getClass().getName());
+    final long now = finishInstant(run);
+    try {
+      endRunningStages(run, cancelAccepted ? StageStatus.CANCELLED : StageStatus.FAILED, now);
+      finishQuietly(run, outcome, now, error);
+    } finally {
+      run.ended(outcome, now, error);
+    }
+  }
+
+  private static void endRunningStages(Run run, StageStatus status, long now) {
+    final Run.Binding bound = run.binding();
+    for (final Map.Entry<AnalysisStage, StageSnapshot> entry : run.snapshot().stages().entrySet()) {
+      final StageSnapshot stage = entry.getValue();
+      if (stage.status() == StageStatus.RUNNING) {
+        final long elapsed = Math.max(0, now - stage.startedAtMillis());
+        if (bound != null && bound.hasRow()) {
+          writeQuietly(
+              bound,
+              new StageRecord(
+                  entry.getKey(), status, stage.startedAtMillis(), elapsed, EMPTY_COUNTERS));
+        }
+        run.stageEnded(
+            entry.getKey(), status, stage.startedAtMillis(), elapsed, StageCounters.none());
+      }
+    }
+  }
+
+  private static void emitTerminal(Run run) {
+    final RunSnapshot snapshot = run.snapshot();
+    switch (snapshot.status()) {
+      case COMPLETED -> run.events().completed(snapshot.completeness());
+      case CANCELLED -> run.events().cancelled(snapshot.completeness());
+      case FAILED -> run.events().failed(snapshot.failure());
+      case RUNNING -> {}
+    }
+  }
+
+  private static void suppress(Throwable fatal, Throwable secondary) {
+    if (secondary != fatal) {
       fatal.addSuppressed(secondary);
-      release(run);
     }
   }
 
@@ -315,6 +350,19 @@ final class AnalysisRunner {
     run.events().failed(error);
   }
 
+  private static void finishInterrupted(
+      Run run,
+      AnalysisRegistry.Rebuild rebuild,
+      AnalysisStatus status,
+      long finishedAt,
+      ProtocolError error) {
+    if (rebuild == null) {
+      finishQuietly(run, status, finishedAt, error);
+    } else if (rebuild == AnalysisRegistry.Rebuild.NOTHING_RENAMED) {
+      finishInKeptFile(run, status, finishedAt, error);
+    }
+  }
+
   private static void finishQuietly(
       Run run, AnalysisStatus status, long finishedAt, ProtocolError error) {
     final Run.Binding bound = run.binding();
@@ -322,22 +370,47 @@ final class AnalysisRunner {
       return;
     }
     try {
-      bound
-          .connections()
-          .write(
-              connection -> {
-                AnalysisDao.finish(
-                    connection,
-                    bound.analysisPk(),
-                    status,
-                    finishedAt,
-                    error == null ? null : error.code(),
-                    error == null ? null : error.detail());
-                return null;
-              });
+      finish(bound.connections(), bound.analysisPk(), status, finishedAt, error);
     } catch (SQLException | RuntimeException failure) {
       Log.error("a análise " + run.id().value() + " não conseguiu gravar " + status, failure);
     }
+  }
+
+  private static void finishInKeptFile(
+      Run run, AnalysisStatus status, long finishedAt, ProtocolError error) {
+    final Run.Binding bound = run.binding();
+    if (bound == null || !bound.hasRow()) {
+      return;
+    }
+    final Path database = bound.connections().databaseFile();
+    if (!Files.isRegularFile(database, LinkOption.NOFOLLOW_LINKS)) {
+      return;
+    }
+    try (SqliteConnections kept = SqliteConnections.open(database)) {
+      finish(kept, bound.analysisPk(), status, finishedAt, error);
+    } catch (SQLException | RuntimeException failure) {
+      Log.error("a análise " + run.id().value() + " não conseguiu gravar " + status, failure);
+    }
+  }
+
+  private static void finish(
+      SqliteConnections connections,
+      long analysisPk,
+      AnalysisStatus status,
+      long finishedAt,
+      ProtocolError error)
+      throws SQLException {
+    connections.write(
+        connection -> {
+          AnalysisDao.finish(
+              connection,
+              analysisPk,
+              status,
+              finishedAt,
+              error == null ? null : error.code(),
+              error == null ? null : error.detail());
+          return null;
+        });
   }
 
   private void release(Run run) {

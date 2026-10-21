@@ -61,6 +61,7 @@ final class Run implements CompletenessRecorder {
   private final BiConsumer<Run, Throwable> launchFailed;
   private volatile Thread thread;
   private volatile Binding binding;
+  private volatile boolean cancelledBeforeEnd;
 
   Run(
       AnalysisId id,
@@ -173,7 +174,11 @@ final class Run implements CompletenessRecorder {
   }
 
   boolean endPhase() {
-    return phase.getAndSet(Phase.ENDED) == Phase.CANCEL_REQUESTED;
+    final Phase before = phase.getAndSet(Phase.ENDED);
+    if (before != Phase.ENDED) {
+      cancelledBeforeEnd = before == Phase.CANCEL_REQUESTED;
+    }
+    return cancelledBeforeEnd;
   }
 
   void stageRunning(AnalysisStage stage, long startedAtMillis) {

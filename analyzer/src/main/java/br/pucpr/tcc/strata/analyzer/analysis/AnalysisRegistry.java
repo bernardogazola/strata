@@ -36,7 +36,7 @@ public final class AnalysisRegistry implements AutoCloseable {
 
   private final AtomicReference<Run> active = new AtomicReference<>();
 
-  private final Object slot = new Object();
+  final Object slot = new Object();
 
   private final Map<RepositoryKey, RepositoryCache> caches = new HashMap<>();
 
@@ -119,10 +119,10 @@ public final class AnalysisRegistry implements AutoCloseable {
 
   @Override
   public void close() {
-    if (!closed.compareAndSet(false, true)) {
-      return;
-    }
     synchronized (slot) {
+      if (closed.get()) {
+        return;
+      }
       final Run current = active.get();
       if (current != null && current.discardIfUnlaunched()) {
         runs.remove(current.id());
@@ -130,6 +130,7 @@ public final class AnalysisRegistry implements AutoCloseable {
       } else if (current != null) {
         current.requestStop();
       }
+      closed.set(true);
     }
     final Set<RepositoryKey> stillInUse = awaitRuns(settings.runStopWait());
     closeCaches(stillInUse);
@@ -230,10 +231,10 @@ public final class AnalysisRegistry implements AutoCloseable {
     return opening.cache();
   }
 
-  void rebuild(Run run) {
+  Rebuild rebuild(Run run) {
     final Run.Binding bound = run.binding();
     if (bound == null) {
-      return;
+      return Rebuild.NOTHING_RENAMED;
     }
     try {
       final CacheOpening.Rebuilt rebuilt = bound.cache().rebuildAfterCorruption();
@@ -245,15 +246,24 @@ public final class AnalysisRegistry implements AutoCloseable {
         }
       }
       run.events().cacheInvalidated(rebuilt.invalidation());
+      return Rebuild.REBUILT;
     } catch (CacheUnavailableException failed) {
       synchronized (caches) {
         caches.remove(bound.key(), bound.cache());
       }
       Log.error("falha ao reconstruir o cache de " + bound.key().value(), failed);
       failed.discarded().ifPresent(run.events()::cacheInvalidated);
+      return failed.discarded().isPresent() ? Rebuild.DISCARDED : Rebuild.NOTHING_RENAMED;
     } catch (RuntimeException failed) {
       Log.error("falha ao reconstruir o cache de " + bound.key().value(), failed);
+      return Rebuild.DISCARDED;
     }
+  }
+
+  enum Rebuild {
+    REBUILT,
+    NOTHING_RENAMED,
+    DISCARDED
   }
 
   void release(Run run) {

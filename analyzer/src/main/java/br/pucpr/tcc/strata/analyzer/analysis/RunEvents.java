@@ -22,6 +22,7 @@ final class RunEvents implements WarningSink {
   private final FrameSink sink;
   private final CancellationToken token;
   private final AtomicBoolean broken = new AtomicBoolean();
+  private final AtomicBoolean terminal = new AtomicBoolean();
   private final Map<String, AtomicInteger> warningsByCode = new ConcurrentHashMap<>();
 
   RunEvents(AnalysisId id, FrameSink sink, CancellationToken token) {
@@ -59,15 +60,25 @@ final class RunEvents implements WarningSink {
   }
 
   void completed(Completeness completeness) {
-    emit(AnalysisEvents.completed(id, completeness));
+    terminal(AnalysisEvents.completed(id, completeness));
   }
 
   void cancelled(Completeness completeness) {
-    emit(AnalysisEvents.cancelled(id, completeness));
+    terminal(AnalysisEvents.cancelled(id, completeness));
   }
 
   void failed(ProtocolError error) {
-    emit(AnalysisEvents.failed(id, error));
+    terminal(AnalysisEvents.failed(id, error));
+  }
+
+  boolean terminalEmitted() {
+    return terminal.get();
+  }
+
+  private void terminal(Envelope envelope) {
+    if (terminal.compareAndSet(false, true)) {
+      emit(envelope);
+    }
   }
 
   void logCappedWarnings() {
