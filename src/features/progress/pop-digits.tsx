@@ -1,13 +1,20 @@
-import { useLayoutEffect, useRef, useState } from "react";
-
-const STILL_BEFORE_POP_MS = 400;
+import {
+  type AnimationEvent,
+  useCallback,
+  useLayoutEffect,
+  useState,
+} from "react";
 
 const STAGGER_MS = 30;
 
-interface Pop {
-  readonly changed: readonly number[];
+interface Rise {
   readonly generation: number;
-  readonly pops: boolean;
+  readonly rank: number;
+}
+
+interface Pop {
+  readonly generation: number;
+  readonly rising: ReadonlyMap<number, Rise>;
   readonly shown: string;
 }
 
@@ -21,36 +28,49 @@ const changedFromRight = (previous: string, next: string): number[] => {
   return changed;
 };
 
+const nextPop = (previous: Pop, value: string): Pop => {
+  const generation = previous.generation + 1;
+  const starting = changedFromRight(previous.shown, value)
+    .filter((position) => !previous.rising.has(position))
+    .sort((a, b) => b - a);
+  const rising = new Map(
+    [...previous.rising].filter(([position]) => position < value.length)
+  );
+  for (const [rank, position] of starting.entries()) {
+    rising.set(position, { generation, rank });
+  }
+  return { generation, rising, shown: value };
+};
+
+const settled = (previous: Pop, position: number): Pop => {
+  const rising = new Map(previous.rising);
+  rising.delete(position);
+  return { ...previous, rising };
+};
+
 export interface PopDigitsProps {
   readonly value: string;
 }
 
 export function PopDigits({ value }: PopDigitsProps) {
   const [pop, setPop] = useState<Pop>({
-    changed: [],
     generation: 0,
-    pops: false,
+    rising: new Map(),
     shown: value,
   });
-  const lastChange = useRef(performance.now());
 
   useLayoutEffect(() => {
-    if (value === pop.shown) {
-      return;
+    if (value !== pop.shown) {
+      setPop((previous) => nextPop(previous, value));
     }
-    const now = performance.now();
-    const pops = now - lastChange.current >= STILL_BEFORE_POP_MS;
-    lastChange.current = now;
-    setPop((previous) => ({
-      changed: changedFromRight(previous.shown, value),
-      generation: previous.generation + 1,
-      pops,
-      shown: value,
-    }));
   }, [value, pop.shown]);
 
-  const order = pop.pops ? [...pop.changed].sort((a, b) => b - a) : [];
-  if (order.length === 0) {
+  const settle = useCallback((event: AnimationEvent<HTMLSpanElement>): void => {
+    const position = Number(event.currentTarget.dataset.position);
+    setPop((previous) => settled(previous, position));
+  }, []);
+
+  if (pop.rising.size === 0) {
     return value;
   }
 
@@ -58,14 +78,16 @@ export function PopDigits({ value }: PopDigitsProps) {
     <>
       {[...value].map((character, index) => {
         const position = value.length - 1 - index;
-        const rank = order.indexOf(position);
-        return rank < 0 ? (
+        const rise = pop.rising.get(position);
+        return rise === undefined ? (
           character
         ) : (
           <span
             className="relative animate-digit-pop motion-reduce:animate-none"
-            key={`${position}:${pop.generation}`}
-            style={{ animationDelay: `${rank * STAGGER_MS}ms` }}
+            data-position={position}
+            key={`${position}:${rise.generation}`}
+            onAnimationEnd={settle}
+            style={{ animationDelay: `${rise.rank * STAGGER_MS}ms` }}
           >
             {character}
           </span>

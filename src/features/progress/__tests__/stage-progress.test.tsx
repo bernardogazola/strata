@@ -150,7 +150,6 @@ describe("StageProgress, as linhas", () => {
   });
 
   test("um salto da contagem sobe só a contagem, e o texto da linha não muda", () => {
-    vi.spyOn(performance, "now").mockReturnValue(0);
     const { container, rerender } = render(
       <StageProgress
         now={STARTED_MS}
@@ -159,7 +158,6 @@ describe("StageProgress, as linhas", () => {
       />
     );
 
-    vi.spyOn(performance, "now").mockReturnValue(3000);
     rerender(
       <StageProgress
         now={STARTED_MS}
@@ -179,7 +177,6 @@ describe("StageProgress, as linhas", () => {
         (_, element) => element?.textContent === "190 de 259 arquivos Java"
       )
     ).toBeDefined();
-    vi.restoreAllMocks();
   });
 
   test("as unidades saem com ponto de milhar: 1.240 de 3.902 arquivos Java", () => {

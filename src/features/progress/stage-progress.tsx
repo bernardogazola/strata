@@ -188,11 +188,13 @@ function ActiveRow({ now, row }: ActiveRowProps) {
               {analysisStageLabels[row.stage]}
             </span>
           </span>
-          {row.tick === undefined ? null : (
-            <UnitsCount stage={row.stage} tick={row.tick} />
-          )}
-          <span className="min-w-12 shrink-0 whitespace-nowrap text-right text-muted-foreground text-xs tabular-nums">
-            {elapsedText(row.stageReport, now)}
+          <span className="flex shrink-0 items-baseline gap-3">
+            {row.tick === undefined ? null : (
+              <UnitsCount stage={row.stage} tick={row.tick} />
+            )}
+            <span className="whitespace-nowrap text-muted-foreground text-xs tabular-nums">
+              {elapsedText(row.stageReport, now)}
+            </span>
           </span>
         </div>
         {fraction === null ? null : (
