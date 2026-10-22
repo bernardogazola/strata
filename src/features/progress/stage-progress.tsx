@@ -2,6 +2,7 @@ import { IconCheck, IconPlayerStopFilled, IconX } from "@tabler/icons-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { analysisStageLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
+import { cn } from "@/lib/utils";
 import type { AnalysisStage, ProgressTick } from "@/protocol/analysis";
 import type { AnalysisStatusReport } from "@/protocol/repository";
 import { PopDigits } from "./pop-digits";
@@ -59,6 +60,27 @@ const useStageAnnouncements = (
   }, [kindsKey, hasReport]);
 
   return announcements;
+};
+
+const NO_STAGES: ReadonlySet<AnalysisStage> = new Set();
+
+const useCompletedLive = (
+  rows: readonly StageRow[],
+  hasReport: boolean
+): ReadonlySet<AnalysisStage> => {
+  const [baseline, setBaseline] = useState<ReadonlySet<AnalysisStage> | null>(
+    null
+  );
+  const completed = rows
+    .filter((row) => row.kind === "completed")
+    .map((row) => row.stage);
+  if (baseline === null) {
+    if (hasReport) {
+      setBaseline(new Set(completed));
+    }
+    return NO_STAGES;
+  }
+  return new Set(completed.filter((stage) => !baseline.has(stage)));
 };
 
 const useClock = (active: boolean, injected: number | undefined): number => {
@@ -138,14 +160,18 @@ const STATUS_ICONS = {
 } as const satisfies Record<RowKind, ReactNode>;
 
 interface IconSlotProps {
+  readonly entering?: boolean;
   readonly kind: RowKind;
 }
 
-function IconSlot({ kind }: IconSlotProps) {
+function IconSlot({ entering = false, kind }: IconSlotProps) {
   return (
     <span
       aria-hidden="true"
-      className="flex h-5 w-4 shrink-0 items-center justify-center"
+      className={cn(
+        "flex h-5 w-4 shrink-0 items-center justify-center",
+        entering && "animate-check-in"
+      )}
     >
       {STATUS_ICONS[kind]}
     </span>
@@ -214,15 +240,16 @@ function ActiveRow({ now, row }: ActiveRowProps) {
 }
 
 interface SettledRowProps {
+  readonly completedLive: boolean;
   readonly kind: SettledKind;
   readonly row: StageRow;
 }
 
-function SettledRow({ kind, row }: SettledRowProps) {
+function SettledRow({ completedLive, kind, row }: SettledRowProps) {
   const duration = kind === "completed" ? stageDurationText(row) : null;
   return (
     <li className="flex items-center gap-3 px-4 py-2.5" data-stage={row.stage}>
-      <IconSlot kind={kind} />
+      <IconSlot entering={completedLive} kind={kind} />
       <span className="grow text-muted-foreground text-sm/5">
         {analysisStageLabels[row.stage]}
       </span>
@@ -262,6 +289,7 @@ export function StageProgress({
   const anySkipped = rows.some((row) => row.kind === "skipped");
   const currentTime = useClock(anyActive, now);
   const announcements = useStageAnnouncements(rows, report !== undefined);
+  const completedLive = useCompletedLive(rows, report !== undefined);
 
   return (
     <div className="flex flex-col gap-3">
@@ -273,7 +301,12 @@ export function StageProgress({
           row.kind === "active" ? (
             <ActiveRow key={row.stage} now={currentTime} row={row} />
           ) : (
-            <SettledRow key={row.stage} kind={row.kind} row={row} />
+            <SettledRow
+              completedLive={completedLive.has(row.stage)}
+              key={row.stage}
+              kind={row.kind}
+              row={row}
+            />
           )
         )}
       </ol>

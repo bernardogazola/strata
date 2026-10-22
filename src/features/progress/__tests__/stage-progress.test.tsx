@@ -518,6 +518,64 @@ describe("StageProgress, depois do terminal", () => {
   });
 });
 
+describe("StageProgress, o check que entra", () => {
+  const CHECK_IN = ".animate-check-in";
+
+  test("o check de uma etapa que conclui com a tela aberta entra animado", () => {
+    const sourceRunning = {
+      LAYOUT_DISCOVERY: COMPLETED_STAGES.LAYOUT_DISCOVERY,
+      REPOSITORY_VALIDATION: COMPLETED_STAGES.REPOSITORY_VALIDATION,
+      SOURCE_ANALYSIS: { startedAt: STARTED_AT, status: "RUNNING" },
+    } as const;
+    const { container, rerender } = render(
+      <StageProgress
+        now={STARTED_MS}
+        report={statusReport({ stages: sourceRunning })}
+        ticks={{ SOURCE_ANALYSIS: tick("SOURCE_ANALYSIS", 4, 9) }}
+      />
+    );
+
+    rerender(
+      <StageProgress
+        now={STARTED_MS}
+        report={statusReport({
+          stages: {
+            ...sourceRunning,
+            SOURCE_ANALYSIS: COMPLETED_STAGES.SOURCE_ANALYSIS,
+          },
+        })}
+        ticks={{ SOURCE_ANALYSIS: tick("SOURCE_ANALYSIS", 9, 9) }}
+      />
+    );
+
+    expect(
+      rowOf(container, "SOURCE_ANALYSIS").querySelector(CHECK_IN)
+    ).not.toBeNull();
+    expect(
+      rowOf(container, "REPOSITORY_VALIDATION").querySelector(CHECK_IN)
+    ).toBeNull();
+    expect(
+      rowOf(container, "LAYOUT_DISCOVERY").querySelector(CHECK_IN)
+    ).toBeNull();
+  });
+
+  test("quem abre uma análise já terminada vê os checks parados, e não dez entradas", () => {
+    const { container, rerender } = render(
+      <StageProgress now={STARTED_MS} report={undefined} ticks={{}} />
+    );
+
+    rerender(
+      <StageProgress
+        now={STARTED_MS}
+        report={statusReport({ stages: COMPLETED_STAGES, status: "COMPLETED" })}
+        ticks={{}}
+      />
+    );
+
+    expect(container.querySelector(CHECK_IN)).toBeNull();
+  });
+});
+
 describe("StageProgress, o tempo decorrido", () => {
   test("a coluna mostra há quanto tempo a etapa corre, desde o startedAt dela", () => {
     const { container } = render(

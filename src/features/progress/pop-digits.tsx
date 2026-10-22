@@ -3,7 +3,19 @@ import {
   useCallback,
   useLayoutEffect,
   useState,
+  useSyncExternalStore,
 } from "react";
+
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+
+const subscribeToReducedMotion = (onChange: () => void): (() => void) => {
+  const query = window.matchMedia(REDUCED_MOTION);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+};
+
+const prefersReducedMotion = (): boolean =>
+  window.matchMedia(REDUCED_MOTION).matches;
 
 const STAGGER_MS = 30;
 
@@ -48,6 +60,12 @@ const settled = (previous: Pop, position: number): Pop => {
   return { ...previous, rising };
 };
 
+const still = (previous: Pop, value: string): Pop => ({
+  ...previous,
+  rising: new Map(),
+  shown: value,
+});
+
 export interface PopDigitsProps {
   readonly value: string;
 }
@@ -58,19 +76,38 @@ export function PopDigits({ value }: PopDigitsProps) {
     rising: new Map(),
     shown: value,
   });
+  const reducedMotion = useSyncExternalStore(
+    subscribeToReducedMotion,
+    prefersReducedMotion
+  );
 
   useLayoutEffect(() => {
     if (value !== pop.shown) {
-      setPop((previous) => nextPop(previous, value));
+      setPop((previous) =>
+        reducedMotion ? still(previous, value) : nextPop(previous, value)
+      );
     }
-  }, [value, pop.shown]);
+  }, [value, pop.shown, reducedMotion]);
 
-  const settle = useCallback((event: AnimationEvent<HTMLSpanElement>): void => {
-    const position = Number(event.currentTarget.dataset.position);
+  const settleAt = useCallback((position: number): void => {
     setPop((previous) => settled(previous, position));
   }, []);
+  const settle = useCallback(
+    (event: AnimationEvent<HTMLSpanElement>): void =>
+      settleAt(Number(event.currentTarget.dataset.position)),
+    [settleAt]
+  );
+  // O React não expõe animationcancel, daí o listener nativo.
+  const settleOnCancel = useCallback(
+    (span: HTMLSpanElement): (() => void) => {
+      const cancel = (): void => settleAt(Number(span.dataset.position));
+      span.addEventListener("animationcancel", cancel);
+      return () => span.removeEventListener("animationcancel", cancel);
+    },
+    [settleAt]
+  );
 
-  if (pop.rising.size === 0) {
+  if (reducedMotion || pop.rising.size === 0) {
     return value;
   }
 
@@ -83,10 +120,11 @@ export function PopDigits({ value }: PopDigitsProps) {
           character
         ) : (
           <span
-            className="relative animate-digit-pop motion-reduce:animate-none"
+            className="relative animate-digit-pop"
             data-position={position}
             key={`${position}:${rise.generation}`}
             onAnimationEnd={settle}
+            ref={settleOnCancel}
             style={{ animationDelay: `${rise.rank * STAGGER_MS}ms` }}
           >
             {character}

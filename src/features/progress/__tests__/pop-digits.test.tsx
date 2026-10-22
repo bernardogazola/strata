@@ -1,6 +1,14 @@
 import { fireEvent, render } from "@testing-library/react";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { PopDigits } from "@/features/progress/pop-digits";
+import { matchMediaStub } from "@/test/setup";
+
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+
+const prefersReducedMotion = (query: string) => ({
+  ...matchMediaStub(false)(query),
+  matches: query === REDUCED_MOTION,
+});
 
 const rising = (container: HTMLElement): HTMLElement[] => [
   ...container.querySelectorAll<HTMLElement>(".animate-digit-pop"),
@@ -80,6 +88,29 @@ describe("PopDigits", () => {
     expect(rising(container)).toStrictEqual([]);
     expect(container.querySelector("span")).toBeNull();
     expect(container.textContent).toBe("125");
+  });
+
+  test("uma subida cancelada também devolve o algarismo ao texto", () => {
+    const { container, rerender } = render(<PopDigits value="124" />);
+
+    rerender(<PopDigits value="125" />);
+    for (const digit of rising(container)) {
+      fireEvent(digit, new Event("animationcancel"));
+    }
+
+    expect(container.querySelector("span")).toBeNull();
+    expect(container.textContent).toBe("125");
+  });
+
+  test("com menos movimento, a troca é instantânea e o número nunca se parte em spans", () => {
+    vi.stubGlobal("matchMedia", prefersReducedMotion);
+    const { container, rerender } = render(<PopDigits value="124" />);
+
+    rerender(<PopDigits value="190" />);
+    rerender(<PopDigits value="203" />);
+
+    expect(container.querySelector("span")).toBeNull();
+    expect(container.textContent).toBe("203");
   });
 
   test("os algarismos ficam em linha, sem bloco próprio: o número não se parte em pedaços", () => {

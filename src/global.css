@@ -32,6 +32,7 @@
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.478 0 0);
   --subtle-foreground: oklch(0.596 0 0);
+  --shimmer-rest: oklch(0.55 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.281 0 0);
   --accent-strong: oklch(0.481 0.221 266.145);
@@ -168,7 +169,20 @@
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
   --default-transition-timing-function: var(--ease-out-quart);
 
-  --animate-digit-pop: digit-pop 250ms var(--ease-out-quart) both;
+  --animate-digit-pop: digit-pop 180ms var(--ease-out-quart) both;
+
+  --animate-check-in: check-in 150ms var(--ease-out-quart) both;
+
+  @keyframes check-in {
+    from {
+      opacity: 0;
+      scale: 0.9;
+    }
+    to {
+      opacity: 1;
+      scale: 1;
+    }
+  }
 
   @keyframes digit-pop {
     from {
@@ -200,6 +214,7 @@
   --muted: oklch(0.235 0 0);
   --muted-foreground: oklch(0.725 0 0);
   --subtle-foreground: oklch(0.633 0 0);
+  --shimmer-rest: oklch(0.78 0 0);
   --accent: oklch(0.235 0 0);
   --accent-foreground: oklch(0.946 0 0);
   --accent-strong: oklch(0.701 0.156 271.75);
@@ -303,9 +318,10 @@
   -webkit-text-fill-color: transparent;
   background-image: linear-gradient(
     90deg,
-    var(--muted-foreground) 40%,
-    var(--foreground) 50%,
-    var(--muted-foreground) 60%
+    var(--shimmer-rest) 35%,
+    var(--foreground) 45%,
+    var(--foreground) 55%,
+    var(--shimmer-rest) 65%
   );
   background-repeat: no-repeat;
   -webkit-background-clip: text;
