@@ -1,4 +1,5 @@
 import { type ReactNode, useCallback, useId } from "react";
+import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
 import { formatInteger } from "@/i18n/format";
 import {
@@ -8,6 +9,7 @@ import {
 } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
 import { DEFAULT_UNTRUSTED_MAX_CHARS } from "@/lib/untrusted";
+import { cn } from "@/lib/utils";
 import type { GraphNode } from "@/protocol/graph";
 import { ElementKindIcon } from "./element-kind-icon";
 import { ElementLabel } from "./element-label";
@@ -61,7 +63,7 @@ function ExpandButton({
   const expand = useCallback(() => onExpand(elementId), [elementId, onExpand]);
   return (
     <Button
-      className="w-full shadow-control"
+      className={cn(SECONDARY_ACTION_CLASS, "w-full shadow-control")}
       onClick={expand}
       size="sm"
       variant="outline"

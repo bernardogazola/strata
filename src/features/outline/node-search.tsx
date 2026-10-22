@@ -15,6 +15,7 @@ import {
   useState,
 } from "react";
 import { protocolErrorOf } from "@/bridge/analyzer";
+import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
 import { ElementKindIcon } from "@/features/graph/element-kind-icon";
 import { ElementLabel } from "@/features/graph/element-label";
@@ -24,6 +25,7 @@ import { interpolate, plural } from "@/i18n/format";
 import { elementKindLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
 import { clampText, sanitizeUntrusted } from "@/lib/untrusted";
+import { cn } from "@/lib/utils";
 import type { SearchHit } from "@/protocol/graph";
 import { SEARCH_QUERY_MAX_CHARS } from "@/protocol/primitives";
 import { graphSearchQueryOptions } from "@/queries/options";
@@ -487,7 +489,7 @@ function SearchFailure({
       </div>
       {message.retryable ? (
         <Button
-          className="shadow-control"
+          className={cn(SECONDARY_ACTION_CLASS, "shadow-control")}
           onClick={onRetry}
           size="sm"
           variant="outline"

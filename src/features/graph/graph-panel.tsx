@@ -2,11 +2,13 @@ import { IconInfoCircle } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { protocolErrorOf } from "@/bridge/analyzer";
+import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
 import { formatProtocolError } from "@/i18n/errors";
 import { interpolate, plural } from "@/i18n/format";
 import { graphLevelLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
+import { cn } from "@/lib/utils";
 import type { GraphSlice } from "@/protocol/graph";
 import {
   type GraphViewParams,
@@ -92,7 +94,7 @@ function FailureState({
       </div>
       {retryable ? (
         <Button
-          className="shadow-control"
+          className={cn(SECONDARY_ACTION_CLASS, "shadow-control")}
           onClick={onRetry}
           size="sm"
           variant="outline"

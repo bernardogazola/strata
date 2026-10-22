@@ -71,7 +71,10 @@ export function DescribePanel({ description }: DescribePanelProps) {
 
   return (
     <div className="flex flex-col gap-7">
-      <h1 className="select-text font-medium text-2xl text-foreground [overflow-wrap:anywhere]">
+      <h1
+        className="select-text font-medium text-2xl text-foreground [overflow-wrap:anywhere]"
+        tabIndex={-1}
+      >
         <RepositoryText value={description.displayName} />
       </h1>
       <div className="flex flex-col gap-3">

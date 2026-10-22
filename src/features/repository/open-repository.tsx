@@ -5,41 +5,22 @@ import {
   exportDiagnostics,
   openRepository,
   protocolErrorOf,
-  restartAnalyzer,
 } from "@/bridge/analyzer";
-import { applyResolvedBackend } from "@/bridge/events";
+import {
+  PRIMARY_ACTION_CLASS,
+  SECONDARY_ACTION_CLASS,
+} from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
+import { useAnalyzerRestart } from "@/features/backend/analyzer-status";
 import { ErrorSurface } from "@/features/errors/error-surface";
 import { interpolate } from "@/i18n/format";
 import { t } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 import type { ProtocolError } from "@/protocol/errors";
 import { type BackendState, useAppStore } from "@/state/app-store";
-import { PRIMARY_ACTION_CLASS } from "./action-styles";
 
 const CRASH_TEXT =
   "text-[color:color-mix(in_oklch,var(--destructive),var(--foreground)_35%)]";
-
-const useCrashRestart = () => {
-  const recoverBackend = useAppStore((state) => state.recoverBackend);
-  const [restarting, setRestarting] = useState(false);
-
-  const restart = useCallback(async () => {
-    setRestarting(true);
-    recoverBackend();
-    try {
-      applyResolvedBackend(await restartAnalyzer());
-    } finally {
-      setRestarting(false);
-    }
-  }, [recoverBackend]);
-
-  const onRestart = useCallback(() => {
-    restart().catch(() => undefined);
-  }, [restart]);
-
-  return { onRestart, restarting };
-};
 
 const useExportDiagnostics = () => {
   const [exporting, setExporting] = useState(false);
@@ -69,7 +50,7 @@ interface AnalyzerCrashedProps {
 }
 
 function AnalyzerCrashed({ exitCode }: AnalyzerCrashedProps) {
-  const { onRestart, restarting } = useCrashRestart();
+  const { restart: onRestart, restarting } = useAnalyzerRestart();
   const { exporting, failure, onExport } = useExportDiagnostics();
 
   return (
@@ -92,7 +73,10 @@ function AnalyzerCrashed({ exitCode }: AnalyzerCrashedProps) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
-            className="h-[30px] border-destructive/25 bg-background px-3 transition-[scale,background-color] active:scale-[0.98] motion-reduce:active:scale-100"
+            className={cn(
+              SECONDARY_ACTION_CLASS,
+              "h-[30px] border-destructive/25 bg-background px-3 dark:border-destructive/25"
+            )}
             disabled={restarting}
             onClick={onRestart}
             size="sm"

@@ -186,6 +186,7 @@ const ptBR = {
     },
     summaryHint:
       "A análise roda localmente e pode ser cancelada a qualquer momento.",
+    summaryNone: "Nenhuma raiz marcada",
     title: "Preparar a análise",
   },
 
@@ -272,11 +273,6 @@ const ptBR = {
       title: "Legenda",
     },
     loading: "Carregando o mapa…",
-    noAnalysis: {
-      action: "Voltar ao início",
-      body: "Abra um repositório e analise-o para ver o mapa da arquitetura.",
-      title: "Nenhuma análise aberta",
-    },
     notice: {
       aggregated:
         "Este repositório tem {total} pacotes, mais do que o primeiro nível comporta. Eles aparecem agrupados pelos prefixos de pacote de topo.",

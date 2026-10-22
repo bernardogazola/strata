@@ -1,7 +1,15 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getRouteApi, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef } from "react";
+import { getRouteApi, Link, notFound } from "@tanstack/react-router";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { buttonVariants } from "@/components/ui/button";
+import { ErrorSurface } from "@/features/errors/error-surface";
 import { ElementLabel } from "@/features/graph/element-label";
 import { GraphPanel } from "@/features/graph/graph-panel";
 import {
@@ -13,9 +21,22 @@ import {
   type OutlineHandle,
 } from "@/features/outline/architecture-outline";
 import { NodeSearch } from "@/features/outline/node-search";
+import {
+  AnalysisScreen,
+  type AnalysisWorkspaceProps,
+  useFocusTitleOnScreenChange,
+} from "@/features/progress/analysis-screen";
+import { CompletenessCaveat } from "@/features/progress/completeness-caveat";
+import { PrepareScreen } from "@/features/repository/prepare-screen";
 import { t } from "@/i18n/messages";
+import { cn } from "@/lib/utils";
 import type { ElementKind } from "@/protocol/enums";
+import type { ProtocolError } from "@/protocol/errors";
 import type { GraphNode, GraphSlice, SearchHit } from "@/protocol/graph";
+import {
+  type RepositoryHandle,
+  repositoryHandleSchema,
+} from "@/protocol/primitives";
 import {
   type GraphViewParams,
   graphSliceQueryOptions,
@@ -64,22 +85,19 @@ function ParentCrumb({
   analysisId,
   parentId,
 }: {
-  readonly analysisId: string | undefined;
+  readonly analysisId: string;
   readonly parentId: string | undefined;
 }) {
   const queryClient = useQueryClient();
-  const levelOne =
-    analysisId === undefined
-      ? undefined
-      : queryClient.getQueryData(
-          graphSliceQueryOptions(analysisId, { level: "PACKAGE" }).queryKey
-        );
+  const levelOne = queryClient.getQueryData(
+    graphSliceQueryOptions(analysisId, { level: "PACKAGE" }).queryKey
+  );
   const label = levelOne?.nodes.find((node) => node.id === parentId)?.label;
 
   if (label === undefined) {
     return <>{t.shell.breadcrumb.selectedPackage}</>;
   }
-  return <ElementLabel className="font-mono" kind="PACKAGE" label={label} />;
+  return <ElementLabel kind="PACKAGE" label={label} />;
 }
 
 const useFocusOnViewChange = (viewKey: string) => {
@@ -99,14 +117,13 @@ const useFocusOnViewChange = (viewKey: string) => {
   return targetRef;
 };
 
-const CRUMB_FOCUS_CLASS =
-  "rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
+const CRUMB_FOCUS_CLASS = "rounded-sm";
 
 function MapBreadcrumb({
   analysisId,
   view,
 }: {
-  readonly analysisId: string | undefined;
+  readonly analysisId: string;
   readonly view: GraphViewParams;
 }) {
   const atRoot = view.level === "PACKAGE";
@@ -158,30 +175,15 @@ function MapBreadcrumb({
   );
 }
 
-function NoAnalysis() {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-      <h2 className="font-medium">{t.graph.noAnalysis.title}</h2>
-      <p className="max-w-sm text-muted-foreground text-sm">
-        {t.graph.noAnalysis.body}
-      </p>
-      <Link
-        className={buttonVariants({ size: "sm", variant: "outline" })}
-        to="/"
-      >
-        {t.graph.noAnalysis.action}
-      </Link>
-    </div>
-  );
-}
-
 function FocusedNodeSummary({
   analysisId,
+  caveat,
   focus,
   onExpand,
   view,
 }: {
   readonly analysisId: string;
+  readonly caveat: ReactNode;
   readonly focus: string | null;
   readonly onExpand: (elementId: string) => void;
   readonly view: GraphViewParams;
@@ -196,6 +198,7 @@ function FocusedNodeSummary({
   });
   return (
     <NodeSummary
+      caveat={caveat}
       node={data?.node ?? null}
       notOnMap={data?.notOnMap}
       onExpand={onExpand}
@@ -203,12 +206,12 @@ function FocusedNodeSummary({
   );
 }
 
-export function RepositoryScreen() {
+function RepositoryWorkspace({ header, report }: AnalysisWorkspaceProps) {
   const search = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
   const view = resolveGraphView(search);
   const focus = search.focus ?? null;
-  const analysisId = search.analysis;
+  const { analysisId } = report;
   const outlineRef = useRef<OutlineHandle>(null);
 
   const go = useCallback(
@@ -245,57 +248,125 @@ export function RepositoryScreen() {
     <AppShell
       header={
         <AppHeader
+          {...header}
           trail={<MapBreadcrumb analysisId={analysisId} view={view} />}
         />
       }
       inspector={
-        analysisId === undefined ? (
-          <NodeSummary node={null} onExpand={onExpand} />
-        ) : (
-          <FocusedNodeSummary
+        <FocusedNodeSummary
+          analysisId={analysisId}
+          caveat={<CompletenessCaveat compact report={report} />}
+          focus={focus}
+          onExpand={onExpand}
+          view={view}
+        />
+      }
+      main={
+        <>
+          <SkipToOutline onSkip={onSkip} />
+          <h1 className="sr-only" tabIndex={-1}>
+            {t.shell.regions.canvas}
+          </h1>
+          <GraphPanel
             analysisId={analysisId}
             focus={focus}
             onExpand={onExpand}
+            onSelect={onSelect}
             view={view}
           />
-        )
-      }
-      main={
-        analysisId === undefined ? (
-          <NoAnalysis />
-        ) : (
-          <>
-            <SkipToOutline onSkip={onSkip} />
-            <GraphPanel
-              analysisId={analysisId}
-              focus={focus}
-              onExpand={onExpand}
-              onSelect={onSelect}
-              view={view}
-            />
-          </>
-        )
+        </>
       }
       sidebar={
-        analysisId === undefined ? null : (
-          <div className="flex h-full min-h-0 flex-col gap-4">
-            <NodeSearch
-              analysisId={analysisId}
-              focus={focus}
-              onReveal={onReveal}
-            />
-            <ArchitectureOutline
-              analysisId={analysisId}
-              focus={focus}
-              onCollapse={onCollapse}
-              onExpand={onExpand}
-              onSelect={onOutlineSelect}
-              ref={outlineRef}
-              view={view}
-            />
-          </div>
-        )
+        <div className="flex h-full min-h-0 flex-col gap-4">
+          <NodeSearch
+            analysisId={analysisId}
+            focus={focus}
+            onReveal={onReveal}
+          />
+          <ArchitectureOutline
+            analysisId={analysisId}
+            focus={focus}
+            onCollapse={onCollapse}
+            onExpand={onExpand}
+            onSelect={onOutlineSelect}
+            ref={outlineRef}
+            view={view}
+          />
+        </div>
       }
+    />
+  );
+}
+
+export const parseRepositoryParams = ({
+  handle,
+}: {
+  readonly handle: string;
+}): { readonly handle: RepositoryHandle } => {
+  const parsed = repositoryHandleSchema.safeParse(handle);
+  if (!parsed.success) {
+    throw notFound();
+  }
+  return { handle: parsed.data };
+};
+
+const UNKNOWN_HANDLE: ProtocolError = {
+  code: "REPO_HANDLE_UNKNOWN",
+  origin: "frontend",
+};
+
+export function UnknownRepositoryScreen() {
+  return (
+    <div className="flex min-h-svh flex-col bg-background">
+      <AppHeader />
+      <main
+        aria-label={t.shell.regions.prepare}
+        className="flex grow items-center justify-center px-4 pt-8 pb-12"
+      >
+        <div className="flex w-full max-w-[520px] flex-col gap-6">
+          <ErrorSurface
+            actions={
+              <Link
+                className={cn(
+                  buttonVariants({ size: "sm", variant: "outline" }),
+                  SECONDARY_ACTION_CLASS
+                )}
+                to="/"
+              >
+                {t.repository.backToStart}
+              </Link>
+            }
+            error={UNKNOWN_HANDLE}
+            variant="page"
+          />
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export function RepositoryScreen() {
+  const { handle } = routeApi.useParams();
+  const { analysis } = routeApi.useSearch();
+  const screenKey = analysis === undefined ? "prepare" : `analysis:${analysis}`;
+  useFocusTitleOnScreenChange(screenKey);
+
+  const [firstKey] = useState(screenKey);
+  const [navigated, setNavigated] = useState(false);
+  if (!navigated && screenKey !== firstKey) {
+    setNavigated(true);
+  }
+
+  if (analysis === undefined) {
+    return <PrepareScreen handle={handle} />;
+  }
+  return (
+    <AnalysisScreen
+      analysisId={analysis}
+      arrivedByNavigation={navigated}
+      handle={handle}
+      key={screenKey}
+      workspace={RepositoryWorkspace}
     />
   );
 }

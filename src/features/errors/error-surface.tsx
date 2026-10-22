@@ -1,5 +1,6 @@
 import { type Icon, IconAlertCircle, IconCircleX } from "@tabler/icons-react";
 import type { ReactNode } from "react";
+import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
 import { type ErrorSeverity, formatProtocolError } from "@/i18n/errors";
 import { interpolate } from "@/i18n/format";
@@ -38,9 +39,6 @@ const SEVERITY_STYLES = {
 
 const ICON_STROKE = 1.5;
 
-const SECONDARY_BUTTON_CLASS =
-  "px-3.5 transition-[scale,background-color,box-shadow] active:scale-[0.98] motion-reduce:active:scale-100";
-
 const codeLine = (error: ProtocolError): string | null =>
   isKnownErrorCode(error.code)
     ? interpolate(t.error.code, { code: error.code })
@@ -53,7 +51,7 @@ interface RetryButtonProps {
 function RetryButton({ onRetry }: RetryButtonProps) {
   return (
     <Button
-      className={SECONDARY_BUTTON_CLASS}
+      className={SECONDARY_ACTION_CLASS}
       onClick={onRetry}
       size="sm"
       variant="outline"

@@ -15,7 +15,15 @@ import {
   within,
 } from "@testing-library/react";
 import type { MouseEvent } from "react";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  type MockInstance,
+  test,
+  vi,
+} from "vitest";
 import { fakeRequest } from "@/bridge/fake";
 import { transport } from "@/bridge/transport";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -23,12 +31,20 @@ import { toGraphView } from "@/features/graph/adapter";
 import type { ArchitectureGraphProps } from "@/features/graph/architecture-graph";
 import type { ArchitectureOutlineProps } from "@/features/outline/architecture-outline";
 import type { NodeSearchProps } from "@/features/outline/node-search";
+import { statusReport } from "@/features/progress/__tests__/status-report";
+import { formatProtocolError } from "@/i18n/errors";
+import { interpolate, plural } from "@/i18n/format";
 import { t } from "@/i18n/messages";
 import type { GraphSlice, SearchHit } from "@/protocol/graph";
+import type {
+  AnalysisStageReport,
+  AnalysisStatusReport,
+} from "@/protocol/repository";
 import { createQueryClient } from "@/queries/client";
 import { graphSliceQueryOptions } from "@/queries/options";
 import type { RouterContext } from "@/router";
 import { Route as RepositoryRoute } from "@/routes/repository.$handle";
+import { type BackendState, useAppStore } from "@/state/app-store";
 
 const IDS = vi.hoisted(() => ({
   BILLING: "pkg:br.pucpr.billing",
@@ -224,6 +240,45 @@ const { BILLING, ORDER_TYPE, ORDERS } = IDS;
 const SCREEN_URL = `/repository/${HANDLE}?analysis=${AN}`;
 const BIDI_OVERRIDE = String.fromCodePoint(0x20_2e);
 
+type StageStatus = AnalysisStageReport["status"];
+
+const RUNNING_META = /^Em andamento há \d/;
+
+const READY: BackendState = { phase: "READY", protocolVersion: 1 };
+const initialStore = useAppStore.getState();
+
+const fixtureStatus = async (): Promise<AnalysisStatusReport> =>
+  (await fakeRequest("analysis.status", {
+    analysisId: AN,
+  })) as AnalysisStatusReport;
+
+const withStructuralGraph = (
+  report: AnalysisStatusReport,
+  status: StageStatus
+): AnalysisStatusReport => ({
+  ...report,
+  stages: report.stages.map((stage) =>
+    stage.stage === "STRUCTURAL_GRAPH" ? { ...stage, status } : stage
+  ),
+});
+
+const mapReadyStatus = async (): Promise<AnalysisStatusReport> =>
+  withStructuralGraph(await fixtureStatus(), "COMPLETED");
+
+let requestSpy: MockInstance<typeof transport.request>;
+
+const serveStatus = (answer: () => Promise<unknown>): void => {
+  requestSpy.mockImplementation((method, payload) =>
+    method === "analysis.status" ? answer() : fakeRequest(method, payload)
+  );
+};
+
+beforeEach(() => {
+  useAppStore.setState({ ...initialStore, backend: READY }, true);
+  requestSpy = vi.spyOn(transport, "request");
+  serveStatus(mapReadyStatus);
+});
+
 afterEach(() => {
   vi.restoreAllMocks();
   focusOutline.mockClear();
@@ -240,15 +295,22 @@ const indexRoute = createRoute({
 const repositoryRoute = createRoute({
   component: RepositoryRoute.options.component,
   getParentRoute: () => rootRoute,
+  notFoundComponent: RepositoryRoute.options.notFoundComponent,
+  params: RepositoryRoute.options.params,
   path: "/repository/$handle",
   search: RepositoryRoute.options.search,
   validateSearch: RepositoryRoute.options.validateSearch,
 });
 const routeTree = rootRoute.addChildren([indexRoute, repositoryRoute]);
 
+interface RenderOptions {
+  readonly main?: string;
+  readonly seed?: (queryClient: ReturnType<typeof createQueryClient>) => void;
+}
+
 const renderAt = async (
   url: string,
-  seed?: (queryClient: ReturnType<typeof createQueryClient>) => void
+  { main = t.shell.regions.canvas, seed }: RenderOptions = {}
 ) => {
   const queryClient = createQueryClient();
   seed?.(queryClient);
@@ -264,7 +326,7 @@ const renderAt = async (
       </ThemeProvider>
     </QueryClientProvider>
   );
-  await screen.findByRole("main", { name: t.shell.regions.canvas });
+  await screen.findByRole("main", { name: main });
   return { queryClient, router };
 };
 
@@ -302,7 +364,11 @@ const sidebar = () =>
 const mapRegion = () =>
   screen.getByRole("main", { name: t.shell.regions.canvas });
 
-const spyRequests = () => vi.spyOn(transport, "request");
+const spyRequests = () => requestSpy;
+const requestedMethods = (): string[] => [
+  ...new Set(requestSpy.mock.calls.map(([method]) => method)),
+];
+
 const slicePayloads = (request: ReturnType<typeof spyRequests>) =>
   request.mock.calls
     .filter(([method]) => method === "graph.slice")
@@ -318,15 +384,24 @@ describe("/repository/$handle: a moldura", () => {
     await renderAt(SCREEN_URL);
 
     expect(screen.getByRole("banner")).toBeDefined();
+    expect(screen.getAllByRole("main")).toHaveLength(1);
     expect(
       within(screen.getByRole("banner")).getByText(t.app.name)
+    ).toBeDefined();
+    expect(
+      within(mapRegion()).getByRole("heading", {
+        level: 1,
+        name: t.shell.regions.canvas,
+      })
     ).toBeDefined();
     expect(
       screen.getByRole("complementary", { name: t.shell.regions.sidebar })
     ).toBeDefined();
     expect(inspector()).toBeDefined();
     const header = within(screen.getByRole("banner"));
-    expect(header.getByText(t.backend.STARTING)).toBeDefined();
+    expect(header.getByText(t.backend.READY)).toBeDefined();
+    expect(await header.findByText("multi-module")).toBeDefined();
+    expect(header.getByRole("button", { name: t.header.close })).toBeDefined();
     expect(header.getByRole("button", { name: "Alternar tema" })).toBeDefined();
     expect(within(mapRegion()).getByText(t.graph.legend.title)).toBeDefined();
 
@@ -339,31 +414,35 @@ describe("/repository/$handle: a moldura", () => {
     expect(within(inspector()).getByText(t.inspector.empty)).toBeDefined();
   });
 
-  test("sem o param analysis, o estado de nenhuma análise com um link para o início", async () => {
-    const request = vi.spyOn(transport, "request");
-    const { router } = await renderAt(`/repository/${HANDLE}`);
+  test("sem o param analysis, a preparação: o describe é pedido e o formulário aparece", async () => {
+    await renderAt(`/repository/${HANDLE}`, {
+      main: t.shell.regions.prepare,
+    });
 
     expect(
-      screen.getByRole("heading", { name: t.graph.noAnalysis.title })
+      await screen.findByRole("heading", { level: 1, name: "multi-module" })
     ).toBeDefined();
-    expect(screen.getByText(t.graph.noAnalysis.body)).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: t.config.analyze })
+    ).toBeDefined();
+    expect(requestedMethods()).toStrictEqual(["repository.describe"]);
     expect(screen.queryByRole("img")).toBeNull();
-    expect(within(inspector()).getByText(t.inspector.empty)).toBeDefined();
-    expect(request).not.toHaveBeenCalled();
-
-    fireEvent.click(
-      screen.getByRole("link", { name: t.graph.noAnalysis.action })
-    );
-    await screen.findByText("index");
-    expect(router.state.location.pathname).toBe("/");
+    expect(
+      screen.queryByRole("navigation", { name: t.shell.breadcrumb.label })
+    ).toBeNull();
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(screen.getAllByRole("main")).toHaveLength(1);
   });
 
-  test("um analysis inválido conta como ausente", async () => {
-    await renderAt(`/repository/${HANDLE}?analysis=an_errado`);
+  test("um analysis inválido conta como ausente: a preparação", async () => {
+    await renderAt(`/repository/${HANDLE}?analysis=an_errado`, {
+      main: t.shell.regions.prepare,
+    });
 
     expect(
-      screen.getByRole("heading", { name: t.graph.noAnalysis.title })
+      await screen.findByRole("heading", { level: 1, name: "multi-module" })
     ).toBeDefined();
+    expect(requestedMethods()).not.toContain("analysis.status");
   });
 
   test("um level inválido cai em PACKAGE sem apagar o parent", async () => {
@@ -640,31 +719,20 @@ describe("/repository/$handle: o rótulo do pai na trilha", () => {
     ).toBeDefined();
   });
 
-  test("sem análise, a trilha não lê cache nenhum e usa o texto genérico", async () => {
-    await renderAt(`/repository/${HANDLE}?level=TYPE&parent=${ORDERS}`);
-
-    expect(
-      screen.getByRole("heading", { name: t.graph.noAnalysis.title })
-    ).toBeDefined();
-    expect(
-      within(breadcrumb()).getByText(t.shell.breadcrumb.selectedPackage)
-    ).toBeDefined();
-  });
-
   test("um rótulo hostil chega saneado", async () => {
-    await renderAt(
-      `${SCREEN_URL}&level=TYPE&parent=${ORDERS}`,
-      seedLevelOne(`ord${BIDI_OVERRIDE}ers`)
-    );
+    await renderAt(`${SCREEN_URL}&level=TYPE&parent=${ORDERS}`, {
+      seed: seedLevelOne(`ord${BIDI_OVERRIDE}ers`),
+    });
 
-    expect(within(breadcrumb()).getByText("orders").tagName).toBe("BDI");
+    const label = within(breadcrumb()).getByText("orders");
+    expect(label.tagName).toBe("BDI");
+    expect(label.className).not.toContain("font-mono");
   });
 
   test("o pacote padrão, de rótulo vazio, recebe o nome que o canvas lhe dá", async () => {
-    await renderAt(
-      `${SCREEN_URL}&level=TYPE&parent=${ORDERS}`,
-      seedLevelOne("")
-    );
+    await renderAt(`${SCREEN_URL}&level=TYPE&parent=${ORDERS}`, {
+      seed: seedLevelOne(""),
+    });
 
     expect(
       within(breadcrumb()).getByText(t.graph.defaultPackage)
@@ -725,16 +793,21 @@ describe("/repository/$handle: a barra lateral", () => {
     expect(outline.getAttribute("data-focus")).toBe("");
   });
 
-  test("sem análise, nem busca, nem estrutura, nem botão de pular, e pedido nenhum", async () => {
-    const request = spyRequests();
-    await renderAt(`/repository/${HANDLE}?level=TYPE&parent=${ORDERS}`);
+  test("sem análise, nem busca, nem estrutura, nem botão de pular: só o describe é pedido", async () => {
+    await renderAt(`/repository/${HANDLE}?level=TYPE&parent=${ORDERS}`, {
+      main: t.shell.regions.prepare,
+    });
+    await screen.findByRole("heading", { level: 1, name: "multi-module" });
 
-    expect(sidebarChildren()).toStrictEqual([]);
-    expect(sidebar().childElementCount).toBe(0);
+    expect(
+      screen.queryByRole("complementary", { name: t.shell.regions.sidebar })
+    ).toBeNull();
+    expect(screen.queryByTestId("search")).toBeNull();
+    expect(screen.queryByTestId("outline")).toBeNull();
     expect(
       screen.queryByRole("button", { name: t.shell.skipToOutline })
     ).toBeNull();
-    expect(request).not.toHaveBeenCalled();
+    expect(requestedMethods()).toStrictEqual(["repository.describe"]);
   });
 });
 
@@ -1034,5 +1107,317 @@ describe("/repository/$handle: a legenda", () => {
     });
     expect(canvas().parentElement?.nextElementSibling).toBe(legend);
     expect(within(sidebar()).queryByText(t.graph.legend.title)).toBeNull();
+  });
+});
+
+describe("a tela pelo analysis.status em /repository/$handle?analysis=", () => {
+  const analysisRegion = () =>
+    screen.getByRole("main", { name: t.shell.regions.analysis });
+  const banner = () => within(screen.getByRole("banner"));
+  const READ_METHODS = ["graph.slice", "outline.children", "graph.search"];
+
+  const runningReport = (graph: StageStatus = "PENDING") =>
+    statusReport({
+      completeness: { totalFiles: 9 },
+      stages: {
+        LAYOUT_DISCOVERY: {
+          counters: { selectedRoots: 3 },
+          durationMs: 2,
+          status: "COMPLETED",
+        },
+        REPOSITORY_VALIDATION: { durationMs: 24, status: "COMPLETED" },
+        SOURCE_ANALYSIS: { status: "RUNNING" },
+        STRUCTURAL_GRAPH: { status: graph },
+      },
+    });
+
+  test("SKIPPED: o resumo com o cartão do mapa, e nenhum pedido de fatia, estrutura ou busca", async () => {
+    serveStatus(fixtureStatus);
+    await renderAt(SCREEN_URL, { main: t.shell.regions.analysis });
+
+    expect(
+      await within(analysisRegion()).findByRole("heading", {
+        level: 1,
+        name: interpolate(plural(9, t.analysis.completed.headline), {
+          total: 9,
+        }),
+      })
+    ).toBeDefined();
+    expect(
+      within(analysisRegion()).getByRole("heading", {
+        name: t.analysis.map.title,
+      })
+    ).toBeDefined();
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(
+      screen.queryByRole("main", { name: t.shell.regions.canvas })
+    ).toBeNull();
+    expect(
+      requestedMethods().filter((method) => READ_METHODS.includes(method))
+    ).toStrictEqual([]);
+    expect(banner().queryByText(t.header.analysis.PARTIAL)).toBeNull();
+  });
+
+  test("COMPLETED: o mapa monta, e os três métodos de leitura saem", async () => {
+    await renderAt(SCREEN_URL);
+    await waitForCanvas(3, "pacotes");
+
+    expect(requestedMethods()).toStrictEqual(
+      expect.arrayContaining(["analysis.status", "graph.slice"])
+    );
+    expect(
+      screen.queryByRole("main", { name: t.shell.regions.analysis })
+    ).toBeNull();
+  });
+
+  test("CANCELLED sem o grafo: o resumo e o selo, mas nenhum cartão do mapa", async () => {
+    serveStatus(() =>
+      Promise.resolve(
+        statusReport({
+          stages: {
+            REPOSITORY_VALIDATION: { durationMs: 24, status: "COMPLETED" },
+            SOURCE_ANALYSIS: { durationMs: 900, status: "CANCELLED" },
+          },
+          status: "CANCELLED",
+        })
+      )
+    );
+    await renderAt(SCREEN_URL, { main: t.shell.regions.analysis });
+
+    expect(
+      await within(analysisRegion()).findByRole("heading", {
+        level: 1,
+        name: t.analysis.cancelled.headline,
+      })
+    ).toBeDefined();
+    expect(
+      within(analysisRegion()).queryByRole("heading", {
+        name: t.analysis.map.title,
+      })
+    ).toBeNull();
+    expect(banner().getByText(t.header.analysis.CANCELLED)).toBeDefined();
+  });
+
+  test("ANALYSIS_NOT_FOUND: a análise não está mais disponível, e Analisar de novo empilha a preparação com o foco no título", async () => {
+    serveStatus(() =>
+      Promise.reject({
+        code: "ANALYSIS_NOT_FOUND",
+        origin: "analyzer",
+        params: {},
+      })
+    );
+    const { router } = await renderAt(SCREEN_URL, {
+      main: t.shell.regions.analysis,
+    });
+
+    expect(
+      await within(analysisRegion()).findByRole("heading", {
+        level: 1,
+        name: t.analysis.notFound.title,
+      })
+    ).toBeDefined();
+    expect(screen.getByText(t.analysis.notFound.body)).toBeDefined();
+    await banner().findByText("multi-module");
+    const lengthBefore = router.history.length;
+
+    fireEvent.click(screen.getByRole("button", { name: t.analysis.again }));
+
+    const title = await screen.findByRole("heading", {
+      level: 1,
+      name: "multi-module",
+    });
+    expect(urlSearch(router)).toStrictEqual({ level: "PACKAGE" });
+    expect(router.history.length).toBe(lengthBefore + 1);
+    expect(document.activeElement).toBe(title);
+  });
+
+  test("outra falha do status: a página do erro, com Analisar de novo", async () => {
+    serveStatus(() =>
+      Promise.reject({
+        code: "PROTO_INVALID_RESPONSE",
+        origin: "frontend",
+        params: {},
+      })
+    );
+    await renderAt(SCREEN_URL, { main: t.shell.regions.analysis });
+
+    const { title } = formatProtocolError({
+      code: "PROTO_INVALID_RESPONSE",
+      origin: "frontend",
+      params: {},
+    });
+    expect(
+      await within(analysisRegion()).findByRole("heading", {
+        level: 1,
+        name: title,
+      })
+    ).toBeDefined();
+    expect(
+      within(analysisRegion()).getByRole("button", { name: t.analysis.again })
+    ).toBeDefined();
+  });
+
+  test("com o analisador iniciando, nem status nem describe: o esqueleto espera", async () => {
+    useAppStore.setState({ backend: { phase: "STARTING" } });
+    await renderAt(SCREEN_URL, { main: t.shell.regions.analysis });
+
+    expect(analysisRegion().getAttribute("aria-busy")).toBe("true");
+    expect(within(analysisRegion()).queryByRole("heading")).toBeNull();
+    expect(requestSpy).not.toHaveBeenCalled();
+  });
+
+  test("RUNNING: o título da execução, há quanto tempo, as etapas e Cancelar análise até o terminal", async () => {
+    serveStatus(() => Promise.resolve(runningReport()));
+    const cancel = vi
+      .spyOn(transport, "analyzerCancel")
+      .mockResolvedValue({ cancelled: false });
+    await renderAt(SCREEN_URL, { main: t.shell.regions.analysis });
+
+    expect(
+      await within(analysisRegion()).findByRole("heading", {
+        level: 1,
+        name: "Analisando 9 arquivos Java em 3 raízes",
+      })
+    ).toBeDefined();
+    const title = screen.getByRole("heading", { level: 1 });
+    expect(title.nextElementSibling?.textContent).toMatch(RUNNING_META);
+    expect(
+      within(analysisRegion()).getByRole("list", {
+        name: t.analysis.stages.toggle,
+      }).children
+    ).toHaveLength(10);
+    expect(banner().getByText(t.header.analysis.RUNNING)).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: t.analysis.cancel }));
+
+    const cancelling = await screen.findByRole("button", {
+      name: t.analysis.cancelling,
+    });
+    expect(cancel).toHaveBeenCalledWith(AN);
+    expect(cancelling.getAttribute("aria-disabled")).toBe("true");
+    expect(
+      requestedMethods().filter((method) => READ_METHODS.includes(method))
+    ).toStrictEqual([]);
+  });
+
+  test("uma recusa do cancelamento devolve o botão, com o motivo", async () => {
+    serveStatus(() => Promise.resolve(runningReport()));
+    vi.spyOn(transport, "analyzerCancel").mockRejectedValue({
+      code: "PROC_ANALYZER_NOT_READY",
+      origin: "shell",
+      params: {},
+    });
+    await renderAt(SCREEN_URL, { main: t.shell.regions.analysis });
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: t.analysis.cancel })
+    );
+
+    expect(await within(analysisRegion()).findByRole("alert")).toBeDefined();
+    expect(
+      screen
+        .getByRole("button", { name: t.analysis.cancel })
+        .getAttribute("aria-disabled")
+    ).not.toBe("true");
+  });
+
+  test("RUNNING com o grafo concluído: o mapa monta, e o andamento é o selo do cabeçalho", async () => {
+    serveStatus(() => Promise.resolve(runningReport("COMPLETED")));
+    await renderAt(SCREEN_URL);
+    await waitForCanvas(3, "pacotes");
+
+    expect(banner().getByText(t.header.analysis.RUNNING)).toBeDefined();
+    expect(mapRegion().firstElementChild).toBe(
+      within(mapRegion()).getByRole("button", { name: t.shell.skipToOutline })
+    );
+  });
+
+  test("parcial com o mapa: o selo parcial e a ressalva compacta no inspetor", async () => {
+    serveStatus(async () => ({
+      ...(await mapReadyStatus()),
+      completeness: {
+        historyTruncatedAtCommits: null,
+        parseFailures: 0,
+        shallowClone: false,
+        skippedFiles: 2,
+        totalFiles: 9,
+      },
+    }));
+    await renderAt(SCREEN_URL);
+
+    expect(await banner().findByText(t.header.analysis.PARTIAL)).toBeDefined();
+    expect(
+      within(inspector()).getByText(
+        interpolate(plural(2, t.analysis.partial.files), {
+          skipped: 2,
+          total: 9,
+        })
+      )
+    ).toBeDefined();
+  });
+
+  test("Fechar repositório fecha o handle e volta ao início", async () => {
+    const close = vi.spyOn(transport, "closeRepository");
+    const { router } = await renderAt(SCREEN_URL);
+
+    fireEvent.click(banner().getByRole("button", { name: t.header.close }));
+
+    await screen.findByText("index");
+    expect(close).toHaveBeenCalledWith(HANDLE);
+    expect(router.state.location.pathname).toBe("/");
+  });
+
+  test("do Analisar ao resumo: a tela troca e o foco que caiu vai ao título novo", async () => {
+    serveStatus(fixtureStatus);
+    const { router } = await renderAt(`/repository/${HANDLE}`, {
+      main: t.shell.regions.prepare,
+    });
+    const analyze = await screen.findByRole("button", {
+      name: t.config.analyze,
+    });
+    await waitFor(() => {
+      expect(analyze.getAttribute("aria-disabled")).not.toBe("true");
+    });
+    analyze.focus();
+
+    fireEvent.click(analyze);
+
+    const title = await screen.findByRole("heading", {
+      level: 1,
+      name: interpolate(plural(9, t.analysis.completed.headline), {
+        total: 9,
+      }),
+    });
+    expect(urlSearch(router)).toStrictEqual({
+      analysis: AN,
+      level: "PACKAGE",
+    });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(title);
+    });
+  });
+});
+
+describe("/repository/$handle: um handle malformado", () => {
+  test("é a página não encontrada da rota, sem pedido nenhum, e volta ao início", async () => {
+    const { router } = await renderAt("/repository/nao-e-um-handle", {
+      main: t.shell.regions.prepare,
+    });
+
+    const { title } = formatProtocolError({
+      code: "REPO_HANDLE_UNKNOWN",
+      origin: "frontend",
+    });
+    expect(
+      screen.getByRole("heading", { level: 1, name: title })
+    ).toBeDefined();
+    expect(requestSpy).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole("link", { name: t.repository.backToStart })
+    );
+
+    await screen.findByText("index");
+    expect(router.state.location.pathname).toBe("/");
   });
 });

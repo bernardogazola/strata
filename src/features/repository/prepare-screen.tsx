@@ -6,10 +6,12 @@ import {
   openRepository,
   protocolErrorOf,
 } from "@/bridge/analyzer";
+import { PRIMARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ErrorSurface } from "@/features/errors/error-surface";
 import { AppHeader } from "@/features/shell/app-header";
 import { startAnalysis } from "@/features/shell/repository-search";
+import { useCloseRepository } from "@/features/shell/use-close-repository";
 import { t } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 import type { ProtocolError } from "@/protocol/errors";
@@ -23,7 +25,6 @@ import {
   selectIsRunInFlight,
   useAppStore,
 } from "@/state/app-store";
-import { PRIMARY_ACTION_CLASS } from "./action-styles";
 import {
   AnalysisConfigForm,
   AnalysisConfigFormSkeleton,
@@ -75,17 +76,7 @@ export function PrepareScreen({ handle }: PrepareScreenProps) {
     null
   );
 
-  const close = useCallback(async () => {
-    try {
-      await closeRepository(handle);
-    } finally {
-      await navigate({ to: "/" });
-    }
-  }, [handle, navigate]);
-
-  const onClose = useCallback(() => {
-    close().catch(() => undefined);
-  }, [close]);
+  const onClose = useCloseRepository(handle);
 
   const chooseAnother = useCallback(async () => {
     setChoosing(true);

@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { GRAPH_PERF } from "@/features/graph/perf";
 import { GRAPH_STYLE } from "@/features/graph/stylesheet";
 import { ROW_HEIGHT } from "@/features/outline/outline-row";
@@ -24,6 +24,7 @@ import {
   type TabStop,
   tabUntil,
 } from "./support/graph-page";
+import { test } from "./support/map-test";
 
 const ANALYSIS_ID = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 const LEVEL_ONE_URL = `/repository/repo_AAAAAAAAAAAAAAAAAAAAAQ?analysis=${ANALYSIS_ID}`;

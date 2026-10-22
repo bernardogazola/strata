@@ -81,6 +81,8 @@ const renderForm = (overrides: Partial<AnalysisConfigFormProps> = {}) => {
 
 const analyze = () => screen.getByRole("button", { name: t.config.analyze });
 
+const ZERO_FILES = /\b0 arquivo/;
+
 const rootCheckbox = (name: string) => screen.getByRole("checkbox", { name });
 
 const groupToggle = (name: string, group: string) =>
@@ -213,6 +215,20 @@ describe("AnalysisConfigForm", () => {
     );
     fireEvent.click(analyze());
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  test("sem raiz marcada, o resumo diz que nenhuma foi marcada, e nunca '0 arquivo'", () => {
+    renderForm();
+
+    fireEvent.click(groupToggle(t.config.roots.clearAll, "Código principal"));
+    fireEvent.click(groupToggle(t.config.roots.clearAll, "Código gerado"));
+
+    expect(screen.getByText(t.config.summaryNone)).toBeDefined();
+    expect(screen.queryByText(ZERO_FILES)).toBeNull();
+    expect(screen.getByText(t.config.summaryHint)).toBeDefined();
+    expect(analyze()).toHaveAccessibleDescription(
+      t.config.disabled.emptySelection
+    );
   });
 
   test("Marcar todas devolve o grupo inteiro", () => {

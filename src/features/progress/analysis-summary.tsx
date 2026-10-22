@@ -4,6 +4,7 @@ import {
   IconPlayerStopFilled,
 } from "@tabler/icons-react";
 import { type ReactNode, useId } from "react";
+import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -30,9 +31,6 @@ export interface AnalysisSummaryProps {
 }
 
 const NO_TICKS: StageTicks = {};
-
-const SECONDARY_BUTTON_CLASS =
-  "px-3.5 transition-[scale,background-color,box-shadow] active:scale-[0.98] motion-reduce:active:scale-100";
 
 const headlineText = (report: AnalysisStatusReport): string => {
   switch (report.status) {
@@ -228,7 +226,7 @@ export function AnalysisSummary({
           <Meta report={report} />
         </div>
         <Button
-          className={SECONDARY_BUTTON_CLASS}
+          className={SECONDARY_ACTION_CLASS}
           onClick={onAnalyzeAgain}
           size="sm"
           variant="outline"

@@ -3,6 +3,7 @@ import { NumberField } from "@base-ui/react/number-field";
 import { IconLoader2 } from "@tabler/icons-react";
 import { useForm, useStore } from "@tanstack/react-form";
 import { type FormEvent, type ReactNode, useCallback, useId } from "react";
+import { PRIMARY_ACTION_CLASS } from "@/components/action-styles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -29,7 +30,6 @@ import {
   type RepositoryDescription,
   type SourceRoot,
 } from "@/protocol/repository";
-import { PRIMARY_ACTION_CLASS } from "./action-styles";
 import { countPhrase, filesInRoots } from "./count-phrase";
 import { RepositoryText } from "./repository-text";
 
@@ -236,7 +236,9 @@ function AnalyzeFooter({
       <div className="flex items-center justify-between gap-6">
         <div className="flex min-w-0 flex-col gap-0.5">
           <p className="font-medium text-foreground text-sm tabular-nums">
-            {filesInRoots(t.config.summary, selectedFiles, selectedRoots)}
+            {selectedRoots === 0
+              ? t.config.summaryNone
+              : filesInRoots(t.config.summary, selectedFiles, selectedRoots)}
           </p>
           <p className="text-muted-foreground text-xs">
             {t.config.summaryHint}

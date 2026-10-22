@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { restartAnalyzer } from "@/bridge/analyzer";
 import { applyResolvedBackend } from "@/bridge/events";
+import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
 import { interpolate } from "@/i18n/format";
 import { t } from "@/i18n/messages";
@@ -77,7 +78,10 @@ export function AnalyzerStatus({ offersRestart = true }: AnalyzerStatusProps) {
       </p>
       {offersRestart && recoverable ? (
         <Button
-          className="h-7 px-2.5 text-xs shadow-control"
+          className={cn(
+            SECONDARY_ACTION_CLASS,
+            "h-7 px-2.5 text-xs shadow-control"
+          )}
           disabled={restarting}
           onClick={restart}
           size="sm"
