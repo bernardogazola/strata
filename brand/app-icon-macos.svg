@@ -1,0 +1,17 @@
+<svg
+  height="1024"
+  viewBox="0 0 1024 1024"
+  width="1024"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <title>Strata</title>
+  <g transform="translate(100 100) scale(41.2) translate(-2 -2)">
+    <rect fill="#FFFFFF" height="20" rx="5" width="20" x="2" y="2" />
+    <path d="M2 9.17V7A5 5 0 0 1 7 2H17A5 5 0 0 1 21.93 6.18Z" fill="#292929" />
+    <path d="M2 10.67L22 7.67V13.33L2 16.33Z" fill="#7F7F7F" />
+    <path
+      d="M2.07 17.82L22 14.83V17A5 5 0 0 1 17 22H7A5 5 0 0 1 2.07 17.82Z"
+      fill="#2449D8"
+    />
+  </g>
+</svg>

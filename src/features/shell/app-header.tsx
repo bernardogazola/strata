@@ -35,20 +35,20 @@ export function BrandMark({ size = 18 }: BrandMarkProps) {
       className="shrink-0"
       fill="none"
       height={size}
-      viewBox="0 0 20 20"
+      viewBox="0 0 24 24"
       width={size}
     >
       <path
         className="fill-foreground"
-        d="M6 2H14C16.2 2 18 3.8 18 6V6.2L2 8.6V6C2 3.8 3.8 2 6 2Z"
+        d="M2 9.17V7A5 5 0 0 1 7 2H17A5 5 0 0 1 21.93 6.18Z"
       />
       <path
         className="fill-subtle-foreground"
-        d="M2 9.8L18 7.4V11.4L2 13.8V9.8Z"
+        d="M2 10.67L22 7.67V13.33L2 16.33Z"
       />
       <path
         className="fill-ring"
-        d="M2 15L18 12.6V14C18 16.2 16.2 18 14 18H6C3.8 18 2 16.2 2 14V15Z"
+        d="M2.07 17.82L22 14.83V17A5 5 0 0 1 17 22H7A5 5 0 0 1 2.07 17.82Z"
       />
     </svg>
   );

@@ -1,0 +1,13 @@
+<svg
+  height="1024"
+  viewBox="0 0 1024 1024"
+  width="1024"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <title>Strata, deep layer</title>
+  <path
+    d="M2.07 17.82L22 14.83V17A5 5 0 0 1 17 22H7A5 5 0 0 1 2.07 17.82Z"
+    fill="#000000"
+    transform="translate(100 100) scale(41.2) translate(-2 -2)"
+  />
+</svg>
