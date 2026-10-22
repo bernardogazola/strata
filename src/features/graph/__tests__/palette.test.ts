@@ -204,7 +204,7 @@ describe("GRAPH_TOKENS", () => {
 });
 
 describe("readGraphPalette", () => {
-  test("lê os 12 tokens de cada tema de global.css, todos na gramática real", async () => {
+  test("lê os tokens de cada tema de global.css, todos na gramática real", async () => {
     const css = await readGlobalCss();
     const style = document.createElement("style");
     style.textContent = `${tokenBlock(css, ":root")}\n${tokenBlock(css, ".dark")}`;
@@ -218,6 +218,8 @@ describe("readGraphPalette", () => {
     expect(Object.keys(dark)).toEqual([...GRAPH_TOKENS]);
     expect(light["--graph-node"]).toBe("#e3e3e3");
     expect(dark["--graph-node"]).toBe("#404040");
+    expect(light["--graph-canvas"]).toBe("#ffffff");
+    expect(dark["--graph-canvas"]).toBe("#111111");
   });
 
   test("um token ausente no documento lança, em vez de virar cinza padrão", () => {

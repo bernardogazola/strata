@@ -1,11 +1,20 @@
 import type { ConcentricLayoutOptions, NodeSingular } from "cytoscape";
 import type { GraphSlice } from "@/protocol/graph";
+import { GRAPH_STYLE } from "./stylesheet";
 
 export const CONCENTRIC_RINGS = 8;
 
 export const FIT_PADDING_PX = 30;
 
 export const MAX_FIT_ZOOM = 1.5;
+
+export const VISIBLE_EDGE_PX = 16;
+
+export const MIN_NODE_SPACING_PX =
+  GRAPH_STYLE.node.labelMarginY +
+  GRAPH_STYLE.node.labelFontSize +
+  2 * GRAPH_STYLE.node.labelHaloWidth +
+  VISIBLE_EDGE_PX;
 
 const LAST_RING = CONCENTRIC_RINGS - 1;
 
@@ -46,6 +55,7 @@ export const concentricLayout = (
       CONCENTRIC_RINGS - (rings.get(node.id()) ?? LAST_RING),
     fit: true,
     levelWidth: () => 1,
+    minNodeSpacing: MIN_NODE_SPACING_PX,
     name: "concentric",
     nodeDimensionsIncludeLabels: false,
     padding: FIT_PADDING_PX,

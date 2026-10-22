@@ -70,6 +70,7 @@
     0 0 0 1px rgb(0 0 0 / 6%), 0 1px 2px rgb(0 0 0 / 6%),
     0 2px 6px rgb(0 0 0 / 4%);
 
+  --graph-canvas: #ffffff;
   --graph-node: #e3e3e3;
   --graph-node-border: #949494;
   --graph-node-label: #171717;
@@ -217,6 +218,7 @@
     0 0 0 1px rgb(255 255 255 / 7%), 0 1px 2px rgb(0 0 0 / 50%),
     0 2px 6px rgb(0 0 0 / 35%);
 
+  --graph-canvas: #111111;
   --graph-node: #404040;
   --graph-node-border: #6b6b6b;
   --graph-node-label: #fafafa;

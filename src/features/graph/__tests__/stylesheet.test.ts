@@ -207,6 +207,21 @@ describe("buildStylesheet pelo parser do Cytoscape", () => {
     expect(node.style("font-size")).toBe(`${GRAPH_STYLE.node.labelFontSize}px`);
   });
 
+  test("o rótulo tem um halo da cor do canvas, e a aresta que passa por baixo não risca o texto", () => {
+    for (const theme of ["light", "dark"] as const) {
+      const palette = palettes[theme];
+      const cy = createGraph(palette, packageSlice);
+      const node = cy.getElementById(packageSlice.nodes[0].id);
+
+      expect(node.style("text-outline-color")).toBe(
+        parsedColor(palette["--graph-canvas"])
+      );
+      expect(node.style("text-outline-width")).toBe(
+        `${GRAPH_STYLE.node.labelHaloWidth}px`
+      );
+    }
+  });
+
   test("toda cor da folha vem da paleta: nenhuma literal", () => {
     const palette = Object.fromEntries(
       GRAPH_TOKENS.map((token, index) => [

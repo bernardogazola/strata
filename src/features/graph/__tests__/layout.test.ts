@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import cytoscape, { type NodeSingular } from "cytoscape";
+import cytoscape, { type Core, type NodeSingular } from "cytoscape";
 import {
   afterEach,
   beforeAll,
@@ -21,11 +21,14 @@ import {
   CONCENTRIC_RINGS,
   concentricLayout,
   FIT_PADDING_PX,
+  MIN_NODE_SPACING_PX,
   pagerankRing,
+  VISIBLE_EDGE_PX,
 } from "../layout";
 import { GRAPH_TOKENS, type GraphPalette } from "../palette";
 import {
   buildStylesheet,
+  GRAPH_STYLE,
   graphRuntimeForSlice,
   setGraphRuntime,
 } from "../stylesheet";
@@ -95,7 +98,7 @@ const createContainer = (): HTMLDivElement => {
 
 type Positions = ReadonlyArray<readonly [string, { x: number; y: number }]>;
 
-const layoutPositions = (slice: GraphSlice): Positions => {
+const runLayout = (slice: GraphSlice): Core => {
   const cy = cytoscape({
     container: createContainer(),
     layout: { name: "preset" },
@@ -105,6 +108,11 @@ const layoutPositions = (slice: GraphSlice): Positions => {
   cy.add(toGraphElements(slice));
   setGraphRuntime(cy, graphRuntimeForSlice(slice));
   cy.layout(concentricLayout(slice)).run();
+  return cy;
+};
+
+const layoutPositions = (slice: GraphSlice): Positions => {
+  const cy = runLayout(slice);
   const positions = cy
     .nodes()
     .map((node) => [node.id(), { ...node.position() }] as const);
@@ -175,11 +183,42 @@ describe("concentricLayout", () => {
       animate: false,
       avoidOverlap: true,
       fit: true,
+      minNodeSpacing: MIN_NODE_SPACING_PX,
       name: "concentric",
       nodeDimensionsIncludeLabels: false,
       padding: FIT_PADDING_PX,
     });
     expect(options.levelWidth?.(cytoscape().collection())).toBe(1);
+  });
+
+  test("um nó por anel sai em coluna, e o vão entre dois vizinhos cabe o rótulo e um trecho da aresta", () => {
+    const base = skewedSlice(3);
+    const column: GraphSlice = {
+      ...base,
+      nodes: base.nodes.map((node, index) => ({
+        ...node,
+        pagerank: [0.7, 0.2, 0.1][index] ?? 0,
+      })),
+    };
+    const { labelFontSize, labelHaloWidth, labelMarginY } = GRAPH_STYLE.node;
+    const labelHeight = labelMarginY + labelFontSize + 2 * labelHaloWidth;
+
+    const cy = runLayout(column);
+    const nodes = cy.nodes().toArray();
+    const gaps = nodes.slice(1).map((node, index) => {
+      const previous = nodes[index];
+      const distance = Math.hypot(
+        node.position("x") - previous.position("x"),
+        node.position("y") - previous.position("y")
+      );
+      return distance - (node.outerWidth() + previous.outerWidth()) / 2;
+    });
+    cy.destroy();
+
+    expect(gaps).toHaveLength(2);
+    for (const gap of gaps) {
+      expect(gap).toBeGreaterThanOrEqual(labelHeight + VISIBLE_EDGE_PX);
+    }
   });
 
   test("o valor concêntrico é o anel invertido: o mais exposto vale mais", () => {
