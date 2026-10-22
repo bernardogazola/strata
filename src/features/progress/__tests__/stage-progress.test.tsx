@@ -128,6 +128,27 @@ describe("StageProgress, as linhas", () => {
     }
   });
 
+  test("só o rótulo de cada etapa que corre brilha, e o brilho fica no texto, não na linha", () => {
+    const { container } = render(
+      <StageProgress now={STARTED_MS} report={RUNNING_PAIR} ticks={{}} />
+    );
+
+    const shimmering = [...container.querySelectorAll(".text-shimmer")];
+    const running = analysisStageSchema.options.filter(
+      (stage) => stage === "GIT_HISTORY_CHEAP" || stage === "SOURCE_ANALYSIS"
+    );
+    expect(shimmering.map((label) => label.textContent)).toEqual(
+      running.map((stage) => analysisStageLabels[stage])
+    );
+    for (const label of shimmering) {
+      expect(label.tagName).toBe("SPAN");
+      expect(label.classList.contains("grow")).toBe(false);
+    }
+    expect(
+      rowOf(container, "LAYOUT_DISCOVERY").querySelector(".text-shimmer")
+    ).toBeNull();
+  });
+
   test("as unidades saem com ponto de milhar: 1.240 de 3.902 arquivos Java", () => {
     const { container } = render(
       <StageProgress
@@ -287,6 +308,7 @@ describe("StageProgress, com o analisador parado no meio da execução", () => {
       "falhou"
     );
     expect(container.querySelector('[class*="animate-spin"]')).toBeNull();
+    expect(container.querySelector(".text-shimmer")).toBeNull();
   });
 });
 

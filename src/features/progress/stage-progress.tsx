@@ -166,7 +166,9 @@ function ActiveRow({ now, row }: ActiveRowProps) {
       <div className="flex min-w-0 grow flex-col gap-2">
         <div className="flex items-baseline gap-4">
           <span className="grow font-medium text-foreground text-sm/5">
-            {analysisStageLabels[row.stage]}
+            <span className="text-shimmer">
+              {analysisStageLabels[row.stage]}
+            </span>
           </span>
           {row.tick === undefined ? null : (
             <span className="text-muted-foreground text-xs tabular-nums">
