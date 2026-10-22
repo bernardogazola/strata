@@ -1,0 +1,11 @@
+<svg
+  height="1024"
+  viewBox="0 0 1024 1024"
+  width="1024"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <title>Strata, dark</title>
+  <path d="M0 0H1024V213.5L0 367.1Z" fill="#EDEDED" />
+  <path d="M0 443.9L1024 290.3V580.1L0 733.7Z" fill="#8A8A8A" />
+  <path d="M0 810.5L1024 656.9V1024H0Z" fill="#7D96FF" />
+</svg>
