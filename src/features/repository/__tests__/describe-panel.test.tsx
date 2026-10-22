@@ -80,6 +80,17 @@ describe("DescribePanel", () => {
     expect(screen.queryByText(t.analysis.partial.shallowClone)).toBeNull();
   });
 
+  test("abaixo de lg os fatos são uma grade de duas colunas, o rótulo sobre o valor", () => {
+    render(<DescribePanel description={OK} />);
+
+    const list = screen
+      .getByText(t.describe.facts.buildSystem, { selector: "dt" })
+      .closest("dl");
+    expect(list).toHaveClass("grid", "grid-cols-2", "lg:flex", "lg:flex-col");
+    const fact = factValue(t.describe.facts.buildSystem).parentElement;
+    expect(fact).toHaveClass("flex-col", "lg:flex-row");
+  });
+
   test("todo valor do repositório vai em um <bdi> próprio, um por módulo", () => {
     render(<DescribePanel description={OK} />);
 

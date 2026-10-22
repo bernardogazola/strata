@@ -259,6 +259,37 @@ describe("StageProgress, as linhas", () => {
   });
 });
 
+describe("StageProgress, com o analisador parado no meio da execução", () => {
+  test("a etapa que corria falhou, as que não começaram não vão começar, e nada gira", () => {
+    const { container } = render(
+      <StageProgress
+        interrupted
+        now={STARTED_MS}
+        report={RUNNING_PAIR}
+        ticks={{
+          SOURCE_ANALYSIS: tick("SOURCE_ANALYSIS", 4, 9),
+          STRUCTURAL_GRAPH: tick("STRUCTURAL_GRAPH", 1, 9, "TYPES"),
+        }}
+      />
+    );
+
+    for (const stage of [
+      "SOURCE_ANALYSIS",
+      "GIT_HISTORY_CHEAP",
+      "STRUCTURAL_GRAPH",
+    ]) {
+      expect(rowOf(container, stage)).toHaveTextContent("falhou");
+    }
+    expect(rowOf(container, "HOTSPOT_PROFILES")).toHaveTextContent(
+      t.analysis.stage.notRun
+    );
+    expect(rowOf(container, "LAYOUT_DISCOVERY")).not.toHaveTextContent(
+      "falhou"
+    );
+    expect(container.querySelector('[class*="animate-spin"]')).toBeNull();
+  });
+});
+
 describe("StageProgress, depois do terminal", () => {
   test("PENDING depois de CANCELLED lê 'não executada', mesmo com tick na store", () => {
     const report = statusReport({
@@ -332,10 +363,68 @@ describe("StageProgress, depois do terminal", () => {
     const layout = rowOf(container, "LAYOUT_DISCOVERY");
     expect(within(layout).getByText("3 raízes escolhidas")).toBeDefined();
     expect(within(layout).getByText("em 2 ms")).toBeDefined();
+    const source = rowOf(container, "SOURCE_ANALYSIS");
+    expect(
+      within(source).getByText("12 tipos extraídos de 9 arquivos Java")
+    ).toBeDefined();
+    expect(within(source).getByText("em 305 ms")).toBeDefined();
     const persistence = rowOf(container, "PERSISTENCE");
     expect(within(persistence).getByText("concluída")).toBeDefined();
     expect(within(persistence).getByText("em 4 ms")).toBeDefined();
     expect(rowOf(container, "STRUCTURAL_GRAPH")).toHaveTextContent("pulada");
+  });
+
+  test.each([
+    { expected: "nenhum tipo extraído de 1 arquivo Java", files: 1, types: 0 },
+    { expected: "1 tipo extraído de 1 arquivo Java", files: 1, types: 1 },
+    {
+      expected: "1.240 tipos extraídos de 3.902 arquivos Java",
+      files: 3902,
+      types: 1240,
+    },
+  ])(
+    "a análise do código concluída diz '$expected'",
+    ({ expected, files, types }) => {
+      const report = statusReport({
+        stages: {
+          SOURCE_ANALYSIS: {
+            counters: { files, types },
+            durationMs: 305,
+            startedAt: STARTED_AT,
+            status: "COMPLETED",
+          },
+        },
+        status: "COMPLETED",
+      });
+      const { container } = render(
+        <StageProgress now={STARTED_MS} report={report} ticks={{}} />
+      );
+
+      expect(
+        within(rowOf(container, "SOURCE_ANALYSIS")).getByText(expected)
+      ).toBeDefined();
+    }
+  );
+
+  test("a análise do código sem os contadores diz só que concluiu", () => {
+    const report = statusReport({
+      stages: {
+        SOURCE_ANALYSIS: {
+          counters: { files: 9 },
+          durationMs: 305,
+          startedAt: STARTED_AT,
+          status: "COMPLETED",
+        },
+      },
+      status: "COMPLETED",
+    });
+    const { container } = render(
+      <StageProgress now={STARTED_MS} report={report} ticks={{}} />
+    );
+
+    expect(
+      within(rowOf(container, "SOURCE_ANALYSIS")).getByText("concluída")
+    ).toBeDefined();
   });
 
   test("a nota das puladas aparece só quando há etapa pulada", () => {

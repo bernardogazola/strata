@@ -1,22 +1,36 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { t } from "@/i18n/messages";
 import type {
   AnalysisConfiguration,
   RepositoryDescription,
   SourceRoot,
 } from "@/protocol/repository";
+import { type BackendState, useAppStore } from "@/state/app-store";
 import {
   AnalysisConfigForm,
   type AnalysisConfigFormProps,
   configurationFormSchema,
 } from "../analysis-config-form";
+
+const initialStore = useAppStore.getState();
+
+afterEach(() => {
+  useAppStore.setState(initialStore, true);
+});
+
+const UNAVAILABLE_STATES = [
+  { phase: "STARTING" },
+  { exitCode: 1, phase: "CRASHED" },
+  { expected: 1, phase: "INCOMPATIBLE", received: 2 },
+] as const satisfies readonly Exclude<BackendState, { phase: "READY" }>[];
 
 const API = "sr_sqbycfms";
 const CORE = "sr_3gwc7d6d";
@@ -136,7 +150,9 @@ describe("AnalysisConfigForm", () => {
     });
     expect(rebuild).toHaveAttribute("aria-disabled", "true");
     expect(rebuild).not.toBeChecked();
-    expect(rebuild).toHaveAccessibleDescription(t.config.rebuild.description);
+    expect(rebuild).toHaveAccessibleDescription(
+      `${t.config.rebuild.unavailable} ${t.config.rebuild.description}`
+    );
   });
 
   test("a configuração padrão vai com sourceRootIds nulo", async () => {
@@ -266,11 +282,80 @@ describe("AnalysisConfigForm", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  test("o analisador fora de READY desabilita Analisar com o motivo", () => {
-    renderForm({ backendReady: false, runInFlight: true });
+  test.each(UNAVAILABLE_STATES)(
+    "o analisador em $phase desabilita Analisar com o motivo dessa fase",
+    (backend) => {
+      useAppStore.setState({ backend });
+      renderForm({ backendReady: false, runInFlight: true });
 
-    expect(analyze()).toHaveAttribute("aria-disabled", "true");
-    expect(analyze()).toHaveAccessibleDescription(t.config.disabled.backend);
+      expect(analyze()).toHaveAttribute("aria-disabled", "true");
+      expect(analyze()).toHaveAccessibleDescription(
+        t.config.backendUnavailable[backend.phase]
+      );
+    }
+  );
+
+  test("o motivo de Analisar acompanha a fase quando ela muda", () => {
+    useAppStore.setState({ backend: { phase: "STARTING" } });
+    renderForm({ backendReady: false });
+    expect(analyze()).toHaveAccessibleDescription(
+      t.config.backendUnavailable.STARTING
+    );
+
+    act(() => {
+      useAppStore.setState({ backend: { exitCode: 1, phase: "CRASHED" } });
+    });
+
+    expect(analyze()).toHaveAccessibleDescription(
+      t.config.backendUnavailable.CRASHED
+    );
+  });
+
+  test("o resumo, a dica e o motivo ficam no rodapé fixo, junto de Analisar", () => {
+    useAppStore.setState({ backend: { phase: "STARTING" } });
+    renderForm({ backendReady: false });
+
+    const reason = screen.getByText(t.config.backendUnavailable.STARTING);
+    let footer = analyze().parentElement;
+    while (footer !== null && !footer.contains(reason)) {
+      footer = footer.parentElement;
+    }
+    expect(footer).not.toBeNull();
+    expect(footer).toHaveClass("sticky", "bottom-0");
+    expect(footer).toHaveTextContent("9 arquivos Java em 3 raízes");
+    expect(footer).toHaveTextContent(t.config.summaryHint);
+    expect(footer?.tagName).not.toBe("FORM");
+  });
+
+  test("recriar o cache tem o selo e a opacidade do histórico", () => {
+    renderForm();
+
+    const rebuild = screen.getByRole("checkbox", {
+      name: t.config.rebuild.label,
+    });
+    expect(rebuild).toHaveAccessibleDescription(
+      `${t.config.rebuild.unavailable} ${t.config.rebuild.description}`
+    );
+    const badge = screen.getByText(t.config.rebuild.unavailable);
+    expect(badge).toHaveAttribute("data-slot", "badge");
+    const label = screen.getByText(t.config.rebuild.label);
+    expect(rebuild).toHaveClass("opacity-50");
+    expect(label).toHaveClass("opacity-50");
+    expect(badge.closest(".opacity-50")).toBeNull();
+    const historyRadio = screen.getByRole("radio", {
+      name: "Todo o histórico",
+    });
+    expect(historyRadio.closest(".opacity-50")).not.toBeNull();
+  });
+
+  test("no escuro, o trilho desligado do switch usa o --input inteiro", () => {
+    renderForm();
+
+    const tests = screen.getByRole("switch", {
+      name: t.config.includeTests.label,
+    });
+    expect(tests).toHaveClass("dark:data-unchecked:bg-input");
+    expect(tests).not.toHaveClass("dark:data-unchecked:bg-input/80");
   });
 
   test("o início em voo deixa o botão inerte, com o mesmo rótulo e um spinner", () => {

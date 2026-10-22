@@ -17,6 +17,8 @@ import {
 const OTHER_ANALYSIS_ID = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1X";
 const STAGES_TOGGLE = /^Etapas da análise/;
 const SAMPLE_LINE = /^Mostrando/;
+const LEFT_OUT = /fica(?:ram|ou) de fora/;
+const WARNING_COUNT = /^\d+ avisos?$/;
 
 const PARTIAL = {
   shallowClone: true,
@@ -111,6 +113,36 @@ describe("AnalysisSummary, o título", () => {
     ).toBeDefined();
   });
 
+  test("concluída e completa: o check do meta é o de sucesso", () => {
+    renderSummary({
+      report: statusReport({
+        completeness: { totalFiles: 9 },
+        stages: COMPLETED_STAGES,
+        status: "COMPLETED",
+      }),
+    });
+
+    const meta = screen.getByText("Análise concluída em 335 ms");
+    expect(meta).toHaveClass("text-success");
+    expect(meta.firstElementChild).toHaveClass("bg-success-soft");
+  });
+
+  test("concluída e parcial: o check do meta é neutro, sem brigar com a ressalva", () => {
+    renderSummary({
+      report: statusReport({
+        completeness: PARTIAL,
+        stages: COMPLETED_STAGES,
+        status: "COMPLETED",
+      }),
+    });
+
+    const meta = screen.getByText("Análise concluída em 335 ms");
+    expect(meta).toHaveClass("text-muted-foreground");
+    expect(meta).not.toHaveClass("text-success");
+    expect(meta.firstElementChild).toHaveClass("bg-muted");
+    expect(meta.firstElementChild).not.toHaveClass("bg-success-soft");
+  });
+
   test("cancelada: o título dela, há quanto tempo, e nenhuma ressalva", () => {
     renderSummary({
       report: statusReport({
@@ -186,7 +218,7 @@ describe("AnalysisSummary, o título", () => {
     const text = document.body.textContent ?? "";
     const caveat = text.indexOf(t.analysis.partial.shallowClone);
     const map = text.indexOf("o mapa");
-    const warnings = text.indexOf("3 arquivos ficaram de fora");
+    const warnings = text.indexOf(t.analysis.warnings.label);
     expect(caveat).toBeGreaterThan(-1);
     expect(map).toBeGreaterThan(caveat);
     expect(warnings).toBeGreaterThan(map);
@@ -212,14 +244,29 @@ describe("AnalysisSummary, os avisos", () => {
     });
 
     const section = screen.getByRole("region", {
-      name: "3 arquivos ficaram de fora",
+      name: t.analysis.warnings.label,
     });
-    expect(within(section).getByText(t.analysis.warnings.label)).toBeDefined();
+    expect(
+      within(section).getByRole("heading", {
+        level: 2,
+        name: t.analysis.warnings.label,
+      })
+    ).toBeDefined();
+    const count = within(section).getByText("3 avisos");
+    expect(count).toHaveClass("tabular-nums");
     const items = within(section).getAllByRole("listitem");
     expect(items).toHaveLength(3);
     expect(section).not.toHaveTextContent("Outra.java");
     expect(within(section).queryByRole("alert")).toBeNull();
     expect(within(section).queryByText(SAMPLE_LINE)).toBeNull();
+  });
+
+  test("quantos ficaram de fora é dito uma vez só, na ressalva", () => {
+    renderSummary({ report: partial, warnings: [parseFailed("src/A.java")] });
+
+    expect(screen.getAllByText(LEFT_OUT)).toEqual([
+      screen.getByText("Análise parcial: 3 de 259 arquivos ficaram de fora."),
+    ]);
   });
 
   test("a amostra menor que a contagem diz quanto mostra", () => {
@@ -228,17 +275,21 @@ describe("AnalysisSummary, os avisos", () => {
     expect(screen.getByText("Mostrando 1 de 3 avisos.")).toBeDefined();
   });
 
-  test("depois de recarregar, sem amostra: o título e a frase, sem lista vazia", () => {
+  test("depois de recarregar, sem amostra: o título e por que não há detalhes, sem lista vazia", () => {
     renderSummary({ report: partial, warnings: [] });
 
     const section = screen.getByRole("region", {
-      name: "3 arquivos ficaram de fora",
+      name: t.analysis.warnings.label,
     });
+    expect(within(section).getByText("3 avisos")).toBeDefined();
     expect(within(section).queryByRole("list")).toBeNull();
-    expect(within(section).getByText("Mostrando 0 de 3 avisos.")).toBeDefined();
+    expect(
+      within(section).getByText(t.analysis.warnings.unavailable)
+    ).toBeDefined();
+    expect(within(section).queryByText(SAMPLE_LINE)).toBeNull();
   });
 
-  test("um arquivo só: o título no singular", () => {
+  test("um arquivo só: a contagem no singular", () => {
     renderSummary({
       report: statusReport({
         completeness: { skippedFiles: 1, totalFiles: 9 },
@@ -247,9 +298,10 @@ describe("AnalysisSummary, os avisos", () => {
       warnings: [parseFailed("src/A.java")],
     });
 
-    expect(
-      screen.getByRole("region", { name: "1 arquivo ficou de fora" })
-    ).toBeDefined();
+    const section = screen.getByRole("region", {
+      name: t.analysis.warnings.label,
+    });
+    expect(within(section).getByText("1 aviso")).toBeDefined();
   });
 
   test("sem aviso e sem arquivo de fora, nenhuma seção", () => {
@@ -275,7 +327,9 @@ describe("AnalysisSummary, os avisos", () => {
     expect(
       screen.getByRole("region", { name: t.analysis.warnings.label })
     ).toBeDefined();
+    expect(screen.queryByText(WARNING_COUNT)).toBeNull();
     expect(screen.queryByText(SAMPLE_LINE)).toBeNull();
+    expect(screen.queryByText(t.analysis.warnings.unavailable)).toBeNull();
   });
 
   test("o mesmo aviso duas vezes renderiza as duas, sem chave duplicada", () => {

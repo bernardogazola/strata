@@ -1,3 +1,4 @@
+import { typesInFiles } from "@/features/repository/count-phrase";
 import {
   formatDuration,
   formatPreciseDuration,
@@ -68,12 +69,16 @@ const isTerminalKind = (kind: RowKind): kind is TerminalKind =>
 const rowKind = (
   status: StageStatus,
   hasTick: boolean,
-  runEnded: boolean
+  runEnded: boolean,
+  interrupted: boolean
 ): RowKind => {
   switch (status) {
     case "RUNNING":
-      return "active";
+      return interrupted ? "failed" : "active";
     case "PENDING":
+      if (hasTick && interrupted) {
+        return "failed";
+      }
       if (runEnded) {
         return "notRun";
       }
@@ -85,7 +90,8 @@ const rowKind = (
 
 export const deriveRows = (
   report: AnalysisStatusReport | undefined,
-  ticks: StageTicks
+  ticks: StageTicks,
+  interrupted = false
 ): readonly StageRow[] => {
   const byStage = new Map(
     (report?.stages ?? []).map((stageReport) => [
@@ -93,7 +99,8 @@ export const deriveRows = (
       stageReport,
     ])
   );
-  const runEnded = report !== undefined && report.status !== "RUNNING";
+  const runEnded =
+    interrupted || (report !== undefined && report.status !== "RUNNING");
   return analysisStageSchema.options.map((stage) => {
     const stageReport = byStage.get(stage);
     const tick = ticks[stage];
@@ -101,7 +108,8 @@ export const deriveRows = (
       kind: rowKind(
         stageReport?.status ?? "PENDING",
         tick !== undefined,
-        runEnded
+        runEnded,
+        interrupted
       ),
       stage,
       stageReport,
@@ -183,7 +191,7 @@ export const elapsedText = (
 
 export const completedSummary = (row: StageRow): string => {
   const counters = row.stageReport?.counters ?? {};
-  const { javaFiles, selectedRoots } = counters;
+  const { files, javaFiles, selectedRoots, types } = counters;
   if (row.stage === "REPOSITORY_VALIDATION" && javaFiles !== undefined) {
     return interpolate(plural(javaFiles, t.analysis.stage.validated), {
       count: javaFiles,
@@ -193,6 +201,13 @@ export const completedSummary = (row: StageRow): string => {
     return interpolate(plural(selectedRoots, t.analysis.stage.layout), {
       count: selectedRoots,
     });
+  }
+  if (
+    row.stage === "SOURCE_ANALYSIS" &&
+    types !== undefined &&
+    files !== undefined
+  ) {
+    return typesInFiles(t.analysis.stage.extracted, types, files);
   }
   return stageStatusLabels.COMPLETED;
 };

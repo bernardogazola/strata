@@ -79,11 +79,11 @@ const ptBR = {
       duration: "em {duration}",
       extracted: {
         files: JAVA_FILE_COUNT,
-        template: "{types} em {files}",
+        template: "{types} de {files}",
         types: {
-          one: "{count} tipo",
-          other: "{count} tipos",
-          zero: "nenhum tipo",
+          one: "{count} tipo extraído",
+          other: "{count} tipos extraídos",
+          zero: "nenhum tipo extraído",
         },
       },
       found: "{completed} {unit} encontrados",
@@ -120,10 +120,6 @@ const ptBR = {
       count: {
         one: "{count} aviso",
         other: "{count} avisos",
-      },
-      heading: {
-        one: "{count} arquivo ficou de fora",
-        other: "{count} arquivos ficaram de fora",
       },
       label: "Avisos desta análise",
       sample: "Mostrando {shown} de {total} avisos.",
@@ -170,7 +166,6 @@ const ptBR = {
     description:
       "Escolha o que entra na análise. Os limites de segurança são fixos e não aparecem aqui.",
     disabled: {
-      backend: "O analisador não está pronto.",
       emptySelection: "Escolha ao menos uma raiz de código para analisar.",
       runInFlight:
         "Já existe uma análise em andamento. Aguarde o fim dela para começar outra.",
@@ -286,9 +281,6 @@ const ptBR = {
     },
     legend: {
       expandHint: "Clique duas vezes em um pacote para ver os tipos dele.",
-      expandShort: "Duplo clique abre um pacote",
-      keyboardHint:
-        "Pelo teclado, use a estrutura da arquitetura: as setas percorrem, Enter seleciona e a seta para a direita abre um pacote.",
       kind: "Forma do elemento",
       kindNames: {
         PACKAGE: "Pacote",

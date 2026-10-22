@@ -20,6 +20,7 @@ import {
 } from "./stage-rows";
 
 export interface StageProgressProps {
+  readonly interrupted?: boolean;
   readonly now?: number;
   readonly report: AnalysisStatusReport | undefined;
   readonly ticks: StageTicks;
@@ -230,8 +231,13 @@ function SettledRow({ kind, row }: SettledRowProps) {
   );
 }
 
-export function StageProgress({ now, report, ticks }: StageProgressProps) {
-  const rows = deriveRows(report, ticks);
+export function StageProgress({
+  interrupted = false,
+  now,
+  report,
+  ticks,
+}: StageProgressProps) {
+  const rows = deriveRows(report, ticks, interrupted);
   const anyActive = rows.some((row) => row.kind === "active");
   const anySkipped = rows.some((row) => row.kind === "skipped");
   const currentTime = useClock(anyActive, now);

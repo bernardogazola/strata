@@ -28,8 +28,10 @@ interface FactProps {
 
 function Fact({ children, label }: FactProps) {
   return (
-    <div className="flex items-baseline border-b py-[11px] text-sm">
-      <dt className="w-[148px] shrink-0 text-muted-foreground">{label}</dt>
+    <div className="flex min-w-0 flex-col gap-0.5 border-b py-2 text-sm lg:flex-row lg:items-baseline lg:gap-0 lg:py-[11px]">
+      <dt className="text-muted-foreground lg:w-[148px] lg:shrink-0">
+        {label}
+      </dt>
       <dd className="min-w-0 select-text text-foreground [overflow-wrap:anywhere]">
         {children}
       </dd>
@@ -78,7 +80,7 @@ export function DescribePanel({ description }: DescribePanelProps) {
         <RepositoryText value={description.displayName} />
       </h1>
       <div className="flex flex-col gap-3">
-        <dl className="flex flex-col border-t">
+        <dl className="grid grid-cols-2 gap-x-8 border-t lg:flex lg:flex-col">
           <Fact label={t.describe.facts.buildSystem}>
             {buildSystemLabels[description.buildSystem]}
           </Fact>
@@ -137,11 +139,17 @@ export function DescribePanelSkeleton() {
         {t.describe.loading}
       </p>
       <Skeleton className="h-[30px] w-48" />
-      <div aria-hidden="true" className="flex flex-col border-t">
+      <div
+        aria-hidden="true"
+        className="grid grid-cols-2 gap-x-8 border-t lg:flex lg:flex-col"
+      >
         {SKELETON_ROWS.map((row) => (
-          <div className="flex items-center border-b py-[11px]" key={row}>
+          <div
+            className="flex flex-col gap-2 border-b py-[11px] lg:flex-row lg:items-center lg:gap-0"
+            key={row}
+          >
             <Skeleton className="h-3.5 w-24" />
-            <Skeleton className="ml-[52px] h-3.5 w-28" />
+            <Skeleton className="h-3.5 w-28 lg:ml-[52px]" />
           </div>
         ))}
       </div>

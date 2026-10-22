@@ -12,8 +12,11 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ErrorSurface } from "@/features/errors/error-surface";
+import { countPhrase, typesInFiles } from "@/features/repository/count-phrase";
 import { formatPreciseDuration, interpolate, plural } from "@/i18n/format";
 import { t } from "@/i18n/messages";
+import { cn } from "@/lib/utils";
+import { isAnalysisPartial } from "@/protocol/analysis";
 import type {
   AnalysisStageReport,
   AnalysisStatusReport,
@@ -64,11 +67,20 @@ interface MetaProps {
 function Meta({ report }: MetaProps) {
   const duration = formatPreciseDuration(runDurationMs(report));
   if (report.status === "COMPLETED") {
+    const isPartial = isAnalysisPartial(report.completeness);
     return (
-      <p className="flex items-center gap-1.5 text-success text-xs">
+      <p
+        className={cn(
+          "flex items-center gap-1.5 text-xs",
+          isPartial ? "text-muted-foreground" : "text-success"
+        )}
+      >
         <span
           aria-hidden="true"
-          className="flex size-3.5 items-center justify-center rounded-full bg-success-soft"
+          className={cn(
+            "flex size-3.5 items-center justify-center rounded-full",
+            isPartial ? "bg-muted" : "bg-success-soft"
+          )}
         >
           <IconCheck size={9} stroke={2.5} />
         </span>
@@ -112,6 +124,24 @@ interface WarningsProps {
   readonly warnings: readonly AnalysisWarning[];
 }
 
+interface SampleNoteProps {
+  readonly shown: number;
+  readonly total: number;
+}
+
+function SampleNote({ shown, total }: SampleNoteProps) {
+  if (shown >= total) {
+    return null;
+  }
+  return (
+    <p className="text-muted-foreground text-xs">
+      {shown === 0
+        ? t.analysis.warnings.unavailable
+        : interpolate(t.analysis.warnings.sample, { shown, total })}
+    </p>
+  );
+}
+
 function Warnings({ report, warnings }: WarningsProps) {
   const headingId = useId();
   const skipped =
@@ -125,15 +155,11 @@ function Warnings({ report, warnings }: WarningsProps) {
     <section aria-labelledby={headingId} className="flex flex-col gap-2.5 pt-1">
       <div className="flex items-baseline justify-between gap-4">
         <h2 className="font-medium text-base text-foreground" id={headingId}>
-          {skipped > 0
-            ? interpolate(plural(skipped, t.analysis.warnings.heading), {
-                count: skipped,
-              })
-            : t.analysis.warnings.label}
+          {t.analysis.warnings.label}
         </h2>
         {skipped > 0 ? (
-          <span className="text-muted-foreground text-xs">
-            {t.analysis.warnings.label}
+          <span className="text-muted-foreground text-xs tabular-nums">
+            {countPhrase(skipped, t.analysis.warnings.count)}
           </span>
         ) : null}
       </div>
@@ -150,14 +176,7 @@ function Warnings({ report, warnings }: WarningsProps) {
           ))}
         </ul>
       )}
-      {shown < skipped ? (
-        <p className="text-muted-foreground text-xs">
-          {interpolate(t.analysis.warnings.sample, {
-            shown,
-            total: skipped,
-          })}
-        </p>
-      ) : null}
+      <SampleNote shown={shown} total={skipped} />
     </section>
   );
 }
@@ -307,11 +326,7 @@ const mapBody = (report: AnalysisStatusReport): string => {
   if (files === undefined || types === undefined) {
     return t.analysis.map.bodyNoCounts;
   }
-  const { body } = t.analysis.map;
-  return interpolate(body.template, {
-    files: interpolate(plural(files, body.files), { count: files }),
-    types: interpolate(plural(types, body.types), { count: types }),
-  });
+  return typesInFiles(t.analysis.map.body, types, files);
 };
 
 export function MapUnavailableCard({ report }: MapUnavailableCardProps) {

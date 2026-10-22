@@ -250,6 +250,10 @@
     @apply bg-background text-foreground text-sm;
   }
 
+  p {
+    text-wrap: pretty;
+  }
+
   html {
     caret-color: var(--accent-strong);
     @apply font-sans;

@@ -30,6 +30,11 @@ import {
   type RepositoryDescription,
   type SourceRoot,
 } from "@/protocol/repository";
+import {
+  type AppStore,
+  type BackendState,
+  useAppStore,
+} from "@/state/app-store";
 import { countPhrase, filesInRoots } from "./count-phrase";
 import { RepositoryText } from "./repository-text";
 
@@ -88,7 +93,9 @@ const withKindChecked = (
     .map((root) => root.id);
 };
 
-type DisabledReason = keyof typeof t.config.disabled;
+type DisabledReason = "backend" | "emptySelection" | "runInFlight";
+
+type BackendPhase = BackendState["phase"];
 
 const disabledReasonOf = (
   backendReady: boolean,
@@ -104,11 +111,20 @@ const disabledReasonOf = (
   return selectedFiles === 0 ? "emptySelection" : null;
 };
 
+const reasonText = (reason: DisabledReason, phase: BackendPhase): string => {
+  if (reason !== "backend") {
+    return t.config.disabled[reason];
+  }
+  return t.config.backendUnavailable[phase === "READY" ? "STARTING" : phase];
+};
+
 const selectValues = (state: {
   readonly values: AnalysisConfiguration;
 }): AnalysisConfiguration => state.values;
 const selectCanSubmit = (state: { readonly canSubmit: boolean }): boolean =>
   state.canSubmit;
+const selectBackendPhase = (state: AppStore): BackendPhase =>
+  state.backend.phase;
 
 export interface AnalysisConfigFormProps {
   readonly backendReady: boolean;
@@ -214,10 +230,27 @@ function SourceRootGroup({
   );
 }
 
+interface UnavailableBadgeProps {
+  readonly children: string;
+  readonly id: string;
+}
+
+function UnavailableBadge({ children, id }: UnavailableBadgeProps) {
+  return (
+    <Badge
+      className="h-auto rounded-sm px-1.5 py-px font-normal text-muted-foreground"
+      id={id}
+      variant="secondary"
+    >
+      {children}
+    </Badge>
+  );
+}
+
 interface AnalyzeFooterProps {
   readonly isBlocked: boolean;
   readonly pending: boolean;
-  readonly reason: DisabledReason | null;
+  readonly reason: string | null;
   readonly reasonId: string;
   readonly selectedFiles: number;
   readonly selectedRoots: number;
@@ -232,7 +265,7 @@ function AnalyzeFooter({
   selectedRoots,
 }: AnalyzeFooterProps) {
   return (
-    <div className="flex flex-col gap-2 border-t pt-4 pb-8">
+    <div className="sticky bottom-0 z-10 flex flex-col gap-2 border-t bg-background pt-4 pb-6">
       <div className="flex items-center justify-between gap-6">
         <div className="flex min-w-0 flex-col gap-0.5">
           <p className="font-medium text-foreground text-sm tabular-nums">
@@ -266,7 +299,7 @@ function AnalyzeFooter({
           className="self-end text-right text-muted-foreground text-xs"
           id={reasonId}
         >
-          {t.config.disabled[reason]}
+          {reason}
         </p>
       )}
     </div>
@@ -291,6 +324,7 @@ export function AnalysisConfigForm({
     reason: `${baseId}-reason`,
     rebuild: `${baseId}-rebuild`,
     rebuildDescription: `${baseId}-rebuild-description`,
+    rebuildReason: `${baseId}-rebuild-reason`,
     rootsDescription: `${baseId}-roots-description`,
     tests: `${baseId}-tests`,
     testsDescription: `${baseId}-tests-description`,
@@ -324,6 +358,7 @@ export function AnalysisConfigForm({
 
   const values = useStore(form.store, selectValues);
   const canSubmit = useStore(form.store, selectCanSubmit);
+  const backendPhase = useAppStore(selectBackendPhase);
   const checked = new Set(values.sourceRootIds ?? []);
   const selected = roots.filter((root) => checked.has(root.id));
   const selectedFiles = selected.reduce(
@@ -369,7 +404,12 @@ export function AnalysisConfigForm({
   );
 
   return (
-    <form aria-labelledby={ids.title} noValidate onSubmit={submit}>
+    <form
+      aria-labelledby={ids.title}
+      className="[&_*]:scroll-mb-32"
+      noValidate
+      onSubmit={submit}
+    >
       <div className="flex flex-col gap-1.5 pb-5">
         <h2 className="font-medium text-foreground text-xl" id={ids.title}>
           {t.config.title}
@@ -394,7 +434,7 @@ export function AnalysisConfigForm({
         <Switch
           aria-describedby={ids.testsDescription}
           checked={values.includeTests}
-          className="mt-0.5"
+          className="mt-0.5 dark:data-unchecked:bg-input"
           id={ids.tests}
           name="includeTests"
           onCheckedChange={toggleTests}
@@ -444,13 +484,9 @@ export function AnalysisConfigForm({
             variant="legend"
           >
             <span id={ids.historyLabel}>{t.config.history.label}</span>
-            <Badge
-              className="h-auto rounded-sm px-1.5 py-px font-normal text-muted-foreground"
-              id={ids.historyReason}
-              variant="secondary"
-            >
+            <UnavailableBadge id={ids.historyReason}>
               {t.config.history.unavailable}
-            </Badge>
+            </UnavailableBadge>
           </FieldLegend>
           <p
             className="text-muted-foreground text-sm"
@@ -535,18 +571,26 @@ export function AnalysisConfigForm({
             orientation="horizontal"
           >
             <Checkbox
-              aria-describedby={ids.rebuildDescription}
+              aria-describedby={`${ids.rebuildReason} ${ids.rebuildDescription}`}
               checked={field.state.value}
-              className="mt-0.5"
+              className="mt-0.5 opacity-50"
               disabled
               id={ids.rebuild}
               name={field.name}
               onCheckedChange={field.handleChange}
             />
             <FieldContent>
-              <FieldLabel className="text-base leading-5" htmlFor={ids.rebuild}>
-                {t.config.rebuild.label}
-              </FieldLabel>
+              <div className="flex items-center gap-2">
+                <FieldLabel
+                  className="text-base leading-5 opacity-50"
+                  htmlFor={ids.rebuild}
+                >
+                  {t.config.rebuild.label}
+                </FieldLabel>
+                <UnavailableBadge id={ids.rebuildReason}>
+                  {t.config.rebuild.unavailable}
+                </UnavailableBadge>
+              </div>
               <FieldDescription id={ids.rebuildDescription}>
                 {t.config.rebuild.description}
               </FieldDescription>
@@ -560,7 +604,7 @@ export function AnalysisConfigForm({
       <AnalyzeFooter
         isBlocked={isBlocked}
         pending={pending}
-        reason={reason}
+        reason={reason === null ? null : reasonText(reason, backendPhase)}
         reasonId={ids.reason}
         selectedFiles={selectedFiles}
         selectedRoots={selected.length}

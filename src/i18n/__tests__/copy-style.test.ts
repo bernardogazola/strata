@@ -38,7 +38,6 @@ const BASE_COPY: readonly CatalogueString[] = [
   ...collectStrings(t.start, "start"),
   ...collectStrings(t.graph.canvas.label, "graph.canvas.label"),
   ...collectStrings(t.graph.legend.expandHint, "graph.legend.expandHint"),
-  ...collectStrings(t.graph.legend.expandShort, "graph.legend.expandShort"),
   ...collectStrings(t.graph.legend.kindNames, "graph.legend.kindNames"),
   ...collectStrings(t.graph.legend.selectionName, "graph.legend.selectionName"),
   ...collectStrings(t.inspector.dependsOn, "inspector.dependsOn"),

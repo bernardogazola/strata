@@ -24,3 +24,19 @@ export const filesInRoots = (
     files: countPhrase(files, phrase.files),
     roots: countPhrase(roots, phrase.roots),
   });
+
+export interface TypesInFilesTemplate {
+  readonly files: CountForms;
+  readonly template: string;
+  readonly types: CountForms;
+}
+
+export const typesInFiles = (
+  phrase: TypesInFilesTemplate,
+  types: number,
+  files: number
+): string =>
+  interpolate(phrase.template, {
+    files: countPhrase(files, phrase.files),
+    types: countPhrase(types, phrase.types),
+  });
