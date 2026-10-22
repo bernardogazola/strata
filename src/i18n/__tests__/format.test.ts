@@ -8,6 +8,7 @@ import {
   hasLocaleData,
   interpolate,
   plural,
+  sentenceCase,
 } from "../format";
 import { t } from "../messages";
 
@@ -71,6 +72,36 @@ describe("plural", () => {
     expect(plural(0, forms)).toBe("nenhum commit");
     expect(plural(1, forms)).toBe("commit");
     expect(plural(5, forms)).toBe("commits");
+  });
+});
+
+describe("sentenceCase", () => {
+  test("sobe só a primeira letra de um rótulo escrito para o meio de frase", () => {
+    expect(sentenceCase("resolvida")).toBe("Resolvida");
+    expect(sentenceCase("externa, não resolvida")).toBe(
+      "Externa, não resolvida"
+    );
+  });
+
+  test("sobe a letra acentuada no locale do produto", () => {
+    expect(sentenceCase("é")).toBe("É");
+    expect(sentenceCase("étnico")).toBe("Étnico");
+  });
+
+  test("devolve a string vazia como veio, sem lançar", () => {
+    expect(sentenceCase("")).toBe("");
+  });
+
+  test("não mexe no que já começa em maiúscula ou não começa por letra", () => {
+    expect(sentenceCase("Deduzida do código")).toBe("Deduzida do código");
+    expect(sentenceCase("(pacote padrão)")).toBe("(pacote padrão)");
+  });
+
+  test("trata a primeira letra por ponto de código, sem partir um par substituto", () => {
+    const lower = String.fromCodePoint(0x1_04_28);
+    const upper = String.fromCodePoint(0x1_04_00);
+
+    expect(sentenceCase(`${lower}x`)).toBe(`${upper}x`);
   });
 });
 

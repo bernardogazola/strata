@@ -38,7 +38,7 @@ const SEARCH_RESULTS_LIMIT = 50;
 const NAVIGATION_KEYS = new Set(["ArrowDown", "ArrowUp", "End", "Home"]);
 
 const INPUT_CLASS =
-  "h-8 w-full min-w-0 rounded-md border border-input bg-background pr-2.5 pl-8 text-sm shadow-control placeholder:text-subtle-foreground";
+  "h-8 w-full min-w-0 rounded-md border border-input bg-background pr-2.5 pl-8 text-sm shadow-control placeholder:text-muted-foreground";
 
 const OPTION_CLASS =
   "flex cursor-pointer items-start gap-1.5 rounded-md px-2 py-1 text-sm transition-[background-color,box-shadow] duration-150 ease-out-quart hover:not-aria-selected:bg-accent aria-disabled:cursor-default aria-disabled:opacity-60 aria-selected:bg-raised aria-selected:shadow-raised motion-reduce:transition-none";

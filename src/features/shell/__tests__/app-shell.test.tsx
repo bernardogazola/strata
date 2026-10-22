@@ -65,6 +65,19 @@ describe("AppShell", () => {
     expect(classes).not.toContain("overflow-y-auto");
   });
 
+  test("as colunas laterais estreitam abaixo de xl, e de xl em diante são as do benchmark", () => {
+    const { container } = renderShell();
+
+    const classes = container.firstElementChild?.className.split(" ") ?? [];
+    expect(classes).toStrictEqual(
+      expect.arrayContaining([
+        "grid-cols-[15rem_minmax(0,1fr)_16rem]",
+        "xl:grid-cols-[18rem_minmax(0,1fr)_20rem]",
+      ])
+    );
+    expect(classes).not.toContain("grid-cols-[18rem_minmax(0,1fr)_20rem]");
+  });
+
   test("há um <main> só", () => {
     renderShell();
 

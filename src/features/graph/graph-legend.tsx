@@ -1,4 +1,5 @@
 import { type ReactElement, useId } from "react";
+import { sentenceCase } from "@/i18n/format";
 import { resolutionQualityLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
@@ -83,6 +84,21 @@ function NodeSample({
   );
 }
 
+function ItemName({
+  shown,
+  spoken,
+}: {
+  readonly shown: string;
+  readonly spoken: string;
+}) {
+  return (
+    <>
+      <span aria-hidden="true">{shown}</span>
+      <span className="sr-only">{spoken}</span>
+    </>
+  );
+}
+
 const GROUP_CLASS = "flex items-center";
 const LIST_CLASS = "flex flex-wrap items-center gap-x-5 gap-y-1";
 const ITEM_CLASS = "flex items-center gap-1.5 whitespace-nowrap";
@@ -105,12 +121,18 @@ export function GraphLegend() {
           {LEGEND_KINDS.map((kind) => (
             <li className={ITEM_CLASS} key={kind}>
               <NodeSample kind={kind} selected={false} />
-              {t.graph.legend.kindShapes[kind]}
+              <ItemName
+                shown={t.graph.legend.kindNames[kind]}
+                spoken={t.graph.legend.kindShapes[kind]}
+              />
             </li>
           ))}
           <li className={ITEM_CLASS}>
             <NodeSample kind="TYPE" selected />
-            {t.graph.legend.selection}
+            <ItemName
+              shown={t.graph.legend.selectionName}
+              spoken={t.graph.legend.selection}
+            />
           </li>
         </ul>
       </div>
@@ -121,14 +143,11 @@ export function GraphLegend() {
           {resolutionQualitySchema.options.map((quality) => (
             <li className={ITEM_CLASS} key={quality}>
               <EdgeSample line={EDGE_LINES[quality]} />
-              {resolutionQualityLabels[quality]}
+              {sentenceCase(resolutionQualityLabels[quality])}
             </li>
           ))}
         </ul>
       </div>
-
-      <p>{t.graph.legend.expandHint}</p>
-      <p>{t.graph.legend.keyboardHint}</p>
     </section>
   );
 }

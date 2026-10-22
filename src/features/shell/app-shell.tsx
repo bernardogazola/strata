@@ -13,7 +13,7 @@ export interface AppShellProps {
 
 export function AppShell({ header, inspector, main, sidebar }: AppShellProps) {
   return (
-    <div className="grid h-svh grid-cols-[18rem_minmax(0,1fr)_20rem] grid-rows-[auto_minmax(0,1fr)] bg-background text-foreground">
+    <div className="grid h-svh grid-cols-[15rem_minmax(0,1fr)_16rem] grid-rows-[auto_minmax(0,1fr)] bg-background text-foreground xl:grid-cols-[18rem_minmax(0,1fr)_20rem]">
       <div className="col-span-3 min-w-0">{header}</div>
       <aside
         aria-label={t.shell.regions.sidebar}

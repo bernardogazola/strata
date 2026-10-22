@@ -1,12 +1,9 @@
 import { type ReactNode, useCallback, useId } from "react";
 import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
+import { countPhrase } from "@/features/repository/count-phrase";
 import { formatInteger } from "@/i18n/format";
-import {
-  type EnglishTerm,
-  elementKindLabels,
-  englishTermAccessibleNames,
-} from "@/i18n/labels";
+import { elementKindLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
 import { DEFAULT_UNTRUSTED_MAX_CHARS } from "@/lib/untrusted";
 import { cn } from "@/lib/utils";
@@ -26,23 +23,11 @@ export interface NodeSummaryProps {
   readonly onExpand: (elementId: string) => void;
 }
 
-function TermName({ term }: { readonly term: EnglishTerm }) {
-  const name = englishTermAccessibleNames[term];
-  return (
-    <>
-      <span aria-hidden="true" title={name}>
-        {term}
-      </span>
-      <span className="sr-only">{name}</span>
-    </>
-  );
-}
-
 function Metric({
   term,
   value,
 }: {
-  readonly term: ReactNode;
+  readonly term: string;
   readonly value: string;
 }) {
   return (
@@ -82,6 +67,7 @@ function SelectedNode({
 }) {
   const titleId = useId();
   const isPackage = node.kind === "PACKAGE";
+  const neighbours = t.graph.canvas.nodes[isPackage ? "PACKAGE" : "TYPE"];
 
   return (
     <section
@@ -113,16 +99,12 @@ function SelectedNode({
           />
         ) : null}
         <Metric
-          term={<TermName term="LOC" />}
-          value={formatInteger(node.loc)}
+          term={t.inspector.dependsOn}
+          value={countPhrase(node.fanOut, neighbours)}
         />
         <Metric
-          term={<TermName term="fan-in" />}
-          value={formatInteger(node.fanIn)}
-        />
-        <Metric
-          term={<TermName term="fan-out" />}
-          value={formatInteger(node.fanOut)}
+          term={t.inspector.usedBy}
+          value={countPhrase(node.fanIn, neighbours)}
         />
       </dl>
 
@@ -130,6 +112,24 @@ function SelectedNode({
         <ExpandButton elementId={node.id} onExpand={onExpand} />
       ) : null}
     </section>
+  );
+}
+
+function EmptySummary({
+  notOnMap,
+}: {
+  readonly notOnMap: NotOnMapReason | undefined;
+}) {
+  if (notOnMap !== undefined) {
+    return (
+      <p className="text-muted-foreground">{t.inspector.notOnMap[notOnMap]}</p>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-muted-foreground">{t.inspector.empty}</p>
+      <p className="text-muted-foreground">{t.graph.legend.expandHint}</p>
+    </div>
   );
 }
 
@@ -142,11 +142,7 @@ export function NodeSummary({
   return (
     <div className="flex flex-1 flex-col gap-5">
       {node === null ? (
-        <p className="text-muted-foreground">
-          {notOnMap === undefined
-            ? t.inspector.empty
-            : t.inspector.notOnMap[notOnMap]}
-        </p>
+        <EmptySummary notOnMap={notOnMap} />
       ) : (
         <SelectedNode node={node} onExpand={onExpand} />
       )}

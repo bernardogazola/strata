@@ -181,6 +181,8 @@ describe("a caixa de busca", () => {
     expect(input.maxLength).toBe(SEARCH_QUERY_MAX_CHARS);
     expect(input.maxLength).toBe(128);
     expect(input.getAttribute("autocomplete")).toBe("off");
+    expect(input.className).toContain("placeholder:text-muted-foreground");
+    expect(input.className).not.toContain("placeholder:text-subtle-foreground");
     expect(container.firstElementChild?.tagName).toBe("SEARCH");
   });
 

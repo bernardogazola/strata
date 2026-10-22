@@ -137,6 +137,16 @@ export const plural = (
   return pluralRules.select(count) === "one" ? forms.one : forms.other;
 };
 
+export const sentenceCase = (label: string): string => {
+  const first = label.codePointAt(0);
+  if (first === undefined) {
+    return label;
+  }
+
+  const head = String.fromCodePoint(first);
+  return `${head.toLocaleUpperCase(LOCALE)}${label.slice(head.length)}`;
+};
+
 export const hasLocaleData = (): boolean =>
   new Intl.DateTimeFormat(LOCALE).resolvedOptions().locale.startsWith("pt");
 

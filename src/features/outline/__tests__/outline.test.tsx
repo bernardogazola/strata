@@ -325,6 +325,24 @@ describe("ArchitectureOutline: o caminho de dados", () => {
     expect(screen.queryAllByRole("region")).toStrictEqual([]);
   });
 
+  test("a dica de teclado fica logo sob o título, no recuo dele, e descreve a árvore", async () => {
+    renderOutline();
+
+    await waitForRows(3);
+
+    const tree = screen.getByRole("tree", { name: t.outline.title });
+    expect(tree).toHaveAccessibleDescription(t.outline.keyboardHint);
+    const hint = screen.getByText(t.outline.keyboardHint);
+    expect(hint.id).toBe(tree.getAttribute("aria-describedby"));
+    expect(
+      screen.getByRole("heading", { name: t.outline.title }).nextElementSibling
+    ).toBe(hint);
+    expect(hint.className.split(" ")).toStrictEqual(
+      expect.arrayContaining(["px-2", "text-muted-foreground", "text-xs"])
+    );
+    expect(hint.hasAttribute("tabindex")).toBe(false);
+  });
+
   test("a contagem de tipos é visível ao olho e dita por extenso ao leitor de tela", async () => {
     renderOutline();
 
@@ -1012,6 +1030,7 @@ describe("ArchitectureOutline: estados", () => {
     expect(
       screen.getByRole("heading", { name: t.outline.title }).tabIndex
     ).toBe(-1);
+    expect(screen.queryByText(t.outline.keyboardHint)).toBeNull();
   });
 
   test("a raiz vazia diz que não há pacotes, sem árvore", async () => {
