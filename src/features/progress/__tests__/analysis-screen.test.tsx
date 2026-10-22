@@ -1,5 +1,12 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { handleFrame, subscribeToAnalyzer } from "@/bridge/events";
 import { fakeRequest } from "@/bridge/fake";
 import { transport } from "@/bridge/transport";
 import {
@@ -25,6 +32,7 @@ const READY: BackendState = { phase: "READY", protocolVersion: 1 };
 const initialStore = useAppStore.getState();
 const OTHER_ANALYSIS = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V2X";
 const WORKSPACE_REGION = "Espaço de trabalho (dublê)";
+const WORKSPACE_TITLE = "Mapa (dublê)";
 
 type Answer = () => Promise<unknown>;
 
@@ -45,6 +53,9 @@ const serveStatus = (report: AnalysisStatusReport) =>
 function StubWorkspace({ header, report }: AnalysisWorkspaceProps) {
   return (
     <main aria-label={WORKSPACE_REGION}>
+      <h1 className="sr-only" tabIndex={-1}>
+        {WORKSPACE_TITLE}
+      </h1>
       <p>{header.repository?.displayName ?? "sem nome"}</p>
       {header.status}
       <p>{report.analysisId}</p>
@@ -99,6 +110,8 @@ const graphCompleted = (): AnalysisStatusReport =>
     },
     status: "COMPLETED",
   });
+
+const RUNNING_META = /^Em andamento há/;
 
 const SA_TICK = {
   completed: 2,
@@ -297,5 +310,191 @@ describe("AnalysisScreen: o foco quando a tela troca", () => {
     await waitFor(() => {
       expect(router.state.location.search).not.toHaveProperty("analysis");
     });
+  });
+});
+
+describe("AnalysisScreen: o analisador para no meio da execução", () => {
+  let stopBridge: () => void = () => undefined;
+
+  afterEach(() => {
+    stopBridge();
+  });
+
+  test("parado, a execução diz que não vai terminar e não oferece cancelar", async () => {
+    serveStatus(running());
+    renderAnalysis();
+    await screen.findByRole("button", { name: t.analysis.cancel });
+    expect(screen.getByText(RUNNING_META)).toBeDefined();
+    expect(banner().getByText(t.header.analysis.RUNNING)).toBeDefined();
+
+    act(() => {
+      useAppStore.setState({ backend: { exitCode: 137, phase: "CRASHED" } });
+    });
+
+    expect(
+      await screen.findByText(t.analysis.running.interrupted)
+    ).toBeDefined();
+    expect(banner().queryByText(t.header.analysis.RUNNING)).toBeNull();
+    expect(screen.queryByText(RUNNING_META)).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: t.analysis.cancel })
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: t.analysis.cancelling })
+    ).toBeNull();
+  });
+
+  test("Reiniciar pergunta de novo, e a análise que o processo novo não conhece sumiu", async () => {
+    let javaRestarted = false;
+    const status = vi.fn(() =>
+      javaRestarted
+        ? Promise.reject({
+            code: "ANALYSIS_NOT_FOUND",
+            origin: "analyzer",
+            params: {},
+          })
+        : Promise.resolve(running())
+    );
+    answer({ "analysis.status": status });
+    vi.spyOn(transport, "subscribe").mockResolvedValue(() => undefined);
+    vi.spyOn(transport, "analyzerRestart").mockImplementation(() => {
+      javaRestarted = true;
+      return Promise.resolve(READY);
+    });
+    const { queryClient } = renderAnalysis();
+    stopBridge = await subscribeToAnalyzer(queryClient);
+    await screen.findByRole("button", { name: t.analysis.cancel });
+
+    act(() => {
+      handleFrame(
+        {
+          kind: "forwarded",
+          value: {
+            event: "analysis.started",
+            payload: { analysisId: ANALYSIS_ID },
+          },
+        },
+        queryClient
+      );
+      handleFrame(
+        { kind: "state", value: { exitCode: 137, phase: "CRASHED" } },
+        queryClient
+      );
+    });
+    await screen.findByText(t.analysis.running.interrupted);
+    const callsBeforeRestart = status.mock.calls.length;
+
+    fireEvent.click(
+      await banner().findByRole("button", { name: t.repository.restart })
+    );
+
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: t.analysis.notFound.title,
+      })
+    ).toBeDefined();
+    expect(status.mock.calls.length).toBeGreaterThan(callsBeforeRestart);
+    expect(
+      screen.queryByRole("button", { name: t.analysis.cancel })
+    ).toBeNull();
+    expect(useAppStore.getState().runningAnalysisId).toBeNull();
+  });
+});
+
+describe("AnalysisScreen: o anúncio do fim da execução", () => {
+  const COMPLETED_HEADLINE = "9 arquivos Java analisados";
+
+  const announcer = (): HTMLElement => {
+    const regions = [
+      ...document.querySelectorAll<HTMLElement>('[aria-live="polite"]'),
+    ].filter((live) => live.closest("header, main") === null);
+    const [region] = regions;
+    if (regions.length !== 1 || region === undefined) {
+      throw new Error(`esperava uma região de anúncio, há ${regions.length}`);
+    }
+    return region;
+  };
+
+  const runUntil = (ended: AnalysisStatusReport) => {
+    let finished = false;
+    answer({
+      "analysis.status": () =>
+        Promise.resolve(
+          finished ? ended : running({ completeness: { totalFiles: 9 } })
+        ),
+    });
+    return () => {
+      finished = true;
+    };
+  };
+
+  const complete = (
+    queryClient: ReturnType<typeof renderAnalysis>["queryClient"]
+  ) => {
+    act(() => {
+      handleFrame(
+        {
+          kind: "forwarded",
+          value: {
+            event: "analysis.completed",
+            payload: {
+              analysisId: ANALYSIS_ID,
+              completeness: {
+                historyTruncatedAtCommits: null,
+                parseFailures: 0,
+                shallowClone: false,
+                skippedFiles: 0,
+                totalFiles: 9,
+              },
+            },
+          },
+        },
+        queryClient
+      );
+    });
+  };
+
+  test("com o foco no cabeçalho, o fim da execução anuncia o título do resumo", async () => {
+    const finish = runUntil(mapSkipped());
+    const { queryClient } = renderAnalysis();
+    await screen.findByRole("button", { name: t.analysis.cancel });
+    const region = announcer();
+    expect(region.textContent).toBe("");
+    const toggle = banner().getByRole("button", { name: "Alternar tema" });
+    toggle.focus();
+
+    finish();
+    complete(queryClient);
+
+    await screen.findByRole("heading", { level: 1, name: COMPLETED_HEADLINE });
+    await waitFor(() =>
+      expect(announcer().textContent).toBe(COMPLETED_HEADLINE)
+    );
+    expect(announcer()).toBe(region);
+    expect(document.activeElement).toBe(toggle);
+  });
+
+  test("o mapa que monta no fim da execução anuncia o título do espaço de trabalho", async () => {
+    const finish = runUntil(graphCompleted());
+    const { queryClient } = renderAnalysis();
+    await screen.findByRole("button", { name: t.analysis.cancel });
+    const region = announcer();
+
+    finish();
+    complete(queryClient);
+
+    await screen.findByRole("main", { name: WORKSPACE_REGION });
+    await waitFor(() => expect(announcer().textContent).toBe(WORKSPACE_TITLE));
+    expect(announcer()).toBe(region);
+  });
+
+  test("quem chega a uma análise já terminada não ouve anúncio nenhum", async () => {
+    serveStatus(mapSkipped());
+    renderAnalysis();
+
+    await screen.findByRole("heading", { level: 1, name: COMPLETED_HEADLINE });
+
+    expect(announcer().textContent).toBe("");
   });
 });

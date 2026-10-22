@@ -23,6 +23,7 @@ import {
   AppHeader,
   type AppHeaderProps,
 } from "@/features/shell/app-header";
+import { useFocusTitleOnScreenChange } from "@/features/shell/focus-title";
 import { leaveAnalysis } from "@/features/shell/repository-search";
 import { useCloseRepository } from "@/features/shell/use-close-repository";
 import { formatDuration, interpolate } from "@/i18n/format";
@@ -58,27 +59,6 @@ export interface AnalysisScreenProps {
   readonly handle: string;
   readonly workspace: ComponentType<AnalysisWorkspaceProps>;
 }
-
-export const useFocusTitleOnScreenChange = (
-  screenKey: string | null,
-  focusFirstScreen = false
-): void => {
-  const shownKey = useRef(screenKey);
-
-  useEffect(() => {
-    if (screenKey === null || shownKey.current === screenKey) {
-      return;
-    }
-    const isFirstScreen = shownKey.current === null;
-    shownKey.current = screenKey;
-    if (isFirstScreen && !focusFirstScreen) {
-      return;
-    }
-    if (document.activeElement === document.body) {
-      document.querySelector<HTMLElement>("main h1")?.focus();
-    }
-  }, [focusFirstScreen, screenKey]);
-};
 
 const useNow = (): number => {
   const [now, setNow] = useState(() => Date.now());
@@ -135,11 +115,18 @@ const runningTitle = (
 
 interface RunningAnalysisProps {
   readonly analysisId: string;
+
+  readonly interrupted: boolean;
   readonly report: AnalysisStatusReport;
   readonly ticks: StageTicks;
 }
 
-function RunningAnalysis({ analysisId, report, ticks }: RunningAnalysisProps) {
+function RunningAnalysis({
+  analysisId,
+  interrupted,
+  report,
+  ticks,
+}: RunningAnalysisProps) {
   const now = useNow();
   const {
     error: cancelError,
@@ -161,24 +148,28 @@ function RunningAnalysis({ analysisId, report, ticks }: RunningAnalysisProps) {
             {runningTitle(report, ticks)}
           </h1>
           <p className="text-muted-foreground text-xs tabular-nums">
-            {interpolate(t.analysis.running.meta, { elapsed })}
+            {interrupted
+              ? t.analysis.running.interrupted
+              : interpolate(t.analysis.running.meta, { elapsed })}
           </p>
         </div>
-        <Button
-          className={SECONDARY_ACTION_CLASS}
-          disabled={cancelling}
-          focusableWhenDisabled
-          onClick={onCancel}
-          size="sm"
-          variant="outline"
-        >
-          {cancelling ? t.analysis.cancelling : t.analysis.cancel}
-        </Button>
+        {interrupted ? null : (
+          <Button
+            className={SECONDARY_ACTION_CLASS}
+            disabled={cancelling}
+            focusableWhenDisabled
+            onClick={onCancel}
+            size="sm"
+            variant="outline"
+          >
+            {cancelling ? t.analysis.cancelling : t.analysis.cancel}
+          </Button>
+        )}
       </div>
       {cancelError === null ? null : (
         <ErrorSurface error={protocolErrorOf(cancelError)} variant="inline" />
       )}
-      <StageProgress report={report} ticks={ticks} />
+      <StageProgress interrupted={interrupted} report={report} ticks={ticks} />
     </div>
   );
 }
@@ -294,6 +285,24 @@ const viewOf = (
     : { kind: "summary", report };
 };
 
+const useEndOfRunAnnouncement = (viewKind: AnalysisView["kind"]): string => {
+  const [announcement, setAnnouncement] = useState("");
+  const shownKind = useRef(viewKind);
+
+  useEffect(() => {
+    const wasRunning = shownKind.current === "running";
+    shownKind.current = viewKind;
+    if (wasRunning && (viewKind === "summary" || viewKind === "workspace")) {
+      setAnnouncement(document.querySelector("main h1")?.textContent ?? "");
+    }
+  }, [viewKind]);
+
+  return announcement;
+};
+
+const reportOf = (view: AnalysisView): AnalysisStatusReport | undefined =>
+  "report" in view ? view.report : undefined;
+
 export function AnalysisScreen({
   analysisId,
   arrivedByNavigation,
@@ -313,7 +322,11 @@ export function AnalysisScreen({
   const progress = useAppStore((state) => state.progress);
   const runningAnalysisId = useAppStore((state) => state.runningAnalysisId);
   const warnings = useAppStore((state) => state.warnings);
-  const onClose = useCloseRepository(handle);
+  const view = viewOf(status.data, status.error);
+  const onClose = useCloseRepository(handle, {
+    cancelAnalysisId:
+      reportOf(view)?.status === "RUNNING" ? analysisId : undefined,
+  });
 
   const onAnalyzeAgain = useCallback(() => {
     navigate({ search: leaveAnalysis });
@@ -323,20 +336,34 @@ export function AnalysisScreen({
     refetch().catch(() => undefined);
   }, [refetch]);
 
-  const view = viewOf(status.data, status.error);
   useFocusTitleOnScreenChange(
     view.kind === "pending" ? null : view.kind,
     arrivedByNavigation
   );
 
-  const chip = view.kind === "gone" ? null : chipStateOf(status.data);
+  const announcement = useEndOfRunAnnouncement(view.kind);
+
+  const interrupted = view.kind === "running" && !backendReady;
+  const chip =
+    view.kind === "gone" || interrupted ? null : chipStateOf(status.data);
   const header: AnalysisHeader = {
     repository: { displayName: describe.data?.displayName, onClose },
     status: chip === null ? undefined : <AnalysisChip state={chip} />,
   };
 
+  const announcer = (
+    <p aria-live="polite" className="sr-only">
+      {announcement}
+    </p>
+  );
+
   if (view.kind === "workspace") {
-    return <Workspace header={header} report={view.report} />;
+    return (
+      <>
+        <Workspace header={header} report={view.report} />
+        {announcer}
+      </>
+    );
   }
 
   let content: ReactNode;
@@ -370,6 +397,7 @@ export function AnalysisScreen({
       content = (
         <RunningAnalysis
           analysisId={analysisId}
+          interrupted={interrupted}
           report={view.report}
           ticks={
             runningAnalysisId === null || runningAnalysisId === analysisId
@@ -397,14 +425,17 @@ export function AnalysisScreen({
   }
 
   return (
-    <AnalysisFrame
-      busy={view.kind === "pending"}
-      header={header}
-      layout={
-        view.kind === "gone" || view.kind === "failure" ? "page" : "column"
-      }
-    >
-      {content}
-    </AnalysisFrame>
+    <>
+      <AnalysisFrame
+        busy={view.kind === "pending"}
+        header={header}
+        layout={
+          view.kind === "gone" || view.kind === "failure" ? "page" : "column"
+        }
+      >
+        {content}
+      </AnalysisFrame>
+      {announcer}
+    </>
   );
 }

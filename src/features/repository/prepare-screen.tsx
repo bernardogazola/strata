@@ -10,6 +10,10 @@ import { PRIMARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ErrorSurface } from "@/features/errors/error-surface";
 import { AppHeader } from "@/features/shell/app-header";
+import {
+  GESTURE_STATE,
+  useFocusTitleAfterGesture,
+} from "@/features/shell/focus-title";
 import { startAnalysis } from "@/features/shell/repository-search";
 import { useCloseRepository } from "@/features/shell/use-close-repository";
 import { t } from "@/i18n/messages";
@@ -77,6 +81,7 @@ export function PrepareScreen({ handle }: PrepareScreenProps) {
   );
 
   const onClose = useCloseRepository(handle);
+  useFocusTitleAfterGesture(describe.data !== undefined || describe.isError);
 
   const chooseAnother = useCallback(async () => {
     setChoosing(true);
@@ -85,9 +90,10 @@ export function PrepareScreen({ handle }: PrepareScreenProps) {
       await closeRepository(handle).catch(() => undefined);
       const opened = await openRepository();
       await (opened === null
-        ? navigate({ to: "/" })
+        ? navigate({ state: GESTURE_STATE, to: "/" })
         : navigate({
             params: { handle: opened.handle },
+            state: GESTURE_STATE,
             to: "/repository/$handle",
           }));
     } catch (error) {

@@ -600,6 +600,7 @@ describe("/repository/$handle: o foco em uma troca de nível", () => {
     await waitFor(() => expect(document.activeElement).toBe(currentCrumb()));
     expect(currentCrumb()?.textContent).toBe("orders");
     expect(currentCrumb()?.tabIndex).toBe(-1);
+    expect(currentCrumb()?.className).toContain("text-muted-foreground");
     expect(liveRegion()?.textContent).toBe(ORDERS_TYPES_LABEL);
   });
 
@@ -616,6 +617,7 @@ describe("/repository/$handle: o foco em uma troca de nível", () => {
     await waitForCanvas(3, "pacotes");
     await waitFor(() => expect(document.activeElement).toBe(currentCrumb()));
     expect(currentCrumb()?.textContent).toBe(t.shell.breadcrumb.root);
+    expect(currentCrumb()?.className).toContain("text-muted-foreground");
     expect(liveRegion()?.textContent).toBe(LEVEL_ONE_LABEL);
   });
 
@@ -1358,6 +1360,7 @@ describe("a tela pelo analysis.status em /repository/$handle?analysis=", () => {
 
   test("Fechar repositório fecha o handle e volta ao início", async () => {
     const close = vi.spyOn(transport, "closeRepository");
+    const cancel = vi.spyOn(transport, "analyzerCancel");
     const { router } = await renderAt(SCREEN_URL);
 
     fireEvent.click(banner().getByRole("button", { name: t.header.close }));
@@ -1365,6 +1368,64 @@ describe("a tela pelo analysis.status em /repository/$handle?analysis=", () => {
     await screen.findByText("index");
     expect(close).toHaveBeenCalledWith(HANDLE);
     expect(router.state.location.pathname).toBe("/");
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  test("Fechar repositório no meio da execução a cancela antes de fechar o handle", async () => {
+    serveStatus(() => Promise.resolve(runningReport()));
+    const cancel = vi
+      .spyOn(transport, "analyzerCancel")
+      .mockResolvedValue({ cancelled: true });
+    const close = vi.spyOn(transport, "closeRepository");
+    const { router } = await renderAt(SCREEN_URL, {
+      main: t.shell.regions.analysis,
+    });
+    await screen.findByRole("button", { name: t.analysis.cancel });
+
+    fireEvent.click(banner().getByRole("button", { name: t.header.close }));
+
+    await screen.findByText("index");
+    expect(cancel).toHaveBeenCalledWith(AN);
+    expect(close).toHaveBeenCalledWith(HANDLE);
+    expect(cancel.mock.invocationCallOrder[0]).toBeLessThan(
+      close.mock.invocationCallOrder[0] ?? 0
+    );
+    expect(router.state.location.pathname).toBe("/");
+  });
+
+  test("uma recusa do cancelamento não impede o fechamento", async () => {
+    serveStatus(() => Promise.resolve(runningReport("COMPLETED")));
+    const cancel = vi.spyOn(transport, "analyzerCancel").mockRejectedValue({
+      code: "PROC_ANALYZER_NOT_READY",
+      origin: "shell",
+      params: {},
+    });
+    const close = vi.spyOn(transport, "closeRepository");
+    const { router } = await renderAt(SCREEN_URL);
+    await waitForCanvas(3, "pacotes");
+
+    fireEvent.click(banner().getByRole("button", { name: t.header.close }));
+
+    await screen.findByText("index");
+    expect(cancel).toHaveBeenCalledWith(AN);
+    expect(close).toHaveBeenCalledWith(HANDLE);
+    expect(router.state.location.pathname).toBe("/");
+  });
+
+  test("do resumo, Fechar repositório não pede cancelamento nenhum", async () => {
+    serveStatus(fixtureStatus);
+    const cancel = vi.spyOn(transport, "analyzerCancel");
+    const close = vi.spyOn(transport, "closeRepository");
+    await renderAt(SCREEN_URL, { main: t.shell.regions.analysis });
+    await within(analysisRegion()).findByRole("heading", {
+      name: t.analysis.map.title,
+    });
+
+    fireEvent.click(banner().getByRole("button", { name: t.header.close }));
+
+    await screen.findByText("index");
+    expect(close).toHaveBeenCalledWith(HANDLE);
+    expect(cancel).not.toHaveBeenCalled();
   });
 
   test("do Analisar ao resumo: a tela troca e o foco que caiu vai ao título novo", async () => {
@@ -1401,7 +1462,7 @@ describe("a tela pelo analysis.status em /repository/$handle?analysis=", () => {
 describe("/repository/$handle: um handle malformado", () => {
   test("é a página não encontrada da rota, sem pedido nenhum, e volta ao início", async () => {
     const { router } = await renderAt("/repository/nao-e-um-handle", {
-      main: t.shell.regions.prepare,
+      main: t.shell.regions.repository,
     });
 
     const { title } = formatProtocolError({

@@ -4,6 +4,7 @@ import {
   IconShield,
 } from "@tabler/icons-react";
 import { AppHeader, BrandMark } from "@/features/shell/app-header";
+import { useFocusTitleAfterGesture } from "@/features/shell/focus-title";
 import { t } from "@/i18n/messages";
 import { OpenRepository } from "./open-repository";
 
@@ -18,6 +19,8 @@ const GUARANTEES = [
 ] as const;
 
 export function StartScreen() {
+  useFocusTitleAfterGesture(true);
+
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <AppHeader />
@@ -28,7 +31,7 @@ export function StartScreen() {
         <div className="flex w-full max-w-[520px] flex-col gap-7">
           <div className="flex flex-col gap-3">
             <BrandMark size={BRAND_MARK_SIZE} />
-            <h1 className="font-medium text-2xl text-foreground">
+            <h1 className="font-medium text-2xl text-foreground" tabIndex={-1}>
               {t.start.title}
             </h1>
             <p className="text-muted-foreground text-sm/5">{t.start.body}</p>

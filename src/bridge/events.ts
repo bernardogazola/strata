@@ -186,9 +186,26 @@ export const primeBackendState = async (): Promise<void> => {
   applyResolvedBackend(await analyzerState());
 };
 
-export const subscribeToAnalyzer = (
+const EVERY_ANALYSIS = ["analysis"] as const;
+
+const forgetAnalysesOnReady = (queryClient: QueryClient): (() => void) =>
+  useAppStore.subscribe((state, previous) => {
+    if (state.backend.phase === "READY" && previous.backend.phase !== "READY") {
+      queryClient
+        .resetQueries({ queryKey: EVERY_ANALYSIS })
+        .catch(() => undefined);
+    }
+  });
+
+export const subscribeToAnalyzer = async (
   queryClient: QueryClient
-): Promise<() => void> =>
-  transport.subscribe((frame) => {
+): Promise<() => void> => {
+  const stopChannels = await transport.subscribe((frame) => {
     handleFrame(frame, queryClient);
   });
+  const stopForgetting = forgetAnalysesOnReady(queryClient);
+  return () => {
+    stopChannels();
+    stopForgetting();
+  };
+};

@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAnalyzerRestart } from "@/features/backend/analyzer-status";
 import { ErrorSurface } from "@/features/errors/error-surface";
+import { GESTURE_STATE } from "@/features/shell/focus-title";
 import { interpolate } from "@/i18n/format";
 import { t } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,7 @@ interface AnalyzerCrashedProps {
 function AnalyzerCrashed({ exitCode }: AnalyzerCrashedProps) {
   const { restart: onRestart, restarting } = useAnalyzerRestart();
   const { exporting, failure, onExport } = useExportDiagnostics();
+  const exportHintId = useId();
 
   return (
     <div className="flex gap-3 rounded-lg bg-destructive-soft px-4 py-3.5">
@@ -85,6 +87,7 @@ function AnalyzerCrashed({ exitCode }: AnalyzerCrashedProps) {
             {t.repository.restart}
           </Button>
           <Button
+            aria-describedby={exportHintId}
             className={cn(
               "h-[30px] px-2.5 transition-[scale,background-color] hover:bg-destructive/10 active:scale-[0.98] motion-reduce:active:scale-100",
               CRASH_TEXT
@@ -97,6 +100,9 @@ function AnalyzerCrashed({ exitCode }: AnalyzerCrashedProps) {
             {t.analyzer.exportDiagnostics}
           </Button>
         </div>
+        <p className="text-muted-foreground text-xs" id={exportHintId}>
+          {t.analyzer.exportHint}
+        </p>
         {failure === null ? null : (
           <ErrorSurface error={failure} variant="inline" />
         )}
@@ -131,6 +137,7 @@ export function OpenRepository() {
       if (opened !== null) {
         await navigate({
           params: { handle: opened.handle },
+          state: GESTURE_STATE,
           to: "/repository/$handle",
         });
       }
@@ -168,7 +175,11 @@ export function OpenRepository() {
       ) : null}
 
       {backend.phase === "INCOMPATIBLE" ? (
-        <ErrorSurface error={versionMismatchOf(backend)} variant="page" />
+        <ErrorSurface
+          error={versionMismatchOf(backend)}
+          headingLevel={2}
+          variant="page"
+        />
       ) : null}
 
       {failure === null ? null : (

@@ -1,6 +1,8 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { transport } from "@/bridge/transport";
+import { GESTURE_STATE } from "@/features/shell/focus-title";
+import { useCloseRepository } from "@/features/shell/use-close-repository";
 import { t } from "@/i18n/messages";
 import { type BackendState, useAppStore } from "@/state/app-store";
 import { StartScreen } from "../start-screen";
@@ -26,6 +28,15 @@ const renderStart = (backend: BackendState) => {
 };
 
 const main = () => screen.getByRole("main", { name: t.shell.regions.start });
+
+function CloseButton({ handle }: { readonly handle: string }) {
+  const onClose = useCloseRepository(handle);
+  return (
+    <button onClick={onClose} type="button">
+      {t.header.close}
+    </button>
+  );
+}
 
 const openButton = () =>
   within(main()).getByRole("button", { name: t.repository.open });
@@ -55,6 +66,36 @@ describe("StartScreen", () => {
     for (const item of guarantees) {
       expect(item.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
     }
+  });
+
+  test("o título recebe foco de programa, mas a montagem não o move", async () => {
+    renderStart(READY);
+
+    const title = await screen.findByRole("heading", {
+      level: 1,
+      name: t.start.title,
+    });
+    expect(title.getAttribute("tabindex")).toBe("-1");
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  test("Fechar repositório chega ao início com o foco no título", async () => {
+    vi.spyOn(transport, "closeRepository").mockResolvedValue(undefined);
+    const { router } = renderRoutes(`/repository/${OTHER_HANDLE}`, {
+      index: StartScreen,
+      repository: (handle) => <CloseButton handle={handle} />,
+    });
+    const close = await screen.findByRole("button", { name: t.header.close });
+    close.focus();
+
+    fireEvent.click(close);
+
+    const title = await screen.findByRole("heading", {
+      level: 1,
+      name: t.start.title,
+    });
+    await waitFor(() => expect(document.activeElement).toBe(title));
+    expect(router.state.location.pathname).toBe("/");
   });
 });
 
@@ -94,6 +135,9 @@ describe("OpenRepository", () => {
     expect(await screen.findByText(`repository:${OTHER_HANDLE}`)).toBeDefined();
     expect(router.state.location.pathname).toBe(`/repository/${OTHER_HANDLE}`);
     expect(router.history.length).toBe(2);
+    expect(router.state.location.state.focusTitle).toBe(
+      GESTURE_STATE.focusTitle
+    );
   });
 
   test("fechar o seletor fica na tela, sem erro", async () => {
@@ -209,6 +253,8 @@ describe("OpenRepository", () => {
       redactAuthors: true,
       redactPaths: true,
     });
+    expect(button).toHaveAccessibleDescription(t.analyzer.exportHint);
+    expect(within(main()).getByText(t.analyzer.exportHint)).toBeDefined();
     expect(within(main()).queryByText("Código:", { exact: false })).toBeNull();
   });
 
@@ -242,8 +288,16 @@ describe("OpenRepository", () => {
       t.start.unavailable.INCOMPATIBLE
     );
     expect(
-      within(main()).getByRole("heading", { name: "Versões incompatíveis" })
+      within(main()).getByRole("heading", {
+        level: 2,
+        name: "Versões incompatíveis",
+      })
     ).toBeDefined();
+    expect(
+      within(main())
+        .getAllByRole("heading", { level: 1 })
+        .map((h) => h.textContent)
+    ).toStrictEqual([t.start.title]);
     expect(
       within(main()).getByText(
         "A interface fala a versão 1 do protocolo e o analisador fala a 2."

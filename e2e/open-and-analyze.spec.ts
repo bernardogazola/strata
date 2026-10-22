@@ -116,11 +116,83 @@ test("Fechar repositório, no cabeçalho, volta ao início", async ({ page }) =>
   expect(new URL(page.url()).pathname).toBe("/");
 });
 
+test("pelo teclado, abrir e fechar levam o foco ao título da tela nova", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const open = mainNamed(page, t.shell.regions.start).getByRole("button", {
+    name: t.repository.open,
+  });
+  await expect(open).not.toHaveAttribute("aria-disabled", "true");
+
+  await open.focus();
+  await page.keyboard.press("Enter");
+
+  await expect(
+    mainNamed(page, t.shell.regions.prepare).getByRole("heading", {
+      level: 1,
+      name: REPOSITORY_NAME,
+    })
+  ).toBeFocused();
+
+  await page
+    .getByRole("banner")
+    .getByRole("button", { name: t.header.close })
+    .focus();
+  await page.keyboard.press("Enter");
+
+  await expect(
+    mainNamed(page, t.shell.regions.start).getByRole("heading", {
+      level: 1,
+      name: t.start.title,
+    })
+  ).toBeFocused();
+});
+
+test("recarregar a preparação alcançada pelo teclado não move o foco", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const open = mainNamed(page, t.shell.regions.start).getByRole("button", {
+    name: t.repository.open,
+  });
+  await expect(open).not.toHaveAttribute("aria-disabled", "true");
+  await open.focus();
+  await page.keyboard.press("Enter");
+  const title = mainNamed(page, t.shell.regions.prepare).getByRole("heading", {
+    level: 1,
+    name: REPOSITORY_NAME,
+  });
+  await expect(title).toBeFocused();
+
+  await page.reload();
+
+  await expect(title).toBeVisible();
+  expect(await page.evaluate(() => document.activeElement?.tagName)).toBe(
+    "BODY"
+  );
+});
+
+test("um link direto para a preparação não move o foco", async ({ page }) => {
+  await page.goto(`/repository/${HANDLE}`);
+
+  await expect(
+    mainNamed(page, t.shell.regions.prepare).getByRole("heading", {
+      level: 1,
+      name: REPOSITORY_NAME,
+    })
+  ).toBeVisible();
+  expect(await page.evaluate(() => document.activeElement?.tagName)).toBe(
+    "BODY"
+  );
+});
+
 test("um handle malformado na URL é a página não encontrada, com Voltar ao início", async ({
   page,
 }) => {
   await page.goto("/repository/nao-e-um-handle");
 
+  await expect(mainNamed(page, t.shell.regions.repository)).toBeVisible();
   const { title } = formatProtocolError({
     code: "REPO_HANDLE_UNKNOWN",
     origin: "frontend",

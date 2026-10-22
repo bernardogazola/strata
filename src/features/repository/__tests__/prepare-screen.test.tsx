@@ -6,6 +6,7 @@ import type { ProtocolMethod } from "@/protocol/envelope";
 import type { RepositoryDescription } from "@/protocol/repository";
 import { type BackendState, useAppStore } from "@/state/app-store";
 import { PrepareScreen } from "../prepare-screen";
+import { StartScreen } from "../start-screen";
 import { HANDLE, OTHER_HANDLE, renderRoutes } from "./route-harness";
 
 const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
@@ -277,5 +278,119 @@ describe("PrepareScreen", () => {
     expect(await screen.findByText("index")).toBeDefined();
     expect(close).toHaveBeenCalledWith(HANDLE);
     expect(router.state.location.pathname).toBe("/");
+  });
+});
+
+describe("PrepareScreen: o foco de quem chega por um gesto", () => {
+  const describeByHandle = (refused: string) =>
+    vi
+      .spyOn(transport, "request")
+      .mockImplementation((method, payload, handle) =>
+        method === "repository.describe"
+          ? (handle === refused ? describeBare : describeOk)(payload)
+          : Promise.reject(new Error(`sem resposta para ${method}`))
+      );
+
+  const activate = (button: HTMLElement): void => {
+    button.focus();
+    fireEvent.click(button);
+  };
+
+  test("abrir pelo início leva o foco ao título, só quando o describe chega", async () => {
+    let deliver: (description: RepositoryDescription) => void = () => undefined;
+    answer({
+      "repository.describe": () =>
+        new Promise((resolve) => {
+          deliver = resolve;
+        }),
+    });
+    vi.spyOn(transport, "openRepository").mockResolvedValue({
+      displayName: "multi-module",
+      handle: HANDLE,
+    });
+    renderRoutes("/", {
+      index: StartScreen,
+      repository: (handle) => <PrepareScreen handle={handle} />,
+    });
+
+    activate(await screen.findByRole("button", { name: t.repository.open }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      t.describe.loading
+    );
+    expect(document.activeElement).toBe(document.body);
+    deliver(DESCRIPTION);
+    const title = await screen.findByRole("heading", {
+      level: 1,
+      name: "multi-module",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(title));
+  });
+
+  test("na carga da página, o describe que chega não move o foco", async () => {
+    answer({ "repository.describe": describeOk });
+    renderPrepare();
+
+    await screen.findByRole("heading", { level: 1, name: "multi-module" });
+
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  test("Escolher outra pasta leva o foco ao título da outra", async () => {
+    describeByHandle(HANDLE);
+    vi.spyOn(transport, "closeRepository").mockResolvedValue(undefined);
+    vi.spyOn(transport, "openRepository").mockResolvedValue({
+      displayName: "multi-module",
+      handle: OTHER_HANDLE,
+    });
+    renderPrepare();
+
+    activate(
+      await screen.findByRole("button", { name: t.repository.chooseAnother })
+    );
+
+    const title = await screen.findByRole("heading", {
+      level: 1,
+      name: "multi-module",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(title));
+  });
+
+  test("Escolher outra pasta e fechar o seletor chega ao início com o foco no título", async () => {
+    describeByHandle(HANDLE);
+    vi.spyOn(transport, "closeRepository").mockResolvedValue(undefined);
+    vi.spyOn(transport, "openRepository").mockResolvedValue(null);
+    renderRoutes(`/repository/${HANDLE}`, {
+      index: StartScreen,
+      repository: (handle) => <PrepareScreen handle={handle} />,
+    });
+
+    activate(
+      await screen.findByRole("button", { name: t.repository.chooseAnother })
+    );
+
+    const title = await screen.findByRole("heading", {
+      level: 1,
+      name: t.start.title,
+    });
+    await waitFor(() => expect(document.activeElement).toBe(title));
+  });
+
+  test("Fechar repositório chega ao início com o foco no título", async () => {
+    answer({ "repository.describe": describeOk });
+    vi.spyOn(transport, "closeRepository").mockResolvedValue(undefined);
+    renderRoutes(`/repository/${HANDLE}`, {
+      index: StartScreen,
+      repository: (handle) => <PrepareScreen handle={handle} />,
+    });
+    await screen.findByRole("heading", { level: 1, name: "multi-module" });
+
+    activate(screen.getByRole("button", { name: t.header.close }));
+
+    const title = await screen.findByRole("heading", {
+      level: 1,
+      name: t.start.title,
+    });
+    await waitFor(() => expect(document.activeElement).toBe(title));
   });
 });

@@ -24,7 +24,6 @@ import { NodeSearch } from "@/features/outline/node-search";
 import {
   AnalysisScreen,
   type AnalysisWorkspaceProps,
-  useFocusTitleOnScreenChange,
 } from "@/features/progress/analysis-screen";
 import { CompletenessCaveat } from "@/features/progress/completeness-caveat";
 import { PrepareScreen } from "@/features/repository/prepare-screen";
@@ -43,6 +42,7 @@ import {
 } from "@/queries/options";
 import { AppHeader } from "./app-header";
 import { AppShell } from "./app-shell";
+import { useFocusTitleOnScreenChange } from "./focus-title";
 import {
   backToLevelOne,
   changesView,
@@ -117,7 +117,7 @@ const useFocusOnViewChange = (viewKey: string) => {
   return targetRef;
 };
 
-const CRUMB_FOCUS_CLASS = "rounded-sm";
+const CURRENT_CRUMB_CLASS = "rounded-sm text-muted-foreground";
 
 function MapBreadcrumb({
   analysisId,
@@ -138,7 +138,7 @@ function MapBreadcrumb({
           {atRoot ? (
             <span
               aria-current="page"
-              className={CRUMB_FOCUS_CLASS}
+              className={CURRENT_CRUMB_CLASS}
               ref={currentRef}
               tabIndex={-1}
             >
@@ -162,7 +162,7 @@ function MapBreadcrumb({
             </span>
             <span
               aria-current="page"
-              className={CRUMB_FOCUS_CLASS}
+              className={CURRENT_CRUMB_CLASS}
               ref={currentRef}
               tabIndex={-1}
             >
@@ -320,7 +320,7 @@ export function UnknownRepositoryScreen() {
     <div className="flex min-h-svh flex-col bg-background">
       <AppHeader />
       <main
-        aria-label={t.shell.regions.prepare}
+        aria-label={t.shell.regions.repository}
         className="flex grow items-center justify-center px-4 pt-8 pb-12"
       >
         <div className="flex w-full max-w-[520px] flex-col gap-6">

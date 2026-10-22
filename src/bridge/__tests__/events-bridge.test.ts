@@ -1,7 +1,11 @@
 import { QueryClient } from "@tanstack/react-query";
-import { beforeEach, describe, expect, test } from "vitest";
-import { handleFrame, resetEventState } from "@/bridge/events";
-import type { RawFrame } from "@/bridge/transport";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import {
+  handleFrame,
+  resetEventState,
+  subscribeToAnalyzer,
+} from "@/bridge/events";
+import { type RawFrame, transport } from "@/bridge/transport";
 import { type AnalysisStage, analysisStageSchema } from "@/protocol/analysis";
 import { queryKeys } from "@/queries/keys";
 import { useAppStore } from "@/state/app-store";
@@ -420,5 +424,61 @@ describe("o describe não é refeito no meio da execução", () => {
       true
     );
     expect(isInvalidated(queryKeys.repository.describe(HANDLE))).toBe(false);
+  });
+});
+
+describe("o analisador de volta ao READY", () => {
+  const stopChannels = vi.fn<() => void>();
+  let stopBridge: () => void = () => undefined;
+
+  beforeEach(async () => {
+    vi.spyOn(transport, "subscribe").mockResolvedValue(stopChannels);
+    stopBridge = await subscribeToAnalyzer(queryClient);
+  });
+
+  afterEach(() => {
+    stopBridge();
+    vi.restoreAllMocks();
+    stopChannels.mockClear();
+  });
+
+  const dataOf = (queryKey: readonly unknown[]): unknown =>
+    queryClient.getQueryState(queryKey)?.data;
+
+  test("o reinício depois de um travamento esquece toda análise, e só ela", () => {
+    handleFrame(state({ phase: "READY", protocolVersion: 1 }), queryClient);
+    seed(queryKeys.analysisStatus(AN));
+    seed(queryKeys.structure.all(OTHER));
+    seed(queryKeys.repository.describe(HANDLE));
+
+    handleFrame(state({ exitCode: 137, phase: "CRASHED" }), queryClient);
+    useAppStore.getState().recoverBackend();
+    expect(dataOf(queryKeys.analysisStatus(AN))).toStrictEqual({ any: true });
+    handleFrame(state({ phase: "READY", protocolVersion: 1 }), queryClient);
+
+    expect(dataOf(queryKeys.analysisStatus(AN))).toBeUndefined();
+    expect(dataOf(queryKeys.structure.all(OTHER))).toBeUndefined();
+    expect(dataOf(queryKeys.repository.describe(HANDLE))).toStrictEqual({
+      any: true,
+    });
+  });
+
+  test("um READY que chega de novo ao READY não esquece nada", () => {
+    handleFrame(state({ phase: "READY", protocolVersion: 1 }), queryClient);
+    seed(queryKeys.analysisStatus(AN));
+
+    handleFrame(state({ phase: "READY", protocolVersion: 1 }), queryClient);
+
+    expect(dataOf(queryKeys.analysisStatus(AN))).toStrictEqual({ any: true });
+  });
+
+  test("depois de desassinar, nem os canais nem a store chegam à ponte", () => {
+    seed(queryKeys.analysisStatus(AN));
+
+    stopBridge();
+    handleFrame(state({ phase: "READY", protocolVersion: 1 }), queryClient);
+
+    expect(stopChannels).toHaveBeenCalledOnce();
+    expect(dataOf(queryKeys.analysisStatus(AN))).toStrictEqual({ any: true });
   });
 });
