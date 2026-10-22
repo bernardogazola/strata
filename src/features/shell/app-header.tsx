@@ -1,7 +1,14 @@
 import type { ReactNode } from "react";
+import type { WindowPlatform } from "@/bridge/environment";
+import { nativeWindowPlatform } from "@/bridge/window";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
 import { AnalyzerStatus } from "@/features/backend/analyzer-status";
+import {
+  useWindowFocused,
+  useWindowFrame,
+  WindowControls,
+} from "@/features/shell/window-controls";
 import { t } from "@/i18n/messages";
 import { clampText, sanitizeUntrusted } from "@/lib/untrusted";
 import { cn } from "@/lib/utils";
@@ -105,7 +112,7 @@ function RepositoryName({ displayName }: { readonly displayName: string }) {
   const name = clampText(sanitizeUntrusted(displayName));
   return (
     <bdi
-      className="min-w-0 max-w-70 truncate font-medium text-foreground"
+      className="min-w-0 max-w-70 truncate font-medium text-foreground group-data-inactive/titlebar:text-muted-foreground"
       lang=""
       title={name}
       translate="no"
@@ -115,12 +122,39 @@ function RepositoryName({ displayName }: { readonly displayName: string }) {
   );
 }
 
-export function AppHeader({ repository, status, trail }: AppHeaderProps) {
+const TRAILING_INSET = {
+  browser: "pr-4",
+  linux: "pr-3",
+  macos: "pr-4",
+  windows: "pr-0",
+} as const satisfies Record<WindowPlatform | "browser", string>;
+
+function TrafficLightSpace() {
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b pr-4 pl-5">
+    <div aria-hidden="true" className="w-[70px] shrink-0" data-traffic-lights />
+  );
+}
+
+export function AppHeader({ repository, status, trail }: AppHeaderProps) {
+  const platform = nativeWindowPlatform();
+  const frame = useWindowFrame();
+  const focused = useWindowFocused();
+  const reservesTrafficLights = platform === "macos" && !frame.fullscreen;
+  const drawsControls = platform === "linux" || platform === "windows";
+
+  return (
+    <header
+      className={cn(
+        "group/titlebar flex h-12 shrink-0 select-none items-center justify-between gap-4 border-b pl-5",
+        TRAILING_INSET[platform ?? "browser"]
+      )}
+      data-inactive={platform !== null && !focused ? "" : undefined}
+      data-tauri-drag-region="deep"
+    >
       <div className="flex min-w-0 items-center gap-2.5">
+        {reservesTrafficLights ? <TrafficLightSpace /> : null}
         <BrandMark />
-        <span className="shrink-0 font-medium text-base text-foreground">
+        <span className="shrink-0 font-medium text-base text-foreground group-data-inactive/titlebar:text-muted-foreground">
           {t.app.name}
         </span>
         {repository?.displayName === undefined ? null : (
@@ -136,7 +170,7 @@ export function AppHeader({ repository, status, trail }: AppHeaderProps) {
           </>
         )}
       </div>
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1 self-stretch">
         {status}
         <AnalyzerStatus offersRestart={repository !== undefined} />
         {repository === undefined ? null : (
@@ -150,6 +184,9 @@ export function AppHeader({ repository, status, trail }: AppHeaderProps) {
           </Button>
         )}
         <ModeToggle />
+        {drawsControls ? (
+          <WindowControls maximized={frame.maximized} platform={platform} />
+        ) : null}
       </div>
     </header>
   );

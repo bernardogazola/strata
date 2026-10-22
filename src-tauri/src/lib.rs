@@ -50,6 +50,9 @@ pub fn run() {
             };
             let _ = window.set_background_color(Some(bg));
 
+            #[cfg(not(target_os = "macos"))]
+            let _ = window.set_decorations(false);
+
             let handle = window.clone();
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_secs(5));

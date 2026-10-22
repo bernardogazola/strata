@@ -313,6 +313,12 @@ const ptBR = {
       RUNNING: "Analisando",
     },
     close: "Fechar repositório",
+    window: {
+      close: "Fechar janela",
+      maximize: "Maximizar",
+      minimize: "Minimizar",
+      restore: "Restaurar",
+    },
   },
 
   inspector: {

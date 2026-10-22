@@ -13,6 +13,10 @@ core:default
 core:window:allow-show
 core:window:allow-set-focus
 core:window:allow-set-background-color
+core:window:allow-start-dragging
+core:window:allow-minimize
+core:window:allow-toggle-maximize
+core:window:allow-close
 core:webview:allow-set-webview-background-color
 "
 
@@ -935,7 +939,7 @@ R
   expect "um namespace que ninguém pensou em proibir"                  fail "não permite \"updater\""
 
   seed; cap_with "$(baseline_body),
-    \"core:window:allow-close\"
+    \"core:window:allow-set-title\"
 "
   expect "uma permissão core fora da baseline"                         fail "concedidas que este script não declara"
 
