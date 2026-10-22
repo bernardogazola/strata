@@ -1,0 +1,44 @@
+diff --git a/dist/cytoscape.cjs.js b/dist/cytoscape.cjs.js
+index 3eacf058d671d4c2a7df887119fe9c661a7068cd..d9237e6fdaf7aaab6f0af1efc4b14ce9185692d3 100644
+--- a/dist/cytoscape.cjs.js
++++ b/dist/cytoscape.cjs.js
+@@ -10422,8 +10422,16 @@ var Selector = function Selector(selector) {
+   }
+ };
+ var selfn = Selector.prototype;
++// O Tauri congela Object.prototype; atribuir toString aqui lançaria erro.
+ [parse$1, matching].forEach(function (p) {
+-  return extend(selfn, p);
++  Object.keys(p).forEach(function (key) {
++    Object.defineProperty(selfn, key, {
++      configurable: true,
++      enumerable: true,
++      value: p[key],
++      writable: true
++    });
++  });
+ });
+ selfn.text = function () {
+   return this.inputText;
+diff --git a/dist/cytoscape.esm.mjs b/dist/cytoscape.esm.mjs
+index fb6941c74377c0f7fb0abed87d77d7afda4698c5..14121cd2104ac2b3bb197a21ebd417807e0030a0 100644
+--- a/dist/cytoscape.esm.mjs
++++ b/dist/cytoscape.esm.mjs
+@@ -10420,8 +10420,16 @@ var Selector = function Selector(selector) {
+   }
+ };
+ var selfn = Selector.prototype;
++// O Tauri congela Object.prototype; atribuir toString aqui lançaria erro.
+ [parse$1, matching].forEach(function (p) {
+-  return extend(selfn, p);
++  Object.keys(p).forEach(function (key) {
++    Object.defineProperty(selfn, key, {
++      configurable: true,
++      enumerable: true,
++      value: p[key],
++      writable: true
++    });
++  });
+ });
+ selfn.text = function () {
+   return this.inputText;

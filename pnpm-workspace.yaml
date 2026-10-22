@@ -1,2 +1,4 @@
 allowBuilds:
   esbuild: true
+patchedDependencies:
+  cytoscape@3.34.1: patches/cytoscape@3.34.1.patch

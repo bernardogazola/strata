@@ -1,3 +1,4 @@
+import { notFound } from "@tanstack/react-router";
 import { z } from "zod";
 import {
   type ElementKind,
@@ -5,7 +6,12 @@ import {
   resolutionQualitySchema,
 } from "@/protocol/enums";
 import type { SearchHit } from "@/protocol/graph";
-import { analysisIdSchema, elementIdSchema } from "@/protocol/primitives";
+import {
+  analysisIdSchema,
+  elementIdSchema,
+  type RepositoryHandle,
+  repositoryHandleSchema,
+} from "@/protocol/primitives";
 import type { GraphViewParams } from "@/queries/options";
 
 export const inspectorTabSchema = z.enum([
@@ -130,3 +136,15 @@ export const revealSearchHit =
 
 export const isRevealable = (hit: SearchHit): boolean =>
   hit.kind === "PACKAGE" || (hit.kind === "TYPE" && hit.packageId !== null);
+
+export const parseRepositoryParams = ({
+  handle,
+}: {
+  readonly handle: string;
+}): { readonly handle: RepositoryHandle } => {
+  const parsed = repositoryHandleSchema.safeParse(handle);
+  if (!parsed.success) {
+    throw notFound();
+  }
+  return { handle: parsed.data };
+};

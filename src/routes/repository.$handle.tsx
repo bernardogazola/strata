@@ -1,10 +1,10 @@
 import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
 import {
-  parseRepositoryParams,
   RepositoryScreen,
   UnknownRepositoryScreen,
 } from "@/features/shell/repository-screen";
 import {
+  parseRepositoryParams,
   REPOSITORY_SEARCH_DEFAULTS,
   repositorySearchSchema,
 } from "@/features/shell/repository-search";

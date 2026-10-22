@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getRouteApi, Link, notFound } from "@tanstack/react-router";
+import { getRouteApi, Link } from "@tanstack/react-router";
 import {
   type ReactNode,
   useCallback,
@@ -32,10 +32,6 @@ import { cn } from "@/lib/utils";
 import type { ElementKind } from "@/protocol/enums";
 import type { ProtocolError } from "@/protocol/errors";
 import type { GraphNode, GraphSlice, SearchHit } from "@/protocol/graph";
-import {
-  type RepositoryHandle,
-  repositoryHandleSchema,
-} from "@/protocol/primitives";
 import {
   type GraphViewParams,
   graphSliceQueryOptions,
@@ -297,18 +293,6 @@ function RepositoryWorkspace({ header, report }: AnalysisWorkspaceProps) {
     />
   );
 }
-
-export const parseRepositoryParams = ({
-  handle,
-}: {
-  readonly handle: string;
-}): { readonly handle: RepositoryHandle } => {
-  const parsed = repositoryHandleSchema.safeParse(handle);
-  if (!parsed.success) {
-    throw notFound();
-  }
-  return { handle: parsed.data };
-};
 
 const UNKNOWN_HANDLE: ProtocolError = {
   code: "REPO_HANDLE_UNKNOWN",

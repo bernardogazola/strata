@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  cytoscape@3.34.1: 5f58126e724dd12cffb03380b43ed1a0914e701363925c2244baaee2eb104ee4
+
 importers:
 
   .:
@@ -46,7 +49,7 @@ importers:
         version: 2.1.1
       cytoscape:
         specifier: 3.34.1
-        version: 3.34.1
+        version: 3.34.1(patch_hash=5f58126e724dd12cffb03380b43ed1a0914e701363925c2244baaee2eb104ee4)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -4251,7 +4254,7 @@ snapshots:
 
   csstype@3.2.3: {}
 
-  cytoscape@3.34.1: {}
+  cytoscape@3.34.1(patch_hash=5f58126e724dd12cffb03380b43ed1a0914e701363925c2244baaee2eb104ee4): {}
 
   data-urls@6.0.1:
     dependencies:
