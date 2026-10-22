@@ -65,6 +65,7 @@ const ptBR = {
       truncatedHistory: "Histórico truncado em {commits} commits.",
     },
     running: {
+      interrupted: "O analisador parou, e esta análise não vai terminar.",
       meta: "Em andamento há {elapsed}",
       title: {
         files: JAVA_FILE_COUNT,
@@ -76,6 +77,15 @@ const ptBR = {
       announceEnd: "Etapa {status}: {stage}",
       announceStart: "Etapa iniciada: {stage}",
       duration: "em {duration}",
+      extracted: {
+        files: JAVA_FILE_COUNT,
+        template: "{types} em {files}",
+        types: {
+          one: "{count} tipo",
+          other: "{count} tipos",
+          zero: "nenhum tipo",
+        },
+      },
       found: "{completed} {unit} encontrados",
       layout: {
         one: "{count} raiz escolhida",
@@ -107,12 +117,18 @@ const ptBR = {
       toggle: "Etapas da análise",
     },
     warnings: {
+      count: {
+        one: "{count} aviso",
+        other: "{count} avisos",
+      },
       heading: {
         one: "{count} arquivo ficou de fora",
         other: "{count} arquivos ficaram de fora",
       },
       label: "Avisos desta análise",
       sample: "Mostrando {shown} de {total} avisos.",
+      unavailable:
+        "Os detalhes destes avisos não estão mais disponíveis. Analise de novo para revê-los.",
     },
   },
 
@@ -125,6 +141,8 @@ const ptBR = {
     },
     exitCode: "código de saída {code}",
     exportDiagnostics: "Exportar diagnóstico…",
+    exportHint:
+      "O diagnóstico sai sem caminhos de pastas e sem nomes de autores.",
     incompatible: {
       title: "Versões incompatíveis",
     },
@@ -143,13 +161,19 @@ const ptBR = {
 
   config: {
     analyze: "Analisar",
+    backendUnavailable: {
+      CRASHED: "Reinicie o analisador para analisar.",
+      INCOMPATIBLE:
+        "Reinstale o Strata para alinhar a interface e o analisador.",
+      STARTING: "O analisador ainda está iniciando.",
+    },
     description:
       "Escolha o que entra na análise. Os limites de segurança são fixos e não aparecem aqui.",
     disabled: {
       backend: "O analisador não está pronto.",
       emptySelection: "Escolha ao menos uma raiz de código para analisar.",
       runInFlight:
-        "Já existe uma análise em andamento. Aguarde o fim ou cancele a atual.",
+        "Já existe uma análise em andamento. Aguarde o fim dela para começar outra.",
     },
     history: {
       commits: "commits",
@@ -168,6 +192,7 @@ const ptBR = {
       description:
         "Nesta versão toda análise já começa do zero, então não há resultado guardado para descartar.",
       label: "Recriar o cache antes de analisar",
+      unavailable: "ainda não usado nesta versão",
     },
     roots: {
       clearAll: "Desmarcar todas",
@@ -261,15 +286,21 @@ const ptBR = {
     },
     legend: {
       expandHint: "Clique duas vezes em um pacote para ver os tipos dele.",
+      expandShort: "Duplo clique abre um pacote",
       keyboardHint:
         "Pelo teclado, use a estrutura da arquitetura: as setas percorrem, Enter seleciona e a seta para a direita abre um pacote.",
       kind: "Forma do elemento",
+      kindNames: {
+        PACKAGE: "Pacote",
+        TYPE: "Tipo",
+      },
       kindShapes: {
         PACKAGE: "Retângulo: pacote",
         TYPE: "Círculo: tipo",
       },
       resolution: "Qualidade de resolução",
       selection: "Borda larga: elemento selecionado",
+      selectionName: "Selecionado",
       title: "Legenda",
     },
     loading: "Carregando o mapa…",
@@ -293,6 +324,7 @@ const ptBR = {
   },
 
   inspector: {
+    dependsOn: "Depende de",
     empty: "Selecione um elemento no mapa para ver os detalhes.",
     expand: "Ver os tipos deste pacote",
     kind: "Elemento",
@@ -303,12 +335,15 @@ const ptBR = {
         "Este elemento não aparece no mapa: o limite de exibição do nível o deixou de fora.",
     },
     typeCount: "tipos neste pacote",
+    usedBy: "Usado por",
   },
 
   outline: {
     failed: "Não foi possível carregar os tipos deste pacote. Tentar de novo",
     failedRefresh: "Não foi possível atualizar os pacotes. Tentar de novo",
     failedRoot: "Não foi possível carregar mais pacotes. Tentar de novo",
+    keyboardHint:
+      "As setas percorrem, Enter seleciona e a seta para a direita abre um pacote.",
     loading: "Carregando a estrutura…",
     loadingTypes: "Carregando os tipos…",
     loadMore: {
@@ -334,7 +369,7 @@ const ptBR = {
       zero: "Nenhum pacote ou tipo encontrado",
     },
     label: "Buscar pacotes e tipos por nome",
-    placeholder: "Buscar…",
+    placeholder: "Buscar pacotes e tipos",
     results: "Resultados da busca",
   },
 
@@ -345,10 +380,11 @@ const ptBR = {
       selectedPackage: "Pacote selecionado",
     },
     regions: {
-      analysis: "Andamento da análise",
+      analysis: "Análise",
       canvas: "Mapa da arquitetura",
       inspector: "Inspetor",
       prepare: "Preparação da análise",
+      repository: "Repositório",
       sidebar: "Estrutura",
       start: "Início",
     },
@@ -356,7 +392,7 @@ const ptBR = {
   },
 
   start: {
-    body: "O Strata lê o código e o histórico Git de uma pasta desta máquina e mostra como o sistema está organizado, sem compilar nem executar nada do repositório.",
+    body: "O Strata lê o código Java de uma pasta desta máquina e mostra como o sistema está organizado, sem compilar nem executar nada do repositório.",
     guarantees: [
       "Tudo roda nesta máquina. Nada é enviado pela rede.",
       "Arquivos de build são lidos como texto. Nenhum build ou teste é executado.",

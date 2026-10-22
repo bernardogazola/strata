@@ -38,7 +38,14 @@ const BASE_COPY: readonly CatalogueString[] = [
   ...collectStrings(t.start, "start"),
   ...collectStrings(t.graph.canvas.label, "graph.canvas.label"),
   ...collectStrings(t.graph.legend.expandHint, "graph.legend.expandHint"),
+  ...collectStrings(t.graph.legend.expandShort, "graph.legend.expandShort"),
+  ...collectStrings(t.graph.legend.kindNames, "graph.legend.kindNames"),
+  ...collectStrings(t.graph.legend.selectionName, "graph.legend.selectionName"),
+  ...collectStrings(t.inspector.dependsOn, "inspector.dependsOn"),
+  ...collectStrings(t.inspector.usedBy, "inspector.usedBy"),
+  ...collectStrings(t.outline.keyboardHint, "outline.keyboardHint"),
   ...collectStrings(t.outline.loadMore.TYPE, "outline.loadMore.TYPE"),
+  ...collectStrings(t.search.placeholder, "search.placeholder"),
   ...collectStrings(stageStatusLabels, "stageStatusLabels"),
 ];
 
