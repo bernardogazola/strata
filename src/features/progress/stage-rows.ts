@@ -1,6 +1,7 @@
 import { typesInFiles } from "@/features/repository/count-phrase";
 import {
   formatDuration,
+  formatInteger,
   formatPreciseDuration,
   interpolate,
   plural,
@@ -149,19 +150,35 @@ export const announcementsBetween = (
     return [];
   });
 
+export interface UnitsParts {
+  readonly after: string;
+  readonly before: string;
+  readonly completed: string;
+}
+
+const COMPLETED_TOKEN = "{completed}";
+
+export const unitsParts = (
+  stage: AnalysisStage,
+  tick: ProgressTick
+): UnitsParts => {
+  const counted = tick.total === null || stage === "REPOSITORY_VALIDATION";
+  const template = counted ? t.analysis.stage.found : t.analysis.stage.units;
+  const params = {
+    unit: progressUnitLabels[tick.unit],
+    ...(tick.total === null ? {} : { total: tick.total }),
+  };
+  const split = template.indexOf(COMPLETED_TOKEN);
+  return {
+    after: interpolate(template.slice(split + COMPLETED_TOKEN.length), params),
+    before: interpolate(template.slice(0, split), params),
+    completed: formatInteger(tick.completed),
+  };
+};
+
 export const unitsText = (stage: AnalysisStage, tick: ProgressTick): string => {
-  const unit = progressUnitLabels[tick.unit];
-  if (tick.total === null || stage === "REPOSITORY_VALIDATION") {
-    return interpolate(t.analysis.stage.found, {
-      completed: tick.completed,
-      unit,
-    });
-  }
-  return interpolate(t.analysis.stage.units, {
-    completed: tick.completed,
-    total: tick.total,
-    unit,
-  });
+  const { after, before, completed } = unitsParts(stage, tick);
+  return `${before}${completed}${after}`;
 };
 
 export const barFraction = (

@@ -149,6 +149,39 @@ describe("StageProgress, as linhas", () => {
     ).toBeNull();
   });
 
+  test("um salto da contagem sobe só a contagem, e o texto da linha não muda", () => {
+    vi.spyOn(performance, "now").mockReturnValue(0);
+    const { container, rerender } = render(
+      <StageProgress
+        now={STARTED_MS}
+        report={RUNNING_PAIR}
+        ticks={{ SOURCE_ANALYSIS: tick("SOURCE_ANALYSIS", 64, 259) }}
+      />
+    );
+
+    vi.spyOn(performance, "now").mockReturnValue(3000);
+    rerender(
+      <StageProgress
+        now={STARTED_MS}
+        report={RUNNING_PAIR}
+        ticks={{ SOURCE_ANALYSIS: tick("SOURCE_ANALYSIS", 190, 259) }}
+      />
+    );
+
+    const row = rowOf(container, "SOURCE_ANALYSIS");
+    expect(
+      [...row.querySelectorAll(".animate-digit-pop")].map(
+        (digit) => digit.textContent
+      )
+    ).toStrictEqual(["1", "9", "0"]);
+    expect(
+      within(row).getByText(
+        (_, element) => element?.textContent === "190 de 259 arquivos Java"
+      )
+    ).toBeDefined();
+    vi.restoreAllMocks();
+  });
+
   test("as unidades saem com ponto de milhar: 1.240 de 3.902 arquivos Java", () => {
     const { container } = render(
       <StageProgress

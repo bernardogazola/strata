@@ -167,6 +167,21 @@
 
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
   --default-transition-timing-function: var(--ease-out-quart);
+
+  --animate-digit-pop: digit-pop 250ms var(--ease-out-quart) both;
+
+  @keyframes digit-pop {
+    from {
+      top: 4px;
+      opacity: 0;
+      filter: blur(1.5px);
+    }
+    to {
+      top: 0;
+      opacity: 1;
+      filter: blur(0);
+    }
+  }
 }
 
 .dark {

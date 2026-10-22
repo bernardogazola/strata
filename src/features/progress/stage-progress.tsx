@@ -2,7 +2,9 @@ import { IconCheck, IconPlayerStopFilled, IconX } from "@tabler/icons-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { analysisStageLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
+import type { AnalysisStage, ProgressTick } from "@/protocol/analysis";
 import type { AnalysisStatusReport } from "@/protocol/repository";
+import { PopDigits } from "./pop-digits";
 import {
   type Announcement,
   announcementsBetween,
@@ -16,7 +18,7 @@ import {
   type StageRow,
   type StageTicks,
   stageDurationText,
-  unitsText,
+  unitsParts,
 } from "./stage-rows";
 
 export interface StageProgressProps {
@@ -150,6 +152,22 @@ function IconSlot({ kind }: IconSlotProps) {
   );
 }
 
+interface UnitsCountProps {
+  readonly stage: AnalysisStage;
+  readonly tick: ProgressTick;
+}
+
+function UnitsCount({ stage, tick }: UnitsCountProps) {
+  const { after, before, completed } = unitsParts(stage, tick);
+  return (
+    <span className="text-muted-foreground text-xs tabular-nums">
+      {before}
+      <PopDigits value={completed} />
+      {after}
+    </span>
+  );
+}
+
 interface ActiveRowProps {
   readonly now: number;
   readonly row: StageRow;
@@ -171,9 +189,7 @@ function ActiveRow({ now, row }: ActiveRowProps) {
             </span>
           </span>
           {row.tick === undefined ? null : (
-            <span className="text-muted-foreground text-xs tabular-nums">
-              {unitsText(row.stage, row.tick)}
-            </span>
+            <UnitsCount stage={row.stage} tick={row.tick} />
           )}
           <span className="min-w-12 shrink-0 whitespace-nowrap text-right text-muted-foreground text-xs tabular-nums">
             {elapsedText(row.stageReport, now)}
