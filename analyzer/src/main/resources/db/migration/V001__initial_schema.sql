@@ -206,7 +206,7 @@ CREATE TABLE graph_metric (
   bridge_span       INTEGER CHECK (bridge_span >= 0),
   component_id      INTEGER CHECK (component_id >= 1),
   internal_cohesion INTEGER CHECK (internal_cohesion >= 0),
-  betweenness       REAL    CHECK (betweenness >= 0),
+  betweenness       REAL    CHECK (betweenness BETWEEN 0 AND 1e308),
   is_entry_point    INTEGER CHECK (is_entry_point IN (0,1)),
   entry_point_kind  TEXT,
   CHECK ((scc_id IS NULL) = (scc_size IS NULL)),
@@ -218,7 +218,7 @@ CREATE TABLE graph_metric (
   CHECK ((granularity = 'PACKAGE') = (component_id IS NOT NULL)),
   CHECK ((component_id IS NULL) = (internal_cohesion IS NULL)),
   CHECK (granularity = 'PACKAGE' OR betweenness IS NULL),
-  CHECK (entry_point_kind IS NULL OR is_entry_point = 1),
+  CHECK (entry_point_kind IS NULL OR is_entry_point IS 1),
   CHECK (is_entry_point IS NOT 1 OR entry_point_kind IS NOT NULL)
 ) STRICT, WITHOUT ROWID;
 CREATE INDEX idx_graph_metric_rank ON graph_metric(analysis_pk, granularity, pagerank DESC);
