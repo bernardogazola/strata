@@ -1,0 +1,5971 @@
+{
+  "schema": 1,
+  "measuredAt": "2026-10-23T19:26:04Z",
+  "baseCommit": "b420fd6",
+  "measure": "PageRank determinism. Synthetic: SyntheticGraphs.generate(n, n / 75, 30) for n = 3000, 30000, 100000; StructuralGraphAnalysis.compute over the generation order and over five shuffled arrival orders of the same types and rows, every double compared as raw bits; the control builds JGraphT directly, sorted and unsorted (PageRankTest's control seed), and runs PageRank with the production constants. Tolerance: on the 30000-type synthetic graph and on Elasticsearch ALL, both orientations, the iterations JGraphT needs at 1e-6 and 1e-10 by bisecting the cap with the two-run recipe (PR(cap) bitwise equal to PR(cap+1)), and the error against a reference vector at 1e-15 (cap 2000). Corpus: five repositories x two selections, two analyses each through the real AnalysisRegistry with the production plan plus the STRUCTURAL_GRAPH stage, on fresh data directories; graph_metric and package_edge dumped by element_id with doubles as raw bits, compared byte for byte; sums, top ten and one-top-level-type cycles are SQL over the persisted rows. Elasticsearch ALL's second analysis also feeds the input it read back from the cache to compute in five shuffled orders.",
+  "settings": {
+    "jgraphtJar": "jgrapht-core-1.5.3.jar",
+    "constants": {
+      "PAGERANK_DAMPING": 0.85,
+      "PAGERANK_TOLERANCE": 1.0e-10,
+      "PAGERANK_MAX_ITER": 200,
+      "BETWEENNESS_MAX_NODES": 1000,
+      "BETWEENNESS_MAX_EDGES": 20000
+    },
+    "plan": "Stages.production().with(STRUCTURAL_GRAPH, new StructuralGraphStage(ExternalPackages.load()))",
+    "selections": {
+      "DEFAULT": {
+        "includeTests": false,
+        "historyScope": "ALL",
+        "historyScopeCommits": null,
+        "sourceRootIds": null
+      },
+      "ALL": {
+        "includeTests": true,
+        "historyScope": "ALL",
+        "historyScopeCommits": null,
+        "sourceRootIds": null
+      }
+    },
+    "synthetic": {
+      "generator": "SyntheticGraphs.generate(types, types / 75, 30): PageRankTest's generator: log-normal out-degree (sigma 0.9, mean 6), 15% of types depend on no internal type, 30% are never a target, Zipf(1) targets over a permutation; each pair becomes 1-3 rows of distinct DependencyTypes, half the types get one external row and one in twenty a self row",
+      "seed": 30,
+      "typesPerPackage": 75,
+      "shuffleSeeds": [1, 2, 3, 4, 5],
+      "rowSeedOffset": 100,
+      "controlSeed": 3000
+    },
+    "tolerance": {
+      "compared": [1.0e-6, 1.0e-10],
+      "referenceTolerance": 1.0e-15,
+      "referenceCap": 2000,
+      "iterations": "two-run recipe at the given tolerance; the smallest converged cap in [1, PAGERANK_MAX_ITER] by bisection",
+      "percentiles": "mid-rank percentile of each vertex within its own vector, Math.round(10 x pct) compared against the reference's"
+    },
+    "baseline": {
+      "file": "benchmarks/stages-baseline.json",
+      "measuredAt": "2026-10-21T16:23:00Z",
+      "baseCommit": "5367f0f"
+    },
+    "census": "values from an earlier corpus analysis (2026-10-23), embedded as literals in the IT",
+    "corpus": "scripts/corpus.sh's pinned clones, read-only, through -Dstrata.corpus",
+    "loadAverage1m": {
+      "start": 5.29296875,
+      "end": 6.19921875
+    }
+  },
+  "environment": {
+    "os": "Mac OS X 27.0.1",
+    "arch": "aarch64",
+    "cpu": "Apple M4 Pro",
+    "logicalCores": 14,
+    "ramBytes": 25769803776,
+    "storage": "APPLE SSD AP1024Z internal NVMe SSD",
+    "runtime": "full JDK under Maven Surefire, not the jlink image the application ships",
+    "jvm": "Eclipse Adoptium 25.0.4.1+1-LTS",
+    "jvmFlags": [
+      "-Xmx2g",
+      "-Xss2m",
+      "-XX:-HeapDumpOnOutOfMemoryError",
+      "-Djava.awt.headless=true"
+    ],
+    "maxHeapBytes": 2147483648,
+    "garbageCollectors": [
+      "G1 Young Generation",
+      "G1 Concurrent GC",
+      "G1 Old Generation"
+    ],
+    "assertionsEnabled": false,
+    "host": {
+      "os": "Mac OS X 27.0.1",
+      "arch": "aarch64",
+      "cpu": "Apple M4 Pro",
+      "logicalCores": 14,
+      "ramBytes": 25769803776,
+      "storage": "APPLE SSD AP1024Z internal NVMe SSD",
+      "jvm": "Eclipse Adoptium 25.0.4.1+1-LTS"
+    }
+  },
+  "decision": {
+    "rule": "PASS iff two builds of the graph from the same rows in different arrival orders produce bit-identical doubles (five shuffled orders of every synthetic graph and of Elasticsearch ALL; two analyses of every corpus selection) and |sum - 1| <= 1e-9 for every PageRank vector of every graph, each containing dangling nodes in G and in G_rev; else FAIL",
+    "outcome": "PASS",
+    "evidence": [
+      "synthetic 3000 types: 5/5 shuffled orders bit-identical; max |sum-1| 1.887379141862766E-14 over 4 vectors; dangling 450 in G, 1122 in G_rev",
+      "synthetic 30000 types: 5/5 shuffled orders bit-identical; max |sum-1| 3.140040683794875E-13 over 4 vectors; dangling 4500 in G, 12760 in G_rev",
+      "synthetic 100000 types: 5/5 shuffled orders bit-identical; max |sum-1| 8.597567102697212E-13 over 4 vectors; dangling 15000 in G, 44510 in G_rev",
+      "elasticsearch ALL read back from the cache: 5/5 shuffled orders bit-identical, 0 doubles differ from the persisted rows",
+      "commons-lang DEFAULT: two analyses byte-identical; max |sum-1| 1.5064989186686084E-14 over 4 vectors x 2 runs; dangling 130 in G, 106 in G_rev",
+      "commons-lang ALL: two analyses byte-identical; max |sum-1| 1.7541523789077473E-14 over 4 vectors x 2 runs; dangling 285 in G, 363 in G_rev",
+      "broken-tree DEFAULT: two analyses byte-identical; max |sum-1| 8.471847355584483E-15 over 4 vectors x 2 runs; dangling 130 in G, 105 in G_rev",
+      "broken-tree ALL: two analyses byte-identical; max |sum-1| 2.808864252301646E-14 over 4 vectors x 2 runs; dangling 285 in G, 363 in G_rev",
+      "junit5 DEFAULT: two analyses byte-identical; max |sum-1| 1.9674583143225455E-14 over 4 vectors x 2 runs; dangling 180 in G, 156 in G_rev",
+      "junit5 ALL: two analyses byte-identical; max |sum-1| 8.311390855067491E-14 over 4 vectors x 2 runs; dangling 507 in G, 1987 in G_rev",
+      "spring-framework DEFAULT: two analyses byte-identical; max |sum-1| 2.9531932455029164E-14 over 4 vectors x 2 runs; dangling 781 in G, 887 in G_rev",
+      "spring-framework ALL: two analyses byte-identical; max |sum-1| 3.0399723469315236E-13 over 4 vectors x 2 runs; dangling 2720 in G, 7108 in G_rev",
+      "elasticsearch DEFAULT: two analyses byte-identical; max |sum-1| 1.1657341758564144E-13 over 4 vectors x 2 runs; dangling 2871 in G, 1997 in G_rev",
+      "elasticsearch ALL: two analyses byte-identical; max |sum-1| 3.234455575484743E-13 over 4 vectors x 2 runs; dangling 3377 in G, 9597 in G_rev"
+    ]
+  },
+  "expectations": [
+    {
+      "id": "synthetic 3000: shuffled orders bit-identical",
+      "expected": "5",
+      "measured": "5",
+      "met": true
+    },
+    {
+      "id": "synthetic 3000: |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "1.887379141862766E-14",
+      "met": true
+    },
+    {
+      "id": "synthetic 3000: pagerankUnconverged",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "synthetic 3000: control G: differs",
+      "expected": "> 0",
+      "measured": "2998",
+      "met": true
+    },
+    {
+      "id": "synthetic 3000: control G: max |difference| < 1e-12",
+      "expected": "< 1e-12",
+      "measured": "2.3592239273284576E-16",
+      "met": true
+    },
+    {
+      "id": "synthetic 3000: control G: sorted JGraphT == analyzer",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "synthetic 3000: control G_rev: differs",
+      "expected": "> 0",
+      "measured": "2977",
+      "met": true
+    },
+    {
+      "id": "synthetic 3000: control G_rev: max |difference| < 1e-12",
+      "expected": "< 1e-12",
+      "measured": "3.0357660829594124E-18",
+      "met": true
+    },
+    {
+      "id": "synthetic 3000: control G_rev: sorted JGraphT == analyzer",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "synthetic 3000: control G differing (PageRankTest)",
+      "expected": "2998",
+      "measured": "2998",
+      "met": true
+    },
+    {
+      "id": "synthetic 3000: control G_rev differing (PageRankTest)",
+      "expected": "2977",
+      "measured": "2977",
+      "met": true
+    },
+    {
+      "id": "synthetic 3000: control max ulps (PageRankTest)",
+      "expected": "28",
+      "measured": "28",
+      "met": true
+    },
+    {
+      "id": "synthetic 30000: shuffled orders bit-identical",
+      "expected": "5",
+      "measured": "5",
+      "met": true
+    },
+    {
+      "id": "synthetic 30000: |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "3.140040683794875E-13",
+      "met": true
+    },
+    {
+      "id": "synthetic 30000: pagerankUnconverged",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "synthetic 30000: control G: differs",
+      "expected": "> 0",
+      "measured": "30000",
+      "met": true
+    },
+    {
+      "id": "synthetic 30000: control G: max |difference| < 1e-12",
+      "expected": "< 1e-12",
+      "measured": "4.912736883966318E-15",
+      "met": true
+    },
+    {
+      "id": "synthetic 30000: control G: sorted JGraphT == analyzer",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "synthetic 30000: control G_rev: differs",
+      "expected": "> 0",
+      "measured": "30000",
+      "met": true
+    },
+    {
+      "id": "synthetic 30000: control G_rev: max |difference| < 1e-12",
+      "expected": "< 1e-12",
+      "measured": "1.0733601507606494E-17",
+      "met": true
+    },
+    {
+      "id": "synthetic 30000: control G_rev: sorted JGraphT == analyzer",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "synthetic 100000: shuffled orders bit-identical",
+      "expected": "5",
+      "measured": "5",
+      "met": true
+    },
+    {
+      "id": "synthetic 100000: |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "8.597567102697212E-13",
+      "met": true
+    },
+    {
+      "id": "synthetic 100000: pagerankUnconverged",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "synthetic 100000: control G: differs",
+      "expected": "> 0",
+      "measured": "100000",
+      "met": true
+    },
+    {
+      "id": "synthetic 100000: control G: max |difference| < 1e-12",
+      "expected": "< 1e-12",
+      "measured": "4.6351811278100286E-15",
+      "met": true
+    },
+    {
+      "id": "synthetic 100000: control G: sorted JGraphT == analyzer",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "synthetic 100000: control G_rev: differs",
+      "expected": "> 0",
+      "measured": "100000",
+      "met": true
+    },
+    {
+      "id": "synthetic 100000: control G_rev: max |difference| < 1e-12",
+      "expected": "< 1e-12",
+      "measured": "8.413408858487514E-17",
+      "met": true
+    },
+    {
+      "id": "synthetic 100000: control G_rev: sorted JGraphT == analyzer",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G: reference converged",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G: 1e-10 percentiles changed",
+      "expected": "0",
+      "measured": "1",
+      "met": false
+    },
+    {
+      "id": "tolerance synthetic-30000 G: 1e-10 iterations <= 147 and > 1e-6's",
+      "expected": "(12, 147]",
+      "measured": "22",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G: detector agrees at k and k-1",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G: 1e-10 vector == GraphAlgorithms.pageRank",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G: 1e-6 bisection boundary",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G: 1e-10 bisection boundary",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G: 1e-6 percentiles changed",
+      "expected": "> 0",
+      "measured": "81",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G_rev: reference converged",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G_rev: 1e-10 percentiles changed",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G_rev: 1e-10 iterations <= 147 and > 1e-6's",
+      "expected": "(12, 147]",
+      "measured": "25",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G_rev: detector agrees at k and k-1",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G_rev: 1e-10 vector == GraphAlgorithms.pageRank",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G_rev: 1e-6 bisection boundary",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G_rev: 1e-10 bisection boundary",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance synthetic-30000 G_rev: 1e-6 percentiles changed",
+      "expected": "> 0",
+      "measured": "70",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G: reference converged",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G: 1e-10 percentiles changed",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G: 1e-10 iterations <= 147 and > 1e-6's",
+      "expected": "(34, 147]",
+      "measured": "91",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G: detector agrees at k and k-1",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G: 1e-10 vector == GraphAlgorithms.pageRank",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G: 1e-6 bisection boundary",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G: 1e-10 bisection boundary",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G: 1e-6 iterations (recorded)",
+      "expected": "34",
+      "measured": "34",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G_rev: reference converged",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G_rev: 1e-10 percentiles changed",
+      "expected": "0",
+      "measured": "2",
+      "met": false
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G_rev: 1e-10 iterations <= 147 and > 1e-6's",
+      "expected": "(41, 147]",
+      "measured": "96",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G_rev: detector agrees at k and k-1",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G_rev: 1e-10 vector == GraphAlgorithms.pageRank",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G_rev: 1e-6 bisection boundary",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G_rev: 1e-10 bisection boundary",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "tolerance elasticsearch-ALL G_rev: 1e-6 iterations (recorded)",
+      "expected": "41",
+      "measured": "41",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL compute == persisted bits",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL shuffled orders bit-identical",
+      "expected": "5",
+      "measured": "5",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: run 1 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: run 1 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: run 1 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: run 1 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "1.5064989186686084E-14",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: run 2 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: run 2 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: run 2 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: run 2 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "1.5064989186686084E-14",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: dumps byte-identical",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: typeNodes == stages-baseline types",
+      "expected": "364",
+      "measured": "364",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: typeNodes",
+      "expected": "364",
+      "measured": "364",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: typeEdges",
+      "expected": "721",
+      "measured": "721",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: packageNodes",
+      "expected": "18",
+      "measured": "18",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: packageEdges",
+      "expected": "50",
+      "measured": "50",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: typeCycles",
+      "expected": "23",
+      "measured": "23",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: largest type cycle",
+      "expected": "70",
+      "measured": "70",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: typesInCycles",
+      "expected": "131",
+      "measured": "131",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: packageCycles",
+      "expected": "1",
+      "measured": "1",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: largest package cycle",
+      "expected": "13",
+      "measured": "13",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: packagesInCycles",
+      "expected": "13",
+      "measured": "13",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: externalPairs",
+      "expected": "603",
+      "measured": "603",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: denylistedPairs",
+      "expected": "1595",
+      "measured": "1595",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: weak components",
+      "expected": "1",
+      "measured": "1",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: cycles in one top-level type",
+      "expected": "18",
+      "measured": "18",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: pagerankUnconverged",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: betweennessSkipped",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: top pagerank (recorded G)",
+      "expected": "type:org.apache.commons.lang3.ArrayUtils",
+      "measured": "type:org.apache.commons.lang3.ArrayUtils",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: top pagerank fanIn >= recorded p99",
+      "expected": ">= 18",
+      "measured": "31",
+      "met": true
+    },
+    {
+      "id": "commons-lang DEFAULT: top pagerankOut (recorded G_rev)",
+      "expected": "type:org.apache.commons.lang3.builder.ReflectionDiffBuilder",
+      "measured": "type:org.apache.commons.lang3.builder.ReflectionDiffBuilder",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: run 1 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: run 1 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: run 1 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: run 1 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "1.7541523789077473E-14",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: run 2 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: run 2 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: run 2 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: run 2 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "1.7541523789077473E-14",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: dumps byte-identical",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: typeNodes == stages-baseline types",
+      "expected": "958",
+      "measured": "958",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: typeNodes",
+      "expected": "958",
+      "measured": "958",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: typeEdges",
+      "expected": "2105",
+      "measured": "2105",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: packageNodes",
+      "expected": "20",
+      "measured": "20",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: packageEdges",
+      "expected": "64",
+      "measured": "64",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: typeCycles",
+      "expected": "27",
+      "measured": "27",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: largest type cycle",
+      "expected": "70",
+      "measured": "70",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: typesInCycles",
+      "expected": "139",
+      "measured": "139",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: packageCycles",
+      "expected": "1",
+      "measured": "1",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: largest package cycle",
+      "expected": "15",
+      "measured": "15",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: packagesInCycles",
+      "expected": "15",
+      "measured": "15",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: externalPairs",
+      "expected": "2096",
+      "measured": "2096",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: denylistedPairs",
+      "expected": "3072",
+      "measured": "3072",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: weak components",
+      "expected": "1",
+      "measured": "1",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: cycles in one top-level type",
+      "expected": "22",
+      "measured": "22",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: pagerankUnconverged",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: betweennessSkipped",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: top pagerank (recorded G)",
+      "expected": "type:org.apache.commons.lang3.builder.ToStringStyle",
+      "measured": "type:org.apache.commons.lang3.builder.ToStringStyle",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: top pagerank fanIn >= recorded p99",
+      "expected": ">= 22",
+      "measured": "28",
+      "met": true
+    },
+    {
+      "id": "commons-lang ALL: top pagerankOut (recorded G_rev)",
+      "expected": "type:org.apache.commons.lang3.function.FailableTest",
+      "measured": "type:org.apache.commons.lang3.function.FailableTest",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: run 1 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: run 1 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: run 1 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: run 1 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "8.471847355584483E-15",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: run 2 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: run 2 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: run 2 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: run 2 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "8.471847355584483E-15",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: dumps byte-identical",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: typeNodes == stages-baseline types",
+      "expected": "362",
+      "measured": "362",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: typeNodes",
+      "expected": "362",
+      "measured": "362",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: typeEdges",
+      "expected": "708",
+      "measured": "708",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: packageNodes",
+      "expected": "18",
+      "measured": "18",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: packageEdges",
+      "expected": "49",
+      "measured": "49",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: typeCycles",
+      "expected": "24",
+      "measured": "24",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: largest type cycle",
+      "expected": "67",
+      "measured": "67",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: typesInCycles",
+      "expected": "130",
+      "measured": "130",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: packageCycles",
+      "expected": "1",
+      "measured": "1",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: largest package cycle",
+      "expected": "13",
+      "measured": "13",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: packagesInCycles",
+      "expected": "13",
+      "measured": "13",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: externalPairs",
+      "expected": "599",
+      "measured": "599",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: denylistedPairs",
+      "expected": "1569",
+      "measured": "1569",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: weak components",
+      "expected": "1",
+      "measured": "1",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: cycles in one top-level type",
+      "expected": "18",
+      "measured": "18",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: pagerankUnconverged",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: betweennessSkipped",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: top pagerank (recorded G)",
+      "expected": "type:org.apache.commons.lang3.ArrayUtils",
+      "measured": "type:org.apache.commons.lang3.ArrayUtils",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: top pagerank fanIn >= recorded p99",
+      "expected": ">= 17",
+      "measured": "30",
+      "met": true
+    },
+    {
+      "id": "broken-tree DEFAULT: top pagerankOut (recorded G_rev)",
+      "expected": "type:org.apache.commons.lang3.builder.ReflectionDiffBuilder",
+      "measured": "type:org.apache.commons.lang3.builder.ReflectionDiffBuilder",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: run 1 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: run 1 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: run 1 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: run 1 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "2.808864252301646E-14",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: run 2 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: run 2 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: run 2 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: run 2 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "2.808864252301646E-14",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: dumps byte-identical",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: typeNodes == stages-baseline types",
+      "expected": "956",
+      "measured": "956",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: typeNodes",
+      "expected": "956",
+      "measured": "956",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: typeEdges",
+      "expected": "2090",
+      "measured": "2090",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: packageNodes",
+      "expected": "20",
+      "measured": "20",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: packageEdges",
+      "expected": "63",
+      "measured": "63",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: typeCycles",
+      "expected": "28",
+      "measured": "28",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: largest type cycle",
+      "expected": "67",
+      "measured": "67",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: typesInCycles",
+      "expected": "138",
+      "measured": "138",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: packageCycles",
+      "expected": "1",
+      "measured": "1",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: largest package cycle",
+      "expected": "15",
+      "measured": "15",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: packagesInCycles",
+      "expected": "15",
+      "measured": "15",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: externalPairs",
+      "expected": "2094",
+      "measured": "2094",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: denylistedPairs",
+      "expected": "3046",
+      "measured": "3046",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: weak components",
+      "expected": "1",
+      "measured": "1",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: cycles in one top-level type",
+      "expected": "22",
+      "measured": "22",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: pagerankUnconverged",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: betweennessSkipped",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: top pagerank (recorded G)",
+      "expected": "type:org.apache.commons.lang3.builder.ToStringStyle",
+      "measured": "type:org.apache.commons.lang3.builder.ToStringStyle",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: top pagerank fanIn >= recorded p99",
+      "expected": ">= 20",
+      "measured": "27",
+      "met": true
+    },
+    {
+      "id": "broken-tree ALL: top pagerankOut (recorded G_rev)",
+      "expected": "type:org.apache.commons.lang3.function.FailableTest",
+      "measured": "type:org.apache.commons.lang3.function.FailableTest",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: run 1 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: run 1 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: run 1 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: run 1 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "1.9674583143225455E-14",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: run 2 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: run 2 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: run 2 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: run 2 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "1.9674583143225455E-14",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: dumps byte-identical",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: typeNodes == stages-baseline types",
+      "expected": "1110",
+      "measured": "1110",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: typeNodes",
+      "expected": "1110",
+      "measured": "1110",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: typeEdges",
+      "expected": "5017",
+      "measured": "5017",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: packageNodes",
+      "expected": "76",
+      "measured": "76",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: packageEdges",
+      "expected": "384",
+      "measured": "384",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: typeCycles",
+      "expected": "59",
+      "measured": "59",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: largest type cycle",
+      "expected": "15",
+      "measured": "15",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: typesInCycles",
+      "expected": "184",
+      "measured": "184",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: packageCycles",
+      "expected": "6",
+      "measured": "6",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: largest package cycle",
+      "expected": "6",
+      "measured": "6",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: packagesInCycles",
+      "expected": "25",
+      "measured": "25",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: externalPairs",
+      "expected": "3993",
+      "measured": "3993",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: denylistedPairs",
+      "expected": "3532",
+      "measured": "3532",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: weak components",
+      "expected": "4",
+      "measured": "4",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: cycles in one top-level type",
+      "expected": "23",
+      "measured": "23",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: pagerankUnconverged",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: betweennessSkipped",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: top pagerank (recorded G)",
+      "expected": "type:org.junit.platform.commons.util.Preconditions",
+      "measured": "type:org.junit.platform.commons.util.Preconditions",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: top pagerank fanIn >= recorded p99",
+      "expected": ">= 45",
+      "measured": "231",
+      "met": true
+    },
+    {
+      "id": "junit5 DEFAULT: top pagerankOut (recorded G_rev)",
+      "expected": "type:org.junit.jupiter.engine.JupiterTestEngine",
+      "measured": "type:org.junit.jupiter.engine.JupiterTestEngine",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: run 1 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: run 1 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: run 1 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: run 1 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "8.311390855067491E-14",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: run 2 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: run 2 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: run 2 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: run 2 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "8.311390855067491E-14",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: dumps byte-identical",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: typeNodes == stages-baseline types",
+      "expected": "3751",
+      "measured": "3751",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: typeNodes",
+      "expected": "3751",
+      "measured": "3751",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: typeEdges",
+      "expected": "16246",
+      "measured": "16246",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: packageNodes",
+      "expected": "114",
+      "measured": "114",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: packageEdges",
+      "expected": "876",
+      "measured": "876",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: typeCycles",
+      "expected": "62",
+      "measured": "62",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: largest type cycle",
+      "expected": "15",
+      "measured": "15",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: typesInCycles",
+      "expected": "191",
+      "measured": "191",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: packageCycles",
+      "expected": "4",
+      "measured": "4",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: largest package cycle",
+      "expected": "55",
+      "measured": "55",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: packagesInCycles",
+      "expected": "63",
+      "measured": "63",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: externalPairs",
+      "expected": "7316",
+      "measured": "7316",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: denylistedPairs",
+      "expected": "7336",
+      "measured": "7336",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: weak components",
+      "expected": "1",
+      "measured": "1",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: cycles in one top-level type",
+      "expected": "26",
+      "measured": "26",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: pagerankUnconverged",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: betweennessSkipped",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: top pagerank (recorded G)",
+      "expected": "type:org.junit.platform.commons.util.Preconditions",
+      "measured": "type:org.junit.platform.commons.util.Preconditions",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: top pagerank fanIn >= recorded p99",
+      "expected": ">= 68",
+      "measured": "243",
+      "met": true
+    },
+    {
+      "id": "junit5 ALL: top pagerankOut (recorded G_rev)",
+      "expected": "type:org.junit.platform.suite.engine.SuiteEngineTests",
+      "measured": "type:org.junit.platform.suite.engine.SuiteEngineTests",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: run 1 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: run 1 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: run 1 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: run 1 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "2.9531932455029164E-14",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: run 2 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: run 2 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: run 2 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: run 2 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "2.9531932455029164E-14",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: dumps byte-identical",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: typeNodes == stages-baseline types",
+      "expected": "6923",
+      "measured": "6923",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: typeNodes",
+      "expected": "6923",
+      "measured": "6923",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: typeEdges",
+      "expected": "36067",
+      "measured": "36067",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: packageNodes",
+      "expected": "571",
+      "measured": "571",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: packageEdges",
+      "expected": "4104",
+      "measured": "4104",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: typeCycles",
+      "expected": "324",
+      "measured": "324",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: largest type cycle",
+      "expected": "38",
+      "measured": "38",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: typesInCycles",
+      "expected": "1266",
+      "measured": "1266",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: packageCycles",
+      "expected": "14",
+      "measured": "14",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: largest package cycle",
+      "expected": "9",
+      "measured": "9",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: packagesInCycles",
+      "expected": "51",
+      "measured": "51",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: externalPairs",
+      "expected": "20650",
+      "measured": "20650",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: denylistedPairs",
+      "expected": "25553",
+      "measured": "25553",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: weak components",
+      "expected": "11",
+      "measured": "11",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: cycles in one top-level type",
+      "expected": "209",
+      "measured": "209",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: pagerankUnconverged",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: betweennessSkipped",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: top pagerank (recorded G)",
+      "expected": "type:org.springframework.util.Assert",
+      "measured": "type:org.springframework.util.Assert",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: top pagerank fanIn >= recorded p99",
+      "expected": ">= 53",
+      "measured": "1709",
+      "met": true
+    },
+    {
+      "id": "spring-framework DEFAULT: top pagerankOut (recorded G_rev)",
+      "expected": "type:org.springframework.test.web.reactive.server.WebTestClient",
+      "measured": "type:org.springframework.test.web.reactive.server.WebTestClient",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: run 1 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: run 1 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: run 1 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: run 1 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "3.0399723469315236E-13",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: run 2 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: run 2 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: run 2 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: run 2 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "3.0399723469315236E-13",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: dumps byte-identical",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: typeNodes == stages-baseline types",
+      "expected": "18468",
+      "measured": "18468",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: typeNodes",
+      "expected": "18468",
+      "measured": "18468",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: typeEdges",
+      "expected": "78453",
+      "measured": "78453",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: packageNodes",
+      "expected": "817",
+      "measured": "817",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: packageEdges",
+      "expected": "7018",
+      "measured": "7018",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: typeCycles",
+      "expected": "368",
+      "measured": "368",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: largest type cycle",
+      "expected": "38",
+      "measured": "38",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: typesInCycles",
+      "expected": "1375",
+      "measured": "1375",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: packageCycles",
+      "expected": "20",
+      "measured": "20",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: largest package cycle",
+      "expected": "337",
+      "measured": "337",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: packagesInCycles",
+      "expected": "420",
+      "measured": "420",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: externalPairs",
+      "expected": "44582",
+      "measured": "44582",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: denylistedPairs",
+      "expected": "43149",
+      "measured": "43149",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: weak components",
+      "expected": "21",
+      "measured": "21",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: cycles in one top-level type",
+      "expected": "247",
+      "measured": "247",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: pagerankUnconverged",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: betweennessSkipped",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: top pagerank (recorded G)",
+      "expected": "type:org.springframework.util.Assert",
+      "measured": "type:org.springframework.util.Assert",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: top pagerank fanIn >= recorded p99",
+      "expected": ">= 61",
+      "measured": "1832",
+      "met": true
+    },
+    {
+      "id": "spring-framework ALL: top pagerankOut (recorded G_rev)",
+      "expected": "type:org.springframework.expression.spel.standard.InternalSpelExpressionParser",
+      "measured": "type:org.springframework.expression.spel.standard.InternalSpelExpressionParser",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: run 1 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: run 1 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: run 1 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: run 1 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "1.1657341758564144E-13",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: run 2 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: run 2 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: run 2 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: run 2 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "1.1657341758564144E-13",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: dumps byte-identical",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: typeNodes == stages-baseline types",
+      "expected": "26883",
+      "measured": "26883",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: typeNodes",
+      "expected": "26883",
+      "measured": "26883",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: typeEdges",
+      "expected": "236817",
+      "measured": "236817",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: packageNodes",
+      "expected": "2007",
+      "measured": "2007",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: packageEdges",
+      "expected": "31478",
+      "measured": "31478",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: typeCycles",
+      "expected": "698",
+      "measured": "698",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: largest type cycle",
+      "expected": "5756",
+      "measured": "5756",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: typesInCycles",
+      "expected": "12265",
+      "measured": "12265",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: packageCycles",
+      "expected": "80",
+      "measured": "80",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: largest package cycle",
+      "expected": "438",
+      "measured": "438",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: packagesInCycles",
+      "expected": "1408",
+      "measured": "1408",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: externalPairs",
+      "expected": "64656",
+      "measured": "64656",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: denylistedPairs",
+      "expected": "104298",
+      "measured": "104298",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: weak components",
+      "expected": "28",
+      "measured": "28",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: cycles in one top-level type",
+      "expected": "466",
+      "measured": "466",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: pagerankUnconverged",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: betweennessSkipped",
+      "expected": "1",
+      "measured": "1",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: top pagerank (recorded G)",
+      "expected": "type:org.elasticsearch.common.io.stream.StreamOutput",
+      "measured": "type:org.elasticsearch.common.io.stream.StreamOutput",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: top pagerank fanIn >= recorded p99",
+      "expected": ">= 104",
+      "measured": "4220",
+      "met": true
+    },
+    {
+      "id": "elasticsearch DEFAULT: top pagerankOut (recorded G_rev)",
+      "expected": "type:org.elasticsearch.xpack.ml.MachineLearning",
+      "measured": "type:org.elasticsearch.xpack.ml.MachineLearning",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: run 1 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: run 1 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: run 1 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: run 1 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "3.234455575484743E-13",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: run 2 terminal event",
+      "expected": "analysis.completed",
+      "measured": "analysis.completed",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: run 2 STRUCTURAL_GRAPH status",
+      "expected": "COMPLETED",
+      "measured": "COMPLETED",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: run 2 analysis_stage row == event",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: run 2 |sum-1| <= 1e-9",
+      "expected": "every vector",
+      "measured": "3.234455575484743E-13",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: dumps byte-identical",
+      "expected": "true",
+      "measured": "true",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: typeNodes == stages-baseline types",
+      "expected": "39364",
+      "measured": "39364",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: typeNodes",
+      "expected": "39364",
+      "measured": "39364",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: typeEdges",
+      "expected": "380071",
+      "measured": "380071",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: packageNodes",
+      "expected": "2129",
+      "measured": "2129",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: packageEdges",
+      "expected": "41471",
+      "measured": "41471",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: typeCycles",
+      "expected": "981",
+      "measured": "981",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: largest type cycle",
+      "expected": "5756",
+      "measured": "5756",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: typesInCycles",
+      "expected": "12995",
+      "measured": "12995",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: packageCycles",
+      "expected": "44",
+      "measured": "44",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: largest package cycle",
+      "expected": "1535",
+      "measured": "1535",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: packagesInCycles",
+      "expected": "1724",
+      "measured": "1724",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: externalPairs",
+      "expected": "115154",
+      "measured": "115154",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: denylistedPairs",
+      "expected": "153655",
+      "measured": "153655",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: weak components",
+      "expected": "23",
+      "measured": "23",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: cycles in one top-level type",
+      "expected": "730",
+      "measured": "730",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: pagerankUnconverged",
+      "expected": "0",
+      "measured": "0",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: betweennessSkipped",
+      "expected": "1",
+      "measured": "1",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: top pagerank (recorded G)",
+      "expected": "type:org.elasticsearch.common.io.stream.StreamOutput",
+      "measured": "type:org.elasticsearch.common.io.stream.StreamOutput",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: top pagerank fanIn >= recorded p99",
+      "expected": ">= 121",
+      "measured": "4537",
+      "met": true
+    },
+    {
+      "id": "elasticsearch ALL: top pagerankOut (recorded G_rev)",
+      "expected": "type:org.elasticsearch.xpack.ml.MachineLearning",
+      "measured": "type:org.elasticsearch.xpack.ml.MachineLearning",
+      "met": true
+    }
+  ],
+  "synthetic": [
+    {
+      "types": 3000,
+      "packages": 40,
+      "seed": 30,
+      "rows": 39667,
+      "typeEdges": 18861,
+      "sinks": 450,
+      "neverTargeted": 1122,
+      "counters": {
+        "typeNodes": 3000,
+        "typeEdges": 18861,
+        "selfPairs": 169,
+        "externalPairs": 907,
+        "denylistedPairs": 608,
+        "packageNodes": 40,
+        "packageEdges": 1556,
+        "typeCycles": 1,
+        "typesInCycles": 1272,
+        "packageCycles": 1,
+        "packagesInCycles": 40,
+        "pagerankUnconverged": 0,
+        "betweennessSkipped": 0
+      },
+      "sums": [
+        {
+          "vector": "TYPE_PAGERANK",
+          "size": 3000,
+          "sumMinusOne": -1.887379141862766e-14,
+          "exactSumMinusOne": 1.60174607952146e-15
+        },
+        {
+          "vector": "TYPE_PAGERANK_OUT",
+          "size": 3000,
+          "sumMinusOne": -2.220446049250313e-16,
+          "exactSumMinusOne": 9.235803311372082e-15
+        },
+        {
+          "vector": "PACKAGE_PAGERANK",
+          "size": 40,
+          "sumMinusOne": 1.7763568394002505e-15,
+          "exactSumMinusOne": 2.022687572988957e-15
+        },
+        {
+          "vector": "PACKAGE_PAGERANK_OUT",
+          "size": 40,
+          "sumMinusOne": 1.1102230246251565e-15,
+          "exactSumMinusOne": 7.91033905045424e-16
+        }
+      ],
+      "compute": {
+        "wallMillis": 107,
+        "peakLiveBytes": 21235568,
+        "peakUsedBytes": 39272536
+      },
+      "shuffledOrders": [
+        {
+          "typeSeed": 1,
+          "rowSeed": 101,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 51,
+            "peakLiveBytes": 24940464,
+            "peakUsedBytes": 40102064
+          }
+        },
+        {
+          "typeSeed": 2,
+          "rowSeed": 102,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 45,
+            "peakLiveBytes": 22511616,
+            "peakUsedBytes": 41195512
+          }
+        },
+        {
+          "typeSeed": 3,
+          "rowSeed": 103,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 40,
+            "peakLiveBytes": 22527112,
+            "peakUsedBytes": 41196296
+          }
+        },
+        {
+          "typeSeed": 4,
+          "rowSeed": 104,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 37,
+            "peakLiveBytes": 23370232,
+            "peakUsedBytes": 44341752
+          }
+        },
+        {
+          "typeSeed": 5,
+          "rowSeed": 105,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 37,
+            "peakLiveBytes": 22598816,
+            "peakUsedBytes": 41196560
+          }
+        }
+      ],
+      "control": {
+        "seed": 3000,
+        "orientations": [
+          {
+            "orientation": "G",
+            "sortedEqualsAnalyzer": true,
+            "differing": 2998,
+            "maxUlps": 28,
+            "maxAbsDifference": 2.3592239273284576e-16,
+            "maxRelativeDifference": 3.334093660658221e-15,
+            "firstMovingSignificantDigit": 15,
+            "firstDifferingPrintedDigit": 12,
+            "tieGroups": 73,
+            "tieGroupsSplit": 0
+          },
+          {
+            "orientation": "G_rev",
+            "sortedEqualsAnalyzer": true,
+            "differing": 2977,
+            "maxUlps": 14,
+            "maxAbsDifference": 3.0357660829594124e-18,
+            "maxRelativeDifference": 1.6770181911435832e-15,
+            "firstMovingSignificantDigit": 15,
+            "firstDifferingPrintedDigit": 13,
+            "tieGroups": 53,
+            "tieGroupsSplit": 0
+          }
+        ]
+      }
+    },
+    {
+      "types": 30000,
+      "packages": 400,
+      "seed": 30,
+      "rows": 375031,
+      "typeEdges": 179087,
+      "sinks": 4500,
+      "neverTargeted": 12760,
+      "counters": {
+        "typeNodes": 30000,
+        "typeEdges": 179087,
+        "selfPairs": 1503,
+        "externalPairs": 8959,
+        "denylistedPairs": 6067,
+        "packageNodes": 400,
+        "packageEdges": 83857,
+        "typeCycles": 1,
+        "typesInCycles": 10191,
+        "packageCycles": 1,
+        "packagesInCycles": 400,
+        "pagerankUnconverged": 0,
+        "betweennessSkipped": 1
+      },
+      "sums": [
+        {
+          "vector": "TYPE_PAGERANK",
+          "size": 30000,
+          "sumMinusOne": 4.4853010194856324e-14,
+          "exactSumMinusOne": -1.937247325718098e-13
+        },
+        {
+          "vector": "TYPE_PAGERANK_OUT",
+          "size": 30000,
+          "sumMinusOne": -2.80109269112927e-13,
+          "exactSumMinusOne": -3.140040683794875e-13
+        },
+        {
+          "vector": "PACKAGE_PAGERANK",
+          "size": 400,
+          "sumMinusOne": -6.661338147750939e-16,
+          "exactSumMinusOne": -1.057313958607864e-15
+        },
+        {
+          "vector": "PACKAGE_PAGERANK_OUT",
+          "size": 400,
+          "sumMinusOne": -3.3306690738754696e-16,
+          "exactSumMinusOne": -1.9255430583342559e-16
+        }
+      ],
+      "compute": {
+        "wallMillis": 454,
+        "peakLiveBytes": 159525392,
+        "peakUsedBytes": 215624208
+      },
+      "shuffledOrders": [
+        {
+          "typeSeed": 1,
+          "rowSeed": 101,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 460,
+            "peakLiveBytes": 149240320,
+            "peakUsedBytes": 159726080
+          }
+        },
+        {
+          "typeSeed": 2,
+          "rowSeed": 102,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 447,
+            "peakLiveBytes": 171381120,
+            "peakUsedBytes": 178721152
+          }
+        },
+        {
+          "typeSeed": 3,
+          "rowSeed": 103,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 426,
+            "peakLiveBytes": 172954944,
+            "peakUsedBytes": 180294976
+          }
+        },
+        {
+          "typeSeed": 4,
+          "rowSeed": 104,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 432,
+            "peakLiveBytes": 171907240,
+            "peakUsedBytes": 178722984
+          }
+        },
+        {
+          "typeSeed": 5,
+          "rowSeed": 105,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 412,
+            "peakLiveBytes": 170858752,
+            "peakUsedBytes": 178198784
+          }
+        }
+      ],
+      "control": {
+        "seed": 3000,
+        "orientations": [
+          {
+            "orientation": "G",
+            "sortedEqualsAnalyzer": true,
+            "differing": 30000,
+            "maxUlps": 748,
+            "maxAbsDifference": 4.912736883966318e-15,
+            "maxRelativeDifference": 9.117446197367669e-14,
+            "firstMovingSignificantDigit": 14,
+            "firstDifferingPrintedDigit": 10,
+            "tieGroups": 633,
+            "tieGroupsSplit": 1
+          },
+          {
+            "orientation": "G_rev",
+            "sortedEqualsAnalyzer": true,
+            "differing": 30000,
+            "maxUlps": 150,
+            "maxAbsDifference": 1.0733601507606494e-17,
+            "maxRelativeDifference": 1.7714039436931905e-14,
+            "firstMovingSignificantDigit": 14,
+            "firstDifferingPrintedDigit": 11,
+            "tieGroups": 466,
+            "tieGroupsSplit": 0
+          }
+        ]
+      }
+    },
+    {
+      "types": 100000,
+      "packages": 1333,
+      "seed": 30,
+      "rows": 1254310,
+      "typeEdges": 599594,
+      "sinks": 15000,
+      "neverTargeted": 44510,
+      "counters": {
+        "typeNodes": 100000,
+        "typeEdges": 599594,
+        "selfPairs": 4971,
+        "externalPairs": 30105,
+        "denylistedPairs": 19912,
+        "packageNodes": 1333,
+        "packageEdges": 380535,
+        "typeCycles": 1,
+        "typesInCycles": 29316,
+        "packageCycles": 1,
+        "packagesInCycles": 1333,
+        "pagerankUnconverged": 0,
+        "betweennessSkipped": 1
+      },
+      "sums": [
+        {
+          "vector": "TYPE_PAGERANK",
+          "size": 100000,
+          "sumMinusOne": -6.731282198302324e-13,
+          "exactSumMinusOne": 2.0216043872560083e-14
+        },
+        {
+          "vector": "TYPE_PAGERANK_OUT",
+          "size": 100000,
+          "sumMinusOne": 8.597567102697212e-13,
+          "exactSumMinusOne": 4.800088388359357e-13
+        },
+        {
+          "vector": "PACKAGE_PAGERANK",
+          "size": 1333,
+          "sumMinusOne": -2.220446049250313e-15,
+          "exactSumMinusOne": -1.2169085183977302e-15
+        },
+        {
+          "vector": "PACKAGE_PAGERANK_OUT",
+          "size": 1333,
+          "sumMinusOne": -4.440892098500626e-16,
+          "exactSumMinusOne": -6.910704647422605e-16
+        }
+      ],
+      "compute": {
+        "wallMillis": 1716,
+        "peakLiveBytes": 570540992,
+        "peakUsedBytes": 633701536
+      },
+      "shuffledOrders": [
+        {
+          "typeSeed": 1,
+          "rowSeed": 101,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 1842,
+            "peakLiveBytes": 717289104,
+            "peakUsedBytes": 822795264
+          }
+        },
+        {
+          "typeSeed": 2,
+          "rowSeed": 102,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 1805,
+            "peakLiveBytes": 695560624,
+            "peakUsedBytes": 783116720
+          }
+        },
+        {
+          "typeSeed": 3,
+          "rowSeed": 103,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 1854,
+            "peakLiveBytes": 705748896,
+            "peakUsedBytes": 825410832
+          }
+        },
+        {
+          "typeSeed": 4,
+          "rowSeed": 104,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 1852,
+            "peakLiveBytes": 675176080,
+            "peakUsedBytes": 727249384
+          }
+        },
+        {
+          "typeSeed": 5,
+          "rowSeed": 105,
+          "differingDoubles": 0,
+          "equalResult": true,
+          "compute": {
+            "wallMillis": 1822,
+            "peakLiveBytes": 641790912,
+            "peakUsedBytes": 701035456
+          }
+        }
+      ],
+      "control": {
+        "seed": 3000,
+        "orientations": [
+          {
+            "orientation": "G",
+            "sortedEqualsAnalyzer": true,
+            "differing": 100000,
+            "maxUlps": 1525,
+            "maxAbsDifference": 4.6351811278100286e-15,
+            "maxRelativeDifference": 1.7293316806620064e-13,
+            "firstMovingSignificantDigit": 13,
+            "firstDifferingPrintedDigit": 9,
+            "tieGroups": 2153,
+            "tieGroupsSplit": 10
+          },
+          {
+            "orientation": "G_rev",
+            "sortedEqualsAnalyzer": true,
+            "differing": 100000,
+            "maxUlps": 5176,
+            "maxAbsDifference": 8.413408858487514e-17,
+            "maxRelativeDifference": 6.178640564311603e-13,
+            "firstMovingSignificantDigit": 13,
+            "firstDifferingPrintedDigit": 8,
+            "tieGroups": 1511,
+            "tieGroupsSplit": 0
+          }
+        ]
+      }
+    }
+  ],
+  "tolerance": [
+    {
+      "graph": "synthetic-30000",
+      "orientation": "G",
+      "vertices": 30000,
+      "edges": 179087,
+      "referenceTolerance": 1.0e-15,
+      "referenceCap": 2000,
+      "referenceConverged": true,
+      "runs": [
+        {
+          "tolerance": 1.0e-6,
+          "iterations": 12,
+          "notConvergedOneBelow": true,
+          "detectorAgrees": null,
+          "productionVector": null,
+          "maxAbsError": 2.2758665196159766e-7,
+          "maxRelativeError": 0.002483554387977213,
+          "percentilesChanged": 81,
+          "maxPercentileShift": 0.1
+        },
+        {
+          "tolerance": 1.0e-10,
+          "iterations": 22,
+          "notConvergedOneBelow": true,
+          "detectorAgrees": true,
+          "productionVector": true,
+          "maxAbsError": 9.770608801196179e-12,
+          "maxRelativeError": 9.04559991453832e-8,
+          "percentilesChanged": 1,
+          "maxPercentileShift": 0.1
+        }
+      ]
+    },
+    {
+      "graph": "synthetic-30000",
+      "orientation": "G_rev",
+      "vertices": 30000,
+      "edges": 179087,
+      "referenceTolerance": 1.0e-15,
+      "referenceCap": 2000,
+      "referenceConverged": true,
+      "runs": [
+        {
+          "tolerance": 1.0e-6,
+          "iterations": 12,
+          "notConvergedOneBelow": true,
+          "detectorAgrees": null,
+          "productionVector": null,
+          "maxAbsError": 2.519793670215304e-7,
+          "maxRelativeError": 0.0021510705931502266,
+          "percentilesChanged": 70,
+          "maxPercentileShift": 0.1
+        },
+        {
+          "tolerance": 1.0e-10,
+          "iterations": 25,
+          "notConvergedOneBelow": true,
+          "detectorAgrees": true,
+          "productionVector": true,
+          "maxAbsError": 4.024878196842111e-11,
+          "maxRelativeError": 3.99181895363317e-7,
+          "percentilesChanged": 0,
+          "maxPercentileShift": 0.0
+        }
+      ]
+    },
+    {
+      "graph": "elasticsearch-ALL",
+      "orientation": "G",
+      "vertices": 39364,
+      "edges": 380071,
+      "referenceTolerance": 1.0e-15,
+      "referenceCap": 2000,
+      "referenceConverged": true,
+      "runs": [
+        {
+          "tolerance": 1.0e-6,
+          "iterations": 34,
+          "notConvergedOneBelow": true,
+          "detectorAgrees": null,
+          "productionVector": null,
+          "maxAbsError": 1.5799280320562378e-6,
+          "maxRelativeError": 0.0035622663878683166,
+          "percentilesChanged": 42,
+          "maxPercentileShift": 0.1
+        },
+        {
+          "tolerance": 1.0e-10,
+          "iterations": 91,
+          "notConvergedOneBelow": true,
+          "detectorAgrees": true,
+          "productionVector": true,
+          "maxAbsError": 1.4109275369138946e-10,
+          "maxRelativeError": 3.2024456684420053e-7,
+          "percentilesChanged": 0,
+          "maxPercentileShift": 0.0
+        }
+      ]
+    },
+    {
+      "graph": "elasticsearch-ALL",
+      "orientation": "G_rev",
+      "vertices": 39364,
+      "edges": 380071,
+      "referenceTolerance": 1.0e-15,
+      "referenceCap": 2000,
+      "referenceConverged": true,
+      "runs": [
+        {
+          "tolerance": 1.0e-6,
+          "iterations": 41,
+          "notConvergedOneBelow": true,
+          "detectorAgrees": null,
+          "productionVector": null,
+          "maxAbsError": 1.8221548076249004e-6,
+          "maxRelativeError": 0.001401720619489002,
+          "percentilesChanged": 75,
+          "maxPercentileShift": 0.1
+        },
+        {
+          "tolerance": 1.0e-10,
+          "iterations": 96,
+          "notConvergedOneBelow": true,
+          "detectorAgrees": true,
+          "productionVector": true,
+          "maxAbsError": 1.246703708150665e-10,
+          "maxRelativeError": 9.228887481138028e-8,
+          "percentilesChanged": 2,
+          "maxPercentileShift": 0.1
+        }
+      ]
+    }
+  ],
+  "corpusShuffle": {
+    "repository": "elasticsearch",
+    "selection": "ALL",
+    "types": 39364,
+    "rows": 1181559,
+    "compute": {
+      "wallMillis": 1383,
+      "peakLiveBytes": 263537184,
+      "peakUsedBytes": 346374688
+    },
+    "rowsCompared": 41493,
+    "persistedMismatches": 0,
+    "shuffledOrders": [
+      {
+        "typeSeed": 1,
+        "rowSeed": 101,
+        "differingDoubles": 0,
+        "equalResult": true,
+        "compute": {
+          "wallMillis": 1297,
+          "peakLiveBytes": 265618816,
+          "peakUsedBytes": 472712600
+        }
+      },
+      {
+        "typeSeed": 2,
+        "rowSeed": 102,
+        "differingDoubles": 0,
+        "equalResult": true,
+        "compute": {
+          "wallMillis": 1286,
+          "peakLiveBytes": 272434728,
+          "peakUsedBytes": 378568480
+        }
+      },
+      {
+        "typeSeed": 3,
+        "rowSeed": 103,
+        "differingDoubles": 0,
+        "equalResult": true,
+        "compute": {
+          "wallMillis": 1322,
+          "peakLiveBytes": 265619080,
+          "peakUsedBytes": 472712896
+        }
+      },
+      {
+        "typeSeed": 4,
+        "rowSeed": 104,
+        "differingDoubles": 0,
+        "equalResult": true,
+        "compute": {
+          "wallMillis": 1319,
+          "peakLiveBytes": 272959232,
+          "peakUsedBytes": 378260920
+        }
+      },
+      {
+        "typeSeed": 5,
+        "rowSeed": 105,
+        "differingDoubles": 0,
+        "equalResult": true,
+        "compute": {
+          "wallMillis": 1284,
+          "peakLiveBytes": 265619248,
+          "peakUsedBytes": 471877712
+        }
+      }
+    ]
+  },
+  "repositories": [
+    {
+      "name": "commons-lang",
+      "origin": "clone",
+      "commitId": "598dfc163b8b410fb3bb8794521206ec8dcec82a",
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "baselineTypes": 364,
+          "determinism": {
+            "tables": [
+              {
+                "table": "graph_metric",
+                "firstDump": "analyzer/target/pagerank-determinism/commons-lang-DEFAULT-run1-graph_metric.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/commons-lang-DEFAULT-run2-graph_metric.tsv",
+                "rows": 382,
+                "firstSha256": "44ee00dc824f4d0eb50d3bb9fab067ceebd934c526ed2c1592fb068e43abb36d",
+                "secondSha256": "44ee00dc824f4d0eb50d3bb9fab067ceebd934c526ed2c1592fb068e43abb36d",
+                "identical": true
+              },
+              {
+                "table": "package_edge",
+                "firstDump": "analyzer/target/pagerank-determinism/commons-lang-DEFAULT-run1-package_edge.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/commons-lang-DEFAULT-run2-package_edge.tsv",
+                "rows": 50,
+                "firstSha256": "7f305d2e77b05f57c22062379e14d62715a7b59eb25c66f158ad44530a2f1903",
+                "secondSha256": "7f305d2e77b05f57c22062379e14d62715a7b59eb25c66f158ad44530a2f1903",
+                "identical": true
+              }
+            ],
+            "countersEqual": true,
+            "identical": true
+          },
+          "typeShape": {
+            "rows": 364,
+            "largestCycle": 70,
+            "components": 0,
+            "betweennessRows": 0,
+            "sinks": 130,
+            "neverTargeted": 106
+          },
+          "packageShape": {
+            "rows": 18,
+            "largestCycle": 13,
+            "components": 1,
+            "betweennessRows": 18,
+            "sinks": 1,
+            "neverTargeted": 4
+          },
+          "cyclesInOneTopLevelType": 18,
+          "topPagerank": [
+            {
+              "id": "type:org.apache.commons.lang3.ArrayUtils",
+              "value": 0.043516921809670116,
+              "fanIn": 31,
+              "fanOut": 14
+            },
+            {
+              "id": "type:org.apache.commons.lang3.StringUtils",
+              "value": 0.03601857167223864,
+              "fanIn": 29,
+              "fanOut": 12
+            },
+            {
+              "id": "type:org.apache.commons.lang3.builder.ToStringStyle",
+              "value": 0.023064084350674783,
+              "fanIn": 17,
+              "fanOut": 12
+            },
+            {
+              "id": "type:org.apache.commons.lang3.ObjectUtils",
+              "value": 0.01932696365319367,
+              "fanIn": 19,
+              "fanOut": 10
+            },
+            {
+              "id": "type:org.apache.commons.lang3.ClassUtils",
+              "value": 0.016352784527157528,
+              "fanIn": 18,
+              "fanOut": 3
+            },
+            {
+              "id": "type:org.apache.commons.lang3.Validate",
+              "value": 0.013450081008599131,
+              "fanIn": 18,
+              "fanOut": 3
+            },
+            {
+              "id": "type:org.apache.commons.lang3.time.FastDatePrinter$Rule",
+              "value": 0.013250391524619475,
+              "fanIn": 8,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.apache.commons.lang3.text.translate.CharSequenceTranslator",
+              "value": 0.012480672122886277,
+              "fanIn": 9,
+              "fanOut": 2
+            },
+            {
+              "id": "type:org.apache.commons.lang3.function.FailableSupplier",
+              "value": 0.012023339605040538,
+              "fanIn": 11,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.apache.commons.lang3.mutable.Mutable",
+              "value": 0.011422812935047018,
+              "fanIn": 8,
+              "fanOut": 0
+            }
+          ],
+          "topPagerankOut": [
+            {
+              "id": "type:org.apache.commons.lang3.builder.ReflectionDiffBuilder",
+              "value": 0.0497270112896399,
+              "fanIn": 1,
+              "fanOut": 11
+            },
+            {
+              "id": "type:org.apache.commons.lang3.builder.ReflectionDiffBuilder$Builder",
+              "value": 0.04550242770043596,
+              "fanIn": 1,
+              "fanOut": 2
+            },
+            {
+              "id": "type:org.apache.commons.lang3.builder.ToStringStyle",
+              "value": 0.02385109718034277,
+              "fanIn": 17,
+              "fanOut": 12
+            },
+            {
+              "id": "type:org.apache.commons.lang3.time.FastDateParser",
+              "value": 0.021698821880439978,
+              "fanIn": 10,
+              "fanOut": 11
+            },
+            {
+              "id": "type:org.apache.commons.lang3.time.FastDatePrinter",
+              "value": 0.020165367654976223,
+              "fanIn": 10,
+              "fanOut": 21
+            },
+            {
+              "id": "type:org.apache.commons.lang3.concurrent.UncheckedFutureImpl",
+              "value": 0.01644879630194252,
+              "fanIn": 1,
+              "fanOut": 5
+            },
+            {
+              "id": "type:org.apache.commons.lang3.concurrent.EventCountCircuitBreaker",
+              "value": 0.015424924111010967,
+              "fanIn": 3,
+              "fanOut": 6
+            },
+            {
+              "id": "type:org.apache.commons.lang3.concurrent.UncheckedFuture",
+              "value": 0.015209583083428848,
+              "fanIn": 1,
+              "fanOut": 2
+            },
+            {
+              "id": "type:org.apache.commons.lang3.Functions",
+              "value": 0.014207513624284235,
+              "fanIn": 1,
+              "fanOut": 13
+            },
+            {
+              "id": "type:org.apache.commons.lang3.Streams$FailableStream",
+              "value": 0.013615046791217634,
+              "fanIn": 2,
+              "fanOut": 4
+            }
+          ],
+          "runs": [
+            {
+              "run": 1,
+              "analysisId": "an_01M5N2Z5T694Z7571TZDW7FWA2",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 1595,
+                "externalPairs": 603,
+                "packageCycles": 1,
+                "packageEdges": 50,
+                "packageNodes": 18,
+                "packagesInCycles": 13,
+                "pagerankUnconverged": 0,
+                "selfPairs": 235,
+                "typeCycles": 23,
+                "typeEdges": 721,
+                "typeNodes": 364,
+                "typesInCycles": 131
+              },
+              "durationMs": 24,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 2495,
+              "heap": {
+                "peakLiveBytes": 118043984,
+                "peakUsedBytes": 233956408
+              },
+              "loadAverage1m": {
+                "start": 5.8984375,
+                "end": 5.8984375
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/commons-lang-DEFAULT-run1-graph_metric.tsv",
+                "rows": 382,
+                "sha256": "44ee00dc824f4d0eb50d3bb9fab067ceebd934c526ed2c1592fb068e43abb36d"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/commons-lang-DEFAULT-run1-package_edge.tsv",
+                "rows": 50,
+                "sha256": "7f305d2e77b05f57c22062379e14d62715a7b59eb25c66f158ad44530a2f1903"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 364,
+                  "sumMinusOne": -1.2989609388114332e-14,
+                  "exactSumMinusOne": -1.5064989186686084e-14
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 364,
+                  "sumMinusOne": 1.7763568394002505e-15,
+                  "exactSumMinusOne": 5.106158551537732e-15
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 18,
+                  "sumMinusOne": 0.0,
+                  "exactSumMinusOne": -2.7755575615628914e-17
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 18,
+                  "sumMinusOne": 2.220446049250313e-16,
+                  "exactSumMinusOne": 3.8163916471489756e-17
+                }
+              ]
+            },
+            {
+              "run": 2,
+              "analysisId": "an_01M5N2Z89VQTBJYCQKF427HT2M",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 1595,
+                "externalPairs": 603,
+                "packageCycles": 1,
+                "packageEdges": 50,
+                "packageNodes": 18,
+                "packagesInCycles": 13,
+                "pagerankUnconverged": 0,
+                "selfPairs": 235,
+                "typeCycles": 23,
+                "typeEdges": 721,
+                "typeNodes": 364,
+                "typesInCycles": 131
+              },
+              "durationMs": 13,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 1102,
+              "heap": {
+                "peakLiveBytes": 119214488,
+                "peakUsedBytes": 322105816
+              },
+              "loadAverage1m": {
+                "start": 5.8984375,
+                "end": 5.8984375
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/commons-lang-DEFAULT-run2-graph_metric.tsv",
+                "rows": 382,
+                "sha256": "44ee00dc824f4d0eb50d3bb9fab067ceebd934c526ed2c1592fb068e43abb36d"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/commons-lang-DEFAULT-run2-package_edge.tsv",
+                "rows": 50,
+                "sha256": "7f305d2e77b05f57c22062379e14d62715a7b59eb25c66f158ad44530a2f1903"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 364,
+                  "sumMinusOne": -1.2989609388114332e-14,
+                  "exactSumMinusOne": -1.5064989186686084e-14
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 364,
+                  "sumMinusOne": 1.7763568394002505e-15,
+                  "exactSumMinusOne": 5.106158551537732e-15
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 18,
+                  "sumMinusOne": 0.0,
+                  "exactSumMinusOne": -2.7755575615628914e-17
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 18,
+                  "sumMinusOne": 2.220446049250313e-16,
+                  "exactSumMinusOne": 3.8163916471489756e-17
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "selection": "ALL",
+          "baselineTypes": 958,
+          "determinism": {
+            "tables": [
+              {
+                "table": "graph_metric",
+                "firstDump": "analyzer/target/pagerank-determinism/commons-lang-ALL-run1-graph_metric.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/commons-lang-ALL-run2-graph_metric.tsv",
+                "rows": 978,
+                "firstSha256": "511013674e2e4509d1fe166f5325c891885572ced6932cc454ec5d9922c87c9a",
+                "secondSha256": "511013674e2e4509d1fe166f5325c891885572ced6932cc454ec5d9922c87c9a",
+                "identical": true
+              },
+              {
+                "table": "package_edge",
+                "firstDump": "analyzer/target/pagerank-determinism/commons-lang-ALL-run1-package_edge.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/commons-lang-ALL-run2-package_edge.tsv",
+                "rows": 64,
+                "firstSha256": "fb567f6d7037b8408284071bd1213f248539d1c88946d4f1a490ed4ea7adac61",
+                "secondSha256": "fb567f6d7037b8408284071bd1213f248539d1c88946d4f1a490ed4ea7adac61",
+                "identical": true
+              }
+            ],
+            "countersEqual": true,
+            "identical": true
+          },
+          "typeShape": {
+            "rows": 958,
+            "largestCycle": 70,
+            "components": 0,
+            "betweennessRows": 0,
+            "sinks": 285,
+            "neverTargeted": 363
+          },
+          "packageShape": {
+            "rows": 20,
+            "largestCycle": 15,
+            "components": 1,
+            "betweennessRows": 20,
+            "sinks": 3,
+            "neverTargeted": 2
+          },
+          "cyclesInOneTopLevelType": 22,
+          "topPagerank": [
+            {
+              "id": "type:org.apache.commons.lang3.builder.ToStringStyle",
+              "value": 0.043749320422918944,
+              "fanIn": 28,
+              "fanOut": 12
+            },
+            {
+              "id": "type:org.apache.commons.lang3.ArrayUtils",
+              "value": 0.034701863025751574,
+              "fanIn": 53,
+              "fanOut": 14
+            },
+            {
+              "id": "type:org.apache.commons.lang3.StringUtils",
+              "value": 0.03196285196425086,
+              "fanIn": 49,
+              "fanOut": 12
+            },
+            {
+              "id": "type:org.apache.commons.lang3.AbstractLangTest",
+              "value": 0.01997294250576484,
+              "fanIn": 185,
+              "fanOut": 1
+            },
+            {
+              "id": "type:org.apache.commons.lang3.Validate",
+              "value": 0.01905746946240461,
+              "fanIn": 73,
+              "fanOut": 3
+            },
+            {
+              "id": "type:org.apache.commons.lang3.ObjectUtils",
+              "value": 0.018720187633757927,
+              "fanIn": 22,
+              "fanOut": 10
+            },
+            {
+              "id": "type:org.apache.commons.lang3.LangAssertions",
+              "value": 0.016065938797228046,
+              "fanIn": 141,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.apache.commons.lang3.ClassUtils",
+              "value": 0.015518983431615811,
+              "fanIn": 21,
+              "fanOut": 3
+            },
+            {
+              "id": "type:org.apache.commons.lang3.function.FailableSupplier",
+              "value": 0.00918115804440189,
+              "fanIn": 22,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.apache.commons.lang3.Strings",
+              "value": 0.00906177163518978,
+              "fanIn": 12,
+              "fanOut": 8
+            }
+          ],
+          "topPagerankOut": [
+            {
+              "id": "type:org.apache.commons.lang3.function.FailableTest",
+              "value": 0.02015423828394588,
+              "fanIn": 0,
+              "fanOut": 56
+            },
+            {
+              "id": "type:org.apache.commons.lang3.time.FastDatePrinter",
+              "value": 0.011009267698578207,
+              "fanIn": 13,
+              "fanOut": 21
+            },
+            {
+              "id": "type:org.apache.commons.lang3.time.FastDateParser",
+              "value": 0.008595774721438375,
+              "fanIn": 15,
+              "fanOut": 11
+            },
+            {
+              "id": "type:org.apache.commons.lang3.builder.EqualsBuilderTest",
+              "value": 0.008174761159654277,
+              "fanIn": 0,
+              "fanOut": 18
+            },
+            {
+              "id": "type:org.apache.commons.lang3.builder.ToStringStyle",
+              "value": 0.007688299285153176,
+              "fanIn": 28,
+              "fanOut": 12
+            },
+            {
+              "id": "type:org.apache.commons.lang3.builder.ToStringBuilderTest",
+              "value": 0.00743359903639681,
+              "fanIn": 0,
+              "fanOut": 18
+            },
+            {
+              "id": "type:org.apache.commons.lang3.reflect.MethodUtilsTest",
+              "value": 0.006233364624474792,
+              "fanIn": 0,
+              "fanOut": 23
+            },
+            {
+              "id": "type:org.apache.commons.lang3.reflect.TypeUtilsTest",
+              "value": 0.006021997799307815,
+              "fanIn": 0,
+              "fanOut": 15
+            },
+            {
+              "id": "type:org.apache.commons.lang3.event.EventUtilsTest",
+              "value": 0.005688804724861312,
+              "fanIn": 0,
+              "fanOut": 10
+            },
+            {
+              "id": "type:org.apache.commons.lang3.concurrent.EventCountCircuitBreaker",
+              "value": 0.005347139779857411,
+              "fanIn": 5,
+              "fanOut": 6
+            }
+          ],
+          "runs": [
+            {
+              "run": 1,
+              "analysisId": "an_01M5N2Z9DS6JG8J0DQ0HSMS0ZS",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 3072,
+                "externalPairs": 2096,
+                "packageCycles": 1,
+                "packageEdges": 64,
+                "packageNodes": 20,
+                "packagesInCycles": 15,
+                "pagerankUnconverged": 0,
+                "selfPairs": 371,
+                "typeCycles": 27,
+                "typeEdges": 2105,
+                "typeNodes": 958,
+                "typesInCycles": 139
+              },
+              "durationMs": 26,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 13550,
+              "heap": {
+                "peakLiveBytes": 246277976,
+                "peakUsedBytes": 663840184
+              },
+              "loadAverage1m": {
+                "start": 5.8984375,
+                "end": 5.7666015625
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/commons-lang-ALL-run1-graph_metric.tsv",
+                "rows": 978,
+                "sha256": "511013674e2e4509d1fe166f5325c891885572ced6932cc454ec5d9922c87c9a"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/commons-lang-ALL-run1-package_edge.tsv",
+                "rows": 64,
+                "sha256": "fb567f6d7037b8408284071bd1213f248539d1c88946d4f1a490ed4ea7adac61"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 958,
+                  "sumMinusOne": -1.7541523789077473e-14,
+                  "exactSumMinusOne": -1.5626768542359448e-14
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 958,
+                  "sumMinusOne": -8.881784197001252e-16,
+                  "exactSumMinusOne": -8.174884380540703e-17
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 20,
+                  "sumMinusOne": 2.220446049250313e-16,
+                  "exactSumMinusOne": 2.6020852139652106e-16
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 20,
+                  "sumMinusOne": 2.220446049250313e-16,
+                  "exactSumMinusOne": 1.1622647289044608e-16
+                }
+              ]
+            },
+            {
+              "run": 2,
+              "analysisId": "an_01M5N2ZPPGF96Q2RN9HTENJQD6",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 3072,
+                "externalPairs": 2096,
+                "packageCycles": 1,
+                "packageEdges": 64,
+                "packageNodes": 20,
+                "packagesInCycles": 15,
+                "pagerankUnconverged": 0,
+                "selfPairs": 371,
+                "typeCycles": 27,
+                "typeEdges": 2105,
+                "typeNodes": 958,
+                "typesInCycles": 139
+              },
+              "durationMs": 24,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 12616,
+              "heap": {
+                "peakLiveBytes": 254897328,
+                "peakUsedBytes": 604697720
+              },
+              "loadAverage1m": {
+                "start": 5.7666015625,
+                "end": 6.458984375
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/commons-lang-ALL-run2-graph_metric.tsv",
+                "rows": 978,
+                "sha256": "511013674e2e4509d1fe166f5325c891885572ced6932cc454ec5d9922c87c9a"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/commons-lang-ALL-run2-package_edge.tsv",
+                "rows": 64,
+                "sha256": "fb567f6d7037b8408284071bd1213f248539d1c88946d4f1a490ed4ea7adac61"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 958,
+                  "sumMinusOne": -1.7541523789077473e-14,
+                  "exactSumMinusOne": -1.5626768542359448e-14
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 958,
+                  "sumMinusOne": -8.881784197001252e-16,
+                  "exactSumMinusOne": -8.174884380540703e-17
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 20,
+                  "sumMinusOne": 2.220446049250313e-16,
+                  "exactSumMinusOne": 2.6020852139652106e-16
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 20,
+                  "sumMinusOne": 2.220446049250313e-16,
+                  "exactSumMinusOne": 1.1622647289044608e-16
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "broken-tree",
+      "origin": "derived",
+      "commitId": "961b02c3ce73d09e98efd9817e9639883c1e0dec",
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "baselineTypes": 362,
+          "determinism": {
+            "tables": [
+              {
+                "table": "graph_metric",
+                "firstDump": "analyzer/target/pagerank-determinism/broken-tree-DEFAULT-run1-graph_metric.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/broken-tree-DEFAULT-run2-graph_metric.tsv",
+                "rows": 380,
+                "firstSha256": "d0493c9f65e9568dfc7556e44fdd0fe1d801ce0897b02964992ae03c2f40aa31",
+                "secondSha256": "d0493c9f65e9568dfc7556e44fdd0fe1d801ce0897b02964992ae03c2f40aa31",
+                "identical": true
+              },
+              {
+                "table": "package_edge",
+                "firstDump": "analyzer/target/pagerank-determinism/broken-tree-DEFAULT-run1-package_edge.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/broken-tree-DEFAULT-run2-package_edge.tsv",
+                "rows": 49,
+                "firstSha256": "15a1e94712ff2f424b6d62a21a702609147d389a2ca93d3259cae2f328400ff5",
+                "secondSha256": "15a1e94712ff2f424b6d62a21a702609147d389a2ca93d3259cae2f328400ff5",
+                "identical": true
+              }
+            ],
+            "countersEqual": true,
+            "identical": true
+          },
+          "typeShape": {
+            "rows": 362,
+            "largestCycle": 67,
+            "components": 0,
+            "betweennessRows": 0,
+            "sinks": 130,
+            "neverTargeted": 105
+          },
+          "packageShape": {
+            "rows": 18,
+            "largestCycle": 13,
+            "components": 1,
+            "betweennessRows": 18,
+            "sinks": 1,
+            "neverTargeted": 4
+          },
+          "cyclesInOneTopLevelType": 18,
+          "topPagerank": [
+            {
+              "id": "type:org.apache.commons.lang3.ArrayUtils",
+              "value": 0.041993160844247285,
+              "fanIn": 30,
+              "fanOut": 14
+            },
+            {
+              "id": "type:org.apache.commons.lang3.StringUtils",
+              "value": 0.035614091651777834,
+              "fanIn": 29,
+              "fanOut": 12
+            },
+            {
+              "id": "type:org.apache.commons.lang3.builder.ToStringStyle",
+              "value": 0.02235197101259724,
+              "fanIn": 16,
+              "fanOut": 12
+            },
+            {
+              "id": "type:org.apache.commons.lang3.ObjectUtils",
+              "value": 0.01801893735680918,
+              "fanIn": 17,
+              "fanOut": 10
+            },
+            {
+              "id": "type:org.apache.commons.lang3.ClassUtils",
+              "value": 0.01584514244074195,
+              "fanIn": 17,
+              "fanOut": 3
+            },
+            {
+              "id": "type:org.apache.commons.lang3.time.FastDatePrinter$Rule",
+              "value": 0.013277667674144634,
+              "fanIn": 8,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.apache.commons.lang3.Validate",
+              "value": 0.013146307922913157,
+              "fanIn": 17,
+              "fanOut": 3
+            },
+            {
+              "id": "type:org.apache.commons.lang3.text.translate.CharSequenceTranslator",
+              "value": 0.012463552228741048,
+              "fanIn": 9,
+              "fanOut": 2
+            },
+            {
+              "id": "type:org.apache.commons.lang3.function.FailableSupplier",
+              "value": 0.012033200598217733,
+              "fanIn": 11,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.apache.commons.lang3.function.FailableFunction",
+              "value": 0.011358781552823513,
+              "fanIn": 9,
+              "fanOut": 0
+            }
+          ],
+          "topPagerankOut": [
+            {
+              "id": "type:org.apache.commons.lang3.builder.ReflectionDiffBuilder",
+              "value": 0.05228570731220763,
+              "fanIn": 1,
+              "fanOut": 11
+            },
+            {
+              "id": "type:org.apache.commons.lang3.builder.ReflectionDiffBuilder$Builder",
+              "value": 0.04777492414972036,
+              "fanIn": 1,
+              "fanOut": 2
+            },
+            {
+              "id": "type:org.apache.commons.lang3.builder.ToStringStyle",
+              "value": 0.02453341326379514,
+              "fanIn": 16,
+              "fanOut": 12
+            },
+            {
+              "id": "type:org.apache.commons.lang3.time.FastDateParser",
+              "value": 0.021645986619842017,
+              "fanIn": 10,
+              "fanOut": 11
+            },
+            {
+              "id": "type:org.apache.commons.lang3.time.FastDatePrinter",
+              "value": 0.020096602606388767,
+              "fanIn": 10,
+              "fanOut": 21
+            },
+            {
+              "id": "type:org.apache.commons.lang3.concurrent.UncheckedFutureImpl",
+              "value": 0.016504256822685175,
+              "fanIn": 1,
+              "fanOut": 5
+            },
+            {
+              "id": "type:org.apache.commons.lang3.concurrent.EventCountCircuitBreaker",
+              "value": 0.01533632457204137,
+              "fanIn": 3,
+              "fanOut": 6
+            },
+            {
+              "id": "type:org.apache.commons.lang3.concurrent.UncheckedFuture",
+              "value": 0.01525678297244568,
+              "fanIn": 1,
+              "fanOut": 2
+            },
+            {
+              "id": "type:org.apache.commons.lang3.Functions",
+              "value": 0.01414514749818329,
+              "fanIn": 1,
+              "fanOut": 13
+            },
+            {
+              "id": "type:org.apache.commons.lang3.Streams$FailableStream",
+              "value": 0.013553197641946842,
+              "fanIn": 2,
+              "fanOut": 4
+            }
+          ],
+          "runs": [
+            {
+              "run": 1,
+              "analysisId": "an_01M5N3032EQAVQGJJ46EQKHSCX",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 1569,
+                "externalPairs": 599,
+                "packageCycles": 1,
+                "packageEdges": 49,
+                "packageNodes": 18,
+                "packagesInCycles": 13,
+                "pagerankUnconverged": 0,
+                "selfPairs": 233,
+                "typeCycles": 24,
+                "typeEdges": 708,
+                "typeNodes": 362,
+                "typesInCycles": 130
+              },
+              "durationMs": 11,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 895,
+              "heap": {
+                "peakLiveBytes": 116169456,
+                "peakUsedBytes": 256154352
+              },
+              "loadAverage1m": {
+                "start": 6.458984375,
+                "end": 6.458984375
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/broken-tree-DEFAULT-run1-graph_metric.tsv",
+                "rows": 380,
+                "sha256": "d0493c9f65e9568dfc7556e44fdd0fe1d801ce0897b02964992ae03c2f40aa31"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/broken-tree-DEFAULT-run1-package_edge.tsv",
+                "rows": 49,
+                "sha256": "15a1e94712ff2f424b6d62a21a702609147d389a2ca93d3259cae2f328400ff5"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 362,
+                  "sumMinusOne": -6.5503158452884236e-15,
+                  "exactSumMinusOne": -8.426636124991838e-15
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 362,
+                  "sumMinusOne": -5.995204332975845e-15,
+                  "exactSumMinusOne": -8.471847355584483e-15
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 18,
+                  "sumMinusOne": 0.0,
+                  "exactSumMinusOne": -1.942890293094024e-16
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 18,
+                  "sumMinusOne": -3.3306690738754696e-16,
+                  "exactSumMinusOne": -4.961309141293668e-16
+                }
+              ]
+            },
+            {
+              "run": 2,
+              "analysisId": "an_01M5N303ZGFSQK4Z1QPPHWCTMD",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 1569,
+                "externalPairs": 599,
+                "packageCycles": 1,
+                "packageEdges": 49,
+                "packageNodes": 18,
+                "packagesInCycles": 13,
+                "pagerankUnconverged": 0,
+                "selfPairs": 233,
+                "typeCycles": 24,
+                "typeEdges": 708,
+                "typeNodes": 362,
+                "typesInCycles": 130
+              },
+              "durationMs": 10,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 793,
+              "heap": {
+                "peakLiveBytes": 120085608,
+                "peakUsedBytes": 400130216
+              },
+              "loadAverage1m": {
+                "start": 6.458984375,
+                "end": 6.458984375
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/broken-tree-DEFAULT-run2-graph_metric.tsv",
+                "rows": 380,
+                "sha256": "d0493c9f65e9568dfc7556e44fdd0fe1d801ce0897b02964992ae03c2f40aa31"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/broken-tree-DEFAULT-run2-package_edge.tsv",
+                "rows": 49,
+                "sha256": "15a1e94712ff2f424b6d62a21a702609147d389a2ca93d3259cae2f328400ff5"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 362,
+                  "sumMinusOne": -6.5503158452884236e-15,
+                  "exactSumMinusOne": -8.426636124991838e-15
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 362,
+                  "sumMinusOne": -5.995204332975845e-15,
+                  "exactSumMinusOne": -8.471847355584483e-15
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 18,
+                  "sumMinusOne": 0.0,
+                  "exactSumMinusOne": -1.942890293094024e-16
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 18,
+                  "sumMinusOne": -3.3306690738754696e-16,
+                  "exactSumMinusOne": -4.961309141293668e-16
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "selection": "ALL",
+          "baselineTypes": 956,
+          "determinism": {
+            "tables": [
+              {
+                "table": "graph_metric",
+                "firstDump": "analyzer/target/pagerank-determinism/broken-tree-ALL-run1-graph_metric.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/broken-tree-ALL-run2-graph_metric.tsv",
+                "rows": 976,
+                "firstSha256": "bdff0e22a1f51ea9b866e7a1fa677aacc4f0e690380948b972f436905b1a7990",
+                "secondSha256": "bdff0e22a1f51ea9b866e7a1fa677aacc4f0e690380948b972f436905b1a7990",
+                "identical": true
+              },
+              {
+                "table": "package_edge",
+                "firstDump": "analyzer/target/pagerank-determinism/broken-tree-ALL-run1-package_edge.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/broken-tree-ALL-run2-package_edge.tsv",
+                "rows": 63,
+                "firstSha256": "37f45a13cfc53c51676cd9f989f38d0214ef2200c7c84d2bea0d7f290fdc1ee2",
+                "secondSha256": "37f45a13cfc53c51676cd9f989f38d0214ef2200c7c84d2bea0d7f290fdc1ee2",
+                "identical": true
+              }
+            ],
+            "countersEqual": true,
+            "identical": true
+          },
+          "typeShape": {
+            "rows": 956,
+            "largestCycle": 67,
+            "components": 0,
+            "betweennessRows": 0,
+            "sinks": 285,
+            "neverTargeted": 363
+          },
+          "packageShape": {
+            "rows": 20,
+            "largestCycle": 15,
+            "components": 1,
+            "betweennessRows": 20,
+            "sinks": 3,
+            "neverTargeted": 2
+          },
+          "cyclesInOneTopLevelType": 22,
+          "topPagerank": [
+            {
+              "id": "type:org.apache.commons.lang3.builder.ToStringStyle",
+              "value": 0.0434369210229375,
+              "fanIn": 27,
+              "fanOut": 12
+            },
+            {
+              "id": "type:org.apache.commons.lang3.ArrayUtils",
+              "value": 0.033908540023629856,
+              "fanIn": 52,
+              "fanOut": 14
+            },
+            {
+              "id": "type:org.apache.commons.lang3.StringUtils",
+              "value": 0.03175059264497671,
+              "fanIn": 49,
+              "fanOut": 12
+            },
+            {
+              "id": "type:org.apache.commons.lang3.AbstractLangTest",
+              "value": 0.02000518324379717,
+              "fanIn": 185,
+              "fanOut": 1
+            },
+            {
+              "id": "type:org.apache.commons.lang3.Validate",
+              "value": 0.01890925501237384,
+              "fanIn": 72,
+              "fanOut": 3
+            },
+            {
+              "id": "type:org.apache.commons.lang3.ObjectUtils",
+              "value": 0.01805847507659878,
+              "fanIn": 20,
+              "fanOut": 10
+            },
+            {
+              "id": "type:org.apache.commons.lang3.LangAssertions",
+              "value": 0.016079950427939513,
+              "fanIn": 141,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.apache.commons.lang3.ClassUtils",
+              "value": 0.015269917156357051,
+              "fanIn": 20,
+              "fanOut": 3
+            },
+            {
+              "id": "type:org.apache.commons.lang3.function.FailableSupplier",
+              "value": 0.009177783329774236,
+              "fanIn": 22,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.apache.commons.lang3.Strings",
+              "value": 0.009012270055125195,
+              "fanIn": 12,
+              "fanOut": 8
+            }
+          ],
+          "topPagerankOut": [
+            {
+              "id": "type:org.apache.commons.lang3.function.FailableTest",
+              "value": 0.020204344445581307,
+              "fanIn": 0,
+              "fanOut": 56
+            },
+            {
+              "id": "type:org.apache.commons.lang3.time.FastDatePrinter",
+              "value": 0.011039581162651234,
+              "fanIn": 13,
+              "fanOut": 21
+            },
+            {
+              "id": "type:org.apache.commons.lang3.time.FastDateParser",
+              "value": 0.008618654620941956,
+              "fanIn": 15,
+              "fanOut": 11
+            },
+            {
+              "id": "type:org.apache.commons.lang3.builder.EqualsBuilderTest",
+              "value": 0.008208463331401641,
+              "fanIn": 0,
+              "fanOut": 18
+            },
+            {
+              "id": "type:org.apache.commons.lang3.builder.ToStringStyle",
+              "value": 0.007785310863977533,
+              "fanIn": 27,
+              "fanOut": 12
+            },
+            {
+              "id": "type:org.apache.commons.lang3.builder.ToStringBuilderTest",
+              "value": 0.007483220436413905,
+              "fanIn": 0,
+              "fanOut": 18
+            },
+            {
+              "id": "type:org.apache.commons.lang3.reflect.MethodUtilsTest",
+              "value": 0.006252786677352785,
+              "fanIn": 0,
+              "fanOut": 23
+            },
+            {
+              "id": "type:org.apache.commons.lang3.reflect.TypeUtilsTest",
+              "value": 0.006040660721285401,
+              "fanIn": 0,
+              "fanOut": 15
+            },
+            {
+              "id": "type:org.apache.commons.lang3.event.EventUtilsTest",
+              "value": 0.005705383079192603,
+              "fanIn": 0,
+              "fanOut": 10
+            },
+            {
+              "id": "type:org.apache.commons.lang3.concurrent.EventCountCircuitBreaker",
+              "value": 0.0053603383084164435,
+              "fanIn": 5,
+              "fanOut": 6
+            }
+          ],
+          "runs": [
+            {
+              "run": 1,
+              "analysisId": "an_01M5N304SP3VM1BVRAZMMR4M6C",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 3046,
+                "externalPairs": 2094,
+                "packageCycles": 1,
+                "packageEdges": 63,
+                "packageNodes": 20,
+                "packagesInCycles": 15,
+                "pagerankUnconverged": 0,
+                "selfPairs": 369,
+                "typeCycles": 28,
+                "typeEdges": 2090,
+                "typeNodes": 956,
+                "typesInCycles": 138
+              },
+              "durationMs": 23,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 12314,
+              "heap": {
+                "peakLiveBytes": 270500336,
+                "peakUsedBytes": 641696240
+              },
+              "loadAverage1m": {
+                "start": 6.458984375,
+                "end": 6.2216796875
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/broken-tree-ALL-run1-graph_metric.tsv",
+                "rows": 976,
+                "sha256": "bdff0e22a1f51ea9b866e7a1fa677aacc4f0e690380948b972f436905b1a7990"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/broken-tree-ALL-run1-package_edge.tsv",
+                "rows": 63,
+                "sha256": "37f45a13cfc53c51676cd9f989f38d0214ef2200c7c84d2bea0d7f290fdc1ee2"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 956,
+                  "sumMinusOne": -2.808864252301646e-14,
+                  "exactSumMinusOne": -2.191763480777209e-14
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 956,
+                  "sumMinusOne": -1.4765966227514582e-14,
+                  "exactSumMinusOne": -5.9162744148189006e-15
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 20,
+                  "sumMinusOne": 2.220446049250313e-16,
+                  "exactSumMinusOne": 3.9898639947466563e-17
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 20,
+                  "sumMinusOne": 4.440892098500626e-16,
+                  "exactSumMinusOne": 3.7470027081099033e-16
+                }
+              ]
+            },
+            {
+              "run": 2,
+              "analysisId": "an_01M5N30GVPE6AMH0FX6AVN35FG",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 3046,
+                "externalPairs": 2094,
+                "packageCycles": 1,
+                "packageEdges": 63,
+                "packageNodes": 20,
+                "packagesInCycles": 15,
+                "pagerankUnconverged": 0,
+                "selfPairs": 369,
+                "typeCycles": 28,
+                "typeEdges": 2090,
+                "typeNodes": 956,
+                "typesInCycles": 138
+              },
+              "durationMs": 25,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 12238,
+              "heap": {
+                "peakLiveBytes": 267601856,
+                "peakUsedBytes": 625503608
+              },
+              "loadAverage1m": {
+                "start": 6.2216796875,
+                "end": 5.87939453125
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/broken-tree-ALL-run2-graph_metric.tsv",
+                "rows": 976,
+                "sha256": "bdff0e22a1f51ea9b866e7a1fa677aacc4f0e690380948b972f436905b1a7990"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/broken-tree-ALL-run2-package_edge.tsv",
+                "rows": 63,
+                "sha256": "37f45a13cfc53c51676cd9f989f38d0214ef2200c7c84d2bea0d7f290fdc1ee2"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 956,
+                  "sumMinusOne": -2.808864252301646e-14,
+                  "exactSumMinusOne": -2.191763480777209e-14
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 956,
+                  "sumMinusOne": -1.4765966227514582e-14,
+                  "exactSumMinusOne": -5.9162744148189006e-15
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 20,
+                  "sumMinusOne": 2.220446049250313e-16,
+                  "exactSumMinusOne": 3.9898639947466563e-17
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 20,
+                  "sumMinusOne": 4.440892098500626e-16,
+                  "exactSumMinusOne": 3.7470027081099033e-16
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "junit5",
+      "origin": "clone",
+      "commitId": "f59f60d2cebdf2224235d81f781b1f310cbc8138",
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "baselineTypes": 1110,
+          "determinism": {
+            "tables": [
+              {
+                "table": "graph_metric",
+                "firstDump": "analyzer/target/pagerank-determinism/junit5-DEFAULT-run1-graph_metric.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/junit5-DEFAULT-run2-graph_metric.tsv",
+                "rows": 1186,
+                "firstSha256": "dbe38ed0e43feb1aae838d67dff0a646afb1311b867a655c782e4a0d8647f9b2",
+                "secondSha256": "dbe38ed0e43feb1aae838d67dff0a646afb1311b867a655c782e4a0d8647f9b2",
+                "identical": true
+              },
+              {
+                "table": "package_edge",
+                "firstDump": "analyzer/target/pagerank-determinism/junit5-DEFAULT-run1-package_edge.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/junit5-DEFAULT-run2-package_edge.tsv",
+                "rows": 384,
+                "firstSha256": "ea484ca5b8889a89b6a961757f6cdcf18ac6b14995b5f5019887ef3ac18dc92e",
+                "secondSha256": "ea484ca5b8889a89b6a961757f6cdcf18ac6b14995b5f5019887ef3ac18dc92e",
+                "identical": true
+              }
+            ],
+            "countersEqual": true,
+            "identical": true
+          },
+          "typeShape": {
+            "rows": 1110,
+            "largestCycle": 15,
+            "components": 0,
+            "betweennessRows": 0,
+            "sinks": 180,
+            "neverTargeted": 156
+          },
+          "packageShape": {
+            "rows": 76,
+            "largestCycle": 6,
+            "components": 4,
+            "betweennessRows": 76,
+            "sinks": 7,
+            "neverTargeted": 17
+          },
+          "cyclesInOneTopLevelType": 23,
+          "topPagerank": [
+            {
+              "id": "type:org.junit.platform.commons.util.Preconditions",
+              "value": 0.05962977414107872,
+              "fanIn": 231,
+              "fanOut": 3
+            },
+            {
+              "id": "type:org.junit.platform.commons.JUnitException",
+              "value": 0.04201553572560083,
+              "fanIn": 103,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.junit.platform.commons.util.StringUtils",
+              "value": 0.03125563686676822,
+              "fanIn": 48,
+              "fanOut": 6
+            },
+            {
+              "id": "type:org.junit.platform.commons.annotation.Contract",
+              "value": 0.02945319380454413,
+              "fanIn": 18,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.junit.platform.commons.PreconditionViolationException",
+              "value": 0.02627463658281791,
+              "fanIn": 45,
+              "fanOut": 1
+            },
+            {
+              "id": "type:org.junit.platform.commons.util.ToStringBuilder",
+              "value": 0.015674219999169865,
+              "fanIn": 65,
+              "fanOut": 2
+            },
+            {
+              "id": "type:org.junit.platform.commons.util.StringUtils$TwoPartSplitResult",
+              "value": 0.012806595645750015,
+              "fanIn": 3,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.junit.jupiter.api.extension.Extension",
+              "value": 0.012581000016527672,
+              "fanIn": 43,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.junit.jupiter.api.extension.ExtensionContext",
+              "value": 0.011955940800159015,
+              "fanIn": 140,
+              "fanOut": 13
+            },
+            {
+              "id": "type:org.junit.platform.commons.util.ExceptionUtils",
+              "value": 0.01041664302217113,
+              "fanIn": 40,
+              "fanOut": 3
+            }
+          ],
+          "topPagerankOut": [
+            {
+              "id": "type:org.junit.jupiter.engine.JupiterTestEngine",
+              "value": 0.03320088679091244,
+              "fanIn": 0,
+              "fanOut": 20
+            },
+            {
+              "id": "type:org.junit.jupiter.engine.discovery.DiscoverySelectorResolver",
+              "value": 0.027328181532735436,
+              "fanIn": 1,
+              "fanOut": 13
+            },
+            {
+              "id": "type:org.junit.platform.testkit.engine.EngineTestKit",
+              "value": 0.020199128602129898,
+              "fanIn": 1,
+              "fanOut": 27
+            },
+            {
+              "id": "type:org.junit.platform.testkit.engine.EngineTestKit$Builder",
+              "value": 0.018769067395731937,
+              "fanIn": 1,
+              "fanOut": 12
+            },
+            {
+              "id": "type:org.junit.jupiter.engine.discovery.MethodSelectorResolver",
+              "value": 0.012842121772517244,
+              "fanIn": 1,
+              "fanOut": 31
+            },
+            {
+              "id": "type:org.junit.platform.launcher.core.LauncherFactory",
+              "value": 0.012572095119914136,
+              "fanIn": 4,
+              "fanOut": 25
+            },
+            {
+              "id": "type:org.junit.jupiter.engine.descriptor.TestFactoryTestDescriptor",
+              "value": 0.011894264681614456,
+              "fanIn": 2,
+              "fanOut": 30
+            },
+            {
+              "id": "type:org.junit.jupiter.engine.extension.MutableExtensionRegistry",
+              "value": 0.010531449449450317,
+              "fanIn": 11,
+              "fanOut": 22
+            },
+            {
+              "id": "type:org.junit.platform.suite.engine.SuiteTestDescriptor",
+              "value": 0.010231576378904591,
+              "fanIn": 2,
+              "fanOut": 40
+            },
+            {
+              "id": "type:org.junit.platform.suite.engine.SuiteTestEngine",
+              "value": 0.009989694969693104,
+              "fanIn": 0,
+              "fanOut": 13
+            }
+          ],
+          "runs": [
+            {
+              "run": 1,
+              "analysisId": "an_01M5N30WVWP79CHTCFYYP17BRQ",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 3532,
+                "externalPairs": 3993,
+                "packageCycles": 6,
+                "packageEdges": 384,
+                "packageNodes": 76,
+                "packagesInCycles": 25,
+                "pagerankUnconverged": 0,
+                "selfPairs": 534,
+                "typeCycles": 59,
+                "typeEdges": 5017,
+                "typeNodes": 1110,
+                "typesInCycles": 184
+              },
+              "durationMs": 49,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 2602,
+              "heap": {
+                "peakLiveBytes": 130626696,
+                "peakUsedBytes": 346012312
+              },
+              "loadAverage1m": {
+                "start": 5.87939453125,
+                "end": 5.87939453125
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/junit5-DEFAULT-run1-graph_metric.tsv",
+                "rows": 1186,
+                "sha256": "dbe38ed0e43feb1aae838d67dff0a646afb1311b867a655c782e4a0d8647f9b2"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/junit5-DEFAULT-run1-package_edge.tsv",
+                "rows": 384,
+                "sha256": "ea484ca5b8889a89b6a961757f6cdcf18ac6b14995b5f5019887ef3ac18dc92e"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 1110,
+                  "sumMinusOne": 1.5543122344752192e-15,
+                  "exactSumMinusOne": 5.719545930621406e-15
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 1110,
+                  "sumMinusOne": 1.6431300764452317e-14,
+                  "exactSumMinusOne": 1.9674583143225455e-14
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 76,
+                  "sumMinusOne": 2.220446049250313e-16,
+                  "exactSumMinusOne": 1.3704315460216776e-16
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 76,
+                  "sumMinusOne": -1.1102230246251565e-16,
+                  "exactSumMinusOne": 2.1423834928313568e-16
+                }
+              ]
+            },
+            {
+              "run": 2,
+              "analysisId": "an_01M5N30ZEMPYWBRCS209B4GW8V",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 3532,
+                "externalPairs": 3993,
+                "packageCycles": 6,
+                "packageEdges": 384,
+                "packageNodes": 76,
+                "packagesInCycles": 25,
+                "pagerankUnconverged": 0,
+                "selfPairs": 534,
+                "typeCycles": 59,
+                "typeEdges": 5017,
+                "typeNodes": 1110,
+                "typesInCycles": 184
+              },
+              "durationMs": 48,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 2235,
+              "heap": {
+                "peakLiveBytes": 128770680,
+                "peakUsedBytes": 307350984
+              },
+              "loadAverage1m": {
+                "start": 5.87939453125,
+                "end": 5.888671875
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/junit5-DEFAULT-run2-graph_metric.tsv",
+                "rows": 1186,
+                "sha256": "dbe38ed0e43feb1aae838d67dff0a646afb1311b867a655c782e4a0d8647f9b2"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/junit5-DEFAULT-run2-package_edge.tsv",
+                "rows": 384,
+                "sha256": "ea484ca5b8889a89b6a961757f6cdcf18ac6b14995b5f5019887ef3ac18dc92e"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 1110,
+                  "sumMinusOne": 1.5543122344752192e-15,
+                  "exactSumMinusOne": 5.719545930621406e-15
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 1110,
+                  "sumMinusOne": 1.6431300764452317e-14,
+                  "exactSumMinusOne": 1.9674583143225455e-14
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 76,
+                  "sumMinusOne": 2.220446049250313e-16,
+                  "exactSumMinusOne": 1.3704315460216776e-16
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 76,
+                  "sumMinusOne": -1.1102230246251565e-16,
+                  "exactSumMinusOne": 2.1423834928313568e-16
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "selection": "ALL",
+          "baselineTypes": 3751,
+          "determinism": {
+            "tables": [
+              {
+                "table": "graph_metric",
+                "firstDump": "analyzer/target/pagerank-determinism/junit5-ALL-run1-graph_metric.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/junit5-ALL-run2-graph_metric.tsv",
+                "rows": 3865,
+                "firstSha256": "d92320ad7093ef805e605c98f2514f12c3acaab2d8240dc06863118815a183bc",
+                "secondSha256": "d92320ad7093ef805e605c98f2514f12c3acaab2d8240dc06863118815a183bc",
+                "identical": true
+              },
+              {
+                "table": "package_edge",
+                "firstDump": "analyzer/target/pagerank-determinism/junit5-ALL-run1-package_edge.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/junit5-ALL-run2-package_edge.tsv",
+                "rows": 876,
+                "firstSha256": "4d7e321a730e2997083fd91f115e9185a98b40de53f94673b17ba115ea9c35bf",
+                "secondSha256": "4d7e321a730e2997083fd91f115e9185a98b40de53f94673b17ba115ea9c35bf",
+                "identical": true
+              }
+            ],
+            "countersEqual": true,
+            "identical": true
+          },
+          "typeShape": {
+            "rows": 3751,
+            "largestCycle": 15,
+            "components": 0,
+            "betweennessRows": 0,
+            "sinks": 507,
+            "neverTargeted": 1987
+          },
+          "packageShape": {
+            "rows": 114,
+            "largestCycle": 55,
+            "components": 1,
+            "betweennessRows": 114,
+            "sinks": 10,
+            "neverTargeted": 22
+          },
+          "cyclesInOneTopLevelType": 26,
+          "topPagerank": [
+            {
+              "id": "type:org.junit.platform.commons.util.Preconditions",
+              "value": 0.03533548025120903,
+              "fanIn": 243,
+              "fanOut": 3
+            },
+            {
+              "id": "type:org.junit.platform.commons.annotation.Testable",
+              "value": 0.033818474310567205,
+              "fanIn": 6,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.junit.jupiter.api.Test",
+              "value": 0.03263617428072956,
+              "fanIn": 1295,
+              "fanOut": 1
+            },
+            {
+              "id": "type:org.junit.platform.commons.JUnitException",
+              "value": 0.02409725663268215,
+              "fanIn": 132,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.junit.platform.commons.annotation.Contract",
+              "value": 0.01925969807129676,
+              "fanIn": 18,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.junit.platform.commons.util.StringUtils",
+              "value": 0.017607913218513453,
+              "fanIn": 54,
+              "fanOut": 6
+            },
+            {
+              "id": "type:org.junit.jupiter.api.extension.Extension",
+              "value": 0.017193110276392216,
+              "fanIn": 108,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.junit.platform.commons.PreconditionViolationException",
+              "value": 0.0157503846448575,
+              "fanIn": 54,
+              "fanOut": 1
+            },
+            {
+              "id": "type:org.junit.jupiter.api.extension.ExtensionContext",
+              "value": 0.0146464987310184,
+              "fanIn": 427,
+              "fanOut": 13
+            },
+            {
+              "id": "type:org.junit.jupiter.api.extension.ExtendWith",
+              "value": 0.012483548868616521,
+              "fanIn": 289,
+              "fanOut": 1
+            }
+          ],
+          "topPagerankOut": [
+            {
+              "id": "type:org.junit.platform.suite.engine.SuiteEngineTests",
+              "value": 0.007663823869817597,
+              "fanIn": 0,
+              "fanOut": 73
+            },
+            {
+              "id": "type:org.junit.jupiter.engine.JupiterTestEngine",
+              "value": 0.005990295010093032,
+              "fanIn": 18,
+              "fanOut": 20
+            },
+            {
+              "id": "type:org.junit.jupiter.engine.discovery.DiscoverySelectorResolver",
+              "value": 0.005528148949029874,
+              "fanIn": 1,
+              "fanOut": 13
+            },
+            {
+              "id": "type:org.junit.vintage.engine.VintageTestEngineExecutionTests",
+              "value": 0.00551637088984966,
+              "fanIn": 0,
+              "fanOut": 63
+            },
+            {
+              "id": "type:org.junit.jupiter.params.ParameterizedClassInvocationContext",
+              "value": 0.0039518553768471115,
+              "fanIn": 2,
+              "fanOut": 18
+            },
+            {
+              "id": "type:org.junit.platform.console.ConsoleDetailsTests$Runner",
+              "value": 0.0035220848570343684,
+              "fanIn": 1,
+              "fanOut": 5
+            },
+            {
+              "id": "type:org.junit.platform.console.command.CommandLineOptionsParsingTests",
+              "value": 0.0033451044784379015,
+              "fanIn": 1,
+              "fanOut": 16
+            },
+            {
+              "id": "type:org.junit.platform.console.ConsoleDetailsTests",
+              "value": 0.003259169415047728,
+              "fanIn": 1,
+              "fanOut": 17
+            },
+            {
+              "id": "type:org.junit.jupiter.engine.extension.MutableExtensionRegistry",
+              "value": 0.003214962129113136,
+              "fanIn": 18,
+              "fanOut": 22
+            },
+            {
+              "id": "type:org.junit.jupiter.api.Assertions",
+              "value": 0.0031766112083313775,
+              "fanIn": 659,
+              "fanOut": 22
+            }
+          ],
+          "runs": [
+            {
+              "run": 1,
+              "analysisId": "an_01M5N311P7REPH5G09XYW3BZG2",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 7336,
+                "externalPairs": 7316,
+                "packageCycles": 4,
+                "packageEdges": 876,
+                "packageNodes": 114,
+                "packagesInCycles": 63,
+                "pagerankUnconverged": 0,
+                "selfPairs": 993,
+                "typeCycles": 62,
+                "typeEdges": 16246,
+                "typeNodes": 3751,
+                "typesInCycles": 191
+              },
+              "durationMs": 100,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 5459,
+              "heap": {
+                "peakLiveBytes": 202751536,
+                "peakUsedBytes": 459652656
+              },
+              "loadAverage1m": {
+                "start": 5.888671875,
+                "end": 5.8974609375
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/junit5-ALL-run1-graph_metric.tsv",
+                "rows": 3865,
+                "sha256": "d92320ad7093ef805e605c98f2514f12c3acaab2d8240dc06863118815a183bc"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/junit5-ALL-run1-package_edge.tsv",
+                "rows": 876,
+                "sha256": "4d7e321a730e2997083fd91f115e9185a98b40de53f94673b17ba115ea9c35bf"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 3751,
+                  "sumMinusOne": -7.172040739078511e-14,
+                  "exactSumMinusOne": -8.311390855067491e-14
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 3751,
+                  "sumMinusOne": 4.773959005888173e-14,
+                  "exactSumMinusOne": 3.8823789018718746e-14
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 114,
+                  "sumMinusOne": 6.661338147750939e-16,
+                  "exactSumMinusOne": 7.042977312465837e-16
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 114,
+                  "sumMinusOne": -7.771561172376096e-16,
+                  "exactSumMinusOne": -7.368237964211488e-16
+                }
+              ]
+            },
+            {
+              "run": 2,
+              "analysisId": "an_01M5N3172XSEY3FK6JPE839VA4",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 7336,
+                "externalPairs": 7316,
+                "packageCycles": 4,
+                "packageEdges": 876,
+                "packageNodes": 114,
+                "packagesInCycles": 63,
+                "pagerankUnconverged": 0,
+                "selfPairs": 993,
+                "typeCycles": 62,
+                "typeEdges": 16246,
+                "typeNodes": 3751,
+                "typesInCycles": 191
+              },
+              "durationMs": 96,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 5271,
+              "heap": {
+                "peakLiveBytes": 202047744,
+                "peakUsedBytes": 433383264
+              },
+              "loadAverage1m": {
+                "start": 5.8974609375,
+                "end": 5.8251953125
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/junit5-ALL-run2-graph_metric.tsv",
+                "rows": 3865,
+                "sha256": "d92320ad7093ef805e605c98f2514f12c3acaab2d8240dc06863118815a183bc"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/junit5-ALL-run2-package_edge.tsv",
+                "rows": 876,
+                "sha256": "4d7e321a730e2997083fd91f115e9185a98b40de53f94673b17ba115ea9c35bf"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 3751,
+                  "sumMinusOne": -7.172040739078511e-14,
+                  "exactSumMinusOne": -8.311390855067491e-14
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 3751,
+                  "sumMinusOne": 4.773959005888173e-14,
+                  "exactSumMinusOne": 3.8823789018718746e-14
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 114,
+                  "sumMinusOne": 6.661338147750939e-16,
+                  "exactSumMinusOne": 7.042977312465837e-16
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 114,
+                  "sumMinusOne": -7.771561172376096e-16,
+                  "exactSumMinusOne": -7.368237964211488e-16
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "spring-framework",
+      "origin": "clone",
+      "commitId": "82a6b40b9366ec181ededdad282b307ee5381a52",
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "baselineTypes": 6923,
+          "determinism": {
+            "tables": [
+              {
+                "table": "graph_metric",
+                "firstDump": "analyzer/target/pagerank-determinism/spring-framework-DEFAULT-run1-graph_metric.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/spring-framework-DEFAULT-run2-graph_metric.tsv",
+                "rows": 7494,
+                "firstSha256": "6d2c86203d47b8a3b2988a96ebe8637b2a8a16f61ca6efead715ea709d882a63",
+                "secondSha256": "6d2c86203d47b8a3b2988a96ebe8637b2a8a16f61ca6efead715ea709d882a63",
+                "identical": true
+              },
+              {
+                "table": "package_edge",
+                "firstDump": "analyzer/target/pagerank-determinism/spring-framework-DEFAULT-run1-package_edge.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/spring-framework-DEFAULT-run2-package_edge.tsv",
+                "rows": 4104,
+                "firstSha256": "80e1edd88c63b9e871545be65870c4ab674e4820b7d0f821ce2ced0c16343e74",
+                "secondSha256": "80e1edd88c63b9e871545be65870c4ab674e4820b7d0f821ce2ced0c16343e74",
+                "identical": true
+              }
+            ],
+            "countersEqual": true,
+            "identical": true
+          },
+          "typeShape": {
+            "rows": 6923,
+            "largestCycle": 38,
+            "components": 0,
+            "betweennessRows": 0,
+            "sinks": 781,
+            "neverTargeted": 887
+          },
+          "packageShape": {
+            "rows": 571,
+            "largestCycle": 9,
+            "components": 11,
+            "betweennessRows": 571,
+            "sinks": 19,
+            "neverTargeted": 198
+          },
+          "cyclesInOneTopLevelType": 209,
+          "topPagerank": [
+            {
+              "id": "type:org.springframework.util.Assert",
+              "value": 0.07257558208251486,
+              "fanIn": 1709,
+              "fanOut": 4
+            },
+            {
+              "id": "type:org.springframework.lang.Contract",
+              "value": 0.03762291681073817,
+              "fanIn": 31,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.springframework.util.ObjectUtils",
+              "value": 0.03570425794797734,
+              "fanIn": 348,
+              "fanOut": 4
+            },
+            {
+              "id": "type:org.springframework.util.StringUtils",
+              "value": 0.034290098208066846,
+              "fanIn": 616,
+              "fanOut": 4
+            },
+            {
+              "id": "type:org.springframework.util.CollectionUtils",
+              "value": 0.03402159837365141,
+              "fanIn": 329,
+              "fanOut": 7
+            },
+            {
+              "id": "type:org.springframework.util.MultiValueMap",
+              "value": 0.0138574696049945,
+              "fanIn": 288,
+              "fanOut": 4
+            },
+            {
+              "id": "type:org.springframework.util.ClassUtils",
+              "value": 0.012628790840097385,
+              "fanIn": 397,
+              "fanOut": 6
+            },
+            {
+              "id": "type:org.springframework.core.NestedRuntimeException",
+              "value": 0.010309204474307877,
+              "fanIn": 32,
+              "fanOut": 1
+            },
+            {
+              "id": "type:org.springframework.core.NestedExceptionUtils",
+              "value": 0.008957022359569319,
+              "fanIn": 3,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.springframework.util.MultiValueMapAdapter",
+              "value": 0.007673025315908826,
+              "fanIn": 3,
+              "fanOut": 3
+            }
+          ],
+          "topPagerankOut": [
+            {
+              "id": "type:org.springframework.test.web.reactive.server.WebTestClient",
+              "value": 0.008676822972888926,
+              "fanIn": 10,
+              "fanOut": 51
+            },
+            {
+              "id": "type:org.springframework.test.web.reactive.server.DefaultControllerSpec",
+              "value": 0.005777367647323943,
+              "fanIn": 1,
+              "fanOut": 21
+            },
+            {
+              "id": "type:org.springframework.web.reactive.config.DelegatingWebFluxConfiguration",
+              "value": 0.005376476143510362,
+              "fanIn": 1,
+              "fanOut": 21
+            },
+            {
+              "id": "type:org.springframework.web.reactive.config.WebFluxConfigurationSupport",
+              "value": 0.005268404797260803,
+              "fanIn": 1,
+              "fanOut": 62
+            },
+            {
+              "id": "type:org.springframework.test.web.reactive.server.DefaultWebTestClient",
+              "value": 0.004668614980527071,
+              "fanIn": 2,
+              "fanOut": 37
+            },
+            {
+              "id": "type:org.springframework.messaging.rsocket.service.RSocketServiceProxyFactory",
+              "value": 0.0044657066536658695,
+              "fanIn": 1,
+              "fanOut": 15
+            },
+            {
+              "id": "type:org.springframework.messaging.rsocket.service.RSocketServiceProxyFactory$Builder",
+              "value": 0.004312488907490234,
+              "fanIn": 1,
+              "fanOut": 9
+            },
+            {
+              "id": "type:org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter",
+              "value": 0.004304484418903185,
+              "fanIn": 6,
+              "fanOut": 115
+            },
+            {
+              "id": "type:org.springframework.test.web.servlet.client.MockMvcWebTestClient",
+              "value": 0.004223394912745849,
+              "fanIn": 0,
+              "fanOut": 39
+            },
+            {
+              "id": "type:org.springframework.http.codec.support.BaseDefaultCodecs",
+              "value": 0.003920400736002769,
+              "fanIn": 6,
+              "fanOut": 67
+            }
+          ],
+          "runs": [
+            {
+              "run": 1,
+              "analysisId": "an_01M5N31CA0J8RHV0MGRJ806NC4",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 25553,
+                "externalPairs": 20650,
+                "packageCycles": 14,
+                "packageEdges": 4104,
+                "packageNodes": 571,
+                "packagesInCycles": 51,
+                "pagerankUnconverged": 0,
+                "selfPairs": 3542,
+                "typeCycles": 324,
+                "typeEdges": 36067,
+                "typeNodes": 6923,
+                "typesInCycles": 1266
+              },
+              "durationMs": 427,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 12279,
+              "heap": {
+                "peakLiveBytes": 294034696,
+                "peakUsedBytes": 552267048
+              },
+              "loadAverage1m": {
+                "start": 5.8251953125,
+                "end": 6.04736328125
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/spring-framework-DEFAULT-run1-graph_metric.tsv",
+                "rows": 7494,
+                "sha256": "6d2c86203d47b8a3b2988a96ebe8637b2a8a16f61ca6efead715ea709d882a63"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/spring-framework-DEFAULT-run1-package_edge.tsv",
+                "rows": 4104,
+                "sha256": "80e1edd88c63b9e871545be65870c4ab674e4820b7d0f821ce2ced0c16343e74"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 6923,
+                  "sumMinusOne": -2.9531932455029164e-14,
+                  "exactSumMinusOne": -1.787232064816638e-14
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 6923,
+                  "sumMinusOne": 1.1546319456101628e-14,
+                  "exactSumMinusOne": 4.429419884263014e-15
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 571,
+                  "sumMinusOne": 1.3322676295501878e-15,
+                  "exactSumMinusOne": 2.9380794672184685e-15
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 571,
+                  "sumMinusOne": 5.10702591327572e-15,
+                  "exactSumMinusOne": 5.963979310408263e-15
+                }
+              ]
+            },
+            {
+              "run": 2,
+              "analysisId": "an_01M5N31RDN5C6CYDBF8VZ9C4K5",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 25553,
+                "externalPairs": 20650,
+                "packageCycles": 14,
+                "packageEdges": 4104,
+                "packageNodes": 571,
+                "packagesInCycles": 51,
+                "pagerankUnconverged": 0,
+                "selfPairs": 3542,
+                "typeCycles": 324,
+                "typeEdges": 36067,
+                "typeNodes": 6923,
+                "typesInCycles": 1266
+              },
+              "durationMs": 320,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 11272,
+              "heap": {
+                "peakLiveBytes": 350507560,
+                "peakUsedBytes": 742089752
+              },
+              "loadAverage1m": {
+                "start": 6.04736328125,
+                "end": 5.57861328125
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/spring-framework-DEFAULT-run2-graph_metric.tsv",
+                "rows": 7494,
+                "sha256": "6d2c86203d47b8a3b2988a96ebe8637b2a8a16f61ca6efead715ea709d882a63"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/spring-framework-DEFAULT-run2-package_edge.tsv",
+                "rows": 4104,
+                "sha256": "80e1edd88c63b9e871545be65870c4ab674e4820b7d0f821ce2ced0c16343e74"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 6923,
+                  "sumMinusOne": -2.9531932455029164e-14,
+                  "exactSumMinusOne": -1.787232064816638e-14
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 6923,
+                  "sumMinusOne": 1.1546319456101628e-14,
+                  "exactSumMinusOne": 4.429419884263014e-15
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 571,
+                  "sumMinusOne": 1.3322676295501878e-15,
+                  "exactSumMinusOne": 2.9380794672184685e-15
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 571,
+                  "sumMinusOne": 5.10702591327572e-15,
+                  "exactSumMinusOne": 5.963979310408263e-15
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "selection": "ALL",
+          "baselineTypes": 18468,
+          "determinism": {
+            "tables": [
+              {
+                "table": "graph_metric",
+                "firstDump": "analyzer/target/pagerank-determinism/spring-framework-ALL-run1-graph_metric.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/spring-framework-ALL-run2-graph_metric.tsv",
+                "rows": 19285,
+                "firstSha256": "ad8bf7706c7fdcf033137dec5ecbde2387e250863fbc06e624f1e7774d192041",
+                "secondSha256": "ad8bf7706c7fdcf033137dec5ecbde2387e250863fbc06e624f1e7774d192041",
+                "identical": true
+              },
+              {
+                "table": "package_edge",
+                "firstDump": "analyzer/target/pagerank-determinism/spring-framework-ALL-run1-package_edge.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/spring-framework-ALL-run2-package_edge.tsv",
+                "rows": 7018,
+                "firstSha256": "740a3e5f491c3e2c0e8f82cf0dbc8f24070a62f7aeff80b5cfc4280fc11619d2",
+                "secondSha256": "740a3e5f491c3e2c0e8f82cf0dbc8f24070a62f7aeff80b5cfc4280fc11619d2",
+                "identical": true
+              }
+            ],
+            "countersEqual": true,
+            "identical": true
+          },
+          "typeShape": {
+            "rows": 18468,
+            "largestCycle": 38,
+            "components": 0,
+            "betweennessRows": 0,
+            "sinks": 2720,
+            "neverTargeted": 7108
+          },
+          "packageShape": {
+            "rows": 817,
+            "largestCycle": 337,
+            "components": 21,
+            "betweennessRows": 817,
+            "sinks": 68,
+            "neverTargeted": 267
+          },
+          "cyclesInOneTopLevelType": 247,
+          "topPagerank": [
+            {
+              "id": "type:org.springframework.util.Assert",
+              "value": 0.05175856158768774,
+              "fanIn": 1832,
+              "fanOut": 4
+            },
+            {
+              "id": "type:org.springframework.lang.Contract",
+              "value": 0.027031458037591896,
+              "fanIn": 34,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.springframework.util.ObjectUtils",
+              "value": 0.02610652830756046,
+              "fanIn": 398,
+              "fanOut": 4
+            },
+            {
+              "id": "type:org.springframework.util.StringUtils",
+              "value": 0.02464295893539344,
+              "fanIn": 677,
+              "fanOut": 4
+            },
+            {
+              "id": "type:org.springframework.util.CollectionUtils",
+              "value": 0.024026221591245022,
+              "fanIn": 347,
+              "fanOut": 7
+            },
+            {
+              "id": "type:org.springframework.core.annotation.AliasFor",
+              "value": 0.015698927174483828,
+              "fanIn": 326,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.springframework.util.MultiValueMap",
+              "value": 0.00963605928146787,
+              "fanIn": 414,
+              "fanOut": 4
+            },
+            {
+              "id": "type:org.springframework.util.ClassUtils",
+              "value": 0.009251753438645153,
+              "fanIn": 511,
+              "fanOut": 6
+            },
+            {
+              "id": "type:org.springframework.context.annotation.Configuration",
+              "value": 0.006911792150527388,
+              "fanIn": 1634,
+              "fanOut": 4
+            },
+            {
+              "id": "type:org.springframework.core.NestedRuntimeException",
+              "value": 0.006831574967165541,
+              "fanIn": 41,
+              "fanOut": 1
+            }
+          ],
+          "topPagerankOut": [
+            {
+              "id": "type:org.springframework.expression.spel.standard.InternalSpelExpressionParser",
+              "value": 0.0015210946129851014,
+              "fanIn": 1,
+              "fanOut": 58
+            },
+            {
+              "id": "type:org.springframework.aop.framework.CglibAopProxy",
+              "value": 0.0015003308552257856,
+              "fanIn": 8,
+              "fanOut": 43
+            },
+            {
+              "id": "type:org.springframework.format.datetime.standard.DateTimeConverters",
+              "value": 0.001406552613841285,
+              "fanIn": 7,
+              "fanOut": 23
+            },
+            {
+              "id": "type:org.springframework.expression.spel.standard.SpelExpressionParser",
+              "value": 0.001365561595168201,
+              "fanIn": 100,
+              "fanOut": 7
+            },
+            {
+              "id": "type:org.springframework.test.web.reactive.server.DefaultWebTestClient",
+              "value": 0.0012962895661364688,
+              "fanIn": 2,
+              "fanOut": 37
+            },
+            {
+              "id": "type:org.springframework.cglib.util.ParallelSorter",
+              "value": 0.0012580601789459675,
+              "fanIn": 1,
+              "fanOut": 15
+            },
+            {
+              "id": "type:org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessorTests",
+              "value": 0.001238134443782493,
+              "fanIn": 0,
+              "fanOut": 85
+            },
+            {
+              "id": "type:org.springframework.cglib.util.ParallelSorter$Generator",
+              "value": 0.0011568223307403117,
+              "fanIn": 1,
+              "fanOut": 7
+            },
+            {
+              "id": "type:org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter",
+              "value": 0.0011041477548437981,
+              "fanIn": 16,
+              "fanOut": 115
+            },
+            {
+              "id": "type:org.springframework.test.web.reactive.server.DefaultWebTestClient$DefaultRequestBodyUriSpec",
+              "value": 0.001024803163968314,
+              "fanIn": 1,
+              "fanOut": 25
+            }
+          ],
+          "runs": [
+            {
+              "run": 1,
+              "analysisId": "an_01M5N323HX8D6YJNXGFAM5GGBE",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 43149,
+                "externalPairs": 44582,
+                "packageCycles": 20,
+                "packageEdges": 7018,
+                "packageNodes": 817,
+                "packagesInCycles": 420,
+                "pagerankUnconverged": 0,
+                "selfPairs": 5742,
+                "typeCycles": 368,
+                "typeEdges": 78453,
+                "typeNodes": 18468,
+                "typesInCycles": 1375
+              },
+              "durationMs": 749,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 25731,
+              "heap": {
+                "peakLiveBytes": 346064000,
+                "peakUsedBytes": 725237376
+              },
+              "loadAverage1m": {
+                "start": 5.57861328125,
+                "end": 5.45849609375
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/spring-framework-ALL-run1-graph_metric.tsv",
+                "rows": 19285,
+                "sha256": "ad8bf7706c7fdcf033137dec5ecbde2387e250863fbc06e624f1e7774d192041"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/spring-framework-ALL-run1-package_edge.tsv",
+                "rows": 7018,
+                "sha256": "740a3e5f491c3e2c0e8f82cf0dbc8f24070a62f7aeff80b5cfc4280fc11619d2"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 18468,
+                  "sumMinusOne": 2.4780177909633494e-13,
+                  "exactSumMinusOne": 3.0399723469315236e-13
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 18468,
+                  "sumMinusOne": -6.317169010117141e-14,
+                  "exactSumMinusOne": -1.534776605392925e-14
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 817,
+                  "sumMinusOne": -8.770761894538737e-15,
+                  "exactSumMinusOne": -1.529278006312529e-14
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 817,
+                  "sumMinusOne": 3.774758283725532e-15,
+                  "exactSumMinusOne": 4.551534930202772e-15
+                }
+              ]
+            },
+            {
+              "run": 2,
+              "analysisId": "an_01M5N32WWHQVZKYQBWT6QYKV03",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 0,
+                "denylistedPairs": 43149,
+                "externalPairs": 44582,
+                "packageCycles": 20,
+                "packageEdges": 7018,
+                "packageNodes": 817,
+                "packagesInCycles": 420,
+                "pagerankUnconverged": 0,
+                "selfPairs": 5742,
+                "typeCycles": 368,
+                "typeEdges": 78453,
+                "typeNodes": 18468,
+                "typesInCycles": 1375
+              },
+              "durationMs": 733,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 25638,
+              "heap": {
+                "peakLiveBytes": 321042600,
+                "peakUsedBytes": 648299000
+              },
+              "loadAverage1m": {
+                "start": 5.45849609375,
+                "end": 5.4306640625
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/spring-framework-ALL-run2-graph_metric.tsv",
+                "rows": 19285,
+                "sha256": "ad8bf7706c7fdcf033137dec5ecbde2387e250863fbc06e624f1e7774d192041"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/spring-framework-ALL-run2-package_edge.tsv",
+                "rows": 7018,
+                "sha256": "740a3e5f491c3e2c0e8f82cf0dbc8f24070a62f7aeff80b5cfc4280fc11619d2"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 18468,
+                  "sumMinusOne": 2.4780177909633494e-13,
+                  "exactSumMinusOne": 3.0399723469315236e-13
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 18468,
+                  "sumMinusOne": -6.317169010117141e-14,
+                  "exactSumMinusOne": -1.534776605392925e-14
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 817,
+                  "sumMinusOne": -8.770761894538737e-15,
+                  "exactSumMinusOne": -1.529278006312529e-14
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 817,
+                  "sumMinusOne": 3.774758283725532e-15,
+                  "exactSumMinusOne": 4.551534930202772e-15
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "elasticsearch",
+      "origin": "clone",
+      "commitId": "b42549c72e6e040825b13e5d8ebf7ff63886b24d",
+      "selections": [
+        {
+          "selection": "DEFAULT",
+          "baselineTypes": 26883,
+          "determinism": {
+            "tables": [
+              {
+                "table": "graph_metric",
+                "firstDump": "analyzer/target/pagerank-determinism/elasticsearch-DEFAULT-run1-graph_metric.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/elasticsearch-DEFAULT-run2-graph_metric.tsv",
+                "rows": 28890,
+                "firstSha256": "68a6c3ae509333d698be400d78845fb72b3e46b683dcc0e89c66f6f5deb7edd0",
+                "secondSha256": "68a6c3ae509333d698be400d78845fb72b3e46b683dcc0e89c66f6f5deb7edd0",
+                "identical": true
+              },
+              {
+                "table": "package_edge",
+                "firstDump": "analyzer/target/pagerank-determinism/elasticsearch-DEFAULT-run1-package_edge.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/elasticsearch-DEFAULT-run2-package_edge.tsv",
+                "rows": 31478,
+                "firstSha256": "6eb5325bb8f247aee8cff80ccbd1e770bfce644902db5bd1231873fa8815ec28",
+                "secondSha256": "6eb5325bb8f247aee8cff80ccbd1e770bfce644902db5bd1231873fa8815ec28",
+                "identical": true
+              }
+            ],
+            "countersEqual": true,
+            "identical": true
+          },
+          "typeShape": {
+            "rows": 26883,
+            "largestCycle": 5756,
+            "components": 0,
+            "betweennessRows": 0,
+            "sinks": 2871,
+            "neverTargeted": 1997
+          },
+          "packageShape": {
+            "rows": 2007,
+            "largestCycle": 438,
+            "components": 28,
+            "betweennessRows": 0,
+            "sinks": 79,
+            "neverTargeted": 239
+          },
+          "cyclesInOneTopLevelType": 466,
+          "topPagerank": [
+            {
+              "id": "type:org.elasticsearch.common.io.stream.StreamOutput",
+              "value": 0.023373461591871647,
+              "fanIn": 4220,
+              "fanOut": 20
+            },
+            {
+              "id": "type:org.elasticsearch.core.Nullable",
+              "value": 0.021886030416767458,
+              "fanIn": 2662,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.elasticsearch.common.io.stream.StreamInput",
+              "value": 0.020220331293534902,
+              "fanIn": 4633,
+              "fanOut": 24
+            },
+            {
+              "id": "type:org.elasticsearch.xcontent.XContentBuilder",
+              "value": 0.01318426683975388,
+              "fanIn": 3300,
+              "fanOut": 15
+            },
+            {
+              "id": "type:org.elasticsearch.common.io.stream.Writeable",
+              "value": 0.010159994261925931,
+              "fanIn": 1402,
+              "fanOut": 1
+            },
+            {
+              "id": "type:org.elasticsearch.xcontent.ToXContent$Params",
+              "value": 0.010111574291341385,
+              "fanIn": 2503,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.elasticsearch.core.Releasable",
+              "value": 0.008912453260439858,
+              "fanIn": 633,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.elasticsearch.xcontent.ToXContent",
+              "value": 0.008525116624921171,
+              "fanIn": 510,
+              "fanOut": 3
+            },
+            {
+              "id": "type:org.elasticsearch.common.Strings",
+              "value": 0.007229368250773898,
+              "fanIn": 2084,
+              "fanOut": 14
+            },
+            {
+              "id": "type:org.elasticsearch.ElasticsearchException",
+              "value": 0.0065489704734113365,
+              "fanIn": 681,
+              "fanOut": 60
+            }
+          ],
+          "topPagerankOut": [
+            {
+              "id": "type:org.elasticsearch.xpack.ml.MachineLearning",
+              "value": 0.021971588164411707,
+              "fanIn": 158,
+              "fanOut": 496
+            },
+            {
+              "id": "type:org.elasticsearch.xpack.security.Security",
+              "value": 0.010662906377462643,
+              "fanIn": 26,
+              "fanOut": 475
+            },
+            {
+              "id": "type:org.elasticsearch.xpack.inference.InferencePlugin",
+              "value": 0.010548852464916474,
+              "fanIn": 26,
+              "fanOut": 224
+            },
+            {
+              "id": "type:org.elasticsearch.xpack.application.EnterpriseSearch",
+              "value": 0.007667160377347681,
+              "fanIn": 54,
+              "fanOut": 198
+            },
+            {
+              "id": "type:org.elasticsearch.xpack.stateless.StatelessPlugin",
+              "value": 0.005210557293501241,
+              "fanIn": 22,
+              "fanOut": 256
+            },
+            {
+              "id": "type:org.elasticsearch.action.ActionModule",
+              "value": 0.004728634653062235,
+              "fanIn": 2,
+              "fanOut": 417
+            },
+            {
+              "id": "type:org.elasticsearch.xpack.watcher.Watcher",
+              "value": 0.004267449708551904,
+              "fanIn": 4,
+              "fanOut": 198
+            },
+            {
+              "id": "type:org.elasticsearch.node.NodeConstruction",
+              "value": 0.0038770354242311164,
+              "fanIn": 2,
+              "fanOut": 270
+            },
+            {
+              "id": "type:org.elasticsearch.xpack.transform.Transform",
+              "value": 0.0038288616133329433,
+              "fanIn": 10,
+              "fanOut": 120
+            },
+            {
+              "id": "type:org.elasticsearch.xpack.esql.plugin.ComputeService",
+              "value": 0.0037369399268383993,
+              "fanIn": 6,
+              "fanOut": 135
+            }
+          ],
+          "runs": [
+            {
+              "run": 1,
+              "analysisId": "an_01M5N33P4GVN62DCAA42FC0QVJ",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 1,
+                "denylistedPairs": 104298,
+                "externalPairs": 64656,
+                "packageCycles": 80,
+                "packageEdges": 31478,
+                "packageNodes": 2007,
+                "packagesInCycles": 1408,
+                "pagerankUnconverged": 0,
+                "selfPairs": 15572,
+                "typeCycles": 698,
+                "typeEdges": 236817,
+                "typeNodes": 26883,
+                "typesInCycles": 12265
+              },
+              "durationMs": 1625,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 82292,
+              "heap": {
+                "peakLiveBytes": 794590000,
+                "peakUsedBytes": 1299780960
+              },
+              "loadAverage1m": {
+                "start": 5.4306640625,
+                "end": 4.923828125
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/elasticsearch-DEFAULT-run1-graph_metric.tsv",
+                "rows": 28890,
+                "sha256": "68a6c3ae509333d698be400d78845fb72b3e46b683dcc0e89c66f6f5deb7edd0"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/elasticsearch-DEFAULT-run1-package_edge.tsv",
+                "rows": 31478,
+                "sha256": "6eb5325bb8f247aee8cff80ccbd1e770bfce644902db5bd1231873fa8815ec28"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 26883,
+                  "sumMinusOne": 2.886579864025407e-14,
+                  "exactSumMinusOne": 6.711966662261044e-14
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 26883,
+                  "sumMinusOne": 1.1657341758564144e-13,
+                  "exactSumMinusOne": 8.361726296177846e-14
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 2007,
+                  "sumMinusOne": -4.6629367034256575e-15,
+                  "exactSumMinusOne": -1.1282126491721223e-14
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 2007,
+                  "sumMinusOne": -6.439293542825908e-15,
+                  "exactSumMinusOne": -4.5725277947675225e-15
+                }
+              ]
+            },
+            {
+              "run": 2,
+              "analysisId": "an_01M5N366YY9GPDSD7EM905X88D",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 1,
+                "denylistedPairs": 104298,
+                "externalPairs": 64656,
+                "packageCycles": 80,
+                "packageEdges": 31478,
+                "packageNodes": 2007,
+                "packagesInCycles": 1408,
+                "pagerankUnconverged": 0,
+                "selfPairs": 15572,
+                "typeCycles": 698,
+                "typeEdges": 236817,
+                "typeNodes": 26883,
+                "typesInCycles": 12265
+              },
+              "durationMs": 1620,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 82088,
+              "heap": {
+                "peakLiveBytes": 813556896,
+                "peakUsedBytes": 1305863328
+              },
+              "loadAverage1m": {
+                "start": 4.923828125,
+                "end": 5.94970703125
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/elasticsearch-DEFAULT-run2-graph_metric.tsv",
+                "rows": 28890,
+                "sha256": "68a6c3ae509333d698be400d78845fb72b3e46b683dcc0e89c66f6f5deb7edd0"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/elasticsearch-DEFAULT-run2-package_edge.tsv",
+                "rows": 31478,
+                "sha256": "6eb5325bb8f247aee8cff80ccbd1e770bfce644902db5bd1231873fa8815ec28"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 26883,
+                  "sumMinusOne": 2.886579864025407e-14,
+                  "exactSumMinusOne": 6.711966662261044e-14
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 26883,
+                  "sumMinusOne": 1.1657341758564144e-13,
+                  "exactSumMinusOne": 8.361726296177846e-14
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 2007,
+                  "sumMinusOne": -4.6629367034256575e-15,
+                  "exactSumMinusOne": -1.1282126491721223e-14
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 2007,
+                  "sumMinusOne": -6.439293542825908e-15,
+                  "exactSumMinusOne": -4.5725277947675225e-15
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "selection": "ALL",
+          "baselineTypes": 39364,
+          "determinism": {
+            "tables": [
+              {
+                "table": "graph_metric",
+                "firstDump": "analyzer/target/pagerank-determinism/elasticsearch-ALL-run1-graph_metric.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/elasticsearch-ALL-run2-graph_metric.tsv",
+                "rows": 41493,
+                "firstSha256": "034a995cc1c068595ae11b13935d5bd240608762dc37583ab52a5efbd8cf7a52",
+                "secondSha256": "034a995cc1c068595ae11b13935d5bd240608762dc37583ab52a5efbd8cf7a52",
+                "identical": true
+              },
+              {
+                "table": "package_edge",
+                "firstDump": "analyzer/target/pagerank-determinism/elasticsearch-ALL-run1-package_edge.tsv",
+                "secondDump": "analyzer/target/pagerank-determinism/elasticsearch-ALL-run2-package_edge.tsv",
+                "rows": 41471,
+                "firstSha256": "eaba2975f0367def5fd2619b6f0408346e1b290f575b8257020cb0c37139ea95",
+                "secondSha256": "eaba2975f0367def5fd2619b6f0408346e1b290f575b8257020cb0c37139ea95",
+                "identical": true
+              }
+            ],
+            "countersEqual": true,
+            "identical": true
+          },
+          "typeShape": {
+            "rows": 39364,
+            "largestCycle": 5756,
+            "components": 0,
+            "betweennessRows": 0,
+            "sinks": 3377,
+            "neverTargeted": 9597
+          },
+          "packageShape": {
+            "rows": 2129,
+            "largestCycle": 1535,
+            "components": 23,
+            "betweennessRows": 0,
+            "sinks": 65,
+            "neverTargeted": 273
+          },
+          "cyclesInOneTopLevelType": 730,
+          "topPagerank": [
+            {
+              "id": "type:org.elasticsearch.common.io.stream.StreamOutput",
+              "value": 0.023394864560692553,
+              "fanIn": 4537,
+              "fanOut": 20
+            },
+            {
+              "id": "type:org.elasticsearch.core.Nullable",
+              "value": 0.021049501336770717,
+              "fanIn": 3037,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.elasticsearch.common.io.stream.StreamInput",
+              "value": 0.020505051746589464,
+              "fanIn": 5081,
+              "fanOut": 24
+            },
+            {
+              "id": "type:org.elasticsearch.xcontent.XContentBuilder",
+              "value": 0.012983580589191988,
+              "fanIn": 4283,
+              "fanOut": 15
+            },
+            {
+              "id": "type:org.elasticsearch.common.io.stream.Writeable",
+              "value": 0.01098558901281488,
+              "fanIn": 2605,
+              "fanOut": 1
+            },
+            {
+              "id": "type:org.elasticsearch.xcontent.ToXContent$Params",
+              "value": 0.009543519985229744,
+              "fanIn": 2643,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.elasticsearch.core.Releasable",
+              "value": 0.008490550518060113,
+              "fanIn": 746,
+              "fanOut": 0
+            },
+            {
+              "id": "type:org.elasticsearch.xcontent.ToXContent",
+              "value": 0.008120735443655765,
+              "fanIn": 967,
+              "fanOut": 3
+            },
+            {
+              "id": "type:org.elasticsearch.common.Strings",
+              "value": 0.0071650664739354546,
+              "fanIn": 2950,
+              "fanOut": 14
+            },
+            {
+              "id": "type:org.elasticsearch.ElasticsearchException",
+              "value": 0.0063795128738639885,
+              "fanIn": 1067,
+              "fanOut": 60
+            }
+          ],
+          "topPagerankOut": [
+            {
+              "id": "type:org.elasticsearch.xpack.ml.MachineLearning",
+              "value": 0.006962035302139502,
+              "fanIn": 201,
+              "fanOut": 496
+            },
+            {
+              "id": "type:org.elasticsearch.action.ActionModule",
+              "value": 0.003197116700385289,
+              "fanIn": 5,
+              "fanOut": 417
+            },
+            {
+              "id": "type:org.elasticsearch.xpack.security.Security",
+              "value": 0.00317955860594771,
+              "fanIn": 65,
+              "fanOut": 475
+            },
+            {
+              "id": "type:org.elasticsearch.xpack.application.EnterpriseSearch",
+              "value": 0.0027894618648247604,
+              "fanIn": 55,
+              "fanOut": 198
+            },
+            {
+              "id": "type:org.elasticsearch.http.AbstractHttpServerTransportTests",
+              "value": 0.0025956472628057945,
+              "fanIn": 1,
+              "fanOut": 65
+            },
+            {
+              "id": "type:org.elasticsearch.http.AbstractHttpServerTransportTests$TestHttpServerTransport",
+              "value": 0.002239391539964088,
+              "fanIn": 1,
+              "fanOut": 11
+            },
+            {
+              "id": "type:org.elasticsearch.painless.Compiler",
+              "value": 0.001956074301614191,
+              "fanIn": 2,
+              "fanOut": 24
+            },
+            {
+              "id": "type:org.elasticsearch.xpack.inference.InferencePlugin",
+              "value": 0.0019135722029415207,
+              "fanIn": 55,
+              "fanOut": 224
+            },
+            {
+              "id": "type:org.elasticsearch.xpack.sql.planner.QueryTranslator",
+              "value": 0.0014503080518545122,
+              "fanIn": 21,
+              "fanOut": 102
+            },
+            {
+              "id": "type:org.elasticsearch.node.NodeConstruction",
+              "value": 0.001428380785281101,
+              "fanIn": 2,
+              "fanOut": 270
+            }
+          ],
+          "runs": [
+            {
+              "run": 1,
+              "analysisId": "an_01M5N38QJ7XA2XH666W8V8RGJ2",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 1,
+                "denylistedPairs": 153655,
+                "externalPairs": 115154,
+                "packageCycles": 44,
+                "packageEdges": 41471,
+                "packageNodes": 2129,
+                "packagesInCycles": 1724,
+                "pagerankUnconverged": 0,
+                "selfPairs": 25780,
+                "typeCycles": 981,
+                "typeEdges": 380071,
+                "typeNodes": 39364,
+                "typesInCycles": 12995
+              },
+              "durationMs": 2670,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 186336,
+              "heap": {
+                "peakLiveBytes": 954590384,
+                "peakUsedBytes": 1846404272
+              },
+              "loadAverage1m": {
+                "start": 5.94970703125,
+                "end": 4.21630859375
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/elasticsearch-ALL-run1-graph_metric.tsv",
+                "rows": 41493,
+                "sha256": "034a995cc1c068595ae11b13935d5bd240608762dc37583ab52a5efbd8cf7a52"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/elasticsearch-ALL-run1-package_edge.tsv",
+                "rows": 41471,
+                "sha256": "eaba2975f0367def5fd2619b6f0408346e1b290f575b8257020cb0c37139ea95"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 39364,
+                  "sumMinusOne": -3.5638159090467525e-14,
+                  "exactSumMinusOne": -3.234455575484743e-13
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 39364,
+                  "sumMinusOne": 1.9229062786507711e-13,
+                  "exactSumMinusOne": 1.7248469532272093e-13
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 2129,
+                  "sumMinusOne": 5.773159728050814e-15,
+                  "exactSumMinusOne": 5.035265281984336e-15
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 2129,
+                  "sumMinusOne": 7.327471962526033e-15,
+                  "exactSumMinusOne": 5.866130064341446e-15
+                }
+              ]
+            },
+            {
+              "run": 2,
+              "analysisId": "an_01M5N3EEF4R5KTY0FDD1M8DDHJ",
+              "terminalEvent": "analysis.completed",
+              "status": "COMPLETED",
+              "counters": {
+                "betweennessSkipped": 1,
+                "denylistedPairs": 153655,
+                "externalPairs": 115154,
+                "packageCycles": 44,
+                "packageEdges": 41471,
+                "packageNodes": 2129,
+                "packagesInCycles": 1724,
+                "pagerankUnconverged": 0,
+                "selfPairs": 25780,
+                "typeCycles": 981,
+                "typeEdges": 380071,
+                "typeNodes": 39364,
+                "typesInCycles": 12995
+              },
+              "durationMs": 2515,
+              "stageRowMatchesEvent": true,
+              "analysisWallMillis": 182091,
+              "heap": {
+                "peakLiveBytes": 1202939016,
+                "peakUsedBytes": 1939424328
+              },
+              "loadAverage1m": {
+                "start": 4.21630859375,
+                "end": 6.71533203125
+              },
+              "graphMetric": {
+                "file": "analyzer/target/pagerank-determinism/elasticsearch-ALL-run2-graph_metric.tsv",
+                "rows": 41493,
+                "sha256": "034a995cc1c068595ae11b13935d5bd240608762dc37583ab52a5efbd8cf7a52"
+              },
+              "packageEdge": {
+                "file": "analyzer/target/pagerank-determinism/elasticsearch-ALL-run2-package_edge.tsv",
+                "rows": 41471,
+                "sha256": "eaba2975f0367def5fd2619b6f0408346e1b290f575b8257020cb0c37139ea95"
+              },
+              "sums": [
+                {
+                  "vector": "TYPE pagerank",
+                  "size": 39364,
+                  "sumMinusOne": -3.5638159090467525e-14,
+                  "exactSumMinusOne": -3.234455575484743e-13
+                },
+                {
+                  "vector": "TYPE pagerankOut",
+                  "size": 39364,
+                  "sumMinusOne": 1.9229062786507711e-13,
+                  "exactSumMinusOne": 1.7248469532272093e-13
+                },
+                {
+                  "vector": "PACKAGE pagerank",
+                  "size": 2129,
+                  "sumMinusOne": 5.773159728050814e-15,
+                  "exactSumMinusOne": 5.035265281984336e-15
+                },
+                {
+                  "vector": "PACKAGE pagerankOut",
+                  "size": 2129,
+                  "sumMinusOne": 7.327471962526033e-15,
+                  "exactSumMinusOne": 5.866130064341446e-15
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
