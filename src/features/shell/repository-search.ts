@@ -1,3 +1,4 @@
+import { notFound } from "@tanstack/react-router";
 import { z } from "zod";
 import {
   type ElementKind,
@@ -5,7 +6,12 @@ import {
   resolutionQualitySchema,
 } from "@/protocol/enums";
 import type { SearchHit } from "@/protocol/graph";
-import { analysisIdSchema, elementIdSchema } from "@/protocol/primitives";
+import {
+  analysisIdSchema,
+  elementIdSchema,
+  type RepositoryHandle,
+  repositoryHandleSchema,
+} from "@/protocol/primitives";
 import type { GraphViewParams } from "@/queries/options";
 
 export const inspectorTabSchema = z.enum([
@@ -68,10 +74,26 @@ export const changesView = (
   prev: RepositorySearch,
   next: RepositorySearch
 ): boolean => {
+  if (prev.analysis !== next.analysis) {
+    return true;
+  }
   const before = resolveGraphView(prev);
   const after = resolveGraphView(next);
   return before.level !== after.level || before.parentId !== after.parentId;
 };
+
+export const startAnalysis =
+  (analysisId: string): SearchTransition =>
+  () => ({
+    ...REPOSITORY_SEARCH_DEFAULTS,
+    analysis: analysisId,
+    level: "PACKAGE",
+  });
+
+export const leaveAnalysis: SearchTransition = () => ({
+  ...REPOSITORY_SEARCH_DEFAULTS,
+  level: "PACKAGE",
+});
 
 export const selectElement =
   (elementId: string | null): SearchTransition =>
@@ -114,3 +136,15 @@ export const revealSearchHit =
 
 export const isRevealable = (hit: SearchHit): boolean =>
   hit.kind === "PACKAGE" || (hit.kind === "TYPE" && hit.packageId !== null);
+
+export const parseRepositoryParams = ({
+  handle,
+}: {
+  readonly handle: string;
+}): { readonly handle: RepositoryHandle } => {
+  const parsed = repositoryHandleSchema.safeParse(handle);
+  if (!parsed.success) {
+    throw notFound();
+  }
+  return { handle: parsed.data };
+};

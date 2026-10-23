@@ -1,4 +1,5 @@
 import { type ReactElement, useId } from "react";
+import { sentenceCase } from "@/i18n/format";
 import { resolutionQualityLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
@@ -18,7 +19,7 @@ const LEGEND_KINDS = [
 type LegendKind = (typeof LEGEND_KINDS)[number];
 type LegendShape = (typeof NODE_SHAPES)[LegendKind];
 
-const SAMPLE_EDGE_WIDTH = 2;
+const SAMPLE_EDGE_WIDTH = 1.5;
 
 const SHAPE_GLYPHS = {
   ellipse: <circle cx="8" cy="8" r="6" />,
@@ -36,15 +37,15 @@ function EdgeSample({ line }: { readonly line: EdgeLine }) {
       aria-hidden="true"
       className="shrink-0 stroke-(--graph-edge-structural)"
       height="10"
-      viewBox="0 0 32 10"
-      width="32"
+      viewBox="0 0 20 10"
+      width="20"
     >
       <line
         strokeDasharray={line.dashPattern?.join(" ")}
         strokeLinecap={line.cap}
         strokeWidth={SAMPLE_EDGE_WIDTH}
-        x1="3"
-        x2="29"
+        x1="1"
+        x2="19"
         y1="5"
         y2="5"
       />
@@ -69,19 +70,38 @@ function NodeSample({
           ? "stroke-(--graph-node-selected)"
           : "stroke-(--graph-node-border)"
       )}
-      height="16"
+      height="14"
       strokeWidth={
         selected
           ? GRAPH_STYLE.node.selectedBorderWidth
           : GRAPH_STYLE.node.borderWidth
       }
       viewBox="-2 -2 20 20"
-      width="16"
+      width="14"
     >
       {SHAPE_GLYPHS[NODE_SHAPES[kind]]}
     </svg>
   );
 }
+
+function ItemName({
+  shown,
+  spoken,
+}: {
+  readonly shown: string;
+  readonly spoken: string;
+}) {
+  return (
+    <>
+      <span aria-hidden="true">{shown}</span>
+      <span className="sr-only">{spoken}</span>
+    </>
+  );
+}
+
+const GROUP_CLASS = "flex items-center";
+const LIST_CLASS = "flex flex-wrap items-center gap-x-5 gap-y-1";
+const ITEM_CLASS = "flex items-center gap-1.5 whitespace-nowrap";
 
 export function GraphLegend() {
   const titleId = useId();
@@ -89,45 +109,44 @@ export function GraphLegend() {
   return (
     <section
       aria-labelledby={titleId}
-      className="flex flex-wrap items-start gap-x-8 gap-y-2 border-t px-4 py-2 text-sm"
+      className="flex min-h-10 flex-wrap items-center gap-x-5 gap-y-1 border-t px-4 py-2 text-muted-foreground text-xs"
     >
-      <h2 className="font-medium" id={titleId}>
+      <h2 className="font-medium text-foreground" id={titleId}>
         {t.graph.legend.title}
       </h2>
 
-      <div className="flex flex-col gap-1">
-        <h3 className="text-muted-foreground text-xs">
-          {t.graph.legend.resolution}
-        </h3>
-        <ul className="flex flex-wrap gap-x-4 gap-y-1">
-          {resolutionQualitySchema.options.map((quality) => (
-            <li className="flex items-center gap-2" key={quality}>
-              <EdgeSample line={EDGE_LINES[quality]} />
-              {resolutionQualityLabels[quality]}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <h3 className="text-muted-foreground text-xs">{t.graph.legend.kind}</h3>
-        <ul className="flex flex-wrap gap-x-4 gap-y-1">
+      <div className={GROUP_CLASS}>
+        <h3 className="sr-only">{t.graph.legend.kind}</h3>
+        <ul className={LIST_CLASS}>
           {LEGEND_KINDS.map((kind) => (
-            <li className="flex items-center gap-2" key={kind}>
+            <li className={ITEM_CLASS} key={kind}>
               <NodeSample kind={kind} selected={false} />
-              {t.graph.legend.kindShapes[kind]}
+              <ItemName
+                shown={t.graph.legend.kindNames[kind]}
+                spoken={t.graph.legend.kindShapes[kind]}
+              />
             </li>
           ))}
-          <li className="flex items-center gap-2">
+          <li className={ITEM_CLASS}>
             <NodeSample kind="TYPE" selected />
-            {t.graph.legend.selection}
+            <ItemName
+              shown={t.graph.legend.selectionName}
+              spoken={t.graph.legend.selection}
+            />
           </li>
         </ul>
       </div>
 
-      <div className="flex max-w-prose flex-col gap-1 text-muted-foreground">
-        <p>{t.graph.legend.expandHint}</p>
-        <p>{t.graph.legend.keyboardHint}</p>
+      <div className={GROUP_CLASS}>
+        <h3 className="sr-only">{t.graph.legend.resolution}</h3>
+        <ul className={LIST_CLASS}>
+          {resolutionQualitySchema.options.map((quality) => (
+            <li className={ITEM_CLASS} key={quality}>
+              <EdgeSample line={EDGE_LINES[quality]} />
+              {sentenceCase(resolutionQualityLabels[quality])}
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );

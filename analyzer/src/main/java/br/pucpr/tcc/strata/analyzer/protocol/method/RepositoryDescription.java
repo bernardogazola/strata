@@ -13,6 +13,7 @@ import java.util.Objects;
 public record RepositoryDescription(
     BuildSystem buildSystem,
     String cachedAnalysisId,
+    List<String> declaredModules,
     String defaultBranch,
     String displayName,
     String headCommitId,
@@ -25,6 +26,7 @@ public record RepositoryDescription(
   public RepositoryDescription {
     Objects.requireNonNull(buildSystem, "buildSystem");
     Objects.requireNonNull(displayName, "displayName");
+    declaredModules = List.copyOf(Objects.requireNonNull(declaredModules, "declaredModules"));
     sourceRoots = List.copyOf(Objects.requireNonNull(sourceRoots, "sourceRoots"));
   }
 
@@ -33,6 +35,7 @@ public record RepositoryDescription(
     return new RepositoryDescription(
         repository.layout().buildSystem(),
         null,
+        describedModules(repository.layout().declaredModules()),
         snapshot.head().branch(),
         snapshot.displayName(),
         snapshot.head().commitId(),
@@ -41,6 +44,13 @@ public record RepositoryDescription(
         snapshot.head().shallow(),
         repository.layout().sourceRoots().stream().map(Root::of).toList(),
         snapshot.inventory().totalFileCount());
+  }
+
+  private static List<String> describedModules(List<String> declared) {
+    return declared.stream()
+        .limit(AnalysisConstants.MAX_DESCRIBED_MODULES)
+        .map(module -> UntrustedText.clamp(module, AnalysisConstants.MAX_PATH_BYTES))
+        .toList();
   }
 
   public record Root(String id, int javaFileCount, SourceRootKind kind, String label) {

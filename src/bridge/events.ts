@@ -9,13 +9,16 @@ import { analyzerState } from "./analyzer";
 import { forwardedFrameSchema } from "./contracts";
 import { type RawFrame, transport } from "./transport";
 
+type RepositoryRead = "currentAnalysis" | "describe";
+
 type StageInvalidation =
   | { readonly scope: "none" }
+  | { readonly scope: "describeAfterRun" }
   | {
       readonly scope: "analysis";
       readonly key: (id: string) => readonly unknown[];
     }
-  | { readonly scope: "repository"; readonly describe: boolean };
+  | { readonly scope: "currentAnalysis" };
 
 const STAGE_INVALIDATION = {
   EVOLUTIONARY_COUPLING: { key: queryKeys.evolution.all, scope: "analysis" },
@@ -23,9 +26,9 @@ const STAGE_INVALIDATION = {
   GIT_HISTORY_DETAILED: { key: queryKeys.evolution.all, scope: "analysis" },
   GUIDED_TOUR: { key: queryKeys.tour, scope: "analysis" },
   HOTSPOT_PROFILES: { key: queryKeys.hotspots.all, scope: "analysis" },
-  LAYOUT_DISCOVERY: { describe: true, scope: "repository" },
-  PERSISTENCE: { describe: false, scope: "repository" },
-  REPOSITORY_VALIDATION: { describe: true, scope: "repository" },
+  LAYOUT_DISCOVERY: { scope: "describeAfterRun" },
+  PERSISTENCE: { scope: "currentAnalysis" },
+  REPOSITORY_VALIDATION: { scope: "describeAfterRun" },
   SOURCE_ANALYSIS: { scope: "none" },
   STRUCTURAL_GRAPH: { key: queryKeys.structure.all, scope: "analysis" },
 } as const satisfies Record<AnalysisStage, StageInvalidation>;
@@ -41,7 +44,7 @@ const invalidateAnalysis = (
 
 const invalidateRepository = (
   queryClient: QueryClient,
-  describe: boolean
+  read: RepositoryRead
 ): void => {
   queryClient
     .invalidateQueries({
@@ -50,7 +53,7 @@ const invalidateRepository = (
         if (key[0] !== "repository") {
           return false;
         }
-        return describe
+        return read === "describe"
           ? key[2] === "describe"
           : key[2] === "analysis" && key[3] === "current";
       },
@@ -97,7 +100,9 @@ const applyForwarded = (
   if (event === "analysis.started") {
     const { analysisId } = payload as { analysisId: string };
     store.clearWarnings();
-    invalidateRepository(queryClient, false);
+    store.markAnalysisRunning(analysisId);
+    invalidateRepository(queryClient, "currentAnalysis");
+    invalidateAnalysis(queryClient, queryKeys.analysisStatus(analysisId));
     endedAnalyses = endedAnalyses.filter((id) => id !== analysisId);
     return;
   }
@@ -106,7 +111,9 @@ const applyForwarded = (
     const { analysisId } = payload as { analysisId: string };
     rememberEnded(analysisId);
     store.clearProgress();
+    store.markAnalysisEnded(analysisId);
     invalidateAnalysis(queryClient, queryKeys.analysis(analysisId));
+    invalidateRepository(queryClient, "describe");
     return;
   }
 
@@ -124,11 +131,12 @@ const applyForwarded = (
       analysisId: string;
       stage: AnalysisStage;
     };
+    invalidateAnalysis(queryClient, queryKeys.analysisStatus(analysisId));
     const rule = STAGE_INVALIDATION[stage];
     if (rule.scope === "analysis") {
       invalidateAnalysis(queryClient, rule.key(analysisId));
-    } else if (rule.scope === "repository") {
-      invalidateRepository(queryClient, rule.describe);
+    } else if (rule.scope === "currentAnalysis") {
+      invalidateRepository(queryClient, "currentAnalysis");
     }
     return;
   }
@@ -178,9 +186,26 @@ export const primeBackendState = async (): Promise<void> => {
   applyResolvedBackend(await analyzerState());
 };
 
-export const subscribeToAnalyzer = (
+const EVERY_ANALYSIS = ["analysis"] as const;
+
+const forgetAnalysesOnReady = (queryClient: QueryClient): (() => void) =>
+  useAppStore.subscribe((state, previous) => {
+    if (state.backend.phase === "READY" && previous.backend.phase !== "READY") {
+      queryClient
+        .resetQueries({ queryKey: EVERY_ANALYSIS })
+        .catch(() => undefined);
+    }
+  });
+
+export const subscribeToAnalyzer = async (
   queryClient: QueryClient
-): Promise<() => void> =>
-  transport.subscribe((frame) => {
+): Promise<() => void> => {
+  const stopChannels = await transport.subscribe((frame) => {
     handleFrame(frame, queryClient);
   });
+  const stopForgetting = forgetAnalysesOnReady(queryClient);
+  return () => {
+    stopChannels();
+    stopForgetting();
+  };
+};

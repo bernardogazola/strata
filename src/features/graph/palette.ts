@@ -1,4 +1,5 @@
 export const GRAPH_TOKENS = [
+  "--graph-canvas",
   "--graph-node",
   "--graph-node-border",
   "--graph-node-label",

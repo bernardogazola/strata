@@ -1,12 +1,18 @@
 import { QueryClient } from "@tanstack/react-query";
-import { beforeEach, describe, expect, test } from "vitest";
-import { handleFrame, resetEventState } from "@/bridge/events";
-import type { RawFrame } from "@/bridge/transport";
-import { analysisStageSchema } from "@/protocol/analysis";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import {
+  handleFrame,
+  resetEventState,
+  subscribeToAnalyzer,
+} from "@/bridge/events";
+import { type RawFrame, transport } from "@/bridge/transport";
+import { type AnalysisStage, analysisStageSchema } from "@/protocol/analysis";
+import { queryKeys } from "@/queries/keys";
 import { useAppStore } from "@/state/app-store";
 
 const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 const OTHER = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1X";
+const HANDLE = "repo_AAAAAAAAAAAAAAAAAAAAAQ";
 
 const initialStore = useAppStore.getState();
 let queryClient: QueryClient;
@@ -80,25 +86,41 @@ describe("validação na fronteira", () => {
   });
 });
 
-describe("clearProgress no fim da análise", () => {
-  const completeness = {
-    historyTruncatedAtCommits: null,
-    parseFailures: 0,
-    shallowClone: false,
-    skippedFiles: 0,
-    totalFiles: 1,
-  };
+const completeness = {
+  historyTruncatedAtCommits: null,
+  parseFailures: 0,
+  shallowClone: false,
+  skippedFiles: 0,
+  totalFiles: 1,
+};
 
-  const terminal = {
-    "analysis.cancelled": { analysisId: AN, completeness },
-    "analysis.completed": { analysisId: AN, completeness },
+const terminalsFor = (analysisId: string) =>
+  ({
+    "analysis.cancelled": { analysisId, completeness },
+    "analysis.completed": { analysisId, completeness },
     "analysis.failed": {
-      analysisId: AN,
+      analysisId,
       error: { code: "REPO_NO_JAVA_SOURCES", origin: "analyzer", params: {} },
     },
-  } as const;
+  }) as const;
 
-  for (const [event, payload] of Object.entries(terminal)) {
+const stageCompleted = (stage: AnalysisStage, analysisId = AN) => ({
+  analysisId,
+  counters: {},
+  durationMs: 1,
+  stage,
+  status: "COMPLETED",
+});
+
+const seed = (queryKey: readonly unknown[]): void => {
+  queryClient.setQueryData(queryKey, { any: true });
+};
+
+const isInvalidated = (queryKey: readonly unknown[]): boolean | undefined =>
+  queryClient.getQueryState(queryKey)?.isInvalidated;
+
+describe("clearProgress no fim da análise", () => {
+  for (const [event, payload] of Object.entries(terminalsFor(AN))) {
     test(`${event} zera o progresso`, () => {
       handleFrame(forwarded("analysis.progress", tick(AN)), queryClient);
       expect(Object.keys(useAppStore.getState().progress)).toHaveLength(1);
@@ -227,18 +249,11 @@ describe("invalidação", () => {
 
   test("todo estágio tem regra, e SOURCE_ANALYSIS não invalida nada de propósito", () => {
     queryClient.setQueryData(["analysis", AN, "structure"], { any: true });
-    const stageEvent = (stage: string) => ({
-      analysisId: AN,
-      counters: {},
-      durationMs: 1,
-      stage,
-      status: "COMPLETED",
-    });
 
     for (const stage of analysisStageSchema.options) {
       expect(
         handleFrame(
-          forwarded("analysis.stage.completed", stageEvent(stage)),
+          forwarded("analysis.stage.completed", stageCompleted(stage)),
           queryClient
         ),
         `${stage} deve ter uma regra`
@@ -249,5 +264,221 @@ describe("invalidação", () => {
       .getQueryCache()
       .find({ queryKey: ["analysis", AN, "structure"] });
     expect(entry?.state.isInvalidated).toBe(true);
+  });
+});
+
+describe("o status da análise", () => {
+  test("analysis.started invalida o status da análise que começou", () => {
+    seed(queryKeys.analysisStatus(AN));
+
+    handleFrame(forwarded("analysis.started", { analysisId: AN }), queryClient);
+
+    expect(isInvalidated(queryKeys.analysisStatus(AN))).toBe(true);
+  });
+
+  test("todo analysis.stage.completed invalida o status, até o que não tem regra própria", () => {
+    for (const stage of analysisStageSchema.options) {
+      queryClient.clear();
+      seed(queryKeys.analysisStatus(AN));
+
+      handleFrame(
+        forwarded("analysis.stage.completed", stageCompleted(stage)),
+        queryClient
+      );
+
+      expect(isInvalidated(queryKeys.analysisStatus(AN)), stage).toBe(true);
+    }
+  });
+
+  test("o fim de um estágio não invalida o status de outra análise", () => {
+    seed(queryKeys.analysisStatus(OTHER));
+
+    handleFrame(
+      forwarded("analysis.stage.completed", stageCompleted("SOURCE_ANALYSIS")),
+      queryClient
+    );
+
+    expect(isInvalidated(queryKeys.analysisStatus(OTHER))).toBe(false);
+  });
+
+  for (const [event, payload] of Object.entries(terminalsFor(AN))) {
+    test(`${event} invalida o status pelo prefixo da análise`, () => {
+      seed(queryKeys.analysisStatus(AN));
+
+      handleFrame(forwarded(event, payload), queryClient);
+
+      expect(isInvalidated(queryKeys.analysisStatus(AN))).toBe(true);
+    });
+  }
+});
+
+describe("a execução em voo", () => {
+  test("analysis.started a põe na store", () => {
+    handleFrame(forwarded("analysis.started", { analysisId: AN }), queryClient);
+
+    expect(useAppStore.getState().runningAnalysisId).toBe(AN);
+  });
+
+  for (const [event, payload] of Object.entries(terminalsFor(AN))) {
+    test(`${event} da mesma análise a tira`, () => {
+      handleFrame(
+        forwarded("analysis.started", { analysisId: AN }),
+        queryClient
+      );
+
+      expect(handleFrame(forwarded(event, payload), queryClient)).toBe(true);
+      expect(useAppStore.getState().runningAnalysisId).toBeNull();
+    });
+  }
+
+  for (const [event, payload] of Object.entries(terminalsFor(OTHER))) {
+    test(`${event} de outra análise não a tira`, () => {
+      handleFrame(
+        forwarded("analysis.started", { analysisId: AN }),
+        queryClient
+      );
+
+      handleFrame(forwarded(event, payload), queryClient);
+
+      expect(useAppStore.getState().runningAnalysisId).toBe(AN);
+    });
+  }
+
+  test("um analysis.started inválido não põe nada", () => {
+    expect(
+      handleFrame(
+        forwarded("analysis.started", { analysisId: "an_minúsculo" }),
+        queryClient
+      )
+    ).toBe(false);
+    expect(useAppStore.getState().runningAnalysisId).toBeNull();
+  });
+});
+
+describe("o describe não é refeito no meio da execução", () => {
+  const describeStages = [
+    "REPOSITORY_VALIDATION",
+    "LAYOUT_DISCOVERY",
+  ] as const satisfies readonly AnalysisStage[];
+
+  for (const stage of describeStages) {
+    test(`${stage} não invalida o describe`, () => {
+      seed(queryKeys.repository.describe(HANDLE));
+
+      expect(
+        handleFrame(
+          forwarded("analysis.stage.completed", stageCompleted(stage)),
+          queryClient
+        )
+      ).toBe(true);
+
+      expect(isInvalidated(queryKeys.repository.describe(HANDLE))).toBe(false);
+    });
+  }
+
+  test("nenhum estágio invalida o describe", () => {
+    seed(queryKeys.repository.describe(HANDLE));
+
+    for (const stage of analysisStageSchema.options) {
+      handleFrame(
+        forwarded("analysis.stage.completed", stageCompleted(stage)),
+        queryClient
+      );
+    }
+
+    expect(isInvalidated(queryKeys.repository.describe(HANDLE))).toBe(false);
+  });
+
+  for (const [event, payload] of Object.entries(terminalsFor(AN))) {
+    test(`${event} invalida o describe, sem precisar do handle`, () => {
+      seed(queryKeys.repository.describe(HANDLE));
+
+      handleFrame(forwarded(event, payload), queryClient);
+
+      expect(isInvalidated(queryKeys.repository.describe(HANDLE))).toBe(true);
+    });
+  }
+
+  test("PERSISTENCE continua invalidando a análise corrente, e não o describe", () => {
+    seed(queryKeys.repository.currentAnalysis(HANDLE));
+    seed(queryKeys.repository.describe(HANDLE));
+
+    handleFrame(
+      forwarded("analysis.stage.completed", stageCompleted("PERSISTENCE")),
+      queryClient
+    );
+
+    expect(isInvalidated(queryKeys.repository.currentAnalysis(HANDLE))).toBe(
+      true
+    );
+    expect(isInvalidated(queryKeys.repository.describe(HANDLE))).toBe(false);
+  });
+
+  test("analysis.started invalida a análise corrente, e não o describe", () => {
+    seed(queryKeys.repository.currentAnalysis(HANDLE));
+    seed(queryKeys.repository.describe(HANDLE));
+
+    handleFrame(forwarded("analysis.started", { analysisId: AN }), queryClient);
+
+    expect(isInvalidated(queryKeys.repository.currentAnalysis(HANDLE))).toBe(
+      true
+    );
+    expect(isInvalidated(queryKeys.repository.describe(HANDLE))).toBe(false);
+  });
+});
+
+describe("o analisador de volta ao READY", () => {
+  const stopChannels = vi.fn<() => void>();
+  let stopBridge: () => void = () => undefined;
+
+  beforeEach(async () => {
+    vi.spyOn(transport, "subscribe").mockResolvedValue(stopChannels);
+    stopBridge = await subscribeToAnalyzer(queryClient);
+  });
+
+  afterEach(() => {
+    stopBridge();
+    vi.restoreAllMocks();
+    stopChannels.mockClear();
+  });
+
+  const dataOf = (queryKey: readonly unknown[]): unknown =>
+    queryClient.getQueryState(queryKey)?.data;
+
+  test("o reinício depois de um travamento esquece toda análise, e só ela", () => {
+    handleFrame(state({ phase: "READY", protocolVersion: 1 }), queryClient);
+    seed(queryKeys.analysisStatus(AN));
+    seed(queryKeys.structure.all(OTHER));
+    seed(queryKeys.repository.describe(HANDLE));
+
+    handleFrame(state({ exitCode: 137, phase: "CRASHED" }), queryClient);
+    useAppStore.getState().recoverBackend();
+    expect(dataOf(queryKeys.analysisStatus(AN))).toStrictEqual({ any: true });
+    handleFrame(state({ phase: "READY", protocolVersion: 1 }), queryClient);
+
+    expect(dataOf(queryKeys.analysisStatus(AN))).toBeUndefined();
+    expect(dataOf(queryKeys.structure.all(OTHER))).toBeUndefined();
+    expect(dataOf(queryKeys.repository.describe(HANDLE))).toStrictEqual({
+      any: true,
+    });
+  });
+
+  test("um READY que chega de novo ao READY não esquece nada", () => {
+    handleFrame(state({ phase: "READY", protocolVersion: 1 }), queryClient);
+    seed(queryKeys.analysisStatus(AN));
+
+    handleFrame(state({ phase: "READY", protocolVersion: 1 }), queryClient);
+
+    expect(dataOf(queryKeys.analysisStatus(AN))).toStrictEqual({ any: true });
+  });
+
+  test("depois de desassinar, nem os canais nem a store chegam à ponte", () => {
+    seed(queryKeys.analysisStatus(AN));
+
+    stopBridge();
+    handleFrame(state({ phase: "READY", protocolVersion: 1 }), queryClient);
+
+    expect(stopChannels).toHaveBeenCalledOnce();
+    expect(dataOf(queryKeys.analysisStatus(AN))).toStrictEqual({ any: true });
   });
 });

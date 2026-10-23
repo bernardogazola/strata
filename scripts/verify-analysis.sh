@@ -461,7 +461,7 @@ shutdown_analyzer() {
 }
 
 FAKE_ID="an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W"
-FAKE_DESCRIBE='{"buildSystem":"MAVEN","cachedAnalysisId":null,"defaultBranch":"main","displayName":"multi-module","headCommitId":"fc5c752e7e9610c39de3b7b7caf2a74b7dfe6249","isBare":false,"isGitRepository":true,"isShallow":false,"sourceRoots":[{"id":"sr_sqbycfms","javaFileCount":2,"kind":"MAIN","label":"api/src/main/java"},{"id":"sr_3gwc7d6d","javaFileCount":6,"kind":"MAIN","label":"core/src/main/java"},{"id":"sr_jc51sw4p","javaFileCount":1,"kind":"TEST","label":"core/src/test/java"},{"id":"sr_3sscth34","javaFileCount":1,"kind":"GENERATED","label":"core/target/generated-sources/annotations"}],"totalFileCount":14}'
+FAKE_DESCRIBE='{"buildSystem":"MAVEN","cachedAnalysisId":null,"declaredModules":["core","api"],"defaultBranch":"main","displayName":"multi-module","headCommitId":"fc5c752e7e9610c39de3b7b7caf2a74b7dfe6249","isBare":false,"isGitRepository":true,"isShallow":false,"sourceRoots":[{"id":"sr_sqbycfms","javaFileCount":2,"kind":"MAIN","label":"api/src/main/java"},{"id":"sr_3gwc7d6d","javaFileCount":6,"kind":"MAIN","label":"core/src/main/java"},{"id":"sr_jc51sw4p","javaFileCount":1,"kind":"TEST","label":"core/src/test/java"},{"id":"sr_3sscth34","javaFileCount":1,"kind":"GENERATED","label":"core/target/generated-sources/annotations"}],"totalFileCount":14}'
 FAKE_REQUEST_ID=""
 FAKE_METHOD=""
 

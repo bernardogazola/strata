@@ -5,7 +5,6 @@ import {
   expect,
   type Page,
   type TestInfo,
-  test,
 } from "@playwright/test";
 import { GRAPH_PERF } from "@/features/graph/perf";
 import { GRAPH_STYLE } from "@/features/graph/stylesheet";
@@ -53,6 +52,7 @@ import {
   readZoom,
   renderedPosition,
   searchOf,
+  serveMap,
   serveSlices,
   settle,
   setZoom,
@@ -62,6 +62,7 @@ import {
   waitForFreshReady,
   withFreshPage,
 } from "./support/graph-page";
+import { test } from "./support/map-test";
 import {
   SYNTHETIC_SLICE_GENERATOR,
   SYNTHETIC_TYPE_PARENT_ID,
@@ -215,6 +216,7 @@ test("duas páginas novas da mesma vista dão as mesmas posições, byte a byte"
 }, testInfo) => {
   const positionsOfFreshPage = () =>
     withFreshPage(browser, contextOptionsOf(testInfo), async (page) => {
+      await serveMap(page);
       await page.goto(LEVEL_ONE_URL);
       await expectGraph(page, PACKAGE_IDS);
       return JSON.stringify(await readPositions(page));
@@ -688,6 +690,7 @@ test.describe("Benchmark do grafo sobre fatias sintéticas", () => {
       browser,
       contextOptionsOf(testInfo),
       async (page) => {
+        await serveMap(page);
         await page.goto(LEVEL_ONE_URL);
         await expectGraph(page, PACKAGE_IDS);
         return captureEnvironment({

@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 import { GRAPH_PERF } from "@/features/graph/perf";
 import { GRAPH_STYLE } from "@/features/graph/stylesheet";
 import { ROW_HEIGHT } from "@/features/outline/outline-row";
@@ -24,6 +24,7 @@ import {
   type TabStop,
   tabUntil,
 } from "./support/graph-page";
+import { test } from "./support/map-test";
 
 const ANALYSIS_ID = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 const LEVEL_ONE_URL = `/repository/repo_AAAAAAAAAAAAAAAAAAAAAQ?analysis=${ANALYSIS_ID}`;
@@ -42,7 +43,8 @@ const SEARCH_HITS = searchResultSchema.parse(
 const ACTIVE_BORDER_WIDTH = `${GRAPH_STYLE.node.activeBorderWidth}px`;
 const SELECTED_BORDER_WIDTH = `${GRAPH_STYLE.node.selectedBorderWidth}px`;
 
-const MAX_TAB_STOPS = 10;
+const MAX_TAB_STOPS = 11;
+const CLOSE_STOP: TabStop = { name: t.header.close, role: "button" };
 const THEME_STOP: TabStop = { name: t.theme.label, role: "button" };
 const SEARCH_STOP: TabStop = { name: t.search.label, role: "searchbox" };
 const ROOT_CRUMB_STOP: TabStop = {
@@ -121,7 +123,7 @@ test.describe("A estrutura da arquitetura pelo teclado, par do canvas", () => {
     expect(await outlineIds(page, 1)).toStrictEqual(PACKAGE_IDS);
   });
 
-  test("o Tab do topo chega à árvore depois do tema e da busca, e a seta move o foco e o destaque", async ({
+  test("o Tab do topo chega à árvore depois de fechar, do tema e da busca, e a seta move o foco e o destaque", async ({
     page,
   }) => {
     await page.goto(LEVEL_ONE_URL);
@@ -132,7 +134,7 @@ test.describe("A estrutura da arquitetura pelo teclado, par do canvas", () => {
 
     expect(
       await tabUntil(page, tabbableRow(page), MAX_TAB_STOPS)
-    ).toStrictEqual([THEME_STOP, SEARCH_STOP]);
+    ).toStrictEqual([CLOSE_STOP, THEME_STOP, SEARCH_STOP]);
     await expect(rowOf(page, BILLING_ID)).toBeFocused();
     await expect
       .poll(() => styleOf(page, BILLING_ID, "border-width"))
@@ -158,7 +160,7 @@ test.describe("A estrutura da arquitetura pelo teclado, par do canvas", () => {
 
     expect(
       await tabUntil(page, tabbableRow(page), MAX_TAB_STOPS)
-    ).toStrictEqual([ROOT_CRUMB_STOP, THEME_STOP, SEARCH_STOP]);
+    ).toStrictEqual([ROOT_CRUMB_STOP, CLOSE_STOP, THEME_STOP, SEARCH_STOP]);
     await expect(orders).toBeFocused();
   });
 

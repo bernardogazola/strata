@@ -16,6 +16,7 @@ import {
   expandPackage,
   type InspectorTab,
   isRevealable,
+  leaveAnalysis,
   REPOSITORY_SEARCH_DEFAULTS,
   type RepositorySearch,
   repositorySearchSchema,
@@ -23,12 +24,14 @@ import {
   revealSearchHit,
   selectElement,
   selectWhereDrawn,
+  startAnalysis,
 } from "@/features/shell/repository-search";
 import type { GraphLevel, ResolutionQuality } from "@/protocol/enums";
 import type { SearchHit } from "@/protocol/graph";
 import { Route as RepositoryRoute } from "@/routes/repository.$handle";
 
 const ANALYSIS_ID = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
+const NEXT_ANALYSIS_ID = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1X";
 const PACKAGE_ID = "pkg:br.pucpr.orders";
 const TYPE_ID = "type:br.pucpr.orders.Order";
 const OTHER_PACKAGE_ID = "pkg:br.pucpr.billing";
@@ -162,6 +165,7 @@ const mountRoute = async (query: string) => {
     expect(router.state.status).toBe("idle");
   });
   return {
+    router,
     search: router.state.matches.at(-1)?.search,
     url: Object.fromEntries(
       new URLSearchParams(router.state.location.searchStr)
@@ -202,6 +206,24 @@ describe("a rota /repository/$handle", () => {
       percentile: "90",
       tab: "history",
     });
+  });
+
+  test("startAnalysis deixa na URL só a análise nova e o nível", async () => {
+    const { router, search } = await mountRoute(
+      `level=TYPE&parent=${encodeURIComponent(PACKAGE_ID)}&tab=history`
+    );
+
+    await router.navigate({
+      params: { handle: HANDLE },
+      search: startAnalysis(NEXT_ANALYSIS_ID)(
+        repositorySearchSchema.parse(search)
+      ),
+      to: "/repository/$handle",
+    });
+
+    expect(
+      Object.fromEntries(new URLSearchParams(router.state.location.searchStr))
+    ).toStrictEqual({ analysis: NEXT_ANALYSIS_ID, level: "PACKAGE" });
   });
 
   test.each([
@@ -309,5 +331,63 @@ describe("as transições de vista", () => {
     expect(isRevealable(orphan)).toBe(false);
     expect(isRevealable(method)).toBe(false);
     expect(isRevealable(hit({}))).toBe(true);
+  });
+});
+
+describe("entrar e sair de uma análise", () => {
+  const preparing = repositorySearchSchema.parse({});
+  const deepInAnalysis = repositorySearchSchema.parse({
+    analysis: ANALYSIS_ID,
+    focus: TYPE_ID,
+    level: "TYPE",
+    minQuality: "RESOLVED",
+    parent: PACKAGE_ID,
+    percentile: 90,
+    tab: "history",
+  });
+
+  test("startAnalysis põe a análise e devolve todo o resto ao padrão", () => {
+    expect(startAnalysis(NEXT_ANALYSIS_ID)(deepInAnalysis)).toStrictEqual({
+      ...REPOSITORY_SEARCH_DEFAULTS,
+      analysis: NEXT_ANALYSIS_ID,
+      level: "PACKAGE",
+    });
+  });
+
+  test("startAnalysis a partir da preparação empilha: o voltar leva de volta a ela", () => {
+    const next = startAnalysis(ANALYSIS_ID)(preparing);
+
+    expect(next.analysis).toBe(ANALYSIS_ID);
+    expect(changesView(preparing, next)).toBe(true);
+  });
+
+  test("o resultado de startAnalysis passa pelo schema como saiu", () => {
+    const next = startAnalysis(ANALYSIS_ID)(preparing);
+
+    expect(repositorySearchSchema.parse(next)).toStrictEqual(next);
+  });
+
+  test("leaveAnalysis volta à preparação, sem nada do mapa que ficou para trás", () => {
+    const next = leaveAnalysis(deepInAnalysis);
+
+    expect(next).toStrictEqual(preparing);
+    expect(next).not.toHaveProperty("analysis");
+    expect(changesView(deepInAnalysis, next)).toBe(true);
+  });
+
+  test("trocar só a análise empilha, mesmo com o mesmo mapa à vista", () => {
+    const levelOne = repositorySearchSchema.parse({ analysis: ANALYSIS_ID });
+    const other = { ...levelOne, analysis: NEXT_ANALYSIS_ID };
+
+    expect(resolveGraphView(other)).toStrictEqual(resolveGraphView(levelOne));
+    expect(changesView(levelOne, other)).toBe(true);
+  });
+
+  test("uma seleção dentro da mesma análise continua substituindo", () => {
+    const levelOne = repositorySearchSchema.parse({ analysis: ANALYSIS_ID });
+
+    expect(changesView(levelOne, selectElement(PACKAGE_ID)(levelOne))).toBe(
+      false
+    );
   });
 });

@@ -8,7 +8,8 @@ import { hasLocaleData } from "@/i18n/format";
 import AppProvider from "./provider";
 import { createAppRouter } from "./router";
 
-z.config(z.locales.pt());
+// ptBR, e não pt: desde o Zod 4.6 o pt é português europeu.
+z.config(z.locales.ptBR());
 
 if (import.meta.env.DEV && !hasLocaleData()) {
   console.warn("Dados de locale pt-BR ausentes neste runtime.");

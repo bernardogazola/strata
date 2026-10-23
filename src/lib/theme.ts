@@ -5,9 +5,11 @@ export type ResolvedTheme = "dark" | "light";
 
 export const THEME_STORAGE_KEY = "vite-ui-theme";
 
+// Tem de bater com global.css, o <style> inline do index.html e BG_LIGHT/BG_DARK em lib.rs;
+// cada um atua em um momento do carregamento, e juntos evitam o flash de tema.
 export const BACKGROUND_COLORS: Record<ResolvedTheme, string> = {
-  dark: "#0A0A0A",
-  light: "#f6f6f6",
+  dark: "#111111",
+  light: "#ffffff",
 };
 
 export const readStoredTheme = (storageKey: string): Theme | null => {

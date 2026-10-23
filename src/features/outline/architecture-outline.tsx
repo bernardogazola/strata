@@ -20,9 +20,11 @@ import {
   useState,
 } from "react";
 import { protocolErrorOf } from "@/bridge/analyzer";
+import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
 import { formatProtocolError } from "@/i18n/errors";
 import { t } from "@/i18n/messages";
+import { cn } from "@/lib/utils";
 import type { ElementKind } from "@/protocol/enums";
 import type { GraphViewParams } from "@/queries/options";
 import { useAppStore } from "@/state/app-store";
@@ -123,6 +125,9 @@ interface OutlineTreeProps {
   readonly expandedId: string | null;
   readonly focus: string | null;
   readonly headingId: string;
+
+  readonly hintId: string;
+
   readonly onCollapse: () => void;
   readonly onExpand: (packageId: string) => void;
   readonly onLoadMore: (parentId: string | null) => void;
@@ -138,6 +143,7 @@ function OutlineTree({
   expandedId,
   focus,
   headingId,
+  hintId,
   onCollapse,
   onExpand,
   onLoadMore,
@@ -410,8 +416,9 @@ function OutlineTree({
   return (
     <div
       aria-busy={busy}
+      aria-describedby={hintId}
       aria-labelledby={headingId}
-      className="min-h-0 flex-1 overflow-y-auto"
+      className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1"
       onBlur={handleBlur}
       onClick={handleClick}
       onFocus={handleFocus}
@@ -461,7 +468,12 @@ function RootFailure({
         )}
       </div>
       {message.retryable ? (
-        <Button onClick={onRetry} size="sm" variant="outline">
+        <Button
+          className={cn(SECONDARY_ACTION_CLASS, "shadow-control")}
+          onClick={onRetry}
+          size="sm"
+          variant="outline"
+        >
           {t.graph.retry}
         </Button>
       ) : null}
@@ -471,7 +483,7 @@ function RootFailure({
 
 function RootStatus({ text }: { readonly text: string }) {
   return (
-    <p className="px-2 text-muted-foreground text-sm" role="status">
+    <p className="px-2 py-1.5 text-muted-foreground text-sm" role="status">
       {text}
     </p>
   );
@@ -487,6 +499,7 @@ export function ArchitectureOutline({
   view,
 }: ArchitectureOutlineProps): ReactNode {
   const headingId = useId();
+  const hintId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const treeRef = useRef<HTMLDivElement>(null);
   const outline = useOutline(analysisId, view, focus);
@@ -510,20 +523,26 @@ export function ArchitectureOutline({
   let body: ReactNode;
   if (rows.length > 0) {
     body = (
-      <OutlineTree
-        busy={outline.busy}
-        expandedId={outline.expandedId}
-        focus={focus}
-        headingId={headingId}
-        onCollapse={onCollapse}
-        onExpand={onExpand}
-        onLoadMore={outline.loadMore}
-        onRetry={retry}
-        onSelect={onSelect}
-        rows={rows}
-        treeRef={treeRef}
-        view={view}
-      />
+      <>
+        <p className="px-2 pb-2 text-muted-foreground text-xs" id={hintId}>
+          {t.outline.keyboardHint}
+        </p>
+        <OutlineTree
+          busy={outline.busy}
+          expandedId={outline.expandedId}
+          focus={focus}
+          headingId={headingId}
+          hintId={hintId}
+          onCollapse={onCollapse}
+          onExpand={onExpand}
+          onLoadMore={outline.loadMore}
+          onRetry={retry}
+          onSelect={onSelect}
+          rows={rows}
+          treeRef={treeRef}
+          view={view}
+        />
+      </>
     );
   } else if (rootStatus === "error" && rootError !== null) {
     body = <RootFailure error={rootError} onRetry={retryRoot} />;
@@ -536,7 +555,7 @@ export function ArchitectureOutline({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <h2
-        className="mb-2 rounded-sm px-2 font-medium text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="rounded-sm px-2 pt-1.5 pb-1 font-medium text-muted-foreground text-xs"
         id={headingId}
         ref={headingRef}
         tabIndex={-1}

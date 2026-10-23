@@ -1,11 +1,14 @@
+import { IconInfoCircle } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { protocolErrorOf } from "@/bridge/analyzer";
+import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
 import { formatProtocolError } from "@/i18n/errors";
 import { interpolate, plural } from "@/i18n/format";
 import { graphLevelLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
+import { cn } from "@/lib/utils";
 import type { GraphSlice } from "@/protocol/graph";
 import {
   type GraphViewParams,
@@ -84,13 +87,18 @@ function FailureState({
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
       <div className="flex max-w-sm flex-col gap-1" role="alert">
-        <p className="font-medium">{message.title}</p>
+        <p className="font-medium text-base">{message.title}</p>
         {message.hint === undefined ? null : (
-          <p className="text-muted-foreground text-sm">{message.hint}</p>
+          <p className="text-muted-foreground">{message.hint}</p>
         )}
       </div>
       {retryable ? (
-        <Button onClick={onRetry} size="sm" variant="outline">
+        <Button
+          className={cn(SECONDARY_ACTION_CLASS, "shadow-control")}
+          onClick={onRetry}
+          size="sm"
+          variant="outline"
+        >
           {t.graph.retry}
         </Button>
       ) : null}
@@ -101,7 +109,7 @@ function FailureState({
 function CenteredStatus({ text }: { readonly text: string }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center p-6">
-      <p className="text-muted-foreground text-sm" role="status">
+      <p className="text-muted-foreground" role="status">
         {text}
       </p>
     </div>
@@ -114,12 +122,19 @@ function NoticeBar({ notices }: { readonly notices: readonly string[] }) {
   }
   return (
     <div
-      className="flex flex-col gap-1 border-b bg-muted px-4 py-2 text-sm"
+      className="flex items-start gap-2 border-b bg-muted/50 px-4 py-2 text-muted-foreground"
       role="status"
     >
-      {notices.map((notice) => (
-        <p key={notice}>{notice}</p>
-      ))}
+      <IconInfoCircle
+        aria-hidden="true"
+        className="mt-0.5 size-3.5 shrink-0 text-subtle-foreground"
+        stroke={1.5}
+      />
+      <div className="flex min-w-0 flex-col gap-1">
+        {notices.map((notice) => (
+          <p key={notice}>{notice}</p>
+        ))}
+      </div>
     </div>
   );
 }

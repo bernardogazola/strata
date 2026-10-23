@@ -17,7 +17,12 @@ import { GraphPanel } from "@/features/graph/graph-panel";
 import { NodeSummary } from "@/features/graph/node-summary";
 import { EDGE_LINES, GRAPH_STYLE } from "@/features/graph/stylesheet";
 import { formatProtocolError } from "@/i18n/errors";
-import { interpolate, plural } from "@/i18n/format";
+import {
+  formatInteger,
+  interpolate,
+  plural,
+  sentenceCase,
+} from "@/i18n/format";
 import {
   elementKindLabels,
   englishTermAccessibleNames,
@@ -461,12 +466,37 @@ describe("NodeSummary", () => {
     return orders?.data as GraphNode;
   };
 
+  const metricRows = () =>
+    [...document.querySelectorAll("dl > div")].map((row) => [
+      row.querySelector("dt")?.textContent,
+      row.querySelector("dd")?.textContent,
+    ]);
+
   test("sem seleção, o vazio do inspetor", () => {
     render(<NodeSummary node={null} onExpand={vi.fn()} />);
 
     expect(screen.getByText(t.inspector.empty)).toBeDefined();
     expect(screen.queryByText(t.inspector.notOnMap.truncated)).toBeNull();
     expect(screen.queryByText(t.inspector.notOnMap.aggregated)).toBeNull();
+  });
+
+  test("sem seleção, a dica do duplo clique é a segunda linha do vazio, no mesmo tom", () => {
+    render(<NodeSummary node={null} onExpand={vi.fn()} />);
+
+    const empty = screen.getByText(t.inspector.empty);
+    const hint = screen.getByText(t.graph.legend.expandHint);
+    expect(empty.nextElementSibling).toBe(hint);
+    expect(hint.className).toContain("text-muted-foreground");
+  });
+
+  test("com uma seleção, dentro ou fora do mapa, a dica do duplo clique sai", async () => {
+    const { rerender } = render(
+      <NodeSummary node={null} notOnMap="truncated" onExpand={vi.fn()} />
+    );
+    expect(screen.queryByText(t.graph.legend.expandHint)).toBeNull();
+
+    rerender(<NodeSummary node={await packageNode()} onExpand={vi.fn()} />);
+    expect(screen.queryByText(t.graph.legend.expandHint)).toBeNull();
   });
 
   test("uma seleção que a fatia truncada deixou fora do mapa diz isso, e não que nada foi selecionado", () => {
@@ -487,7 +517,7 @@ describe("NodeSummary", () => {
     expect(screen.queryByText(t.inspector.empty)).toBeNull();
   });
 
-  test("um pacote mostra o rótulo isolado, o tipo, as métricas e o botão de expandir", async () => {
+  test("um pacote mostra o rótulo isolado, o tipo, as linhas do artboard H e o botão de expandir", async () => {
     const onExpand = vi.fn<(elementId: string) => void>();
     render(<NodeSummary node={await packageNode()} onExpand={onExpand} />);
 
@@ -498,35 +528,89 @@ describe("NodeSummary", () => {
     expect(label?.getAttribute("translate")).toBe("no");
 
     expect(screen.getByText(elementKindLabels.PACKAGE)).toBeDefined();
-    expect(screen.getByText("4.210")).toBeDefined();
-    expect(screen.getByText(t.inspector.typeCount)).toBeDefined();
-    expect(screen.getByText("3")).toBeDefined();
+    expect(metricRows()).toStrictEqual([
+      [t.inspector.typeCount, "3"],
+      [t.inspector.dependsOn, "2 pacotes"],
+      [t.inspector.usedBy, "nenhum pacote"],
+    ]);
 
     fireEvent.click(screen.getByRole("button", { name: t.inspector.expand }));
     expect(onExpand).toHaveBeenCalledWith(ORDERS);
   });
 
-  test("os termos ingleses têm nome acessível em português", async () => {
-    render(<NodeSummary node={await packageNode()} onExpand={vi.fn()} />);
+  test("sem jargão inglês: nem LOC, nem fan-in, nem fan-out, nem dica de ponteiro", async () => {
+    const node = await packageNode();
+    const { container } = render(
+      <NodeSummary node={node} onExpand={vi.fn()} />
+    );
 
     for (const term of ["LOC", "fan-in", "fan-out"] as const) {
-      const name = screen.getByText(englishTermAccessibleNames[term]);
-      expect(name.className).toContain("sr-only");
-      const visible = screen.getByText(term);
-      expect(visible.getAttribute("aria-hidden")).toBe("true");
-      expect(visible.getAttribute("title")).toBe(
-        englishTermAccessibleNames[term]
-      );
+      expect(screen.queryByText(term)).toBeNull();
+      expect(screen.queryByText(englishTermAccessibleNames[term])).toBeNull();
     }
+    expect(screen.queryByText(formatInteger(node.loc))).toBeNull();
+    expect(container.querySelector("[title]")).toBeNull();
   });
 
-  test("um tipo não oferece expandir nem conta tipos", async () => {
+  test("o título do inspetor é o nome em Inter, e não em mono", async () => {
+    render(<NodeSummary node={await packageNode()} onExpand={vi.fn()} />);
+
+    const heading = screen.getByRole("heading", { level: 2 });
+    expect(heading.className).not.toContain("font-mono");
+    expect(heading.querySelector(".font-mono")).toBeNull();
+  });
+
+  test("a ressalva assenta no pé do inspetor, com ou sem seleção, depois do resumo", async () => {
+    const caveat = <p>ressalva parcial</p>;
+    const { rerender } = render(
+      <NodeSummary caveat={caveat} node={null} onExpand={vi.fn()} />
+    );
+    expect(screen.getByText("ressalva parcial")).toBeDefined();
+
+    rerender(
+      <NodeSummary
+        caveat={caveat}
+        node={await packageNode()}
+        onExpand={vi.fn()}
+      />
+    );
+    const button = screen.getByRole("button", { name: t.inspector.expand });
+    const note = screen.getByText("ressalva parcial");
+    expect(button.compareDocumentPosition(note)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(note.parentElement?.classList.contains("mt-auto")).toBe(true);
+  });
+
+  test("sem ressalva, o pé fica vazio: nenhum invólucro a mais", () => {
+    const { container } = render(
+      <NodeSummary node={null} onExpand={vi.fn()} />
+    );
+
+    expect(container.firstElementChild?.childElementCount).toBe(1);
+  });
+
+  test("um tipo não oferece expandir nem conta tipos, e conta os vizinhos em tipos", async () => {
     const node = { ...(await packageNode()), id: "type:x.Y", kind: "TYPE" };
     render(<NodeSummary node={node as GraphNode} onExpand={vi.fn()} />);
 
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.queryByText(t.inspector.typeCount)).toBeNull();
     expect(screen.getByText(elementKindLabels.TYPE)).toBeDefined();
+    expect(metricRows()).toStrictEqual([
+      [t.inspector.dependsOn, "2 tipos"],
+      [t.inspector.usedBy, "nenhum tipo"],
+    ]);
+  });
+
+  test("um vizinho só conjuga no singular", async () => {
+    const node = { ...(await packageNode()), fanIn: 1, fanOut: 1 };
+    render(<NodeSummary node={node} onExpand={vi.fn()} />);
+
+    expect(metricRows().slice(1)).toStrictEqual([
+      [t.inspector.dependsOn, "1 pacote"],
+      [t.inspector.usedBy, "1 pacote"],
+    ]);
   });
 
   test("um rótulo hostil chega saneado e cortado", async () => {
@@ -566,8 +650,8 @@ describe("GraphLegend", () => {
       .getByText(t.graph.legend.resolution)
       .parentElement?.querySelectorAll("li");
     expect([...(items ?? [])].map((item) => item.textContent)).toStrictEqual(
-      resolutionQualitySchema.options.map(
-        (quality) => resolutionQualityLabels[quality]
+      resolutionQualitySchema.options.map((quality) =>
+        sentenceCase(resolutionQualityLabels[quality])
       )
     );
 
@@ -585,17 +669,26 @@ describe("GraphLegend", () => {
     );
   });
 
-  test("forma, seleção e dica de expansão são texto; os desenhos ficam fora da árvore acessível", () => {
+  test("forma e seleção têm nome curto à vista e a frase longa para o leitor de tela; os desenhos ficam fora da árvore acessível", () => {
     const { container } = render(<GraphLegend />);
 
     expect(
       screen.getByRole("heading", { level: 2, name: t.graph.legend.title })
     ).toBeDefined();
-    expect(screen.getByText(t.graph.legend.kindShapes.PACKAGE)).toBeDefined();
-    expect(screen.getByText(t.graph.legend.kindShapes.TYPE)).toBeDefined();
-    expect(screen.getByText(t.graph.legend.selection)).toBeDefined();
-    expect(screen.getByText(t.graph.legend.expandHint)).toBeDefined();
-    expect(screen.getByText(t.graph.legend.keyboardHint)).toBeDefined();
+    const pairs = [
+      [t.graph.legend.kindNames.PACKAGE, t.graph.legend.kindShapes.PACKAGE],
+      [t.graph.legend.kindNames.TYPE, t.graph.legend.kindShapes.TYPE],
+      [t.graph.legend.selectionName, t.graph.legend.selection],
+    ] as const;
+    for (const [short, long] of pairs) {
+      const visible = screen.getByText(short);
+      const spoken = screen.getByText(long);
+      expect(visible.getAttribute("aria-hidden")).toBe("true");
+      expect(visible.className).not.toContain("sr-only");
+      expect(spoken.className).toContain("sr-only");
+      expect(spoken.getAttribute("aria-hidden")).toBeNull();
+      expect(visible.parentElement).toBe(spoken.parentElement);
+    }
 
     const svgs = [...container.querySelectorAll("svg")];
     expect(svgs).toHaveLength(6);
@@ -604,11 +697,67 @@ describe("GraphLegend", () => {
     }
   });
 
+  test("segue a ordem do artboard H: formas e seleção, depois os traços", () => {
+    render(<GraphLegend />);
+
+    const [kinds, resolutions] = screen
+      .getAllByRole("list")
+      .map((list) =>
+        [...list.querySelectorAll("li")].map(
+          (item) =>
+            item.querySelector('[aria-hidden="true"]:not(svg)')?.textContent ??
+            item.textContent
+        )
+      );
+    expect(kinds).toStrictEqual([
+      t.graph.legend.kindNames.PACKAGE,
+      t.graph.legend.kindNames.TYPE,
+      t.graph.legend.selectionName,
+    ]);
+    expect(resolutions).toStrictEqual(
+      resolutionQualitySchema.options.map((quality) =>
+        sentenceCase(resolutionQualityLabels[quality])
+      )
+    );
+  });
+
+  test("as dicas saíram da legenda: a do gesto mora no inspetor e a de teclado na estrutura", () => {
+    const { container } = render(<GraphLegend />);
+
+    expect(screen.queryByText(t.graph.legend.expandHint)).toBeNull();
+    expect(screen.queryByText(t.outline.keyboardHint)).toBeNull();
+    expect(container.querySelector("p")).toBeNull();
+  });
+
+  test("cada desenho é filho direto do seu item", () => {
+    const { container } = render(<GraphLegend />);
+
+    const items = [...container.querySelectorAll("li")];
+    expect(items).toHaveLength(6);
+    for (const item of items) {
+      expect(item.firstElementChild?.tagName).toBe("svg");
+    }
+  });
+
+  test("na linha única, os nomes dos grupos ficam para o leitor de tela, sem sumir da árvore", () => {
+    render(<GraphLegend />);
+
+    const groups = screen.getAllByRole("heading", { level: 3 });
+    expect(groups.map((group) => group.textContent)).toStrictEqual([
+      t.graph.legend.kind,
+      t.graph.legend.resolution,
+    ]);
+    for (const group of groups) {
+      expect(group.className).toContain("sr-only");
+      expect(group.nextElementSibling?.tagName).toBe("UL");
+    }
+  });
+
   test("o pacote é um retângulo, o tipo um círculo, e a seleção engrossa a borda", () => {
     render(<GraphLegend />);
 
     const sampleOf = (text: string) =>
-      screen.getByText(text).querySelector("svg");
+      screen.getByText(text).parentElement?.querySelector(":scope > svg");
     expect(
       sampleOf(t.graph.legend.kindShapes.PACKAGE)?.querySelector("rect")
     ).not.toBeNull();

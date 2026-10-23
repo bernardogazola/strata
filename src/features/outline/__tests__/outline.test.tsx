@@ -325,6 +325,24 @@ describe("ArchitectureOutline: o caminho de dados", () => {
     expect(screen.queryAllByRole("region")).toStrictEqual([]);
   });
 
+  test("a dica de teclado fica logo sob o título, no recuo dele, e descreve a árvore", async () => {
+    renderOutline();
+
+    await waitForRows(3);
+
+    const tree = screen.getByRole("tree", { name: t.outline.title });
+    expect(tree).toHaveAccessibleDescription(t.outline.keyboardHint);
+    const hint = screen.getByText(t.outline.keyboardHint);
+    expect(hint.id).toBe(tree.getAttribute("aria-describedby"));
+    expect(
+      screen.getByRole("heading", { name: t.outline.title }).nextElementSibling
+    ).toBe(hint);
+    expect(hint.className.split(" ")).toStrictEqual(
+      expect.arrayContaining(["px-2", "text-muted-foreground", "text-xs"])
+    );
+    expect(hint.hasAttribute("tabindex")).toBe(false);
+  });
+
   test("a contagem de tipos é visível ao olho e dita por extenso ao leitor de tela", async () => {
     renderOutline();
 
@@ -418,6 +436,38 @@ describe("ArchitectureOutline: o caminho de dados", () => {
     expect(
       rows.every((row) => row.getAttribute("aria-selected") !== null)
     ).toBe(true);
+  });
+
+  test("as raias: o tipo recua 20 px e guarda a seta vazia, e o ícone dele cai sob o nome do pacote", async () => {
+    renderOutline({ focus: ORDER_SERVICE, view: ordersTypes });
+    await waitForRows(6);
+
+    const [chevron, packageIcon, packageName] = rowById(ORDERS).children;
+    const [emptyChevron, typeIcon, typeName] = rowById(ORDER).children;
+    expect(chevron?.hasAttribute("data-chevron")).toBe(true);
+    expect(chevron?.classList.contains("w-3.5")).toBe(true);
+    expect(emptyChevron?.hasAttribute("data-chevron")).toBe(false);
+    expect(emptyChevron?.classList.contains("w-3.5")).toBe(true);
+    for (const icon of [packageIcon, typeIcon]) {
+      expect(icon?.getAttribute("aria-hidden")).toBe("true");
+      expect(icon?.classList.contains("w-3")).toBe(true);
+    }
+    expect(packageName?.tagName).toBe("BDI");
+    expect(typeName?.tagName).toBe("BDI");
+    expect(rowById(ORDERS).classList.contains("pl-2")).toBe(true);
+    expect(rowById(ORDER).classList.contains("pl-7")).toBe(true);
+
+    expect(screen.getByRole("tree").querySelector(".font-mono")).toBeNull();
+  });
+
+  test("a linha selecionada sobe e marca o ícone no acento; nenhuma outra o faz", async () => {
+    renderOutline({ focus: ORDER_SERVICE, view: ordersTypes });
+    const rows = await waitForRows(6);
+
+    const accented = rows.filter(
+      (row) => row.querySelector(".border-accent-strong") !== null
+    );
+    expect(accented).toStrictEqual([rowById(ORDER_SERVICE)]);
   });
 });
 
@@ -980,6 +1030,7 @@ describe("ArchitectureOutline: estados", () => {
     expect(
       screen.getByRole("heading", { name: t.outline.title }).tabIndex
     ).toBe(-1);
+    expect(screen.queryByText(t.outline.keyboardHint)).toBeNull();
   });
 
   test("a raiz vazia diz que não há pacotes, sem árvore", async () => {

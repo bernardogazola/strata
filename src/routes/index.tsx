@@ -1,18 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ModeToggle } from "@/components/mode-toggle";
-import { AnalyzerStatus } from "@/features/backend/analyzer-status";
-import { RepositoryProbe } from "@/features/backend/repository-probe";
+import { StartScreen } from "@/features/repository/start-screen";
 
 export const Route = createFileRoute("/")({
-  component: Index,
+  component: StartScreen,
 });
-
-function Index() {
-  return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-6">
-      <AnalyzerStatus />
-      <RepositoryProbe />
-      <ModeToggle />
-    </div>
-  );
-}

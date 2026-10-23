@@ -1,13 +1,17 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capacidades da janela principal. Não inclui dialog, fs nem shell: o seletor de pastas roda no Rust e a WebView só recebe um handle opaco. core:default não dá acesso a arquivos nem a processos.",
+  "description": "Capacidades da janela principal. Não inclui dialog, fs nem shell: o seletor de pastas roda no Rust e a WebView só recebe um handle opaco. core:default não dá acesso a arquivos nem a processos. As permissões de janela (arrastar, minimizar, maximizar e fechar) servem ao cabeçalho, que faz o papel de barra de título.",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "core:window:allow-show",
     "core:window:allow-set-focus",
     "core:window:allow-set-background-color",
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
     "core:webview:allow-set-webview-background-color"
   ]
 }

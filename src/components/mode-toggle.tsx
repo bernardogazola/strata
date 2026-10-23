@@ -13,13 +13,27 @@ import type { Theme } from "@/lib/theme";
 
 const THEME_OPTIONS: readonly Theme[] = ["light", "dark", "system"];
 
+const ICON_STROKE = 1.5;
+
 export function ModeToggle() {
   const { theme, resolvedTheme, setTheme } = useTheme();
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button size="icon" variant="outline" />}>
-        {resolvedTheme === "dark" ? <IconMoon /> : <IconSun />}
+      <DropdownMenuTrigger
+        render={
+          <Button
+            className="size-7 text-muted-foreground hover:text-foreground aria-expanded:text-foreground"
+            size="icon-sm"
+            variant="ghost"
+          />
+        }
+      >
+        {resolvedTheme === "dark" ? (
+          <IconMoon aria-hidden="true" stroke={ICON_STROKE} />
+        ) : (
+          <IconSun aria-hidden="true" stroke={ICON_STROKE} />
+        )}
         <span className="sr-only">{t.theme.label}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

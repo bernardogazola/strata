@@ -38,6 +38,7 @@ interface AppState {
   readonly activeElementId: string | null;
   readonly backend: BackendState;
   readonly progress: Readonly<Partial<Record<AnalysisStage, ProgressTick>>>;
+  readonly runningAnalysisId: string | null;
   readonly warnings: readonly AnalysisWarning[];
 }
 
@@ -46,6 +47,8 @@ interface AppActions {
   readonly applyProgress: (tick: ProgressTick) => void;
   readonly clearProgress: () => void;
   readonly clearWarnings: () => void;
+  readonly markAnalysisEnded: (analysisId: string) => void;
+  readonly markAnalysisRunning: (analysisId: string) => void;
   readonly recoverBackend: () => void;
   readonly releaseActiveElementId: (elementId: string) => void;
   readonly setActiveElementId: (elementId: string | null) => void;
@@ -58,6 +61,7 @@ const initialState: AppState = {
   activeElementId: null,
   backend: { phase: "STARTING" },
   progress: {},
+  runningAnalysisId: null,
   warnings: [],
 };
 
@@ -89,11 +93,28 @@ export const useAppStore = create<AppStore>()(
 
       clearWarnings: () => set({ warnings: [] }, false, "clearWarnings"),
 
+      markAnalysisEnded: (analysisId) =>
+        set(
+          (state) =>
+            state.runningAnalysisId === analysisId
+              ? { runningAnalysisId: null }
+              : state,
+          false,
+          "markAnalysisEnded"
+        ),
+
+      markAnalysisRunning: (analysisId) =>
+        set({ runningAnalysisId: analysisId }, false, "markAnalysisRunning"),
+
       recoverBackend: () =>
         set(
           (state) =>
             state.backend.phase === "CRASHED"
-              ? { backend: { phase: "STARTING" as const }, progress: {} }
+              ? {
+                  backend: { phase: "STARTING" as const },
+                  progress: {},
+                  runningAnalysisId: null,
+                }
               : state,
           false,
           "recoverBackend"
@@ -123,6 +144,9 @@ export const selectActiveElementId = (state: AppStore): string | null =>
 
 export const selectIsAnalysing = (state: AppStore): boolean =>
   Object.keys(state.progress).length > 0;
+
+export const selectIsRunInFlight = (state: AppStore): boolean =>
+  state.runningAnalysisId !== null;
 
 export const selectAnalyzerUsable = (state: AppStore): boolean =>
   state.backend.phase === "READY";

@@ -5,6 +5,7 @@ import {
   selectAnalyzerUsable,
   selectBackendRecoverable,
   selectIsAnalysing,
+  selectIsRunInFlight,
   useAppStore,
 } from "../app-store";
 
@@ -19,6 +20,9 @@ const tick = (
   unit: ProgressTick["unit"],
   completed: number
 ): ProgressTick => ({ completed, stage, total: 100, unit });
+
+const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
+const OTHER = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1X";
 
 const INCOMPATIBLE: BackendState = {
   expected: 1,
@@ -116,6 +120,29 @@ describe("recoverBackend", () => {
     expect(selectIsAnalysing(useAppStore.getState())).toBe(false);
   });
 
+  test("tira a execução em voo, porque o processo que a rodava morreu", () => {
+    const { markAnalysisRunning, recoverBackend, setBackend } =
+      useAppStore.getState();
+    markAnalysisRunning(AN);
+    setBackend({ exitCode: 137, phase: "CRASHED" });
+
+    recoverBackend();
+
+    expect(useAppStore.getState().runningAnalysisId).toBeNull();
+    expect(selectIsRunInFlight(useAppStore.getState())).toBe(false);
+  });
+
+  test("fora de CRASHED não tira a execução em voo", () => {
+    const { markAnalysisRunning, recoverBackend, setBackend } =
+      useAppStore.getState();
+    setBackend({ phase: "READY", protocolVersion: 1 });
+    markAnalysisRunning(AN);
+
+    recoverBackend();
+
+    expect(useAppStore.getState().runningAnalysisId).toBe(AN);
+  });
+
   test("de INCOMPATIBLE não faz nada: o estado é terminal", () => {
     const { recoverBackend, setBackend } = useAppStore.getState();
     setBackend(INCOMPATIBLE);
@@ -172,6 +199,52 @@ describe("releaseActiveElementId", () => {
     });
 
     useAppStore.getState().releaseActiveElementId("pkg:br.pucpr.orders");
+    stop();
+
+    expect(notifications).toBe(0);
+  });
+});
+
+describe("a execução em voo", () => {
+  test("nasce vazia", () => {
+    expect(useAppStore.getState().runningAnalysisId).toBeNull();
+    expect(selectIsRunInFlight(useAppStore.getState())).toBe(false);
+  });
+
+  test("markAnalysisRunning a põe, sem depender de tick nenhum", () => {
+    useAppStore.getState().markAnalysisRunning(AN);
+
+    expect(useAppStore.getState().runningAnalysisId).toBe(AN);
+    expect(selectIsRunInFlight(useAppStore.getState())).toBe(true);
+    expect(selectIsAnalysing(useAppStore.getState())).toBe(false);
+  });
+
+  test("markAnalysisEnded tira a execução que ainda é a dela", () => {
+    const { markAnalysisEnded, markAnalysisRunning } = useAppStore.getState();
+    markAnalysisRunning(AN);
+
+    markAnalysisEnded(AN);
+
+    expect(useAppStore.getState().runningAnalysisId).toBeNull();
+    expect(selectIsRunInFlight(useAppStore.getState())).toBe(false);
+  });
+
+  test("o fim de outra análise não libera a que está rodando", () => {
+    const { markAnalysisEnded, markAnalysisRunning } = useAppStore.getState();
+    markAnalysisRunning(AN);
+
+    markAnalysisEnded(OTHER);
+
+    expect(useAppStore.getState().runningAnalysisId).toBe(AN);
+  });
+
+  test("um fim que não muda nada não notifica ninguém", () => {
+    let notifications = 0;
+    const stop = useAppStore.subscribe(() => {
+      notifications += 1;
+    });
+
+    useAppStore.getState().markAnalysisEnded(AN);
     stop();
 
     expect(notifications).toBe(0);

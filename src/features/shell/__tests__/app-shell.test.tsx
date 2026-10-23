@@ -6,7 +6,7 @@ import { t } from "@/i18n/messages";
 const renderShell = () =>
   render(
     <AppShell
-      header={<p>cabeçalho</p>}
+      header={<header>cabeçalho</header>}
       inspector={<p>inspetor</p>}
       main={<p>canvas</p>}
       sidebar={<p>lateral</p>}
@@ -65,9 +65,30 @@ describe("AppShell", () => {
     expect(classes).not.toContain("overflow-y-auto");
   });
 
+  test("as colunas laterais estreitam abaixo de xl, e de xl em diante são as do benchmark", () => {
+    const { container } = renderShell();
+
+    const classes = container.firstElementChild?.className.split(" ") ?? [];
+    expect(classes).toStrictEqual(
+      expect.arrayContaining([
+        "grid-cols-[15rem_minmax(0,1fr)_16rem]",
+        "xl:grid-cols-[18rem_minmax(0,1fr)_20rem]",
+      ])
+    );
+    expect(classes).not.toContain("grid-cols-[18rem_minmax(0,1fr)_20rem]");
+  });
+
   test("há um <main> só", () => {
     renderShell();
 
     expect(screen.getAllByRole("main")).toHaveLength(1);
+  });
+
+  test("não embrulha o cabeçalho em um segundo <header>: o banner é um só", () => {
+    renderShell();
+
+    const banners = screen.getAllByRole("banner");
+    expect(banners).toHaveLength(1);
+    expect(banners[0]?.parentElement?.tagName).not.toBe("HEADER");
   });
 });

@@ -1,0 +1,36 @@
+<svg
+  height="24"
+  viewBox="0 0 24 24"
+  width="24"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <title>Strata</title>
+  <style>
+  .top {
+    fill: #292929;
+  }
+  .middle {
+    fill: #7f7f7f;
+  }
+  .deep {
+    fill: #2449d8;
+  }
+  @media (prefers-color-scheme: dark) {
+    .top {
+      fill: #ededed;
+    }
+    .middle {
+      fill: #8a8a8a;
+    }
+    .deep {
+      fill: #7d96ff;
+    }
+  }
+  </style>
+  <path class="top" d="M2 9.17V7A5 5 0 0 1 7 2H17A5 5 0 0 1 21.93 6.18Z" />
+  <path class="middle" d="M2 10.67L22 7.67V13.33L2 16.33Z" />
+  <path
+    class="deep"
+    d="M2.07 17.82L22 14.83V17A5 5 0 0 1 17 22H7A5 5 0 0 1 2.07 17.82Z"
+  />
+</svg>

@@ -18,8 +18,8 @@ use crate::log::ShellLog;
 use crate::runtime::{AnalyzerRuntime, HandshakeCell, PlanSource};
 
 // Tem de bater com BACKGROUND_COLORS em theme.ts, o global.css e o estilo inline do index.html.
-const BG_LIGHT: Color = Color(246, 246, 246, 255);
-const BG_DARK: Color = Color(10, 10, 10, 255);
+const BG_LIGHT: Color = Color(255, 255, 255, 255);
+const BG_DARK: Color = Color(17, 17, 17, 255);
 
 const HOME_VAR: &str = "STRATA_ANALYZER_HOME";
 const MAX_HEAP_VAR: &str = "STRATA_ANALYZER_MAX_HEAP";
@@ -49,6 +49,9 @@ pub fn run() {
                 _ => BG_LIGHT,
             };
             let _ = window.set_background_color(Some(bg));
+
+            #[cfg(not(target_os = "macos"))]
+            let _ = window.set_decorations(false);
 
             let handle = window.clone();
             std::thread::spawn(move || {

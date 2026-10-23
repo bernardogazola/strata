@@ -8,6 +8,10 @@ import {
   type Page,
 } from "@playwright/test";
 import type { GraphSlice, OutlinePage } from "@/protocol/graph";
+import {
+  type AnalysisStatusReport,
+  analysisStatusReportSchema,
+} from "@/protocol/repository";
 import { recordGesture } from "./frames";
 import { mulberry32 } from "./synthetic-slice";
 
@@ -148,15 +152,6 @@ export const tokenAsCytoscapeRgb = (
     return resolved.replaceAll(" ", "");
   }, token);
 
-export const serveSlices = async (
-  page: Page,
-  overrides: readonly SliceOverride[]
-): Promise<void> => {
-  await page.addInitScript((served) => {
-    window.__STRATA_FAKE_TRANSCRIPTS__ = served;
-  }, overrides);
-};
-
 export interface OutlineOverride {
   readonly method: "outline.children";
 
@@ -164,16 +159,56 @@ export interface OutlineOverride {
   readonly result: OutlinePage;
 }
 
-export type TranscriptOverride = SliceOverride | OutlineOverride;
+export interface StatusOverride {
+  readonly method: "analysis.status";
+  readonly request: Record<string, never>;
+  readonly result: AnalysisStatusReport;
+}
+
+export type TranscriptOverride =
+  | SliceOverride
+  | OutlineOverride
+  | StatusOverride;
+
+const mapReadyStatus = (): StatusOverride => {
+  const report = analysisStatusReportSchema.parse(
+    fixtureResponse("analysis.status.completed.jsonl")
+  );
+  return {
+    method: "analysis.status",
+    request: {},
+    result: {
+      ...report,
+      stages: report.stages.map((stage) =>
+        stage.stage === "STRUCTURAL_GRAPH"
+          ? { ...stage, status: "COMPLETED" }
+          : stage
+      ),
+    },
+  };
+};
+
+export const MAP_READY_STATUS = mapReadyStatus();
 
 export const serveTranscripts = async (
   page: Page,
   overrides: readonly TranscriptOverride[]
 ): Promise<void> => {
-  await page.addInitScript((served) => {
-    window.__STRATA_FAKE_TRANSCRIPTS__ = served;
-  }, overrides);
+  await page.addInitScript(
+    (served) => {
+      window.__STRATA_FAKE_TRANSCRIPTS__ = served;
+    },
+    [...overrides, MAP_READY_STATUS]
+  );
 };
+
+export const serveSlices = (
+  page: Page,
+  overrides: readonly SliceOverride[]
+): Promise<void> => serveTranscripts(page, overrides);
+
+export const serveMap = (page: Page): Promise<void> =>
+  serveTranscripts(page, []);
 
 export const withFreshPage = async <T>(
   browser: Browser,

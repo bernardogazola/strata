@@ -42,7 +42,9 @@ export const GRAPH_STYLE = {
     activeBorderWidth: 3,
     borderWidth: 1,
     hotspotScale: 1.5,
-    labelFontSize: 11,
+    labelFontSize: 13,
+    labelFontWeight: 500,
+    labelHaloWidth: 2,
     labelMarginY: 4,
     labelMaxWidth: 160,
     labelMinZoomedFontSize: 8,
@@ -51,6 +53,8 @@ export const GRAPH_STYLE = {
     selectedBorderWidth: 4,
   },
 } as const;
+
+export const LABEL_FONT_FAMILY = '"Inter Variable", sans-serif';
 
 export interface EdgeLine {
   readonly cap: "butt" | "round";
@@ -150,12 +154,16 @@ const nodeRules = (palette: GraphPalette): StylesheetStyle[] => [
       "border-color": palette["--graph-node-border"],
       "border-width": GRAPH_STYLE.node.borderWidth,
       color: palette["--graph-node-label"],
+      "font-family": LABEL_FONT_FAMILY,
       "font-size": GRAPH_STYLE.node.labelFontSize,
+      "font-weight": GRAPH_STYLE.node.labelFontWeight,
       height: sizedNode,
       label: "data(label)",
       "min-zoomed-font-size": GRAPH_STYLE.node.labelMinZoomedFontSize,
       "text-margin-y": GRAPH_STYLE.node.labelMarginY,
       "text-max-width": `${GRAPH_STYLE.node.labelMaxWidth}px`,
+      "text-outline-color": palette["--graph-canvas"],
+      "text-outline-width": GRAPH_STYLE.node.labelHaloWidth,
       "text-valign": "bottom",
       "text-wrap": "ellipsis",
       width: sizedNode,

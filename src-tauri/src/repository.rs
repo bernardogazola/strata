@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
@@ -216,8 +217,14 @@ impl RepositoryRegistry {
 }
 
 pub fn canonicalize(picked: &Path) -> Result<PathBuf, ProtocolError> {
-    std::fs::canonicalize(picked)
-        .map_err(|error| ProtocolError::not_found(format!("{}: {error}", picked.display())))
+    std::fs::canonicalize(picked).map_err(|error| canonicalize_failure(&error))
+}
+
+fn canonicalize_failure(error: &io::Error) -> ProtocolError {
+    match error.kind() {
+        io::ErrorKind::PermissionDenied => ProtocolError::root_unreadable(error),
+        _ => ProtocolError::path_changed(error),
+    }
 }
 
 #[must_use]
@@ -237,4 +244,63 @@ pub fn display_name(path: &Path) -> String {
         || path.to_string_lossy().into_owned(),
         |name| name.to_string_lossy().into_owned(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+    use std::path::Path;
+
+    use super::{canonicalize, canonicalize_failure};
+    use crate::error::ErrorCode;
+
+    fn code_for(kind: io::ErrorKind) -> ErrorCode {
+        canonicalize_failure(&io::Error::from(kind)).code()
+    }
+
+    #[test]
+    fn a_folder_that_no_longer_resolves_changed_and_never_needs_a_reinstall() {
+        for kind in [
+            io::ErrorKind::NotFound,
+            io::ErrorKind::NotADirectory,
+            io::ErrorKind::InvalidFilename,
+            io::ErrorKind::Other,
+        ] {
+            assert_eq!(code_for(kind), ErrorCode::PathChanged, "{kind:?}");
+        }
+    }
+
+    #[test]
+    fn a_folder_the_os_will_not_list_is_unreadable() {
+        assert_eq!(
+            code_for(io::ErrorKind::PermissionDenied),
+            ErrorCode::RootUnreadable
+        );
+    }
+
+    #[test]
+    fn the_refusal_is_the_shells_and_puts_neither_path_nor_os_text_on_the_wire() {
+        let picked = Path::new("/strata-nowhere/repositorio-sumido");
+        let refused = canonicalize(picked).expect_err("a pasta não existe");
+
+        assert_eq!(refused.code(), ErrorCode::PathChanged);
+        assert_eq!(
+            serde_json::to_string(&refused).expect("serializa"),
+            r#"{"code":"REPO_PATH_CHANGED","origin":"shell"}"#
+        );
+        assert!(
+            !refused.to_string().contains("repositorio-sumido"),
+            "a linha de log não pode carregar o caminho: {refused}"
+        );
+    }
+
+    #[test]
+    fn the_unreadable_refusal_serializes_with_no_params() {
+        let refused = canonicalize_failure(&io::Error::from(io::ErrorKind::PermissionDenied));
+
+        assert_eq!(
+            serde_json::to_string(&refused).expect("serializa"),
+            r#"{"code":"REPO_ROOT_UNREADABLE","origin":"shell"}"#
+        );
+    }
 }
