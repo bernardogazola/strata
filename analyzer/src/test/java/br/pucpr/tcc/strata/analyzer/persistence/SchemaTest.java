@@ -56,6 +56,7 @@ final class SchemaTest {
           "hotspot_metric",
           "hotspot_profile",
           "module_dependency",
+          "package_edge",
           "path_lineage",
           "path_rename",
           "provider_metadata",
@@ -66,7 +67,7 @@ final class SchemaTest {
           "tour_step",
           "tour_step_reason");
 
-  private static final int FOREIGN_KEYS = 48;
+  private static final int FOREIGN_KEYS = 51;
 
   private static final String FOREIGN_KEY_CHILDREN =
       """
@@ -210,7 +211,7 @@ final class SchemaTest {
   }
 
   @Test
-  void temExatamenteAs29TabelasDoMvp() throws Exception {
+  void temExatamenteAs30TabelasDoMvp() throws Exception {
     try (Connection banco = DaoTestDatabase.create(temp)) {
       assertThat(TestCaches.userTables(banco)).isEqualTo(TABLES);
     }

@@ -110,6 +110,16 @@ public final class AnalysisConstants {
 
   public static final long MAX_COMMIT_GRAPH_BYTES = 268_435_456L;
 
+  public static final double PAGERANK_DAMPING = 0.85d;
+
+  public static final double PAGERANK_TOLERANCE = 1e-10d;
+
+  public static final int PAGERANK_MAX_ITER = 200;
+
+  public static final int BETWEENNESS_MAX_NODES = 1_000;
+
+  public static final int GRAPH_READ_CHECK_STRIDE_ROWS = 8_192;
+
   private AnalysisConstants() {}
 
   public static Map<String, Object> asMetadata() {

@@ -21,6 +21,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 final class TestCaches {
 
+  static final int V001_TABLES = 30;
+
   static final String V01_PATH = "/Users/alice/work/acme-payments-legacy";
 
   static final String V01_ROOT = "fa7da60406a5f3ea0cbf4335426a66d992d3c3d1";

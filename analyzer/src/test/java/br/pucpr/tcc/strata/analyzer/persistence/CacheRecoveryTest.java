@@ -95,8 +95,8 @@ final class CacheRecoveryTest {
     reaberto.cache().close();
 
     try (Connection raw = TestCaches.raw(database)) {
-      assertThat(TestCaches.userTables(raw)).hasSize(29);
-      assertThat(TestCaches.strictTables(raw)).isEqualTo(29);
+      assertThat(TestCaches.userTables(raw)).hasSize(TestCaches.V001_TABLES);
+      assertThat(TestCaches.strictTables(raw)).isEqualTo(TestCaches.V001_TABLES);
       assertThat(TestCaches.scalar(raw, "PRAGMA auto_vacuum")).isEqualTo("2");
       assertThat(TestCaches.scalar(raw, "PRAGMA integrity_check")).isEqualTo("ok");
     }
@@ -163,7 +163,7 @@ final class CacheRecoveryTest {
     assertThat(versao)
         .as("montar o novo ao lado e movê-lo para o lugar reaplicaria o -wal velho nele (medido)")
         .isEqualTo("0.0.0-test");
-    assertThat(tabelas).hasSize(29);
+    assertThat(tabelas).hasSize(TestCaches.V001_TABLES);
     assertThat(TestCaches.sibling(database, "-wal")).doesNotExist();
     assertThat(TestCaches.sibling(database, "-shm")).doesNotExist();
     final Path bak = CacheRecovery.backups(database.getParent()).get(0);

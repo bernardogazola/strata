@@ -27,6 +27,18 @@ final class AnalysisConstantsTest {
   }
 
   @Test
+  void asConstantesDoGrafoDaFase30SaoEcoadasNosMetadados() {
+    assertThat(AnalysisConstants.asMetadata())
+        .containsAllEntriesOf(
+            Map.ofEntries(
+                Map.entry("PAGERANK_DAMPING", 0.85d),
+                Map.entry("PAGERANK_TOLERANCE", 1e-10d),
+                Map.entry("PAGERANK_MAX_ITER", 200),
+                Map.entry("BETWEENNESS_MAX_NODES", 1_000),
+                Map.entry("GRAPH_READ_CHECK_STRIDE_ROWS", 8_192)));
+  }
+
+  @Test
   void oTetoDeEntradasDoBancoDeObjetosSubstituiODeObjetosSoltos() {
     assertThat(AnalysisConstants.asMetadata()).doesNotContainKey("MAX_LOOSE_OBJECTS");
   }

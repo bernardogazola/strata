@@ -190,20 +190,61 @@ CREATE TABLE code_metric (
 CREATE INDEX idx_code_metric_loc ON code_metric(analysis_pk, loc DESC);
 
 CREATE TABLE graph_metric (
-  element_pk     INTEGER PRIMARY KEY REFERENCES code_element(id) ON DELETE CASCADE,
-  analysis_pk    INTEGER NOT NULL REFERENCES analysis(id) ON DELETE CASCADE,
-  fan_in         INTEGER NOT NULL DEFAULT 0,
-  fan_out        INTEGER NOT NULL DEFAULT 0,
-  fan_out_external INTEGER NOT NULL DEFAULT 0,
-  pagerank       REAL    NOT NULL DEFAULT 0,
-  pagerank_out   REAL    NOT NULL DEFAULT 0,
-  scc_id         INTEGER,
-  scc_size       INTEGER,
-  component_id   INTEGER,
-  is_entry_point INTEGER NOT NULL DEFAULT 0 CHECK (is_entry_point IN (0,1)),
-  entry_point_kind TEXT
+  element_pk        INTEGER PRIMARY KEY REFERENCES code_element(id) ON DELETE CASCADE,
+  analysis_pk       INTEGER NOT NULL REFERENCES analysis(id) ON DELETE CASCADE,
+  granularity       TEXT    NOT NULL CHECK (granularity IN ('TYPE','PACKAGE')),
+  fan_in            INTEGER NOT NULL CHECK (fan_in >= 0),
+  fan_out           INTEGER NOT NULL CHECK (fan_out >= 0),
+  fan_in_resolved   INTEGER CHECK (fan_in_resolved BETWEEN 0 AND fan_in),
+  fan_out_resolved  INTEGER CHECK (fan_out_resolved BETWEEN 0 AND fan_out),
+  fan_out_external  INTEGER CHECK (fan_out_external >= 0),
+  external_fan_in   INTEGER CHECK (external_fan_in BETWEEN 0 AND fan_in),
+  pagerank          REAL    NOT NULL CHECK (pagerank > 0 AND pagerank <= 1),
+  pagerank_out      REAL    NOT NULL CHECK (pagerank_out > 0 AND pagerank_out <= 1),
+  scc_id            INTEGER CHECK (scc_id >= 1),
+  scc_size          INTEGER CHECK (scc_size >= 2),
+  bridge_span       INTEGER CHECK (bridge_span >= 0),
+  component_id      INTEGER CHECK (component_id >= 1),
+  internal_cohesion INTEGER CHECK (internal_cohesion >= 0),
+  betweenness       REAL    CHECK (betweenness >= 0),
+  is_entry_point    INTEGER CHECK (is_entry_point IN (0,1)),
+  entry_point_kind  TEXT,
+  CHECK ((scc_id IS NULL) = (scc_size IS NULL)),
+  CHECK ((granularity = 'TYPE') = (fan_in_resolved IS NOT NULL)),
+  CHECK ((fan_in_resolved IS NULL) = (fan_out_resolved IS NULL)),
+  CHECK ((fan_in_resolved IS NULL) = (fan_out_external IS NULL)),
+  CHECK ((fan_in_resolved IS NULL) = (external_fan_in IS NULL)),
+  CHECK ((fan_in_resolved IS NULL) = (bridge_span IS NULL)),
+  CHECK ((granularity = 'PACKAGE') = (component_id IS NOT NULL)),
+  CHECK ((component_id IS NULL) = (internal_cohesion IS NULL)),
+  CHECK (granularity = 'PACKAGE' OR betweenness IS NULL),
+  CHECK (entry_point_kind IS NULL OR is_entry_point = 1),
+  CHECK (is_entry_point IS NOT 1 OR entry_point_kind IS NOT NULL)
 ) STRICT, WITHOUT ROWID;
-CREATE INDEX idx_graph_metric_rank ON graph_metric(analysis_pk, pagerank DESC);
+CREATE INDEX idx_graph_metric_rank ON graph_metric(analysis_pk, granularity, pagerank DESC);
+
+CREATE TABLE package_edge (
+  source_pk            INTEGER NOT NULL REFERENCES code_element(id) ON DELETE CASCADE,
+  target_pk            INTEGER NOT NULL REFERENCES code_element(id) ON DELETE CASCADE,
+  analysis_pk          INTEGER NOT NULL REFERENCES analysis(id) ON DELETE CASCADE,
+  type_pair_count      INTEGER NOT NULL CHECK (type_pair_count >= 1),
+  occurrence_total     INTEGER NOT NULL CHECK (occurrence_total >= type_pair_count),
+  resolution           TEXT    NOT NULL CHECK (resolution IN ('RESOLVED','INFERRED')),
+  imports              INTEGER NOT NULL CHECK (imports >= 0),
+  extends              INTEGER NOT NULL CHECK (extends >= 0),
+  implements           INTEGER NOT NULL CHECK (implements >= 0),
+  calls                INTEGER NOT NULL CHECK (calls >= 0),
+  field_type           INTEGER NOT NULL CHECK (field_type >= 0),
+  parameter_type       INTEGER NOT NULL CHECK (parameter_type >= 0),
+  return_type          INTEGER NOT NULL CHECK (return_type >= 0),
+  annotation_reference INTEGER NOT NULL CHECK (annotation_reference >= 0),
+  CHECK (source_pk <> target_pk),
+  CHECK (imports + extends + implements + calls + field_type + parameter_type + return_type
+         + annotation_reference = occurrence_total),
+  PRIMARY KEY (source_pk, target_pk)
+) STRICT, WITHOUT ROWID;
+CREATE INDEX idx_package_edge_rank   ON package_edge(analysis_pk, type_pair_count DESC);
+CREATE INDEX idx_package_edge_target ON package_edge(target_pk);
 
 CREATE TABLE git_author (
   id           INTEGER PRIMARY KEY,
