@@ -118,6 +118,8 @@ public final class AnalysisConstants {
 
   public static final int BETWEENNESS_MAX_NODES = 1_000;
 
+  public static final int BETWEENNESS_MAX_EDGES = 20_000;
+
   public static final int GRAPH_READ_CHECK_STRIDE_ROWS = 8_192;
 
   private AnalysisConstants() {}

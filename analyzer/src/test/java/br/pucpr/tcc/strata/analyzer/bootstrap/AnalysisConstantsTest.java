@@ -35,6 +35,7 @@ final class AnalysisConstantsTest {
                 Map.entry("PAGERANK_TOLERANCE", 1e-10d),
                 Map.entry("PAGERANK_MAX_ITER", 200),
                 Map.entry("BETWEENNESS_MAX_NODES", 1_000),
+                Map.entry("BETWEENNESS_MAX_EDGES", 20_000),
                 Map.entry("GRAPH_READ_CHECK_STRIDE_ROWS", 8_192)));
   }
 

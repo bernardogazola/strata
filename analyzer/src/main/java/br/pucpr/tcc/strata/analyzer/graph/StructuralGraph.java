@@ -3,73 +3,127 @@ package br.pucpr.tcc.strata.analyzer.graph;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality;
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.Map;
+import java.util.Objects;
 import org.jgrapht.Graph;
 import org.jgrapht.graph.DefaultEdge;
 
 public final class StructuralGraph {
 
-  StructuralGraph() {
-    throw new UnsupportedOperationException("ainda não implementado");
+  private static final DependencyType[] DEPENDENCY_TYPES = DependencyType.values();
+
+  static final int OCCURRENCE_SLOTS = DEPENDENCY_TYPES.length;
+
+  private final CodeElementId[] typeIds;
+  private final int[] packageOfType;
+  private final CodeElementId[] packageIds;
+  private final int[] edgeSources;
+  private final int[] edgeTargets;
+  private final ResolutionQuality[] edgeResolutions;
+  private final int[] edgeOccurrences;
+  private final int[] fanOutExternal;
+  private final long selfPairs;
+  private final long externalPairs;
+  private final long denylistedPairs;
+  private final Graph<Integer, DefaultEdge> forward;
+
+  StructuralGraph(
+      CodeElementId[] typeIds,
+      int[] packageOfType,
+      CodeElementId[] packageIds,
+      TypeEdges edges,
+      int[] fanOutExternal,
+      long selfPairs,
+      long denylistedPairs) {
+    this.typeIds = typeIds;
+    this.packageOfType = packageOfType;
+    this.packageIds = packageIds;
+    this.edgeSources = edges.sources();
+    this.edgeTargets = edges.targets();
+    this.edgeResolutions = edges.resolutions();
+    this.edgeOccurrences = edges.occurrences();
+    this.fanOutExternal = fanOutExternal;
+    this.selfPairs = selfPairs;
+    long external = 0;
+    for (final int count : fanOutExternal) {
+      external += count;
+    }
+    this.externalPairs = external;
+    this.denylistedPairs = denylistedPairs;
+    this.forward = DenseGraphs.forward(typeIds.length, edgeSources, edgeTargets);
   }
 
   public int typeCount() {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return typeIds.length;
   }
 
   public CodeElementId typeId(int type) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return typeIds[type];
   }
 
   public int packageCount() {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return packageIds.length;
   }
 
   public CodeElementId packageId(int pkg) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return packageIds[pkg];
   }
 
   public int packageOf(int type) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return packageOfType[type];
   }
 
   public int edgeCount() {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return edgeSources.length;
   }
 
   public int edgeSource(int edge) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return edgeSources[edge];
   }
 
   public int edgeTarget(int edge) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return edgeTargets[edge];
   }
 
   public ResolutionQuality edgeResolution(int edge) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return edgeResolutions[edge];
   }
 
   public Map<DependencyType, Integer> edgeOccurrences(int edge) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    final Map<DependencyType, Integer> occurrences = new EnumMap<>(DependencyType.class);
+    for (final DependencyType type : DEPENDENCY_TYPES) {
+      final int count = edgeOccurrence(edge, type);
+      if (count > 0) {
+        occurrences.put(type, count);
+      }
+    }
+    return Collections.unmodifiableMap(occurrences);
+  }
+
+  int edgeOccurrence(int edge, DependencyType type) {
+    Objects.checkIndex(edge, edgeSources.length);
+    return edgeOccurrences[edge * OCCURRENCE_SLOTS + type.ordinal()];
   }
 
   public int fanOutExternal(int type) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return fanOutExternal[type];
   }
 
   public long selfPairs() {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return selfPairs;
   }
 
   public long externalPairs() {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return externalPairs;
   }
 
   public long denylistedPairs() {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return denylistedPairs;
   }
 
   public Graph<Integer, DefaultEdge> forward() {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return forward;
   }
 }

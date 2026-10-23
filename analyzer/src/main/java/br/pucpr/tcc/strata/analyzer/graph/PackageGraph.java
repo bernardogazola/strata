@@ -7,35 +7,53 @@ import org.jgrapht.graph.DefaultEdge;
 
 public final class PackageGraph {
 
-  PackageGraph() {
-    throw new UnsupportedOperationException("ainda não implementado");
+  private final CodeElementId[] packageIds;
+  private final List<PackageEdge> edges;
+  private final int[] internalCohesion;
+  private final int[] bridgeSpan;
+  private final int[] externalFanIn;
+  private final Graph<Integer, DefaultEdge> forward;
+
+  PackageGraph(
+      CodeElementId[] packageIds,
+      List<PackageEdge> edges,
+      int[] internalCohesion,
+      int[] bridgeSpan,
+      int[] externalFanIn,
+      Graph<Integer, DefaultEdge> forward) {
+    this.packageIds = packageIds;
+    this.edges = List.copyOf(edges);
+    this.internalCohesion = internalCohesion;
+    this.bridgeSpan = bridgeSpan;
+    this.externalFanIn = externalFanIn;
+    this.forward = forward;
   }
 
   public int packageCount() {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return packageIds.length;
   }
 
   public CodeElementId packageId(int pkg) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return packageIds[pkg];
   }
 
   public List<PackageEdge> edges() {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return edges;
   }
 
   public int internalCohesion(int pkg) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return internalCohesion[pkg];
   }
 
   public int bridgeSpan(int type) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return bridgeSpan[type];
   }
 
   public int externalFanIn(int type) {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return externalFanIn[type];
   }
 
   public Graph<Integer, DefaultEdge> forward() {
-    throw new UnsupportedOperationException("ainda não implementado");
+    return forward;
   }
 }
