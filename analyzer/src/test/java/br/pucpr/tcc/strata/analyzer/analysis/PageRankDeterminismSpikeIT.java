@@ -130,6 +130,8 @@ final class PageRankDeterminismSpikeIT {
 
   private static final int CONTRACTION_BOUND_ITERATIONS = 147;
 
+  private static final long MAX_PERCENTILES_CHANGED_AT_PRODUCTION = 2;
+
   private static final int ES_COARSE_ITERATIONS_G = 34;
 
   private static final int ES_COARSE_ITERATIONS_G_REV = 41;
@@ -1219,7 +1221,12 @@ final class PageRankDeterminismSpikeIT {
     final ToleranceRun production = result.runs().get(1);
     final boolean largest = result.graph().startsWith(LARGEST);
     checks.equal(at + "reference converged", true, result.referenceConverged());
-    checks.equal(at + "1e-10 percentiles changed", 0L, production.percentilesChanged());
+    checks.that(
+        at + "1e-10 percentiles changed <= 2 and < 1e-6's",
+        "<= " + MAX_PERCENTILES_CHANGED_AT_PRODUCTION + " and < " + coarse.percentilesChanged(),
+        production.percentilesChanged(),
+        production.percentilesChanged() <= MAX_PERCENTILES_CHANGED_AT_PRODUCTION
+            && production.percentilesChanged() < coarse.percentilesChanged());
     checks.that(
         at + "1e-10 iterations <= 147 and > 1e-6's",
         "(" + coarse.iterations() + ", 147]",

@@ -18,6 +18,10 @@ public record GraphCounters(
     long pagerankUnconverged,
     long betweennessSkipped) {
 
+  public static final int PAGERANK_VECTORS = 4;
+
+  public static final int MAX_BETWEENNESS_SKIPPED = 1;
+
   public static final GraphCounters EMPTY =
       new GraphCounters(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
@@ -42,8 +46,12 @@ public record GraphCounters(
         throw new IllegalArgumentException("um contador é >= 0: " + value);
       }
     }
-    if (pagerankUnconverged > 4 || betweennessSkipped > 1) {
-      throw new IllegalArgumentException("pagerankUnconverged <= 4 e betweennessSkipped <= 1");
+    if (pagerankUnconverged > PAGERANK_VECTORS || betweennessSkipped > MAX_BETWEENNESS_SKIPPED) {
+      throw new IllegalArgumentException(
+          "pagerankUnconverged <= "
+              + PAGERANK_VECTORS
+              + " e betweennessSkipped <= "
+              + MAX_BETWEENNESS_SKIPPED);
     }
   }
 

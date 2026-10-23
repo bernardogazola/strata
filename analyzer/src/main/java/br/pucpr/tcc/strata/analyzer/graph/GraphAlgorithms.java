@@ -1,6 +1,7 @@
 package br.pucpr.tcc.strata.analyzer.graph;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
+import br.pucpr.tcc.strata.analyzer.bootstrap.Log;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -80,9 +81,20 @@ public final class GraphAlgorithms {
     if (vertexCount > maxNodes || graph.edgeSet().size() > maxEdges) {
       return Optional.empty();
     }
-    final Map<Integer, Double> scores =
-        new BetweennessCentrality<>(graph, false, OverflowStrategy.THROW_EXCEPTION_ON_OVERFLOW)
-            .getScores();
+    final Map<Integer, Double> scores;
+    try {
+      scores =
+          new BetweennessCentrality<>(graph, false, OverflowStrategy.THROW_EXCEPTION_ON_OVERFLOW)
+              .getScores();
+    } catch (ArithmeticException overflow) {
+      Log.warn(
+          "betweenness não calculada: a contagem de caminhos mínimos estoura um long ("
+              + vertexCount
+              + " vértices, "
+              + graph.edgeSet().size()
+              + " arestas)");
+      return Optional.empty();
+    }
     final double[] values = new double[vertexCount];
     for (int vertex = 0; vertex < vertexCount; vertex++) {
       values[vertex] = scores.get(vertex);

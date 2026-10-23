@@ -28,19 +28,26 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 
 public final class StructuralGraphStage implements StageExecutor {
 
   private final ExternalPackages packages;
+  private final UnaryOperator<BooleanSupplier> cancellationSeam;
 
   public StructuralGraphStage(ExternalPackages packages) {
+    this(packages, UnaryOperator.identity());
+  }
+
+  StructuralGraphStage(ExternalPackages packages, UnaryOperator<BooleanSupplier> cancellationSeam) {
     this.packages = Objects.requireNonNull(packages, "packages");
+    this.cancellationSeam = Objects.requireNonNull(cancellationSeam, "cancellationSeam");
   }
 
   @Override
   public StageOutcome execute(StageContext context) throws SQLException {
-    final BooleanSupplier cancelled = context.cancellation().asSupplier();
+    final BooleanSupplier cancelled = cancellationSeam.apply(context.cancellation().asSupplier());
     final long analysisPk = context.analysisPk();
     final long readStart = System.nanoTime();
     final GraphSource source =
