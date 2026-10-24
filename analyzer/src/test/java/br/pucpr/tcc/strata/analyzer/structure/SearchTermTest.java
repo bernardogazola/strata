@@ -15,6 +15,7 @@ final class SearchTermTest {
   private static final String ZERO_WIDTH_SPACE = Character.toString(0x200B);
   private static final String RIGHT_TO_LEFT_OVERRIDE = Character.toString(0x202E);
   private static final String LIGATURE_FI = Character.toString(0xFB01);
+  private static final String FULLWIDTH_FULL_STOP = Character.toString(0xFF0E);
   private static final String HIGH_SURROGATE = String.valueOf((char) 0xD83D);
   private static final String LOW_SURROGATE = String.valueOf((char) 0xDE00);
 
@@ -113,6 +114,37 @@ final class SearchTermTest {
     assertThat(SearchTerm.of("a ")).contains(new SearchTerm("a "));
     assertThat(SearchTerm.of(" A ")).contains(new SearchTerm(" a "));
     assertThat(SearchTerm.of(" ")).contains(new SearchTerm(" "));
+  }
+
+  @Test
+  void umaConsultaComPontoViraOUltimoSegmentoDobrado() {
+    assertThat(SearchTerm.of("core.spi")).contains(new SearchTerm("spi"));
+    assertThat(SearchTerm.of("Order.Builder")).contains(new SearchTerm("builder"));
+    assertThat(SearchTerm.of("br.pucpr.legacy.core.Catalog")).contains(new SearchTerm("catalog"));
+    assertThat(SearchTerm.of(".spi")).contains(new SearchTerm("spi"));
+    assertThat(SearchTerm.of("core. Spi")).contains(new SearchTerm(" spi"));
+  }
+
+  @Test
+  void umUltimoSegmentoVazioDeixaAConsultaVazia() {
+    assertThat(SearchTerm.of("a.")).isEmpty();
+    assertThat(SearchTerm.of(".")).isEmpty();
+    assertThat(SearchTerm.of("..")).isEmpty();
+    assertThat(SearchTerm.of("a.b.")).isEmpty();
+    assertThat(SearchTerm.of("core." + COMBINING_ACUTE)).isEmpty();
+  }
+
+  @Test
+  void oTetoEOSubstitutoSolitarioSaoDaConsultaInteira() {
+    assertThat(SearchTerm.of("a".repeat(126) + ".b")).contains(new SearchTerm("b"));
+    assertRefused("a".repeat(127) + ".b", Reason.QUERY_TOO_LONG);
+    assertThat(SearchTerm.of(HIGH_SURROGATE + ".spi")).isEmpty();
+  }
+
+  @Test
+  void oPontoDeLarguraCheiaNaoCortaEViraPontoNaDobra() {
+    assertThat(SearchTerm.of("core" + FULLWIDTH_FULL_STOP + "spi"))
+        .contains(new SearchTerm("core.spi"));
   }
 
   @Test

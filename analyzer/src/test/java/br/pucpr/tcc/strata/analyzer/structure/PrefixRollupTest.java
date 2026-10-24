@@ -190,6 +190,16 @@ final class PrefixRollupTest {
   }
 
   @Test
+  void umInicioAcimaDoTetoAindaDesceACadeiaDeFilhoUnico() {
+    final Map<String, PackageGroup> groups =
+        PrefixRollup.groups(packages("x.y.a", "x.y.b", "z"), 1);
+
+    assertThat(sizes(groups)).hasSize(2);
+    assertGroup(groups, List.of("x.y.a", "x.y.b"), PackageGroup.prefix("x.y"));
+    assertExact(groups, List.of("z"));
+  }
+
+  @Test
   void depoisDeUmaRecusaUmCandidatoMenorAindaEAceito() {
     final Set<String> a = packages("a.p1", "a.p2", "a.p3", "a.p4", "a.p5");
     final Map<String, PackageGroup> groups =

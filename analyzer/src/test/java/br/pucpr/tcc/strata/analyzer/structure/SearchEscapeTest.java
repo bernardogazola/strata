@@ -122,6 +122,25 @@ final class SearchEscapeTest {
   }
 
   @Test
+  void oPacoteDeNomeIgualVemAntesDoTipoQueSoComecaPorEle() throws Exception {
+    final SyntheticAnalysis faixa = cache.analysis("an_search_faixa");
+    final long core = faixa.addPackage("app.core", NodeValues.PLAIN);
+    faixa.addType(core, "CoreService", NodeValues.PLAIN);
+    final long analise = faixa.write().pk();
+
+    assertThat(busca(analise, "core", AMBOS, TETO))
+        .containsExactly(
+            new SearchHit(
+                new CodeElementId("pkg:app.core"), ElementKind.PACKAGE, "core", "app.core", null),
+            new SearchHit(
+                new CodeElementId("type:app.core.CoreService"),
+                ElementKind.TYPE,
+                "CoreService",
+                "app.core.CoreService",
+                new CodeElementId("pkg:app.core")));
+  }
+
+  @Test
   void sublinhadoNaoEhCuringa() throws Exception {
     assertThat(busca("a_b")).containsExactly(tipo("a_b"));
   }

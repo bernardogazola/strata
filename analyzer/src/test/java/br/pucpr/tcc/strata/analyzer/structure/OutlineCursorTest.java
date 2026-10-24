@@ -84,7 +84,7 @@ final class OutlineCursorTest {
     tipo(a, "other", "X");
     final long order = tipo(a, "p.a", "Order");
     tipo(a, "p.a", "Order$Builder");
-    a.addMethod(order, "total");
+    pk.put("method:p.a.Order#total()", a.addMethod(order, "total"));
     tipo(a, "p.b", "Y");
     tipo(a, "p." + Z_LARGO, "Z1");
     tipo(a, "p." + Z_MATEMATICO, "Z2");
@@ -262,6 +262,17 @@ final class OutlineCursorTest {
     assertCursorDesconhecido(outline, "pkg:big", new OutlineCursor(999_999));
   }
 
+  @Test
+  void naRaizOCursorDeUmPacoteForaDoConjuntoDaFase30EhDesconhecido() {
+    assertCursorDesconhecido(outline, null, cursorDe("pkg:p.empty"));
+  }
+
+  @Test
+  void umPaiTipoComCursorEhCursorDesconhecido() {
+    assertCursorDesconhecido(outline, "type:p.a.Order", cursorDe("type:p.a.Order$Builder"));
+    assertCursorDesconhecido(outline, "type:p.a.Order", cursorDe("method:p.a.Order#total()"));
+  }
+
   private void assertCursorDesconhecido(long analise, String pai, OutlineCursor cursor) {
     assertThatThrownBy(() -> pagina(analise, pai, cursor, MEIO_MILHAR))
         .as("o cursor %s sob %s", cursor, pai)
@@ -277,6 +288,11 @@ final class OutlineCursorTest {
     assertThat(pagina(outline, "type:p.a.Order", null, MEIO_MILHAR)).isEqualTo(OutlinePage.EMPTY);
     assertThat(pagina(outline, "type:p.a.Order$Builder", null, MEIO_MILHAR))
         .isEqualTo(OutlinePage.EMPTY);
+  }
+
+  @Test
+  void umPacoteSemTipoTemAPaginaVazia() throws Exception {
+    assertThat(pagina(outline, "pkg:p.empty", null, MEIO_MILHAR)).isEqualTo(OutlinePage.EMPTY);
   }
 
   @Test

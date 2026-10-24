@@ -543,6 +543,25 @@ final class StructureReadsTest {
   }
 
   @Test
+  void umaConsultaComPontoCasaPeloUltimoSegmento() throws Exception {
+    final String analise = pronta();
+    final String id = novoId();
+    final String coreSpi =
+        "{\"results\":[{\"elementId\":\"pkg:br.pucpr.legacy.core.spi\",\"kind\":\"PACKAGE\","
+            + "\"label\":\"core.spi\",\"packageId\":null,"
+            + "\"qualifiedName\":\"br.pucpr.legacy.core.spi\"}]}";
+
+    assertThat(despachar(id, "graph.search", comAnalise(analise, "{\"query\":\"core.spi\"}")))
+        .isEqualTo(ok(id, coreSpi));
+    for (final String consulta : List.of("a.", ".")) {
+      final String vazio = novoId();
+      assertThat(despachar(vazio, "graph.search", comAnalise(analise, "{}").put("query", consulta)))
+          .as(consulta)
+          .isEqualTo(ok(vazio, "{\"results\":[]}"));
+    }
+  }
+
+  @Test
   void umPaiQueNaoEElementoInternoEElementNotFound() throws Exception {
     final String analise = pronta();
 

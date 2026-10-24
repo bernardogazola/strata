@@ -69,7 +69,9 @@ final class GraphSliceTest {
 
   private static final double C = 1.0 / 2048;
 
-  private static final String ORACULO_ES = "/structure/elasticsearch-with-tests-rule-g-300.tsv";
+  private static final double ACIMA_DE_UM_301_AVOS = 0.003322259136212625;
+
+  private static final String ORACULO_ES = "/structure/elasticsearch-with-tests.groups.txt";
 
   private static final String BILLING = "pkg:com.acme.billing";
   private static final String API = "pkg:com.acme.billing.api";
@@ -244,6 +246,25 @@ final class GraphSliceTest {
   }
 
   @Test
+  void umPacoteSemTipoDaAFatiaVaziaENaoElementoNaoEncontrado() throws Exception {
+    final Slice esperada =
+        new Slice(
+            GraphLevel.TYPE,
+            new CodeElementId("pkg:com.acme.empty"),
+            List.of(),
+            List.of(),
+            new SliceTotals(0, 0),
+            false,
+            false,
+            TYPE_BUDGET);
+    final long analise = mundoAcme("an_acme");
+
+    final Slice slice = fatia(analise, GraphLevel.TYPE, "pkg:com.acme.empty", TYPE_BUDGET);
+
+    assertThat(slice).isEqualTo(esperada);
+  }
+
+  @Test
   void paiAusenteExternoOuDeOutraAnaliseEhElementoNaoEncontrado() throws Exception {
     final long acme = mundoAcme("an_acme");
     final SyntheticAnalysis outra = cache.analysis("an_outra");
@@ -346,6 +367,33 @@ final class GraphSliceTest {
     assertThat(slice.nodes()).hasSize(153);
   }
 
+  @Test
+  void umGrupoComTodoPacoteTemOPagerankCortadoEmUm() throws Exception {
+    final Slice esperada =
+        new Slice(
+            GraphLevel.PACKAGE,
+            null,
+            List.of(pfx("a", "a", 301, 301, 0, 0, 1.0, ResolutionMix.NONE)),
+            List.of(),
+            new SliceTotals(301, 0),
+            false,
+            true,
+            PACKAGE_BUDGET);
+    final SyntheticAnalysis a = cache.analysis("an_teto");
+    final NodeValues valores = new NodeValues(1, 0, 0, ACIMA_DE_UM_301_AVOS, ResolutionMix.NONE);
+    for (int i = 0; i <= 300; i++) {
+      a.addType(a.addPackage("a.p%03d".formatted(i), valores), "T", valores);
+    }
+    final long analise = a.write().pk();
+
+    final Slice slice = fatia(analise, GraphLevel.PACKAGE, null, PACKAGE_BUDGET);
+
+    assertThat(slice).isEqualTo(esperada);
+    assertThat(new BigDecimal(ACIMA_DE_UM_301_AVOS).multiply(BigDecimal.valueOf(301)))
+        .as("a soma exata passa de 1, então é o teto que dá 1.0")
+        .isGreaterThan(BigDecimal.ONE);
+  }
+
   private record ArestaGerada(
       int origem,
       int destino,
@@ -372,7 +420,9 @@ final class GraphSliceTest {
       final LinkedHashMap<String, String> grupo = new LinkedHashMap<>();
       for (final String linha : texto.split("\n")) {
         final String[] campos = linha.split("\t", -1);
-        grupo.put(campos[0], campos[1]);
+        assertThat(campos).as(linha).hasSize(2);
+        assertThat(campos[0]).as(linha).startsWith("pkg:");
+        grupo.put(campos[0].substring("pkg:".length()), campos[1]);
       }
       assertThat(grupo).hasSize(2_129);
       assertThat(grupo.keySet()).first().isEqualTo("");
@@ -730,6 +780,31 @@ final class GraphSliceTest {
 
     final Slice slice =
         fatia(analise, GraphLevel.PACKAGE, null, SliceBudget.of(GraphLevel.PACKAGE, 2));
+
+    assertThat(slice).isEqualTo(esperada);
+  }
+
+  @Test
+  void limiteIgualAoNumeroDePacotesNaoAgrega() throws Exception {
+    final Slice esperada =
+        new Slice(
+            GraphLevel.PACKAGE,
+            null,
+            List.of(
+                pkg("a.x", "a.x", 3, 1, 0, 1, 0.2, mix(1, 0, 0)),
+                pkg("a.y", "a.y", 4, 1, 1, 0, 0.2, mix(0, 1, 0)),
+                pkg("b", "b", 5, 1, 1, 1, 0.6, mix(0, 0, 1))),
+            List.of(
+                aresta("e_ccdbd9142a7770f4", "pkg:a.x", "pkg:b", 1, RESOLVED, CALLS, 1),
+                aresta("e_75c24988723945a3", "pkg:b", "pkg:a.y", 1, RESOLVED, CALLS, 1)),
+            new SliceTotals(3, 2),
+            false,
+            false,
+            new SliceBudget(3, AnalysisConstants.GRAPH_SLICE_PACKAGE_MAX_EDGES));
+    final long analise = mundoTri("an_tri", 0.2, 0.2, 0.6);
+
+    final Slice slice =
+        fatia(analise, GraphLevel.PACKAGE, null, SliceBudget.of(GraphLevel.PACKAGE, 3));
 
     assertThat(slice).isEqualTo(esperada);
   }

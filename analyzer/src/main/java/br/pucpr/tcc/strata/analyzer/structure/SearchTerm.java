@@ -7,6 +7,8 @@ import java.util.Optional;
 
 public record SearchTerm(String folded) {
 
+  private static final char SEGMENT_SEPARATOR = '.';
+
   public SearchTerm {
     Objects.requireNonNull(folded, "folded");
     if (folded.isEmpty()) {
@@ -24,8 +26,12 @@ public record SearchTerm(String folded) {
     if (hasLoneSurrogate(query)) {
       return Optional.empty();
     }
-    final String folded = NameFold.fold(query);
+    final String folded = NameFold.fold(lastSegment(query));
     return folded.isEmpty() ? Optional.empty() : Optional.of(new SearchTerm(folded));
+  }
+
+  private static String lastSegment(String query) {
+    return query.substring(query.lastIndexOf(SEGMENT_SEPARATOR) + 1);
   }
 
   private static boolean hasLoneSurrogate(String query) {
