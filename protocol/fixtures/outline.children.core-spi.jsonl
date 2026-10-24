@@ -1,0 +1,2 @@
+{"id":"req_01JQ8ZB1B2C3D4E5F6G7H8J9PA","kind":"request","method":"outline.children","payload":{"analysisId":"an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W","limit":500,"parentId":"pkg:br.pucpr.legacy.core.spi"},"protocol":1}
+{"id":"req_01JQ8ZB1B2C3D4E5F6G7H8J9PA","kind":"response","ok":true,"payload":{"items":[{"childCount":0,"id":"type:br.pucpr.legacy.core.spi.MemoryStore","kind":"TYPE","label":"MemoryStore"},{"childCount":0,"id":"type:br.pucpr.legacy.core.spi.Store","kind":"TYPE","label":"Store"}],"nextCursor":null},"protocol":1}
