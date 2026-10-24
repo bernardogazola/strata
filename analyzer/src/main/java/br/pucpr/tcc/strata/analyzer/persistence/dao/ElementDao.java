@@ -137,17 +137,12 @@ public final class ElementDao {
         rows.getInt("is_test") == 1,
         nullableLong(rows, "source_root_pk"),
         nullableLong(rows, "file_pk"),
-        nullableInt(rows, "start_line"),
-        nullableInt(rows, "end_line"));
+        Columns.nullableInt(rows, "start_line"),
+        Columns.nullableInt(rows, "end_line"));
   }
 
   private static Long nullableLong(ResultSet rows, String column) throws SQLException {
     final long value = rows.getLong(column);
-    return rows.wasNull() ? null : value;
-  }
-
-  private static Integer nullableInt(ResultSet rows, String column) throws SQLException {
-    final int value = rows.getInt(column);
     return rows.wasNull() ? null : value;
   }
 

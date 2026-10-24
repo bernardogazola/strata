@@ -3,7 +3,7 @@ package br.pucpr.tcc.strata.analyzer.structure;
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.DependencyEndRow;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.DependencyPageDao;
-import br.pucpr.tcc.strata.analyzer.persistence.dao.DependencyTotalsRow;
+import br.pucpr.tcc.strata.analyzer.persistence.dao.OutboundCountsRow;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.PackageDependencyRow;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.StructureDao;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.StructureElementRow;
@@ -60,24 +60,53 @@ public final class DependencyPageQuery {
             .filter(row -> !row.isExternal())
             .orElseThrow(ElementNotFoundException::new);
     final boolean type = anchor.kind() == ElementKind.TYPE;
-    final List<Ranked> ranked =
+    final Ranking ranking =
         type
             ? typeRanking(connection, analysisPk, anchor, direction)
             : packageRanking(connection, analysisPk, anchor, direction);
-    final DependencyTotalsRow totals =
-        type
-            ? DependencyPageDao.typeTotals(connection, analysisPk, anchor.pk())
-            : DependencyPageDao.packageTotals(connection, analysisPk, anchor.pk());
+    final List<Ranked> ranked = ranking.rows();
+    final DependencyTotals totals = totals(connection, analysisPk, anchor, direction, ranking);
     final int from = after == null ? 0 : resumeAfter(ranked, after, anchor, direction);
-    final int to = Math.min(ranked.size(), from + limit);
-    final List<DependencyEntry> items =
-        ranked.subList(from, to).stream().map(Ranked::entry).toList();
+    final List<DependencyEntry> rest =
+        ranked.subList(from, ranked.size()).stream().map(Ranked::entry).toList();
+    final int taken =
+        DependencyPageBytes.fit(rest, limit, AnalysisConstants.DEPENDENCY_PAGE_MAX_BYTES);
+    final int to = from + taken;
     final DependencyCursor next =
         to < ranked.size()
             ? new DependencyCursor(direction, anchor.pk(), ranked.get(to - 1).otherPk())
             : null;
-    return new DependencyPage(
-        items, next, new DependencyTotals(totals.in(), totals.out(), totals.outExternal()));
+    return new DependencyPage(rest.subList(0, taken), next, totals);
+  }
+
+  private static DependencyTotals totals(
+      Connection connection,
+      long analysisPk,
+      StructureElementRow anchor,
+      DependencyDirection direction,
+      Ranking ranking)
+      throws SQLException {
+    final boolean inbound = direction == DependencyDirection.IN;
+    if (anchor.kind() == ElementKind.TYPE) {
+      if (inbound) {
+        final OutboundCountsRow out =
+            DependencyPageDao.typeOutboundCounts(connection, analysisPk, anchor.pk());
+        return new DependencyTotals(ranking.rows().size(), out.out(), out.outExternal());
+      }
+      return new DependencyTotals(
+          DependencyPageDao.typeInboundCount(connection, analysisPk, anchor.pk()),
+          ranking.internal(),
+          ranking.rows().size() - ranking.internal());
+    }
+    return inbound
+        ? new DependencyTotals(
+            ranking.rows().size(),
+            DependencyPageDao.packageOutboundCount(connection, analysisPk, anchor.pk()),
+            null)
+        : new DependencyTotals(
+            DependencyPageDao.packageInboundCount(connection, analysisPk, anchor.pk()),
+            ranking.rows().size(),
+            null);
   }
 
   private static int resumeAfter(
@@ -88,7 +117,7 @@ public final class DependencyPageQuery {
     if (after.direction() != direction || after.anchorPk() != anchor.pk()) {
       throw new InvalidStructureRequest(InvalidStructureRequest.Reason.CURSOR_UNKNOWN);
     }
-    for (int index = 0; index < ranked.size(); index++) {
+    for (int index = 0; index < ranked.size() - 1; index++) {
       if (ranked.get(index).otherPk() == after.lastPk()) {
         return index + 1;
       }
@@ -96,7 +125,7 @@ public final class DependencyPageQuery {
     throw new InvalidStructureRequest(InvalidStructureRequest.Reason.CURSOR_UNKNOWN);
   }
 
-  private static List<Ranked> typeRanking(
+  private static Ranking typeRanking(
       Connection connection,
       long analysisPk,
       StructureElementRow anchor,
@@ -105,8 +134,8 @@ public final class DependencyPageQuery {
     final boolean inbound = direction == DependencyDirection.IN;
     final List<TypeDependencyRow> rows =
         inbound
-            ? DependencyPageDao.inbound(connection, analysisPk, anchor.pk())
-            : DependencyPageDao.outbound(connection, analysisPk, anchor.pk());
+            ? DependencyPageDao.inbound(connection, analysisPk, anchor.pk(), anchor.elementId())
+            : DependencyPageDao.outbound(connection, analysisPk, anchor.pk(), anchor.elementId());
     final Map<CodeElementId, DependencyEndRow> others = HashMap.newHashMap(rows.size());
     final List<PairRow> pairRows = new ArrayList<>(rows.size());
     for (final TypeDependencyRow row : rows) {
@@ -122,7 +151,7 @@ public final class DependencyPageQuery {
     return blocks(internal, external);
   }
 
-  private static List<Ranked> packageRanking(
+  private static Ranking packageRanking(
       Connection connection,
       long analysisPk,
       StructureElementRow anchor,
@@ -134,7 +163,7 @@ public final class DependencyPageQuery {
             ? DependencyPageDao.packageInbound(connection, analysisPk, anchor.pk())
             : DependencyPageDao.packageOutbound(connection, analysisPk, anchor.pk());
     if (rows.isEmpty()) {
-      return List.of();
+      return new Ranking(List.of(), 0);
     }
     final String commonProperPrefix = CommonProperPrefix.read(connection, analysisPk);
     final List<Ranked> internal = new ArrayList<>(rows.size());
@@ -150,11 +179,11 @@ public final class DependencyPageQuery {
     return blocks(internal, List.of());
   }
 
-  private static List<Ranked> blocks(List<Ranked> internal, List<Ranked> external) {
+  private static Ranking blocks(List<Ranked> internal, List<Ranked> external) {
     final List<Ranked> ranked = new ArrayList<>(internal.size() + external.size());
     ranked.addAll(internal.stream().sorted(BY_RANK).toList());
     ranked.addAll(external.stream().sorted(BY_RANK).toList());
-    return List.copyOf(ranked);
+    return new Ranking(List.copyOf(ranked), internal.size());
   }
 
   private static DependencyEntry entry(PairEdge pair, DependencyEndRow other) {
@@ -181,4 +210,6 @@ public final class DependencyPageQuery {
   }
 
   private record Ranked(DependencyEntry entry, long otherPk) {}
+
+  private record Ranking(List<Ranked> rows, int internal) {}
 }

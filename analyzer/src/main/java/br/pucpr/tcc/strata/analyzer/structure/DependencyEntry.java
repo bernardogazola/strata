@@ -1,12 +1,9 @@
 package br.pucpr.tcc.strata.analyzer.structure;
 
-import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality;
-import java.util.Collections;
-import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -38,21 +35,13 @@ public record DependencyEntry(
       throw new IllegalArgumentException(
           "uma ponta de dependência é PACKAGE ou TYPE: " + elementId);
     }
-    if (label.codePointCount(0, label.length()) > AnalysisConstants.MAX_LABEL_CHARS) {
+    if (NodeLabels.exceedsCeiling(label)) {
       throw new IllegalArgumentException("um rótulo acima do teto: " + elementId);
     }
     if (!fitsEnd(kind, isExternal, packageId, resolution, ambiguous)) {
       throw new IllegalArgumentException("um campo que não cabe na ponta: " + elementId);
     }
-    if (types.isEmpty()) {
-      throw new IllegalArgumentException("uma dependência tem pelo menos um tipo: " + edgeId);
-    }
-    for (final Map.Entry<DependencyType, Long> entry : types.entrySet()) {
-      if (!entry.getKey().isTypeEdge() || entry.getValue() == null || entry.getValue() < 1) {
-        throw new IllegalArgumentException("um tipo presente tem >= 1 ocorrência: " + entry);
-      }
-    }
-    types = Collections.unmodifiableMap(new EnumMap<>(types));
+    types = TypeOccurrences.checked(types, edgeId);
     if (weight < 1) {
       throw new IllegalArgumentException("uma dependência pesa pelo menos 1: " + edgeId);
     }

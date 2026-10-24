@@ -3,8 +3,6 @@ package br.pucpr.tcc.strata.analyzer.structure;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality;
-import java.util.Collections;
-import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -29,15 +27,7 @@ public record PairEdge(
     if (source.equals(target)) {
       throw new IllegalArgumentException("um par liga dois elementos: " + source);
     }
-    if (types.isEmpty()) {
-      throw new IllegalArgumentException("um par tem pelo menos um tipo de dependência: " + id);
-    }
-    for (final Map.Entry<DependencyType, Long> entry : types.entrySet()) {
-      if (!entry.getKey().isTypeEdge() || entry.getValue() == null || entry.getValue() < 1) {
-        throw new IllegalArgumentException("um tipo presente tem >= 1 ocorrência: " + entry);
-      }
-    }
-    types = Collections.unmodifiableMap(new EnumMap<>(types));
+    types = TypeOccurrences.checked(types, id);
     if (weight < 1) {
       throw new IllegalArgumentException("um par pesa pelo menos 1: " + id);
     }

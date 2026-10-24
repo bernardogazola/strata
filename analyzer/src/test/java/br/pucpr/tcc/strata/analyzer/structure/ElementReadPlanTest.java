@@ -228,7 +228,7 @@ final class ElementReadPlanTest {
     final Plano mundo = mundo();
 
     final Gravador gravador =
-        grava(c -> DependencyPageDao.typeTotals(c, mundo.analise(), mundo.a()));
+        grava(c -> DependencyPageDao.typeOutboundCounts(c, mundo.analise(), mundo.a()));
 
     assertThat(planos(gravador, true))
         .anySatisfy(linha -> assertThat(linha).contains(ORIGEM_PELA_ANALISE));
@@ -240,12 +240,18 @@ final class ElementReadPlanTest {
     final long analise = mundo.analise();
     final CodeElementId a = new CodeElementId("type:app.p.A");
     final Map<String, SqlWork<?>> chamadas = new TreeMap<>();
-    chamadas.put("inbound", c -> DependencyPageDao.inbound(c, analise, mundo.a()));
-    chamadas.put("outbound", c -> DependencyPageDao.outbound(c, analise, mundo.a()));
+    chamadas.put("inbound", c -> DependencyPageDao.inbound(c, analise, mundo.a(), a));
+    chamadas.put("outbound", c -> DependencyPageDao.outbound(c, analise, mundo.a(), a));
     chamadas.put("packageInbound", c -> DependencyPageDao.packageInbound(c, analise, mundo.p()));
     chamadas.put("packageOutbound", c -> DependencyPageDao.packageOutbound(c, analise, mundo.p()));
-    chamadas.put("typeTotals", c -> DependencyPageDao.typeTotals(c, analise, mundo.a()));
-    chamadas.put("packageTotals", c -> DependencyPageDao.packageTotals(c, analise, mundo.p()));
+    chamadas.put(
+        "typeInboundCount", c -> DependencyPageDao.typeInboundCount(c, analise, mundo.a()));
+    chamadas.put(
+        "typeOutboundCounts", c -> DependencyPageDao.typeOutboundCounts(c, analise, mundo.a()));
+    chamadas.put(
+        "packageInboundCount", c -> DependencyPageDao.packageInboundCount(c, analise, mundo.p()));
+    chamadas.put(
+        "packageOutboundCount", c -> DependencyPageDao.packageOutboundCount(c, analise, mundo.p()));
     chamadas.put("element", c -> ElementDetailDao.element(c, analise, a));
     chamadas.put("codeMetric", c -> ElementDetailDao.codeMetric(c, analise, mundo.a()));
     chamadas.put("graphMetric", c -> ElementDetailDao.graphMetric(c, analise, mundo.a()));
@@ -266,6 +272,80 @@ final class ElementReadPlanTest {
         }
       }
     }
+  }
+
+  private static final Pattern CONTAGEM = Pattern.compile("(?i)\\bcount\\s*\\(");
+
+  private static long contagens(Gravador gravador) {
+    return gravador.execucoes.stream()
+        .mapToLong(execucao -> CONTAGEM.matcher(execucao.sql()).results().count())
+        .sum();
+  }
+
+  @Test
+  void aPaginaContaEmSqlSoOOutroSentido() throws Exception {
+    final Plano mundo = mundo();
+    final CodeElementId a = new CodeElementId("type:app.p.A");
+    final CodeElementId p = new CodeElementId("pkg:app.p");
+    final List<DependencyPage> paginas = new ArrayList<>();
+    final Map<String, Long> esperadas =
+        Map.of("type IN", 2L, "type OUT", 1L, "package IN", 1L, "package OUT", 1L);
+    final Map<String, Long> executadas = new TreeMap<>();
+
+    for (final DependencyDirection sentido : DependencyDirection.values()) {
+      final Gravador tipo =
+          grava(
+              c -> paginas.add(DependencyPageQuery.page(c, mundo.analise(), a, sentido, null, 50)));
+      executadas.put("type " + sentido, contagens(tipo));
+      final Gravador pacote =
+          grava(
+              c -> paginas.add(DependencyPageQuery.page(c, mundo.analise(), p, sentido, null, 50)));
+      executadas.put("package " + sentido, contagens(pacote));
+    }
+
+    assertThat(executadas).isEqualTo(esperadas);
+    assertThat(paginas.get(0).totals()).isEqualTo(new DependencyTotals(2, 2, 1));
+    assertThat(paginas.get(2).totals()).isEqualTo(paginas.get(0).totals());
+    assertThat(paginas.get(1).totals()).isEqualTo(new DependencyTotals(1, 1, null));
+    assertThat(paginas.get(3).totals()).isEqualTo(paginas.get(1).totals());
+  }
+
+  @Test
+  void oDescribeSoContaOsMetodosNoTeto() throws Exception {
+    final Plano mundo = mundo();
+    final List<ElementDetail> descritos = new ArrayList<>();
+
+    final Gravador abaixo =
+        grava(
+            c ->
+                descritos.add(
+                    ElementDetailQuery.describe(
+                        c, mundo.analise(), new CodeElementId("type:app.p.A"))));
+    final long noTeto = tipoComMilMetodos();
+    final Gravador teto =
+        grava(
+            c ->
+                descritos.add(
+                    ElementDetailQuery.describe(c, noTeto, new CodeElementId("type:app.mil.M"))));
+
+    assertThat(contagens(abaixo)).isZero();
+    assertThat(descritos.get(0).methodTotal()).isEqualTo(1);
+    assertThat(contagens(teto)).isEqualTo(1);
+    assertThat(descritos.get(1).methodTotal()).isEqualTo(1_000);
+    assertThat(descritos.get(1).methods()).hasSize(1_000);
+  }
+
+  private long tipoComMilMetodos() throws SQLException {
+    final SyntheticAnalysis s = cache.analysis("an_mil");
+    final GraphValues grafo = new GraphValues(0, 0, 0, 0.5, null, ResolutionMix.NONE);
+    final long pacote = s.addPackage("app.mil", false, new Metrics(1, 0, 0, 0, null), grafo);
+    final long arquivo = s.addSourceFile("src/app/mil/M.java");
+    final Declaration classe = new Declaration(TypeKind.CLASS, "public", false, arquivo, 1, 9);
+    final long tipo = s.addType(pacote, "M", classe, new Metrics(1, 0, 0, 0, 0), grafo);
+    for (int i = 0; i < 1_000; i++) {
+      s.addMethod(tipo, "m%04d".formatted(i), List.of(), i + 1, i + 1, Metrics.withoutCc(1));
+    }
+    return s.write().pk();
   }
 
   private static Set<String> tabelas(String sql) {

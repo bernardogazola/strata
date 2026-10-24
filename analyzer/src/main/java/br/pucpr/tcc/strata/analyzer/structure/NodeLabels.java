@@ -44,10 +44,14 @@ public final class NodeLabels {
   }
 
   public static String clamp(String label) {
-    if (label.codePointCount(0, label.length()) <= AnalysisConstants.MAX_LABEL_CHARS) {
+    if (!exceedsCeiling(label)) {
       return label;
     }
     return label.substring(0, label.offsetByCodePoints(0, AnalysisConstants.MAX_LABEL_CHARS));
+  }
+
+  public static boolean exceedsCeiling(String text) {
+    return text.codePointCount(0, text.length()) > AnalysisConstants.MAX_LABEL_CHARS;
   }
 
   private static String withoutPrefix(String name, String prefix) {

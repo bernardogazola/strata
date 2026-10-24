@@ -58,6 +58,7 @@ public final class OutlineQuery {
     final List<OutlineRow> rows =
         OutlineDao.typePage(connection, analysisPk, parentRow.pk(), keyOf(after), limit + 1);
     return page(
+        after,
         rows,
         limit,
         row ->
@@ -75,6 +76,7 @@ public final class OutlineQuery {
         OutlineDao.rootPage(connection, analysisPk, keyOf(after), limit + 1);
     final String commonProperPrefix = CommonProperPrefix.read(connection, analysisPk);
     return page(
+        after,
         rows,
         limit,
         row ->
@@ -99,7 +101,13 @@ public final class OutlineQuery {
   }
 
   private static OutlinePage page(
-      List<OutlineRow> rows, int limit, Function<OutlineRow, OutlineItem> item) {
+      OutlineCursor after,
+      List<OutlineRow> rows,
+      int limit,
+      Function<OutlineRow, OutlineItem> item) {
+    if (after != null && rows.isEmpty()) {
+      throw new InvalidStructureRequest(InvalidStructureRequest.Reason.CURSOR_UNKNOWN);
+    }
     final boolean more = rows.size() > limit;
     final List<OutlineRow> shown = more ? rows.subList(0, limit) : rows;
     final List<OutlineItem> items = shown.stream().map(item).toList();

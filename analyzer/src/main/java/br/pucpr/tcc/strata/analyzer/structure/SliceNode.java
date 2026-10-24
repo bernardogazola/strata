@@ -1,6 +1,5 @@
 package br.pucpr.tcc.strata.analyzer.structure;
 
-import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.graph.ResolutionMix;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
@@ -27,7 +26,7 @@ public record SliceNode(
     if (!idMatchesKind(id, kind)) {
       throw new IllegalArgumentException("um nó " + kind + " com id alheio");
     }
-    if (label.codePointCount(0, label.length()) > AnalysisConstants.MAX_LABEL_CHARS) {
+    if (NodeLabels.exceedsCeiling(label)) {
       throw new IllegalArgumentException("um rótulo de nó acima do teto: " + id);
     }
     if (loc < 0 || fanIn < 0 || fanOut < 0) {

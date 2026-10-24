@@ -45,7 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-final class StructureCaches implements AutoCloseable {
+public final class StructureCaches implements AutoCloseable {
 
   static final SliceBudget PACKAGE_BUDGET =
       new SliceBudget(
@@ -148,7 +148,7 @@ final class StructureCaches implements AutoCloseable {
     this.connections = connections;
   }
 
-  static StructureCaches create(Path directory) throws SQLException, CacheDiscardException {
+  public static StructureCaches create(Path directory) throws SQLException, CacheDiscardException {
     final SqliteConnections connections =
         SqliteConnections.open(directory.resolve(RepositoryCache.DATABASE_FILE));
     try {
@@ -165,7 +165,7 @@ final class StructureCaches implements AutoCloseable {
     }
   }
 
-  SyntheticAnalysis analysis(String analysisId) throws SQLException {
+  public SyntheticAnalysis analysis(String analysisId) throws SQLException {
     final long pk =
         connections.write(
             c -> {
@@ -187,7 +187,7 @@ final class StructureCaches implements AutoCloseable {
     return new SyntheticAnalysis(pk);
   }
 
-  <T> T read(SqlWork<T> work) throws SQLException {
+  public <T> T read(SqlWork<T> work) throws SQLException {
     return connections.read(work);
   }
 
@@ -285,9 +285,9 @@ final class StructureCaches implements AutoCloseable {
     return occurrences;
   }
 
-  record NodeValues(int loc, int fanIn, int fanOut, double pagerank, ResolutionMix mix) {
+  public record NodeValues(int loc, int fanIn, int fanOut, double pagerank, ResolutionMix mix) {
 
-    static final NodeValues PLAIN = new NodeValues(1, 0, 0, 0.001, ResolutionMix.NONE);
+    public static final NodeValues PLAIN = new NodeValues(1, 0, 0, 0.001, ResolutionMix.NONE);
   }
 
   record Metrics(int loc, Integer unitCount, Integer ccSum, Integer ccMax, Integer ccP90) {
@@ -312,7 +312,7 @@ final class StructureCaches implements AutoCloseable {
       Integer startLine,
       Integer endLine) {}
 
-  final class SyntheticAnalysis {
+  public final class SyntheticAnalysis {
 
     private final long pk;
     private final List<ElementRow> packages = new ArrayList<>();
@@ -331,11 +331,11 @@ final class StructureCaches implements AutoCloseable {
       this.pk = pk;
     }
 
-    long pk() {
+    public long pk() {
       return pk;
     }
 
-    long addPackage(String qualifiedName, NodeValues values) {
+    public long addPackage(String qualifiedName, NodeValues values) {
       final long elementPk = addBarePackage(qualifiedName);
       codeMetrics.add(new CodeMetricRow(elementPk, values.loc(), null, null, null, null));
       graphMetrics.add(
@@ -377,7 +377,7 @@ final class StructureCaches implements AutoCloseable {
       return elementPk;
     }
 
-    long addType(long packagePk, String binaryName, NodeValues values) {
+    public long addType(long packagePk, String binaryName, NodeValues values) {
       final long elementPk = nextElementPk++;
       final String packageName = qualifiedNames.get(packagePk);
       final String dotted = binaryName.replace('$', '.');
@@ -472,7 +472,7 @@ final class StructureCaches implements AutoCloseable {
               false));
     }
 
-    SyntheticAnalysis write() throws SQLException {
+    public SyntheticAnalysis write() throws SQLException {
       if (written) {
         throw new IllegalStateException("gravado duas vezes: " + pk);
       }
@@ -571,7 +571,7 @@ final class StructureCaches implements AutoCloseable {
       return elementPk;
     }
 
-    long addDependency(
+    public long addDependency(
         long sourcePk,
         long targetPk,
         DependencyType type,

@@ -9,6 +9,7 @@ import static br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType.P
 import static br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType.RETURN_TYPE;
 import static br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality.INFERRED;
 import static br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality.RESOLVED;
+import static br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality.UNRESOLVED_EXTERNAL;
 import static br.pucpr.tcc.strata.analyzer.structure.StructureCaches.EDGE_TYPES;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -255,6 +256,61 @@ final class EvidenceSelectionTest {
         .isInstanceOf(IllegalArgumentException.class);
   }
 
+  @Test
+  void empatadasNoConteudoSaemPelaQualidadeEmOrdemDeDeclaracao() {
+    final String metodo = "method:p.S#a()";
+    final List<RelationshipEvidence> esperadas =
+        List.of(
+            new RelationshipEvidence(CALLS, ARQUIVO, 7, RESOLVED, ref(metodo), null),
+            new RelationshipEvidence(CALLS, ARQUIVO, 7, INFERRED, ref(metodo), null),
+            new RelationshipEvidence(CALLS, ARQUIVO, 7, UNRESOLVED_EXTERNAL, ref(metodo), null));
+
+    for (final List<RelationshipEvidence> entrada : permutacoes(esperadas)) {
+      assertThat(EvidenceSelection.select(entrada, 50)).as("%s", entrada).isEqualTo(esperadas);
+    }
+  }
+
+  @Test
+  void empatadasAteAQualidadeSaemPeloArquivo() {
+    final List<RelationshipEvidence> esperadas =
+        List.of(
+            new RelationshipEvidence(FIELD_TYPE, null, 4, RESOLVED, null, null),
+            new RelationshipEvidence(FIELD_TYPE, "p/" + Z_LARGO + ".java", 4, RESOLVED, null, null),
+            new RelationshipEvidence(
+                FIELD_TYPE, "p/" + Z_MATEMATICO + ".java", 4, RESOLVED, null, null));
+
+    for (final List<RelationshipEvidence> entrada : permutacoes(esperadas)) {
+      assertThat(EvidenceSelection.select(entrada, 50)).as("%s", entrada).isEqualTo(esperadas);
+    }
+  }
+
+  private static List<List<RelationshipEvidence>> permutacoes(List<RelationshipEvidence> tres) {
+    final List<List<RelationshipEvidence>> ordens = new ArrayList<>();
+    for (final int[] ordem :
+        new int[][] {{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}}) {
+      ordens.add(List.of(tres.get(ordem[0]), tres.get(ordem[1]), tres.get(ordem[2])));
+    }
+    return ordens;
+  }
+
+  @Test
+  void oTetoDeEvidenciasEhCinquentaNoPadraoENoMaximo() {
+    assertThat(EvidenceQuery.resultLimit(null)).isEqualTo(50);
+    assertThat(EvidenceQuery.resultLimit(51)).isEqualTo(50);
+    assertThat(EvidenceQuery.resultLimit(Integer.MAX_VALUE)).isEqualTo(50);
+    assertThat(EvidenceQuery.resultLimit(50)).isEqualTo(50);
+    assertThat(EvidenceQuery.resultLimit(1)).isEqualTo(1);
+    for (final int abaixo : new int[] {0, -1, Integer.MIN_VALUE}) {
+      assertThatThrownBy(() -> EvidenceQuery.resultLimit(abaixo))
+          .isInstanceOfSatisfying(
+              InvalidStructureRequest.class,
+              recusa -> {
+                assertThat(recusa.reason()).isEqualTo(Reason.LIMIT_NOT_POSITIVE);
+                assertThat(recusa.detail()).isEqualTo("limit deve ser pelo menos 1");
+              });
+    }
+  }
+
   private static final String CATALOGO = "type:app.loja.Catalogo";
   private static final String ESTOQUE = "type:app.loja.Estoque";
   private static final String NUCLEO = "type:app.base.Base$Nucleo";
@@ -448,5 +504,69 @@ final class EvidenceSelectionTest {
                 .map(RelationshipEvidence::type)
                 .collect(Collectors.toCollection(() -> EnumSet.noneOf(DependencyType.class))))
         .containsExactly(CALLS, FIELD_TYPE, PARAMETER_TYPE);
+  }
+
+  @Test
+  void aQualidadeDesempataQualquerQueSejaAOrdemDeInsercao() throws Exception {
+    final long primeiraResolvida = mundoDoEmpate("an_empate_r", false);
+    final long primeiraDeduzida = mundoDoEmpate("an_empate_i", true);
+    final MethodRef metodo =
+        new MethodRef(
+            new CodeElementId("method:app.A#m(app.B,app.B)"),
+            "m(B, B)",
+            new CodeElementId("type:app.A"),
+            "A");
+    final List<RelationshipEvidence> esperadas =
+        List.of(
+            new RelationshipEvidence(PARAMETER_TYPE, "src/app/A.java", 3, RESOLVED, metodo, null),
+            new RelationshipEvidence(PARAMETER_TYPE, "src/app/A.java", 3, INFERRED, metodo, null));
+
+    assertThat(evidencias(primeiraResolvida, "type:app.A", "type:app.B", 50)).isEqualTo(esperadas);
+    assertThat(evidencias(primeiraDeduzida, "type:app.A", "type:app.B", 50)).isEqualTo(esperadas);
+  }
+
+  private long mundoDoEmpate(String analysisId, boolean deduzidaPrimeiro) throws SQLException {
+    final SyntheticAnalysis s = cache.analysis(analysisId);
+    final long arquivo = s.addSourceFile("src/app/A.java");
+    final long pacote = s.addPackage("app", false, new Metrics(10, 1, 1, 1, null), grafo());
+    final Declaration classe = new Declaration(TypeKind.CLASS, "public", false, arquivo, 1, 20);
+    final Metrics metricas = new Metrics(10, 1, 1, 1, 1);
+    final long a = s.addType(pacote, "A", classe, metricas, grafo());
+    final long b = s.addType(pacote, "B", classe, metricas, grafo());
+    final long m = s.addMethod(a, "m", List.of("app.B", "app.B"), 3, 5, Metrics.oneUnit(3, 1));
+    final long linha = s.addDependency(a, b, PARAMETER_TYPE, INFERRED, 2, false);
+    final ResolutionQuality primeira = deduzidaPrimeiro ? INFERRED : RESOLVED;
+    final ResolutionQuality segunda = deduzidaPrimeiro ? RESOLVED : INFERRED;
+    s.addEvidence(linha, m, null, arquivo, 3, primeira);
+    s.addEvidence(linha, m, null, arquivo, 3, segunda);
+    return s.write().pk();
+  }
+
+  @Test
+  void umParComMaisDeCinquentaGuardadasDaCinquentaSemLimiteEComCem() throws Exception {
+    final SyntheticAnalysis s = cache.analysis("an_sessenta");
+    final long arquivo = s.addSourceFile(ARQUIVO);
+    final long pacote = s.addPackage("p", false, new Metrics(10, 1, 1, 1, null), grafo());
+    final Metrics metricas = new Metrics(10, 1, 1, 1, 1);
+    final long origem = s.addType(pacote, "S", classe(arquivo), metricas, grafo());
+    final long destino = s.addType(pacote, "T", classe(arquivo), metricas, grafo());
+    for (final DependencyType tipo : List.of(FIELD_TYPE, IMPORTS, CALLS)) {
+      final long linha = s.addDependency(origem, destino, tipo, RESOLVED, 20, false);
+      for (int numero = 20; numero >= 1; numero--) {
+        s.addEvidence(linha, null, null, arquivo, numero, RESOLVED);
+      }
+    }
+    final long analise = s.write().pk();
+
+    final List<RelationshipEvidence> semLimite =
+        evidencias(analise, "type:p.S", "type:p.T", EvidenceQuery.resultLimit(null));
+    final List<RelationshipEvidence> comCem =
+        evidencias(analise, "type:p.S", "type:p.T", EvidenceQuery.resultLimit(100));
+
+    assertThat(semLimite).hasSize(50);
+    assertThat(porTipo(semLimite))
+        .containsExactly(
+            Map.entry(IMPORTS, 17L), Map.entry(CALLS, 17L), Map.entry(FIELD_TYPE, 16L));
+    assertThat(comCem).isEqualTo(semLimite);
   }
 }

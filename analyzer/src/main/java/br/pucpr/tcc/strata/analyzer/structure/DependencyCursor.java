@@ -15,7 +15,7 @@ public record DependencyCursor(DependencyDirection direction, long anchorPk, lon
 
   private static final int DECODED_BYTES = 2 + 2 * Long.BYTES;
 
-  private static final int ENCODED_CHARS = 24;
+  static final int ENCODED_CHARS = 24;
 
   public DependencyCursor {
     Objects.requireNonNull(direction, "direction");

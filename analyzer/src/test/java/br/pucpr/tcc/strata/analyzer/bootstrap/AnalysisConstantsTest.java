@@ -67,6 +67,7 @@ final class AnalysisConstantsTest {
             Map.ofEntries(
                 Map.entry("DEPENDENCY_PAGE_DEFAULT", 500),
                 Map.entry("DEPENDENCY_PAGE_MAX", 2_000),
+                Map.entry("DEPENDENCY_PAGE_MAX_BYTES", 4_194_304),
                 Map.entry("DEPENDENCY_EVIDENCE_RESULTS_MAX", 50),
                 Map.entry("ELEMENT_METHODS_MAX", 1_000),
                 Map.entry("DEPENDENCY_EVIDENCE_CAP", 20)));

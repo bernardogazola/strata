@@ -19,6 +19,7 @@ import br.pucpr.tcc.strata.analyzer.protocol.JsonLines;
 import br.pucpr.tcc.strata.analyzer.repository.HermeticSystemReader;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.SourceFileStatus;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -1247,13 +1248,15 @@ final class ElementReadsSpikeIT {
           .computeIfAbsent(DependencyType.valueOf(key.type()).ordinal(), t -> new ArrayList<>())
           .add(key);
     }
-    final Comparator<String> methodOrder =
+    final Comparator<String> nullFirst =
         Comparator.nullsFirst(ElementReadsSpikeIT::compareCodePoints);
     final Comparator<EvidenceKey> content =
         Comparator.comparing(
                 EvidenceKey::line, Comparator.nullsLast(Comparator.<Integer>naturalOrder()))
-            .thenComparing(EvidenceKey::fromMethod, methodOrder)
-            .thenComparing(EvidenceKey::toMethod, methodOrder);
+            .thenComparing(EvidenceKey::fromMethod, nullFirst)
+            .thenComparing(EvidenceKey::toMethod, nullFirst)
+            .thenComparingInt(key -> ResolutionQuality.valueOf(key.resolution()).ordinal())
+            .thenComparing(EvidenceKey::filePath, nullFirst);
     byType.values().forEach(keys -> keys.sort(content));
     final Map<Integer, Integer> taken = new TreeMap<>();
     byType.keySet().forEach(type -> taken.put(type, 0));
@@ -2136,7 +2139,17 @@ final class ElementReadsSpikeIT {
       String resolution) {
 
     String content() {
-      return type + "\t" + line + "\t" + fromMethod + "\t" + toMethod;
+      return type
+          + "\t"
+          + line
+          + "\t"
+          + fromMethod
+          + "\t"
+          + toMethod
+          + "\t"
+          + resolution
+          + "\t"
+          + filePath;
     }
   }
 

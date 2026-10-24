@@ -18,10 +18,8 @@ public final class DependencyPageDao {
       """
       SELECT o.id AS other_pk, o.element_id AS other_id, o.qualified_name AS other_name,
              o.is_external AS other_external, p.element_id AS package_id,
-             p.qualified_name AS package_name, a.element_id AS anchor_id, d.type, d.resolution,
-             d.occurrences, d.ambiguous
+             p.qualified_name AS package_name, d.type, d.resolution, d.occurrences, d.ambiguous
         FROM dependency d
-        JOIN code_element a ON a.id = d.target_pk
         JOIN code_element o ON o.id = d.source_pk
         LEFT JOIN code_element p ON p.id = o.parent_pk
        WHERE d.target_pk = ? AND d.source_pk <> d.target_pk""";
@@ -30,10 +28,8 @@ public final class DependencyPageDao {
       """
       SELECT o.id AS other_pk, o.element_id AS other_id, o.qualified_name AS other_name,
              o.is_external AS other_external, p.element_id AS package_id,
-             p.qualified_name AS package_name, a.element_id AS anchor_id, d.type, d.resolution,
-             d.occurrences, d.ambiguous
+             p.qualified_name AS package_name, d.type, d.resolution, d.occurrences, d.ambiguous
         FROM dependency d
-        JOIN code_element a ON a.id = d.source_pk
         JOIN code_element o ON o.id = d.target_pk
         LEFT JOIN code_element p ON p.id = o.parent_pk
        WHERE d.source_pk = ? AND d.target_pk <> d.source_pk""";
@@ -58,12 +54,15 @@ public final class DependencyPageDao {
         JOIN code_element o ON o.id = pe.target_pk
        WHERE pe.source_pk = ?""";
 
-  private static final String TYPE_TOTALS =
+  private static final String TYPE_INBOUND_COUNT =
       """
-      SELECT (SELECT count(DISTINCT d.source_pk)
-                FROM dependency d
-               WHERE d.target_pk = ?2 AND d.source_pk <> ?2) AS inbound,
-             (SELECT count(DISTINCT d.target_pk)
+      SELECT count(DISTINCT d.source_pk)
+        FROM dependency d
+       WHERE d.target_pk = ?1 AND d.source_pk <> ?1""";
+
+  private static final String TYPE_OUTBOUND_COUNTS =
+      """
+      SELECT (SELECT count(DISTINCT d.target_pk)
                 FROM dependency d
                 JOIN code_element t ON t.id = d.target_pk
                WHERE d.source_pk = ?2 AND d.target_pk <> ?2 AND t.is_external = 0) AS outbound,
@@ -73,21 +72,24 @@ public final class DependencyPageDao {
                WHERE d.analysis_pk = ?1 AND d.source_pk = ?2 AND t.is_external = 1)
                AS outbound_external""";
 
-  private static final String PACKAGE_TOTALS =
-      """
-      SELECT (SELECT count(*) FROM package_edge WHERE target_pk = ?1) AS inbound,
-             (SELECT count(*) FROM package_edge WHERE source_pk = ?1) AS outbound""";
+  private static final String PACKAGE_INBOUND_COUNT =
+      "SELECT count(*) FROM package_edge WHERE target_pk = ?";
+
+  private static final String PACKAGE_OUTBOUND_COUNT =
+      "SELECT count(*) FROM package_edge WHERE source_pk = ?";
 
   private DependencyPageDao() {}
 
-  public static List<TypeDependencyRow> inbound(Connection connection, long analysisPk, long typePk)
+  public static List<TypeDependencyRow> inbound(
+      Connection connection, long analysisPk, long typePk, CodeElementId typeId)
       throws SQLException {
-    return typeRows(connection, INBOUND, typePk, true);
+    return typeRows(connection, INBOUND, typePk, typeId, true);
   }
 
   public static List<TypeDependencyRow> outbound(
-      Connection connection, long analysisPk, long typePk) throws SQLException {
-    return typeRows(connection, OUTBOUND, typePk, false);
+      Connection connection, long analysisPk, long typePk, CodeElementId typeId)
+      throws SQLException {
+    return typeRows(connection, OUTBOUND, typePk, typeId, false);
   }
 
   public static List<PackageDependencyRow> packageInbound(
@@ -100,39 +102,59 @@ public final class DependencyPageDao {
     return packageRows(connection, PACKAGE_OUTBOUND, packagePk);
   }
 
-  public static DependencyTotalsRow typeTotals(Connection connection, long analysisPk, long typePk)
+  public static int typeInboundCount(Connection connection, long analysisPk, long typePk)
       throws SQLException {
-    try (PreparedStatement statement = connection.prepareStatement(TYPE_TOTALS)) {
-      statement.setLong(1, analysisPk);
-      statement.setLong(2, typePk);
+    try (PreparedStatement statement = connection.prepareStatement(TYPE_INBOUND_COUNT)) {
+      statement.setLong(1, typePk);
       try (ResultSet rows = statement.executeQuery()) {
         rows.next();
-        return new DependencyTotalsRow(
-            rows.getInt("inbound"), rows.getInt("outbound"), rows.getInt("outbound_external"));
+        return rows.getInt(1);
       }
     }
   }
 
-  public static DependencyTotalsRow packageTotals(
-      Connection connection, long analysisPk, long packagePk) throws SQLException {
-    try (PreparedStatement statement = connection.prepareStatement(PACKAGE_TOTALS)) {
+  public static OutboundCountsRow typeOutboundCounts(
+      Connection connection, long analysisPk, long typePk) throws SQLException {
+    try (PreparedStatement statement = connection.prepareStatement(TYPE_OUTBOUND_COUNTS)) {
+      statement.setLong(1, analysisPk);
+      statement.setLong(2, typePk);
+      try (ResultSet rows = statement.executeQuery()) {
+        rows.next();
+        return new OutboundCountsRow(rows.getInt("outbound"), rows.getInt("outbound_external"));
+      }
+    }
+  }
+
+  public static int packageInboundCount(Connection connection, long analysisPk, long packagePk)
+      throws SQLException {
+    return packageCount(connection, PACKAGE_INBOUND_COUNT, packagePk);
+  }
+
+  public static int packageOutboundCount(Connection connection, long analysisPk, long packagePk)
+      throws SQLException {
+    return packageCount(connection, PACKAGE_OUTBOUND_COUNT, packagePk);
+  }
+
+  private static int packageCount(Connection connection, String sql, long packagePk)
+      throws SQLException {
+    try (PreparedStatement statement = connection.prepareStatement(sql)) {
       statement.setLong(1, packagePk);
       try (ResultSet rows = statement.executeQuery()) {
         rows.next();
-        return new DependencyTotalsRow(rows.getInt("inbound"), rows.getInt("outbound"), null);
+        return rows.getInt(1);
       }
     }
   }
 
   private static List<TypeDependencyRow> typeRows(
-      Connection connection, String sql, long typePk, boolean inbound) throws SQLException {
+      Connection connection, String sql, long typePk, CodeElementId anchor, boolean inbound)
+      throws SQLException {
     final List<TypeDependencyRow> dependencies = new ArrayList<>();
     try (PreparedStatement statement = connection.prepareStatement(sql)) {
       statement.setLong(1, typePk);
       try (ResultSet rows = statement.executeQuery()) {
         while (rows.next()) {
           final DependencyEndRow other = otherEnd(rows, rows.getInt("other_external") == 1);
-          final CodeElementId anchor = new CodeElementId(rows.getString("anchor_id"));
           final Dependency dependency =
               new Dependency(
                   inbound ? other.elementId() : anchor,

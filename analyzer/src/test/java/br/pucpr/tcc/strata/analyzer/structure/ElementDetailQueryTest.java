@@ -417,6 +417,39 @@ final class ElementDetailQueryTest {
   }
 
   @Test
+  void osEmpatesExatosSobemAUmaCasa() {
+    assertThat(ElementDetailQuery.ccMean(1, 20)).isEqualTo(0.1);
+    assertThat(ElementDetailQuery.ccMean(13, 20)).isEqualTo(0.7);
+    assertThat(ElementDetailQuery.ccMean(47, 20)).isEqualTo(2.4);
+  }
+
+  @Test
+  void aMediaNuncaPassaPorUmDoubleNemComContagensAcimaDeDoisElevadoACinquentaETres() {
+    final long escala = 1L << 53;
+
+    assertThat(ElementDetailQuery.ccMean(23 * escala - 1, 20 * escala)).isEqualTo(1.1);
+    assertThat(ElementDetailQuery.ccMean(3 * escala - 1, 20 * escala)).isEqualTo(0.1);
+    assertThat(ElementDetailQuery.ccMean(47 * escala - 1, 20 * escala)).isEqualTo(2.3);
+  }
+
+  @Test
+  void oP90EhAColunaDoP90ENuncaOMaximo() throws Exception {
+    final SyntheticAnalysis a = cache.analysis("an_p90");
+    final long pacote = a.addPackage("app", NodeValues.PLAIN);
+    final long arquivo = a.addSourceFile("src/app/Pico.java");
+    a.addType(
+        pacote,
+        "Pico",
+        new Declaration(TypeKind.CLASS, "", false, arquivo, 1, 40),
+        new Metrics(20, 5, 15, 9, 4),
+        grafo(0, 0, 0.5, null, ResolutionMix.NONE));
+    final long analise = a.write().pk();
+
+    assertThat(descreve(analise, "type:app.Pico").metrics())
+        .isEqualTo(new ElementMetrics(20, 5, 15, 9, 3.0, 4));
+  }
+
+  @Test
   void umaContagemNegativaERecusada() {
     assertThatThrownBy(() -> ElementDetailQuery.ccMean(-1, 1))
         .isInstanceOf(IllegalArgumentException.class);

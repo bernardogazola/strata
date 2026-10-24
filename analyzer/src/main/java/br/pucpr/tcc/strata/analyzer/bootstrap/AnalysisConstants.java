@@ -144,6 +144,8 @@ public final class AnalysisConstants {
 
   public static final int DEPENDENCY_PAGE_MAX = 2_000;
 
+  public static final int DEPENDENCY_PAGE_MAX_BYTES = 4_194_304;
+
   public static final int DEPENDENCY_EVIDENCE_RESULTS_MAX = 50;
 
   public static final int ELEMENT_METHODS_MAX = 1_000;

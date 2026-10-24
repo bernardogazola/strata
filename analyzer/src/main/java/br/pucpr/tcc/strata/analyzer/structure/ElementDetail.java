@@ -40,7 +40,7 @@ public record ElementDetail(
         || (kind == ElementKind.PACKAGE) != (metrics.ccP90() == null)) {
       throw new IllegalArgumentException("um campo que não cabe no tipo de elemento: " + elementId);
     }
-    if (label.codePointCount(0, label.length()) > AnalysisConstants.MAX_LABEL_CHARS) {
+    if (NodeLabels.exceedsCeiling(label)) {
       throw new IllegalArgumentException("um rótulo acima do teto: " + elementId);
     }
     if (modifiers.stream().anyMatch(String::isEmpty)) {

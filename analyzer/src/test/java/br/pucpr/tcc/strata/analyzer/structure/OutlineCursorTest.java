@@ -273,6 +273,17 @@ final class OutlineCursorTest {
     assertCursorDesconhecido(outline, "type:p.a.Order", cursorDe("method:p.a.Order#total()"));
   }
 
+  @Test
+  void oCursorDaUltimaLinhaEhDesconhecido() throws Exception {
+    assertCursorDesconhecido(outline, null, cursorDe("pkg:p." + Z_MATEMATICO));
+    assertCursorDesconhecido(outline, "pkg:kilo", cursorDe("type:kilo.K0999"));
+    assertCursorDesconhecido(outline, "pkg:long", cursorDe("type:long.C"));
+    assertThat(pagina(outline, null, cursorDe("pkg:p." + Z_LARGO), MEIO_MILHAR))
+        .isEqualTo(new OutlinePage(List.of(pacote("p." + Z_MATEMATICO, 1)), null));
+    assertThat(pagina(outline, "pkg:kilo", cursorDe("type:kilo.K0998"), MEIO_MILHAR))
+        .isEqualTo(new OutlinePage(List.of(tipoDe("kilo", "K0999", "K0999")), null));
+  }
+
   private void assertCursorDesconhecido(long analise, String pai, OutlineCursor cursor) {
     assertThatThrownBy(() -> pagina(analise, pai, cursor, MEIO_MILHAR))
         .as("o cursor %s sob %s", cursor, pai)

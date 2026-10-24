@@ -78,8 +78,8 @@ public final class ElementDetailDao {
                 packageId == null ? null : new CodeElementId(packageId),
                 rows.getString("package_name"),
                 rows.getString("relative_path"),
-                nullableInt(rows, "start_line"),
-                nullableInt(rows, "end_line")));
+                Columns.nullableInt(rows, "start_line"),
+                Columns.nullableInt(rows, "end_line")));
       }
     }
   }
@@ -118,9 +118,9 @@ public final class ElementDetailDao {
           methods.add(
               new ElementMethodRow(
                   new CodeElementId(rows.getString("element_id")),
-                  nullableInt(rows, "cc_sum"),
-                  nullableInt(rows, "start_line"),
-                  nullableInt(rows, "end_line")));
+                  Columns.nullableInt(rows, "cc_sum"),
+                  Columns.nullableInt(rows, "start_line"),
+                  Columns.nullableInt(rows, "end_line")));
         }
       }
     }
@@ -137,10 +137,5 @@ public final class ElementDetailDao {
         return rows.getInt(1);
       }
     }
-  }
-
-  private static Integer nullableInt(ResultSet rows, String column) throws SQLException {
-    final int value = rows.getInt(column);
-    return rows.wasNull() ? null : value;
   }
 }

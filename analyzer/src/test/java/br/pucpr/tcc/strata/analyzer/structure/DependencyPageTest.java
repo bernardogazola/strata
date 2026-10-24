@@ -772,25 +772,10 @@ final class DependencyPageTest {
 
   @Test
   void naoHaTetoDeAlcanceTodaLinhaChegaPeloCursor() throws Exception {
-    final SyntheticAnalysis a = cache.analysis("an_muitos");
-    final long pacote = a.addPackage("app.muitos", NodeValues.PLAIN);
-    final Map<String, Long> pks = new HashMap<>();
-    final List<String> dependentes = new ArrayList<>();
-    for (int i = 2_499; i >= 0; i--) {
-      final String nome = "T%04d".formatted(i);
-      pks.put("type:app.muitos." + nome, a.addType(pacote, nome, NodeValues.PLAIN));
-    }
-    for (int i = 0; i < 2_500; i++) {
-      dependentes.add("type:app.muitos.T%04d".formatted(i));
-    }
-    final long centro =
-        a.addType(pacote, "Centro", new NodeValues(1, 2_500, 0, 0.5, ResolutionMix.NONE));
-    pks.put("type:app.muitos.Centro", centro);
-    for (final String id : dependentes) {
-      a.addDependency(pks.get(id), centro, IMPORTS, RESOLVED, 1);
-    }
-    final Mundo mundo = new Mundo(a.write().pk(), Map.copyOf(pks));
-    final String id = "type:app.muitos.Centro";
+    final Mundo mundo = mundoMuitos();
+    final long centro = mundo.de(CENTRO);
+    final List<String> dependentes = dependentesDoCentro();
+    final String id = CENTRO;
 
     final DependencyPage padrao =
         pagina(mundo.pk(), id, IN, null, AnalysisConstants.DEPENDENCY_PAGE_DEFAULT);
@@ -802,6 +787,63 @@ final class DependencyPageTest {
         .isEqualTo(new DependencyCursor(IN, centro, mundo.de("type:app.muitos.T0499")));
     assertThat(padrao.totals()).isEqualTo(new DependencyTotals(2_500, 0, 0));
     assertThat(todas).extracting(entrada -> entrada.elementId().value()).isEqualTo(dependentes);
+  }
+
+  private static final String CENTRO = "type:app.muitos.Centro";
+
+  private static List<String> dependentesDoCentro() {
+    final List<String> dependentes = new ArrayList<>();
+    for (int i = 0; i < 2_500; i++) {
+      dependentes.add("type:app.muitos.T%04d".formatted(i));
+    }
+    return dependentes;
+  }
+
+  private Mundo mundoMuitos() throws SQLException {
+    final SyntheticAnalysis a = cache.analysis("an_muitos");
+    final long pacote = a.addPackage("app.muitos", NodeValues.PLAIN);
+    final Map<String, Long> pks = new HashMap<>();
+    for (int i = 2_499; i >= 0; i--) {
+      final String nome = "T%04d".formatted(i);
+      pks.put("type:app.muitos." + nome, a.addType(pacote, nome, NodeValues.PLAIN));
+    }
+    final long centro =
+        a.addType(pacote, "Centro", new NodeValues(1, 2_500, 0, 0.5, ResolutionMix.NONE));
+    pks.put(CENTRO, centro);
+    for (final String id : dependentesDoCentro()) {
+      a.addDependency(pks.get(id), centro, IMPORTS, RESOLVED, 1);
+    }
+    return new Mundo(a.write().pk(), Map.copyOf(pks));
+  }
+
+  @Test
+  void oTamanhoDaPaginaEhQuinhentosNoPadraoEDoisMilNoMaximo() {
+    assertThat(DependencyPageQuery.pageSize(null)).isEqualTo(500);
+    assertThat(DependencyPageQuery.pageSize(5_000)).isEqualTo(2_000);
+    assertThat(DependencyPageQuery.pageSize(2_001)).isEqualTo(2_000);
+    assertThat(DependencyPageQuery.pageSize(Integer.MAX_VALUE)).isEqualTo(2_000);
+    assertThat(DependencyPageQuery.pageSize(2_000)).isEqualTo(2_000);
+    assertThat(DependencyPageQuery.pageSize(1)).isEqualTo(1);
+    for (final int abaixo : new int[] {0, -1, Integer.MIN_VALUE}) {
+      assertRefused(() -> DependencyPageQuery.pageSize(abaixo), Reason.LIMIT_NOT_POSITIVE);
+    }
+  }
+
+  @Test
+  void oLimitePedidoChegaAPaginaCortadoEmDoisMil() throws Exception {
+    final Mundo mundo = mundoMuitos();
+    final Map<Integer, Integer> esperado = new HashMap<>();
+    esperado.put(null, 500);
+    esperado.put(5_000, 2_000);
+    esperado.put(2_001, 2_000);
+    esperado.put(1_999, 1_999);
+
+    for (final Map.Entry<Integer, Integer> caso : esperado.entrySet()) {
+      final DependencyPage page =
+          pagina(mundo.pk(), CENTRO, IN, null, DependencyPageQuery.pageSize(caso.getKey()));
+      assertThat(page.items()).as("limit %s", caso.getKey()).hasSize(caso.getValue());
+      assertThat(page.next()).as("limit %s", caso.getKey()).isNotNull();
+    }
   }
 
   @Test
@@ -857,6 +899,31 @@ final class DependencyPageTest {
             pagina(
                 mundo.pk(), CORE, IN, new DependencyCursor(IN, mundo.de(CORE), mundo.de(ALVO)), 3),
         Reason.CURSOR_UNKNOWN);
+  }
+
+  @Test
+  void umCursorDaUltimaLinhaERecusado() throws Exception {
+    final Mundo mundo = mundoDep("an_dep");
+    final long alvo = mundo.de(ALVO);
+
+    assertRefused(
+        () -> pagina(mundo.pk(), ALVO, IN, new DependencyCursor(IN, alvo, mundo.de(ETA)), 3),
+        Reason.CURSOR_UNKNOWN);
+    assertRefused(
+        () ->
+            pagina(mundo.pk(), ALVO, OUT, new DependencyCursor(OUT, alvo, mundo.de(EXT_LONGO)), 3),
+        Reason.CURSOR_UNKNOWN);
+    assertRefused(
+        () ->
+            pagina(
+                mundo.pk(),
+                CORE,
+                IN,
+                new DependencyCursor(IN, mundo.de(CORE), mundo.de(UTIL_PKG)),
+                3),
+        Reason.CURSOR_UNKNOWN);
+    assertThat(pagina(mundo.pk(), ALVO, IN, new DependencyCursor(IN, alvo, mundo.de(EPSILON)), 3))
+        .isEqualTo(new DependencyPage(inDeAlvo().subList(7, 8), null, TOTAIS_DE_ALVO));
   }
 
   @Test

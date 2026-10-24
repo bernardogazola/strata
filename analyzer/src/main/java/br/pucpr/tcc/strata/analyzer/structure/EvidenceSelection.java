@@ -1,5 +1,6 @@
 package br.pucpr.tcc.strata.analyzer.structure;
 
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -14,11 +15,16 @@ public final class EvidenceSelection {
   private static final Comparator<MethodRef> BY_METHOD_ID =
       Comparator.nullsFirst(Comparator.comparing(MethodRef::elementId));
 
+  private static final Comparator<String> BY_FILE_PATH =
+      Comparator.nullsFirst(CodeElementId::compareCodePoints);
+
   private static final Comparator<RelationshipEvidence> BY_CONTENT =
       Comparator.comparing(
               RelationshipEvidence::line, Comparator.nullsLast(Comparator.<Integer>naturalOrder()))
           .thenComparing(RelationshipEvidence::fromMethod, BY_METHOD_ID)
-          .thenComparing(RelationshipEvidence::toMethod, BY_METHOD_ID);
+          .thenComparing(RelationshipEvidence::toMethod, BY_METHOD_ID)
+          .thenComparing(RelationshipEvidence::resolution)
+          .thenComparing(RelationshipEvidence::filePath, BY_FILE_PATH);
 
   private EvidenceSelection() {}
 

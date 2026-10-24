@@ -51,7 +51,9 @@ public final class ElementDetailQuery {
     final boolean type = row.kind() == ElementKind.TYPE;
     final List<MethodSummary> methods = type ? methods(connection, analysisPk, row) : List.of();
     final int methodTotal =
-        type ? ElementDetailDao.methodCount(connection, analysisPk, row.pk()) : 0;
+        methods.size() < AnalysisConstants.ELEMENT_METHODS_MAX
+            ? methods.size()
+            : ElementDetailDao.methodCount(connection, analysisPk, row.pk());
     return new ElementDetail(
         row.elementId(),
         row.kind(),

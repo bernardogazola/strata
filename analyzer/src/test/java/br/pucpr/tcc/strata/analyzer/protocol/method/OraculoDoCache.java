@@ -4,6 +4,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.DependencyAggregator;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -479,7 +480,9 @@ final class OraculoDoCache {
                             DependencyType.valueOf(doPar.get(v.dependencyPk()).type()).ordinal())
                     .thenComparing(v -> v.line() == null ? Integer.MAX_VALUE : v.line())
                     .thenComparing(v -> idDoMetodo(v.fromMethodPk()), OraculoDoCache::nuloPrimeiro)
-                    .thenComparing(v -> idDoMetodo(v.toMethodPk()), OraculoDoCache::nuloPrimeiro))
+                    .thenComparing(v -> idDoMetodo(v.toMethodPk()), OraculoDoCache::nuloPrimeiro)
+                    .thenComparingInt(v -> ResolutionQuality.valueOf(v.resolution()).ordinal())
+                    .thenComparing(Evidencia::filePath, OraculoDoCache::nuloPrimeiro))
             .toList();
     final ArrayNode lista = JSON.createArrayNode();
     for (final Evidencia v : doParOrdenadas) {

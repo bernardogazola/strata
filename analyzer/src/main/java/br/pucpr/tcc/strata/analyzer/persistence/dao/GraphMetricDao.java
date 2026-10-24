@@ -96,17 +96,17 @@ public final class GraphMetricDao {
         ElementKind.valueOf(rows.getString("granularity")),
         rows.getInt("fan_in"),
         rows.getInt("fan_out"),
-        nullableInt(rows, "fan_in_resolved"),
-        nullableInt(rows, "fan_out_resolved"),
-        nullableInt(rows, "fan_out_external"),
-        nullableInt(rows, "external_fan_in"),
+        Columns.nullableInt(rows, "fan_in_resolved"),
+        Columns.nullableInt(rows, "fan_out_resolved"),
+        Columns.nullableInt(rows, "fan_out_external"),
+        Columns.nullableInt(rows, "external_fan_in"),
         rows.getDouble("pagerank"),
         rows.getDouble("pagerank_out"),
-        nullableInt(rows, "scc_id"),
-        nullableInt(rows, "scc_size"),
-        nullableInt(rows, "bridge_span"),
-        nullableInt(rows, "component_id"),
-        nullableInt(rows, "internal_cohesion"),
+        Columns.nullableInt(rows, "scc_id"),
+        Columns.nullableInt(rows, "scc_size"),
+        Columns.nullableInt(rows, "bridge_span"),
+        Columns.nullableInt(rows, "component_id"),
+        Columns.nullableInt(rows, "internal_cohesion"),
         nullableDouble(rows, "betweenness"),
         rows.getLong("resolved_occurrences"),
         rows.getLong("inferred_occurrences"),
@@ -120,11 +120,6 @@ public final class GraphMetricDao {
     } else {
       statement.setDouble(index, value);
     }
-  }
-
-  private static Integer nullableInt(ResultSet rows, String column) throws SQLException {
-    final int value = rows.getInt(column);
-    return rows.wasNull() ? null : value;
   }
 
   private static Double nullableDouble(ResultSet rows, String column) throws SQLException {

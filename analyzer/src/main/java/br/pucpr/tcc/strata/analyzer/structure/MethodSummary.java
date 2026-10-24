@@ -1,6 +1,5 @@
 package br.pucpr.tcc.strata.analyzer.structure;
 
-import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.SourceLines;
@@ -15,7 +14,7 @@ public record MethodSummary(
     if (elementId.kind() != ElementKind.METHOD) {
       throw new IllegalArgumentException("não é um método: " + elementId);
     }
-    if (signature.codePointCount(0, signature.length()) > AnalysisConstants.MAX_LABEL_CHARS) {
+    if (NodeLabels.exceedsCeiling(signature)) {
       throw new IllegalArgumentException("uma assinatura acima do teto: " + elementId);
     }
     if (cc != null && cc < 1) {

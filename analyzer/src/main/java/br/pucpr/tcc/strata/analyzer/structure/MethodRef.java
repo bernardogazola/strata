@@ -1,6 +1,5 @@
 package br.pucpr.tcc.strata.analyzer.structure;
 
-import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
 import java.util.Objects;
@@ -16,12 +15,8 @@ public record MethodRef(
     if (elementId.kind() != ElementKind.METHOD || ownerId.kind() != ElementKind.TYPE) {
       throw new IllegalArgumentException("um método de um tipo: " + elementId + " de " + ownerId);
     }
-    if (exceedsLabel(signature) || exceedsLabel(ownerLabel)) {
+    if (NodeLabels.exceedsCeiling(signature) || NodeLabels.exceedsCeiling(ownerLabel)) {
       throw new IllegalArgumentException("um texto acima do teto: " + elementId);
     }
-  }
-
-  private static boolean exceedsLabel(String text) {
-    return text.codePointCount(0, text.length()) > AnalysisConstants.MAX_LABEL_CHARS;
   }
 }

@@ -67,7 +67,7 @@ public final class EdgeEvidenceDao {
                   DependencyType.valueOf(rows.getString("type")),
                   ResolutionQuality.valueOf(rows.getString("resolution")),
                   rows.getString("relative_path"),
-                  nullableInt(rows, "line"),
+                  Columns.nullableInt(rows, "line"),
                   method(rows, FROM),
                   method(rows, TO)));
         }
@@ -95,10 +95,5 @@ public final class EdgeEvidenceDao {
         rows.getString(prefix + "_owner_simple"),
         rows.getString(prefix + "_owner_name"),
         rows.getString(prefix + "_owner_package"));
-  }
-
-  private static Integer nullableInt(ResultSet rows, String column) throws SQLException {
-    final int value = rows.getInt(column);
-    return rows.wasNull() ? null : value;
   }
 }

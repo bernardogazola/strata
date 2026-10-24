@@ -77,15 +77,10 @@ public final class ModuleDependencyDao {
                   rows.getString("required_name"),
                   rows.getInt("is_transitive") == 1,
                   rows.getInt("is_static") == 1,
-                  nullableInt(rows, "line")));
+                  Columns.nullableInt(rows, "line")));
         }
       }
     }
     return List.copyOf(modules);
-  }
-
-  private static Integer nullableInt(ResultSet rows, String column) throws SQLException {
-    final int value = rows.getInt(column);
-    return rows.wasNull() ? null : value;
   }
 }

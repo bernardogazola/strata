@@ -50,10 +50,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -959,6 +961,9 @@ final class StructureReadsTest {
         "Kind, que não está na entrada",
         cursor(0, ancora, pk.get("type:br.pucpr.legacy.core.Kind")));
     estranhos.put("uma chave que não existe", cursor(0, ancora, 999_999_999L));
+    estranhos.put(
+        "Catalog, a última linha da entrada, que o Java nunca cunha",
+        cursor(0, ancora, pk.get("type:br.pucpr.legacy.core.Catalog")));
     for (final Map.Entry<String, String> estranho : estranhos.entrySet()) {
       final JsonNode recusa = pagina(analise, catalogEntry, "IN", estranho.getValue(), 1);
       assertThat(recusa.path("error"))
@@ -973,6 +978,117 @@ final class StructureReadsTest {
                                   "o cursor não aponta para uma linha desta listagem"))))
                   .path("error"));
     }
+  }
+
+  private static final int DEPENDENTES = 2_001;
+
+  private static final int OCORRENCIAS = 25;
+
+  private Path repositorioDosTetos() throws Exception {
+    final Path repositorio = repositorios.toRealPath().resolve("tetos");
+    try (var git = TestRepositories.init(repositorio)) {
+      TestRepositories.write(
+          repositorio, "src/main/java/app/Centro.java", "package app;\n\npublic class Centro {}\n");
+      final StringBuilder muitos = new StringBuilder("package app;\n\npublic class Muitos {\n");
+      for (int i = 0; i < DEPENDENTES; i++) {
+        muitos.append("  static class N%04d {\n    Centro c;\n  }\n".formatted(i));
+      }
+      TestRepositories.write(repositorio, "src/main/java/app/Muitos.java", muitos + "}\n");
+      TestRepositories.write(
+          repositorio,
+          "src/main/java/app/Alvo.java",
+          "package app;\n\npublic class Alvo {\n  public void m() {}\n}\n");
+      final StringBuilder fonte = new StringBuilder("package app;\n\npublic class Fonte {\n");
+      final StringBuilder chamadas = new StringBuilder("  void chama() {\n");
+      for (int i = 0; i < OCORRENCIAS; i++) {
+        fonte.append("  Alvo a%02d;\n".formatted(i));
+        fonte.append("  void p%02d(Alvo x) {}\n".formatted(i));
+        chamadas.append("    a%02d.m();\n".formatted(i));
+      }
+      fonte.append(chamadas).append("  }\n}\n");
+      TestRepositories.write(repositorio, "src/main/java/app/Fonte.java", fonte.toString());
+      TestRepositories.commitAll(git, "tetos\n");
+    }
+    return repositorio;
+  }
+
+  private static JsonNode limiteAbaixoDeUm(String metodo) throws IOException {
+    return JSON.readTree(
+            bytes(
+                Envelope.error(
+                    "x", ErrorCodes.invalidPayload(metodo, "limit deve ser pelo menos 1"))))
+        .path("error");
+  }
+
+  private JsonNode paginaSemLimite(String analise, String elemento, String sentido, String cursor)
+      throws IOException {
+    final ObjectNode payload =
+        comAnalise(analise, "{}")
+            .put("cursor", cursor)
+            .put("direction", sentido)
+            .put("elementId", elemento);
+    final JsonNode resposta = JSON.readTree(despachar(novoId(), "element.dependencies", payload));
+    assertThat(resposta.path("ok").asBoolean()).as(resposta.toString()).isTrue();
+    return resposta.path("payload");
+  }
+
+  private JsonNode evidencia(String analise, String origem, String destino, Integer limite)
+      throws IOException {
+    final ObjectNode payload =
+        comAnalise(analise, "{}").put("source", origem).put("target", destino);
+    if (limite != null) {
+      payload.put("limit", limite);
+    }
+    return JSON.readTree(despachar(novoId(), "element.dependencyEvidence", payload));
+  }
+
+  @Test
+  void osTetosDaPaginaDeDependenciasValemPeloFio() throws Exception {
+    montar(planoComGrafo());
+    final String analise = comecar(repositorioDosTetos());
+    assertThat(quadros.terminal(analise)).isEqualTo("analysis.completed");
+    final String centro = "type:app.Centro";
+
+    final JsonNode padrao = paginaSemLimite(analise, centro, "IN", null);
+    assertThat(padrao.path("items")).hasSize(500);
+    assertThat(padrao.path("nextCursor").isTextual()).isTrue();
+    assertThat(padrao.path("totals").path("in").asInt()).isEqualTo(DEPENDENTES);
+    assertThat(paginaServida(analise, centro, "IN", null, 5_000).path("items")).hasSize(2_000);
+    assertThat(paginaServida(analise, centro, "IN", null, 2_001).path("items")).hasSize(2_000);
+    assertThat(pagina(analise, centro, "IN", null, 0).path("error"))
+        .isEqualTo(limiteAbaixoDeUm("element.dependencies"));
+
+    final List<Integer> tamanhos = new ArrayList<>();
+    final Set<String> vistas = new HashSet<>();
+    String cursor = null;
+    do {
+      final JsonNode pagina = paginaSemLimite(analise, centro, "IN", cursor);
+      tamanhos.add(pagina.path("items").size());
+      pagina.path("items").forEach(item -> vistas.add(item.path("elementId").asText()));
+      assertThat(pagina.path("totals")).isEqualTo(padrao.path("totals"));
+      cursor = pagina.path("nextCursor").isNull() ? null : pagina.path("nextCursor").asText();
+    } while (cursor != null && tamanhos.size() < 10);
+    assertThat(tamanhos).containsExactly(500, 500, 500, 500, 1);
+    assertThat(vistas).hasSize(DEPENDENTES);
+  }
+
+  @Test
+  void oTetoDaEvidenciaValePeloFio() throws Exception {
+    montar(planoComGrafo());
+    final String analise = comecar(repositorioDosTetos());
+    assertThat(quadros.terminal(analise)).isEqualTo("analysis.completed");
+
+    final JsonNode semLimite = evidencia(analise, "type:app.Fonte", "type:app.Alvo", null);
+    final JsonNode cinquentaEUm = evidencia(analise, "type:app.Fonte", "type:app.Alvo", 51);
+    final JsonNode zero = evidencia(analise, "type:app.Fonte", "type:app.Alvo", 0);
+
+    assertThat(semLimite.path("ok").asBoolean()).as(semLimite.toString()).isTrue();
+    assertThat(semLimite.path("payload").path("evidence")).hasSize(50);
+    final Set<String> tipos = new TreeSet<>();
+    semLimite.path("payload").path("evidence").forEach(e -> tipos.add(e.path("type").asText()));
+    assertThat(tipos).containsExactly("CALLS", "FIELD_TYPE", "PARAMETER_TYPE");
+    assertThat(cinquentaEUm.path("payload")).isEqualTo(semLimite.path("payload"));
+    assertThat(zero.path("error")).isEqualTo(limiteAbaixoDeUm("element.dependencyEvidence"));
   }
 
   private static String cursor(int sentido, long ancora, long ultima) {
