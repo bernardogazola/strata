@@ -1,14 +1,21 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { DependencyDirection } from "@/protocol/enums";
 import { type ProtocolError, protocolErrorSchema } from "@/protocol/errors";
 import {
+  type DependencyPage,
+  dependencyEvidenceResultSchema,
+  dependencyPageSchema,
+  type ElementDetail,
+  elementDetailSchema,
   type GraphNode,
   type GraphSlice,
   graphSliceSchema,
   type OutlineNode,
   type OutlinePage,
   outlinePageSchema,
+  type RelationshipEvidence,
   type SearchHit,
   searchResultSchema,
 } from "@/protocol/graph";
@@ -22,7 +29,9 @@ const FIXTURES_DIR = path.resolve(
 const JSONL_SUFFIX = ".jsonl";
 
 interface Frame {
+  readonly error?: unknown;
   readonly kind?: unknown;
+  readonly method?: unknown;
   readonly ok?: unknown;
   readonly payload?: unknown;
 }
@@ -32,14 +41,14 @@ interface Transcript {
   readonly result: unknown;
 }
 
-const readTranscript = (stem: string): Transcript | undefined => {
-  const frames = readFileSync(
-    path.join(FIXTURES_DIR, `${stem}${JSONL_SUFFIX}`),
-    "utf8"
-  )
+const readFrames = (stem: string): Frame[] =>
+  readFileSync(path.join(FIXTURES_DIR, `${stem}${JSONL_SUFFIX}`), "utf8")
     .split("\n")
     .filter((line) => line.trim() !== "")
     .map((line) => JSON.parse(line) as Frame);
+
+const readTranscript = (stem: string): Transcript | undefined => {
+  const frames = readFrames(stem);
   const request = frames.find((frame) => frame.kind === "request");
   const response = frames.find(
     (frame) => frame.kind === "response" && frame.ok === true
@@ -110,34 +119,53 @@ export const TYPE_IDS: readonly string[] = TYPE_SLICE.nodes.map(
 
 const SLICE_STEM = /^graph\.slice\./;
 const OUTLINE_STEM = /^outline\.children\./;
+const DESCRIBE_STEM = /^element\.describe\./;
+const DEPENDENCIES_STEM = /^element\.dependencies\./;
+const EVIDENCE_STEM = /^element\.dependencyEvidence\./;
+const ELEMENT_STEM = /^element\./;
 
-const worldTranscripts = (topic: RegExp): Transcript[] =>
+const stemsOf = (topic: RegExp): string[] =>
   readdirSync(FIXTURES_DIR)
     .filter((name) => name.endsWith(JSONL_SUFFIX))
     .map((name) => name.slice(0, -JSONL_SUFFIX.length))
     .filter((stem) => topic.test(stem))
-    .sort()
-    .flatMap((stem) => {
-      const transcript = readTranscript(stem);
-      return transcript?.request.analysisId === WORLD_ANALYSIS_ID
-        ? [transcript]
-        : [];
-    });
+    .sort();
+
+const worldTranscripts = (topic: RegExp): Transcript[] =>
+  stemsOf(topic).flatMap((stem) => {
+    const transcript = readTranscript(stem);
+    return transcript?.request.analysisId === WORLD_ANALYSIS_ID
+      ? [transcript]
+      : [];
+  });
+
+const byRequest = <K, T>(
+  transcripts: readonly Transcript[],
+  keyOf: (request: Transcript["request"]) => K,
+  parse: (result: unknown) => T
+): ReadonlyMap<K, T> => {
+  const map = new Map<K, T>();
+  for (const { request, result } of transcripts) {
+    const key = keyOf(request);
+    if (map.has(key)) {
+      throw new Error(
+        `duas fixtures do mundo respondem ${JSON.stringify(key)}`
+      );
+    }
+    map.set(key, parse(result));
+  }
+  return map;
+};
 
 const byParent = <T>(
   transcripts: readonly Transcript[],
   parse: (result: unknown) => T
-): ReadonlyMap<string | null, T> => {
-  const map = new Map<string | null, T>();
-  for (const { request, result } of transcripts) {
-    const parentId = (request.parentId ?? null) as string | null;
-    if (map.has(parentId)) {
-      throw new Error(`duas fixtures do mundo respondem parentId ${parentId}`);
-    }
-    map.set(parentId, parse(result));
-  }
-  return map;
-};
+): ReadonlyMap<string | null, T> =>
+  byRequest(
+    transcripts,
+    (request) => (request.parentId ?? null) as string | null,
+    parse
+  );
 
 const TYPE_SLICES = byParent(
   worldTranscripts(SLICE_STEM).filter(
@@ -207,26 +235,124 @@ export interface UnknownParent {
   readonly parentId: string;
 }
 
-const unknownParentFixture = (): UnknownParent => {
-  const stem = "outline.children.unknown-parent";
-  const frames = readFileSync(
-    path.join(FIXTURES_DIR, `${stem}${JSONL_SUFFIX}`),
-    "utf8"
-  )
-    .split("\n")
-    .filter((line) => line.trim() !== "")
-    .map((line) => JSON.parse(line) as Frame & { readonly error?: unknown });
+export interface Refusal {
+  readonly error: ProtocolError;
+  readonly method: string;
+  readonly request: Readonly<Record<string, unknown>>;
+
+  readonly stem: string;
+}
+
+const readRefusal = (stem: string): Refusal | undefined => {
+  const frames = readFrames(stem);
   const request = frames.find((frame) => frame.kind === "request");
   const response = frames.find(
     (frame) => frame.kind === "response" && frame.ok === false
   );
-  const { parentId } = (request?.payload ?? {}) as { parentId?: unknown };
-  if (typeof parentId !== "string" || response === undefined) {
+  if (request === undefined || response === undefined) {
+    return undefined;
+  }
+  return {
+    error: protocolErrorSchema.parse(response.error),
+    method: String(request.method),
+    request: (request.payload ?? {}) as Record<string, unknown>,
+    stem,
+  };
+};
+
+const unknownParentFixture = (): UnknownParent => {
+  const stem = "outline.children.unknown-parent";
+  const refusal = readRefusal(stem);
+  const parentId = refusal?.request.parentId;
+  if (refusal === undefined || typeof parentId !== "string") {
     throw new Error(
       `${stem}${JSONL_SUFFIX} não é uma página recusada da estrutura`
     );
   }
-  return { error: protocolErrorSchema.parse(response.error), parentId };
+  return { error: refusal.error, parentId };
 };
 
 export const UNKNOWN_PARENT: UnknownParent = unknownParentFixture();
+
+const DETAILS = byRequest(
+  worldTranscripts(DESCRIBE_STEM),
+  (request) => String(request.elementId),
+  (result) => elementDetailSchema.parse(result)
+);
+
+const pageKey = (elementId: unknown, direction: unknown): string =>
+  JSON.stringify([elementId, direction]);
+
+const PAGES = byRequest(
+  worldTranscripts(DEPENDENCIES_STEM),
+  (request) => pageKey(request.elementId, request.direction),
+  (result) => dependencyPageSchema.parse(result)
+);
+
+export interface EvidencePair {
+  readonly source: string;
+  readonly target: string;
+}
+
+const pairKey = (source: unknown, target: unknown): string =>
+  JSON.stringify([source, target]);
+
+const EVIDENCE_TRANSCRIPTS = worldTranscripts(EVIDENCE_STEM);
+
+const EVIDENCE = byRequest(
+  EVIDENCE_TRANSCRIPTS,
+  (request) => pairKey(request.source, request.target),
+  (result) => dependencyEvidenceResultSchema.parse(result).evidence
+);
+
+export const DESCRIBED_IDS: readonly string[] = [...DETAILS.keys()];
+
+export const detailOf = (elementId: string): ElementDetail => {
+  const detail = DETAILS.get(elementId);
+  if (detail === undefined) {
+    throw new Error(
+      `nenhuma fixture de element.describe descreve ${elementId}`
+    );
+  }
+  return detail;
+};
+
+export const dependencyPageOf = (
+  elementId: string,
+  direction: DependencyDirection
+): DependencyPage => {
+  const page = PAGES.get(pageKey(elementId, direction));
+  if (page === undefined) {
+    throw new Error(
+      `nenhuma fixture de element.dependencies lista ${direction} de ${elementId}`
+    );
+  }
+  return page;
+};
+
+export const EVIDENCE_PAIRS: readonly EvidencePair[] = EVIDENCE_TRANSCRIPTS.map(
+  ({ request }) => ({
+    source: String(request.source),
+    target: String(request.target),
+  })
+);
+
+export const evidenceOf = (
+  source: string,
+  target: string
+): readonly RelationshipEvidence[] => {
+  const evidence = EVIDENCE.get(pairKey(source, target));
+  if (evidence === undefined) {
+    throw new Error(
+      `nenhuma fixture de element.dependencyEvidence responde ${source} -> ${target}`
+    );
+  }
+  return evidence;
+};
+
+export const ELEMENT_REFUSALS: readonly Refusal[] = stemsOf(
+  ELEMENT_STEM
+).flatMap((stem) => {
+  const refusal = readRefusal(stem);
+  return refusal?.request.analysisId === WORLD_ANALYSIS_ID ? [refusal] : [];
+});

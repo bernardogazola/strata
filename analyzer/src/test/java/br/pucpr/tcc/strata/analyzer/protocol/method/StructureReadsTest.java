@@ -35,15 +35,22 @@ import br.pucpr.tcc.strata.analyzer.structure.ElementNotFoundException;
 import br.pucpr.tcc.strata.analyzer.structure.InvalidStructureRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.InstantSource;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -273,9 +280,29 @@ final class StructureReadsTest {
         new String[] {"graph.search", "{\"query\":\"c\"}"});
   }
 
+  private static List<String[]> leiturasDoElemento() {
+    return List.of(
+        new String[] {"element.describe", "{\"elementId\":\"pkg:br.pucpr.legacy.core\"}"},
+        new String[] {
+          "element.dependencies",
+          "{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.CatalogEntry\"}"
+        },
+        new String[] {
+          "element.dependencyEvidence",
+          "{\"source\":\"type:br.pucpr.legacy.core.Catalog\","
+              + "\"target\":\"type:br.pucpr.legacy.core.spi.Store\"}"
+        });
+  }
+
+  private static List<String[]> seisLeituras() {
+    final List<String[]> seis = new ArrayList<>(tresLeituras());
+    seis.addAll(leiturasDoElemento());
+    return List.copyOf(seis);
+  }
+
   private void verificarQueNenhumaLeituraServe(String analysisId, String porque)
       throws IOException {
-    for (final String[] leitura : tresLeituras()) {
+    for (final String[] leitura : seisLeituras()) {
       final String id = novoId();
       assertThat(despachar(id, leitura[0], comAnalise(analysisId, leitura[1])))
           .as(leitura[0] + ": " + porque)
@@ -338,7 +365,78 @@ final class StructureReadsTest {
         "graph.search|{}|query é obrigatório",
         "graph.search|{\"query\":null}|query é obrigatório",
         "graph.search|{\"query\":\"c\",\"limit\":0}|limit deve ser pelo menos 1",
-        "graph.search|{\"query\":\"c\",\"kinds\":[\"TYPE\",null]}|kinds não pode conter null"
+        "graph.search|{\"query\":\"c\",\"kinds\":[\"TYPE\",null]}|kinds não pode conter null",
+        "element.describe|{\"elementId\":null}|elementId é obrigatório",
+        "element.describe|{\"elementId\":\"pfx:br.pucpr\"}|elementId não é um id de elemento",
+        "element.describe|{\"elementId\":\"nope\"}|elementId não é um id de elemento",
+        "element.describe|{\"elementId\":\"method:br.pucpr.legacy.core.Catalog#add("
+            + "br.pucpr.legacy.core.CatalogEntry)\"}|elementId deve ser um id de pacote ou de tipo",
+        "element.describe|{\"elementId\":\"file:core/src/main/java/br/pucpr/legacy/core/Kind.java\"}"
+            + "|elementId deve ser um id de pacote ou de tipo",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":null}|elementId é obrigatório",
+        "element.dependencies|{\"direction\":null,\"elementId\":null}|elementId é obrigatório",
+        "element.dependencies|{\"direction\":null,\"elementId\":\"type:br.pucpr.legacy.core.Kind\"}"
+            + "|direction é obrigatório",
+        "element.dependencies|{\"direction\":\"OUT\",\"elementId\":\"pfx:br.pucpr\"}"
+            + "|elementId não é um id de elemento",
+        "element.dependencies|{\"direction\":\"OUT\",\"elementId\":\"method:br.pucpr.legacy.core."
+            + "Catalog#add(br.pucpr.legacy.core.CatalogEntry)\"}"
+            + "|elementId deve ser um id de pacote ou de tipo",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"file:core/src/main/java/br/"
+            + "pucpr/legacy/core/Kind.java\"}|elementId deve ser um id de pacote ou de tipo",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"method:a.B#m()\",\"limit\":0}"
+            + "|elementId deve ser um id de pacote ou de tipo",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"limit\":0}|limit deve ser pelo menos 1",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"limit\":-1,\"cursor\":\"!\"}|limit deve ser pelo menos 1",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"cursor\":\"AQAAAAAAAAAq\"}|o cursor está malformado",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"cursor\":\"\"}|o cursor está malformado",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"cursor\":\"AQAAAAAAAAAAAQAAAAAAAAAB\"}|o cursor está malformado",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"cursor\":\"AgIAAAAAAAAAAQAAAAAAAAAB\"}|o cursor está malformado",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"cursor\":\"AgAAAAAAAAAAAAAAAAAAAAAB\"}|o cursor está malformado",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"cursor\":\"AgAAAAAAAAAAAQAAAAAAAAAA\"}|o cursor está malformado",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"cursor\":\"AgAAAAAAAAAAAf__________\"}|o cursor está malformado",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"cursor\":\"AgAAAAAAAAAAAQAAAAAAAAA\"}|o cursor está malformado",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"cursor\":\"AgAAAAAAAAAAAQAAAAAAAAABA\"}|o cursor está malformado",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"cursor\":\"AgAAAAAAAAAAAQAAAAAAAA==\"}|o cursor está malformado",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"cursor\":\"AgAAAAAAAAAAAQAAAAAAAA+/\"}|o cursor está malformado",
+        "outline.children|{\"parentId\":null,\"cursor\":\"AgAAAAAAAAAAAQAAAAAAAAAB\"}"
+            + "|o cursor está malformado",
+        "element.dependencyEvidence|{\"source\":null,\"target\":\"type:a.B\"}|source é obrigatório",
+        "element.dependencyEvidence|{\"source\":\"type:a.B\",\"target\":null}|target é obrigatório",
+        "element.dependencyEvidence|{\"source\":null,\"target\":null}|source é obrigatório",
+        "element.dependencyEvidence|{\"source\":\"pfx:a\",\"target\":\"type:a.B\"}"
+            + "|source não é um id de elemento",
+        "element.dependencyEvidence|{\"source\":\"type:a.B\",\"target\":\"nope\"}"
+            + "|target não é um id de elemento",
+        "element.dependencyEvidence|{\"source\":\"pkg:br.pucpr.legacy.core\","
+            + "\"target\":\"type:br.pucpr.legacy.core.Kind\"}|source deve ser um id de tipo",
+        "element.dependencyEvidence|{\"source\":\"method:a.B#m()\",\"target\":\"type:a.C\"}"
+            + "|source deve ser um id de tipo",
+        "element.dependencyEvidence|{\"source\":\"pkg:a\",\"target\":\"pkg:b\"}"
+            + "|source deve ser um id de tipo",
+        "element.dependencyEvidence|{\"source\":\"type:br.pucpr.legacy.core.Catalog\","
+            + "\"target\":\"pkg:br.pucpr.legacy.core.spi\"}|target deve ser um id de tipo",
+        "element.dependencyEvidence|{\"source\":\"type:a.B\",\"target\":\"file:a/B.java\"}"
+            + "|target deve ser um id de tipo",
+        "element.dependencyEvidence|{\"source\":\"type:a.B\",\"target\":\"type:a.B\"}"
+            + "|source e target devem ser diferentes",
+        "element.dependencyEvidence|{\"limit\":0,\"source\":\"type:a.B\",\"target\":\"type:a.B\"}"
+            + "|source e target devem ser diferentes",
+        "element.dependencyEvidence|{\"limit\":0,\"source\":\"type:a.B\",\"target\":\"type:a.C\"}"
+            + "|limit deve ser pelo menos 1"
       })
   void cadaRecusaPuraTemAFraseFixaEVemAntesDaProntidao(String metodo, String payload, String detail)
       throws Exception {
@@ -443,7 +541,23 @@ final class StructureReadsTest {
         "outline.children|{\"parentId\":\"pkg:br.pucpr.legacy.core\"}",
         "graph.search|{\"query\":\"c\"}",
         "graph.search|{\"query\":\"\"}",
-        "graph.search|{\"query\":\"c\",\"kinds\":[\"METHOD\"]}"
+        "graph.search|{\"query\":\"c\",\"kinds\":[\"METHOD\"]}",
+        "element.describe|{\"elementId\":\"pkg:br.pucpr.legacy.core\"}",
+        "element.describe|{\"elementId\":\"type:br.pucpr.legacy.core.Catalog\"}",
+        "element.describe|{\"elementId\":\"pkg:\"}",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\"}",
+        "element.dependencies|{\"direction\":\"OUT\",\"elementId\":\"pkg:br.pucpr.legacy.core\","
+            + "\"limit\":2000}",
+        "element.dependencies|{\"direction\":\"OUT\",\"elementId\":\"pkg:br.pucpr.legacy.core\","
+            + "\"limit\":2001}",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"cursor\":\"AgAAAAAAAAAAAQAAAAAAAAAB\"}",
+        "element.dependencies|{\"direction\":\"OUT\",\"elementId\":\"type:br.pucpr.legacy.core.Kind\","
+            + "\"cursor\":\"AgEAAAAAAAAAAQAAAAAAAAAB\",\"limit\":1}",
+        "element.dependencyEvidence|{\"source\":\"type:br.pucpr.legacy.core.Catalog\","
+            + "\"target\":\"type:br.pucpr.legacy.core.spi.Store\"}",
+        "element.dependencyEvidence|{\"limit\":51,\"source\":\"type:br.pucpr.legacy.api.Main\","
+            + "\"target\":\"type:java.lang.String\"}"
       })
   void umaAnaliseDesconhecidaEAnalysisNotFoundEmTodaLeitura(String metodo, String payload)
       throws Exception {
@@ -506,6 +620,135 @@ final class StructureReadsTest {
     assertThat(quadros.terminal(id)).isEqualTo("analysis.cancelled");
 
     verificarQueNenhumaLeituraServe(id, "uma análise CANCELLED não é legível");
+  }
+
+  @Test
+  void asLeiturasDoElementoServemDepoisDoGrafoEnquantoAHistoriaRoda() throws Exception {
+    final CountDownLatch dentro = new CountDownLatch(1);
+    montar(planoComGrafo().with(GUIDED_TOUR, quePrende(dentro)));
+    final String id = comecar(multiModulo());
+    assertThat(dentro.await(AWAIT.toMillis(), TimeUnit.MILLISECONDS)).isTrue();
+
+    for (final String[] leitura : leiturasDoElemento()) {
+      final JsonNode resposta =
+          JSON.readTree(despachar(novoId(), leitura[0], comAnalise(id, leitura[1])));
+      assertThat(resposta.path("ok").asBoolean()).as(leitura[0] + ": " + resposta).isTrue();
+    }
+
+    final ObjectNode cancelar = inbound.createObjectNode();
+    cancelar.put("id", novoId()).put("kind", "request").put("method", "analysis.cancel");
+    cancelar.set("payload", JSON.createObjectNode().put("analysisId", id));
+    cancelar.put("protocol", 1);
+    despacharQuadro(JSON.writeValueAsString(cancelar)).afterEmit().run();
+    assertThat(quadros.terminal(id)).isEqualTo("analysis.cancelled");
+
+    verificarQueNenhumaLeituraServe(id, "uma análise CANCELLED não é legível");
+  }
+
+  @ParameterizedTest(name = "{0} {1}")
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        "element.dependencies|{\"direction\":\"SIDEWAYS\",\"elementId\":\"type:a.B\"}"
+            + "|o payload não segue o schema",
+        "element.dependencies|{\"direction\":\"in\",\"elementId\":\"type:a.B\"}"
+            + "|o payload não segue o schema",
+        "element.dependencies|{\"direction\":0,\"elementId\":\"type:a.B\"}"
+            + "|o payload não segue o schema",
+        "element.dependencies|{\"elementId\":\"type:a.B\"}|o payload não segue o schema",
+        "element.dependencies|{\"direction\":\"IN\"}|o payload não segue o schema",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:a.B\",\"limit\":1.5}"
+            + "|o payload não segue o schema",
+        "element.describe|{}|o payload não segue o schema",
+        "element.dependencyEvidence|{\"source\":\"type:a.B\"}|o payload não segue o schema",
+        "element.dependencyEvidence|{\"target\":\"type:a.B\"}|o payload não segue o schema",
+        "element.dependencyEvidence|{\"edgeId\":\"e_0123456789abcdef\",\"source\":\"type:a.B\","
+            + "\"target\":\"type:a.C\"}|propriedade desconhecida \"edgeId\"",
+        "element.describe|{\"elementId\":\"type:a.B\",\"simpleName\":\"B\"}"
+            + "|propriedade desconhecida \"simpleName\"",
+        "element.dependencies|{\"direction\":\"IN\",\"elementId\":\"type:a.B\",\"truncated\":true}"
+            + "|propriedade desconhecida \"truncated\""
+      })
+  void osParamsDasLeiturasDoElementoSaoRecordsEstritos(String metodo, String payload, String detail)
+      throws Exception {
+    montar(planoComGrafo());
+    final String id = novoId();
+
+    assertThat(despachar(id, metodo, comAnalise(DESCONHECIDA, payload)))
+        .isEqualTo(erro(id, ErrorCodes.invalidPayload(metodo, detail)));
+  }
+
+  @Test
+  void oTetoDoIdNomeiaOCampoNasLeiturasDoElemento() throws Exception {
+    montar(planoComGrafo());
+    final int teto = AnalysisConstants.MAX_ELEMENT_ID_BYTES;
+    final String ascii = "type:a." + "b".repeat(teto - 6);
+    final String acentuado = "type:a." + E_AGUDO.repeat((teto - 5) / 2);
+    final String noTeto = "type:a." + "b".repeat(teto - 7);
+    assertThat(ascii.getBytes(UTF_8)).hasSize(teto + 1);
+    assertThat(acentuado.getBytes(UTF_8)).hasSizeGreaterThan(teto);
+    assertThat(acentuado.length()).isLessThan(teto);
+    assertThat(noTeto.getBytes(UTF_8)).hasSize(teto);
+
+    for (final String acima : List.of(ascii, acentuado)) {
+      final Map<String, ObjectNode> pedidos = new LinkedHashMap<>();
+      pedidos.put(
+          "element.describe elementId", comAnalise(DESCONHECIDA, "{}").put("elementId", acima));
+      pedidos.put(
+          "element.dependencies elementId",
+          comAnalise(DESCONHECIDA, "{\"direction\":\"OUT\"}").put("elementId", acima));
+      pedidos.put(
+          "element.dependencyEvidence source",
+          comAnalise(DESCONHECIDA, "{\"target\":\"type:a.C\"}").put("source", acima));
+      pedidos.put(
+          "element.dependencyEvidence target",
+          comAnalise(DESCONHECIDA, "{\"source\":\"type:a.C\"}").put("target", acima));
+      for (final Map.Entry<String, ObjectNode> pedido : pedidos.entrySet()) {
+        final String metodo = pedido.getKey().split(" ")[0];
+        final String campo = pedido.getKey().split(" ")[1];
+        final String id = novoId();
+        final String resposta = despachar(id, metodo, pedido.getValue());
+        assertThat(resposta)
+            .as(pedido.getKey())
+            .isEqualTo(
+                erro(
+                    id,
+                    ErrorCodes.invalidPayload(metodo, campo + " passa de 4096 bytes em UTF-8")));
+        assertThat(resposta).doesNotContain("bbbb").doesNotContain(E_AGUDO + E_AGUDO);
+      }
+    }
+    final List<ObjectNode> noTetoPassam =
+        List.of(
+            comAnalise(DESCONHECIDA, "{}").put("elementId", noTeto),
+            comAnalise(DESCONHECIDA, "{\"direction\":\"IN\"}").put("elementId", noTeto),
+            comAnalise(DESCONHECIDA, "{\"target\":\"type:a.C\"}").put("source", noTeto),
+            comAnalise(DESCONHECIDA, "{\"source\":\"type:a.C\"}").put("target", noTeto));
+    final List<String> metodos =
+        List.of(
+            "element.describe",
+            "element.dependencies",
+            "element.dependencyEvidence",
+            "element.dependencyEvidence");
+    for (int i = 0; i < metodos.size(); i++) {
+      final String id = novoId();
+      assertThat(despachar(id, metodos.get(i), noTetoPassam.get(i)))
+          .as(metodos.get(i) + ": no teto o id passa e o pedido para na prontidão")
+          .isEqualTo(erro(id, ErrorCodes.analysisNotFound()));
+    }
+  }
+
+  @Test
+  void umCursorDeDependenciasAcimaDoTetoEMalformado() throws Exception {
+    montar(planoComGrafo());
+    final String id = novoId();
+    final ObjectNode payload =
+        comAnalise(DESCONHECIDA, "{\"direction\":\"IN\",\"elementId\":\"type:a.B\"}");
+    payload.put("cursor", "A".repeat(AnalysisConstants.MAX_CURSOR_CHARS + 1));
+
+    assertThat(despachar(id, "element.dependencies", payload))
+        .isEqualTo(
+            erro(
+                id, ErrorCodes.invalidPayload("element.dependencies", "o cursor está malformado")));
   }
 
   @Test
@@ -592,6 +835,197 @@ final class StructureReadsTest {
                 "outline.children",
                 comAnalise(analise, "{\"parentId\":\"type:br.pucpr.legacy.core.Catalog\"}")))
         .isEqualTo(ok(folha, "{\"items\":[],\"nextCursor\":null}"));
+  }
+
+  @Test
+  void umElementoQueNaoEInternoEElementNotFoundNasLeiturasDoElemento() throws Exception {
+    final String analise = pronta();
+    final List<String> ausentes =
+        List.of(
+            "pkg:br.pucpr.legacy.nowhere",
+            "type:br.pucpr.legacy.core.Nowhere",
+            "type:java.lang.String",
+            "pkg:java.lang");
+
+    for (final String ausente : ausentes) {
+      final String id = novoId();
+      assertThat(
+              despachar(
+                  id, "element.describe", comAnalise(analise, "{}").put("elementId", ausente)))
+          .as("element.describe de " + ausente)
+          .isEqualTo(erro(id, ELEMENT_NOT_FOUND));
+      for (final String sentido : List.of("IN", "OUT")) {
+        final String pagina = novoId();
+        final ObjectNode payload =
+            comAnalise(analise, "{}").put("direction", sentido).put("elementId", ausente);
+        assertThat(despachar(pagina, "element.dependencies", payload))
+            .as("element.dependencies " + sentido + " de " + ausente)
+            .isEqualTo(erro(pagina, ELEMENT_NOT_FOUND));
+      }
+    }
+    final String kind = "type:br.pucpr.legacy.core.Kind";
+    for (final String[] par :
+        List.of(
+            new String[] {"type:br.pucpr.legacy.core.Nowhere", kind},
+            new String[] {"type:java.lang.String", kind},
+            new String[] {"type:br.pucpr.legacy.core.CatalogEntry", "type:java.lang.Nowhere"})) {
+      final String id = novoId();
+      final ObjectNode payload =
+          comAnalise(analise, "{}").put("source", par[0]).put("target", par[1]);
+      assertThat(despachar(id, "element.dependencyEvidence", payload))
+          .as(par[0] + " -> " + par[1])
+          .isEqualTo(erro(id, ELEMENT_NOT_FOUND));
+    }
+    final String semPar = novoId();
+    assertThat(
+            despachar(
+                semPar,
+                "element.dependencyEvidence",
+                comAnalise(analise, "{}")
+                    .put("source", kind)
+                    .put("target", "type:br.pucpr.legacy.core.Catalog")))
+        .as("Kind não depende de Catalog: o par nunca foi emitido")
+        .isEqualTo(
+            erro(
+                semPar,
+                ErrorCodes.invalidPayload(
+                    "element.dependencyEvidence", "o par não tem dependência")));
+    final JsonNode externo =
+        JSON.readTree(
+            despachar(
+                novoId(),
+                "element.dependencyEvidence",
+                comAnalise(analise, "{}")
+                    .put("source", "type:br.pucpr.legacy.api.Main")
+                    .put("target", "type:java.lang.String")));
+    assertThat(externo.path("ok").asBoolean())
+        .as("o destino externo é servido: " + externo)
+        .isTrue();
+  }
+
+  @Test
+  void umCursorEscritoAMaoRetomaDepoisDaLinhaQueEleNomeia() throws Exception {
+    final String analise = pronta();
+    final Map<String, Long> pk = chaves(analise);
+    final String catalogEntry = "type:br.pucpr.legacy.core.CatalogEntry";
+    final JsonNode entrada = payloadDaFixture("element.dependencies.catalog-entry-in.jsonl");
+    final JsonNode saida = payloadDaFixture("element.dependencies.catalog-entry-out.jsonl");
+    final long ancora = pk.get(catalogEntry);
+    final String depoisDoEndpoint =
+        cursor(0, ancora, pk.get("type:br.pucpr.legacy.api.CatalogEndpoint"));
+
+    final JsonNode uma = paginaServida(analise, catalogEntry, "IN", depoisDoEndpoint, 1);
+    final ObjectNode esperada = JSON.createObjectNode();
+    esperada.putArray("items").add(entrada.path("items").get(1));
+    esperada.put(
+        "nextCursor", cursor(0, ancora, pk.get("type:br.pucpr.legacy.core.spi.MemoryStore")));
+    esperada.set("totals", entrada.path("totals"));
+    assertThat(uma).as("retoma depois de CatalogEndpoint, uma linha").isEqualTo(esperada);
+
+    final JsonNode resto = paginaServida(analise, catalogEntry, "IN", depoisDoEndpoint, 3);
+    final ObjectNode tresUltimas = JSON.createObjectNode();
+    final ArrayNode itens = tresUltimas.putArray("items");
+    for (int i = 1; i < 4; i++) {
+      itens.add(entrada.path("items").get(i));
+    }
+    tresUltimas.putNull("nextCursor");
+    tresUltimas.set("totals", entrada.path("totals"));
+    assertThat(resto).as("as três que sobram, e nada depois").isEqualTo(tresUltimas);
+
+    final JsonNode externa =
+        paginaServida(
+            analise,
+            catalogEntry,
+            "OUT",
+            cursor(1, ancora, pk.get("type:br.pucpr.legacy.core.Kind")),
+            1);
+    final ObjectNode soAExterna = JSON.createObjectNode();
+    soAExterna.putArray("items").add(saida.path("items").get(1));
+    soAExterna.putNull("nextCursor");
+    soAExterna.set("totals", saida.path("totals"));
+    assertThat(externa).as("depois do último interno, o externo").isEqualTo(soAExterna);
+
+    final Map<String, String> estranhos = new LinkedHashMap<>();
+    estranhos.put(
+        "o sentido OUT em um pedido IN",
+        cursor(1, ancora, pk.get("type:br.pucpr.legacy.api.CatalogEndpoint")));
+    estranhos.put(
+        "a âncora de Catalog",
+        cursor(
+            0,
+            pk.get("type:br.pucpr.legacy.core.Catalog"),
+            pk.get("type:br.pucpr.legacy.api.CatalogEndpoint")));
+    estranhos.put(
+        "Kind, que não está na entrada",
+        cursor(0, ancora, pk.get("type:br.pucpr.legacy.core.Kind")));
+    estranhos.put("uma chave que não existe", cursor(0, ancora, 999_999_999L));
+    for (final Map.Entry<String, String> estranho : estranhos.entrySet()) {
+      final JsonNode recusa = pagina(analise, catalogEntry, "IN", estranho.getValue(), 1);
+      assertThat(recusa.path("error"))
+          .as(estranho.getKey())
+          .isEqualTo(
+              JSON.readTree(
+                      bytes(
+                          Envelope.error(
+                              "x",
+                              ErrorCodes.invalidPayload(
+                                  "element.dependencies",
+                                  "o cursor não aponta para uma linha desta listagem"))))
+                  .path("error"));
+    }
+  }
+
+  private static String cursor(int sentido, long ancora, long ultima) {
+    final ByteBuffer bytes = ByteBuffer.allocate(18);
+    bytes.put((byte) 2).put((byte) sentido).putLong(ancora).putLong(ultima);
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes.array());
+  }
+
+  private JsonNode paginaServida(
+      String analise, String elemento, String sentido, String cursor, int limite)
+      throws IOException {
+    final JsonNode resposta = pagina(analise, elemento, sentido, cursor, limite);
+    assertThat(resposta.path("ok").asBoolean()).as(resposta.toString()).isTrue();
+    return resposta.path("payload");
+  }
+
+  private JsonNode pagina(
+      String analise, String elemento, String sentido, String cursor, int limite)
+      throws IOException {
+    final ObjectNode payload =
+        comAnalise(analise, "{}")
+            .put("cursor", cursor)
+            .put("direction", sentido)
+            .put("elementId", elemento)
+            .put("limit", limite);
+    return JSON.readTree(despachar(novoId(), "element.dependencies", payload));
+  }
+
+  private Map<String, Long> chaves(String analise) throws SQLException {
+    final ReadableAnalysis legivel = registro.readable(new AnalysisId(analise)).orElseThrow();
+    return legivel
+        .connections()
+        .read(
+            conexao -> {
+              final Map<String, Long> chaves = new HashMap<>();
+              try (PreparedStatement consulta =
+                  conexao.prepareStatement(
+                      "SELECT element_id, id FROM code_element WHERE analysis_pk = ?")) {
+                consulta.setLong(1, legivel.analysisPk());
+                try (ResultSet linha = consulta.executeQuery()) {
+                  while (linha.next()) {
+                    chaves.put(linha.getString(1), linha.getLong(2));
+                  }
+                }
+              }
+              return Map.copyOf(chaves);
+            });
+  }
+
+  private static JsonNode payloadDaFixture(String arquivo) throws IOException {
+    final Path pasta = Path.of(System.getProperty("strata.protocol.fixtures"));
+    final List<String> linhas = Files.readAllLines(pasta.resolve(arquivo), UTF_8);
+    return JSON.readTree(linhas.get(1)).path("payload");
   }
 
   @Test

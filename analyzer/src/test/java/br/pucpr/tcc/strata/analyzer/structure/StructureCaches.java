@@ -1,6 +1,7 @@
 package br.pucpr.tcc.strata.analyzer.structure;
 
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
+import br.pucpr.tcc.strata.analyzer.graph.Cycle;
 import br.pucpr.tcc.strata.analyzer.graph.ResolutionMix;
 import br.pucpr.tcc.strata.analyzer.persistence.CacheDiscardException;
 import br.pucpr.tcc.strata.analyzer.persistence.Migrations;
@@ -13,11 +14,16 @@ import br.pucpr.tcc.strata.analyzer.persistence.dao.DependencyDao;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.DependencyRow;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.ElementDao;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.ElementRow;
+import br.pucpr.tcc.strata.analyzer.persistence.dao.EvidenceDao;
+import br.pucpr.tcc.strata.analyzer.persistence.dao.EvidenceRow;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.GraphMetricDao;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.GraphMetricRow;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.PackageEdgeDao;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.PackageEdgeRow;
+import br.pucpr.tcc.strata.analyzer.persistence.dao.SourceFileDao;
+import br.pucpr.tcc.strata.analyzer.persistence.dao.SourceFileRow;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.SourceFileStatus;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality;
@@ -136,6 +142,7 @@ final class StructureCaches implements AutoCloseable {
   private final SqliteConnections connections;
   private long nextElementPk = 1;
   private long nextDependencyPk = 1;
+  private long nextSourceFilePk = 1;
 
   private StructureCaches(SqliteConnections connections) {
     this.connections = connections;
@@ -283,6 +290,28 @@ final class StructureCaches implements AutoCloseable {
     static final NodeValues PLAIN = new NodeValues(1, 0, 0, 0.001, ResolutionMix.NONE);
   }
 
+  record Metrics(int loc, Integer unitCount, Integer ccSum, Integer ccMax, Integer ccP90) {
+
+    static Metrics withoutCc(int loc) {
+      return new Metrics(loc, 0, null, null, null);
+    }
+
+    static Metrics oneUnit(int loc, int cc) {
+      return new Metrics(loc, 1, cc, cc, null);
+    }
+  }
+
+  record GraphValues(
+      int fanIn, int fanOut, int fanOutExternal, double pagerank, Cycle cycle, ResolutionMix mix) {}
+
+  record Declaration(
+      TypeKind typeKind,
+      String modifiers,
+      boolean isTest,
+      Long filePk,
+      Integer startLine,
+      Integer endLine) {}
+
   final class SyntheticAnalysis {
 
     private final long pk;
@@ -293,6 +322,8 @@ final class StructureCaches implements AutoCloseable {
     private final List<GraphMetricRow> graphMetrics = new ArrayList<>();
     private final List<PackageEdgeRow> packageEdges = new ArrayList<>();
     private final List<DependencyRow> dependencies = new ArrayList<>();
+    private final List<SourceFileRow> sourceFiles = new ArrayList<>();
+    private final List<EvidenceRow> evidence = new ArrayList<>();
     private final Map<Long, String> qualifiedNames = new HashMap<>();
     private boolean written;
 
@@ -455,6 +486,7 @@ final class StructureCaches implements AutoCloseable {
     }
 
     private void writeAll(Connection c) throws SQLException {
+      SourceFileDao.insert(c, pk, sourceFiles);
       ElementDao.insert(c, pk, packages);
       ElementDao.insert(c, pk, types);
       ElementDao.insert(c, pk, members);
@@ -462,6 +494,182 @@ final class StructureCaches implements AutoCloseable {
       GraphMetricDao.insert(c, pk, graphMetrics);
       PackageEdgeDao.insert(c, pk, packageEdges);
       DependencyDao.insert(c, pk, dependencies);
+      EvidenceDao.insert(c, evidence);
+    }
+
+    long addSourceFile(String relativePath) {
+      final long filePk = nextSourceFilePk++;
+      sourceFiles.add(new SourceFileRow(filePk, relativePath, 1_000, 0, SourceFileStatus.ANALYZED));
+      return filePk;
+    }
+
+    long addPackage(String qualifiedName, boolean isTest, Metrics metrics, GraphValues graph) {
+      final long elementPk = nextElementPk++;
+      final CodeElementId id = CodeElementId.ofPackage(qualifiedName);
+      packages.add(
+          declared(
+              elementPk,
+              id,
+              null,
+              qualifiedName.substring(qualifiedName.lastIndexOf('.') + 1),
+              qualifiedName,
+              new Declaration(null, "", isTest, null, null, null)));
+      qualifiedNames.put(elementPk, qualifiedName);
+      addMetricRows(elementPk, ElementKind.PACKAGE, metrics, graph);
+      return elementPk;
+    }
+
+    long addType(
+        long packagePk,
+        String binaryName,
+        Declaration declaration,
+        Metrics metrics,
+        GraphValues graph) {
+      final long elementPk = nextElementPk++;
+      final String packageName = qualifiedNames.get(packagePk);
+      final String prefix = packageName.isEmpty() ? "" : packageName + ".";
+      types.add(
+          declared(
+              elementPk,
+              CodeElementId.ofType(prefix + binaryName),
+              packagePk,
+              binaryName.substring(binaryName.lastIndexOf('$') + 1),
+              prefix + binaryName.replace('$', '.'),
+              declaration));
+      qualifiedNames.put(elementPk, prefix + binaryName);
+      addMetricRows(elementPk, ElementKind.TYPE, metrics, graph);
+      return elementPk;
+    }
+
+    long addMethod(
+        long typePk,
+        String name,
+        List<String> parameters,
+        Integer startLine,
+        Integer endLine,
+        Metrics metrics) {
+      final long elementPk = nextElementPk++;
+      final String owner = qualifiedNames.get(typePk);
+      members.add(
+          declared(
+              elementPk,
+              CodeElementId.ofMethod(owner, name, parameters),
+              typePk,
+              name,
+              owner.replace('$', '.') + "." + name,
+              new Declaration(null, "", false, null, startLine, endLine)));
+      if (metrics != null) {
+        codeMetrics.add(
+            new CodeMetricRow(
+                elementPk,
+                metrics.loc(),
+                metrics.unitCount(),
+                metrics.ccSum(),
+                metrics.ccMax(),
+                metrics.ccP90()));
+      }
+      return elementPk;
+    }
+
+    long addDependency(
+        long sourcePk,
+        long targetPk,
+        DependencyType type,
+        ResolutionQuality resolution,
+        int count,
+        boolean ambiguous) {
+      final long dependencyPk = nextDependencyPk++;
+      dependencies.add(
+          new DependencyRow(
+              dependencyPk,
+              sourcePk,
+              targetPk,
+              type,
+              resolution,
+              count,
+              TYPE_WEIGHTS.get(type) * count,
+              ambiguous));
+      return dependencyPk;
+    }
+
+    void addEvidence(
+        long dependencyPk,
+        Long fromMethodPk,
+        Long toMethodPk,
+        Long filePk,
+        Integer line,
+        ResolutionQuality resolution) {
+      evidence.add(
+          new EvidenceRow(dependencyPk, fromMethodPk, toMethodPk, filePk, line, resolution));
+    }
+
+    private void addMetricRows(
+        long elementPk, ElementKind granularity, Metrics metrics, GraphValues graph) {
+      if (metrics != null) {
+        codeMetrics.add(
+            new CodeMetricRow(
+                elementPk,
+                metrics.loc(),
+                metrics.unitCount(),
+                metrics.ccSum(),
+                metrics.ccMax(),
+                metrics.ccP90()));
+      }
+      if (graph != null) {
+        graphMetrics.add(graphRow(elementPk, granularity, graph));
+      }
+    }
+
+    private static GraphMetricRow graphRow(
+        long elementPk, ElementKind granularity, GraphValues graph) {
+      final boolean type = granularity == ElementKind.TYPE;
+      final Integer sccId = graph.cycle() == null ? null : graph.cycle().id();
+      final Integer sccSize = graph.cycle() == null ? null : graph.cycle().size();
+      return new GraphMetricRow(
+          elementPk,
+          granularity,
+          graph.fanIn(),
+          graph.fanOut(),
+          type ? graph.fanIn() : null,
+          type ? graph.fanOut() : null,
+          type ? graph.fanOutExternal() : null,
+          type ? 0 : null,
+          graph.pagerank(),
+          graph.pagerank(),
+          sccId,
+          sccSize,
+          type ? 0 : null,
+          type ? null : 1,
+          type ? null : 0,
+          null,
+          graph.mix().resolved(),
+          graph.mix().inferred(),
+          graph.mix().unresolvedExternal());
+    }
+
+    private static ElementRow declared(
+        long elementPk,
+        CodeElementId id,
+        Long parentPk,
+        String simpleName,
+        String qualifiedName,
+        Declaration declaration) {
+      return new ElementRow(
+          elementPk,
+          id,
+          id.kind(),
+          parentPk,
+          simpleName,
+          qualifiedName,
+          id.sortKey(),
+          declaration.typeKind(),
+          declaration.modifiers(),
+          false,
+          declaration.isTest(),
+          null,
+          declaration.filePk(),
+          declaration.startLine(),
+          declaration.endLine());
     }
 
     private static ElementRow element(

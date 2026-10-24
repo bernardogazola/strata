@@ -66,7 +66,56 @@ final class ProtocolFixtureTest {
 
   private static final String VERSAO_DA_FIXTURE = "0.0.0-fixture";
 
-  private static final Set<String> DIRIGIDOS =
+  private static final Set<String> DIRIGIDOS_DA_FASE_32 =
+      Set.of(
+          "element.dependencies.api-in.jsonl",
+          "element.dependencies.api-out.jsonl",
+          "element.dependencies.audited-in.jsonl",
+          "element.dependencies.audited-out.jsonl",
+          "element.dependencies.catalog-endpoint-in.jsonl",
+          "element.dependencies.catalog-endpoint-out.jsonl",
+          "element.dependencies.catalog-entry-in.jsonl",
+          "element.dependencies.catalog-entry-out.jsonl",
+          "element.dependencies.catalog-in.jsonl",
+          "element.dependencies.catalog-metadata-in.jsonl",
+          "element.dependencies.catalog-metadata-out.jsonl",
+          "element.dependencies.catalog-out.jsonl",
+          "element.dependencies.core-gen-in.jsonl",
+          "element.dependencies.core-gen-out.jsonl",
+          "element.dependencies.core-in.jsonl",
+          "element.dependencies.core-out.jsonl",
+          "element.dependencies.core-spi-in.jsonl",
+          "element.dependencies.core-spi-out.jsonl",
+          "element.dependencies.foreign-cursor.jsonl",
+          "element.dependencies.kind-in.jsonl",
+          "element.dependencies.kind-out.jsonl",
+          "element.dependencies.main-in.jsonl",
+          "element.dependencies.main-out.jsonl",
+          "element.dependencies.memory-store-in.jsonl",
+          "element.dependencies.memory-store-out.jsonl",
+          "element.dependencies.store-in.jsonl",
+          "element.dependencies.store-out.jsonl",
+          "element.dependencyEvidence.catalog-endpoint-catalog.jsonl",
+          "element.dependencyEvidence.catalog-store.jsonl",
+          "element.dependencyEvidence.main-string.jsonl",
+          "element.dependencyEvidence.no-pair.jsonl",
+          "element.describe.api.jsonl",
+          "element.describe.audited.jsonl",
+          "element.describe.catalog-endpoint.jsonl",
+          "element.describe.catalog-entry.jsonl",
+          "element.describe.catalog-metadata.jsonl",
+          "element.describe.catalog.jsonl",
+          "element.describe.core-gen.jsonl",
+          "element.describe.core-spi.jsonl",
+          "element.describe.core.jsonl",
+          "element.describe.kind.jsonl",
+          "element.describe.main.jsonl",
+          "element.describe.memory-store.jsonl",
+          "element.describe.method.jsonl",
+          "element.describe.store.jsonl",
+          "element.describe.unknown.jsonl");
+
+  private static final Set<String> DIRIGIDOS_ATE_A_FASE_31 =
       Set.of(
           "analysis.start.ok.jsonl",
           "analysis.cancel.unknown.jsonl",
@@ -105,6 +154,14 @@ final class ProtocolFixtureTest {
           "outline.children.core-spi.jsonl",
           "outline.children.unknown-parent.jsonl",
           "graph.search.hit.jsonl");
+
+  private static final Set<String> DIRIGIDOS = comAsDaFase32();
+
+  private static Set<String> comAsDaFase32() {
+    final Set<String> todos = new TreeSet<>(DIRIGIDOS_ATE_A_FASE_31);
+    todos.addAll(DIRIGIDOS_DA_FASE_32);
+    return Set.copyOf(todos);
+  }
 
   private static final Map<String, String> EXPECTADOS_NAO_DIRIGIVEIS = Map.of();
 
@@ -181,7 +238,7 @@ final class ProtocolFixtureTest {
   @Test
   void aPastaDeFixturesExisteEFoiLida() throws IOException {
     assertThat(FIXTURES).isDirectory();
-    assertThat(arquivos()).contains("protocol.ready.mvp.jsonl").hasSize(37);
+    assertThat(arquivos()).contains("protocol.ready.mvp.jsonl").hasSize(83);
   }
 
   @Test
@@ -802,6 +859,162 @@ final class ProtocolFixtureTest {
     }
     m.appendTail(saida);
     return saida.toString();
+  }
+
+  @Test
+  void asQuarentaESeisDaFase32SaoAsElementDoDiretorio() throws IOException {
+    assertThat(DIRIGIDOS_DA_FASE_32)
+        .hasSize(46)
+        .isEqualTo(
+            new TreeSet<>(arquivos().stream().filter(a -> a.startsWith("element.")).toList()));
+    for (final String arquivo : DIRIGIDOS_DA_FASE_32) {
+      final List<String> l = linhas(arquivo);
+      assertThat(l).as(arquivo + ": requisição e resposta").hasSize(2);
+      assertThat(inbound.readTree(l.get(0)).path("payload").path("analysisId").asText())
+          .as(arquivo)
+          .isEqualTo(ID_DA_FIXTURE.value());
+    }
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(
+      strings = {
+        "element.dependencies.api-in.jsonl",
+        "element.dependencies.api-out.jsonl",
+        "element.dependencies.audited-in.jsonl",
+        "element.dependencies.audited-out.jsonl",
+        "element.dependencies.catalog-endpoint-in.jsonl",
+        "element.dependencies.catalog-endpoint-out.jsonl",
+        "element.dependencies.catalog-entry-in.jsonl",
+        "element.dependencies.catalog-entry-out.jsonl",
+        "element.dependencies.catalog-in.jsonl",
+        "element.dependencies.catalog-metadata-in.jsonl",
+        "element.dependencies.catalog-metadata-out.jsonl",
+        "element.dependencies.catalog-out.jsonl",
+        "element.dependencies.core-gen-in.jsonl",
+        "element.dependencies.core-gen-out.jsonl",
+        "element.dependencies.core-in.jsonl",
+        "element.dependencies.core-out.jsonl",
+        "element.dependencies.core-spi-in.jsonl",
+        "element.dependencies.core-spi-out.jsonl",
+        "element.dependencies.kind-in.jsonl",
+        "element.dependencies.kind-out.jsonl",
+        "element.dependencies.main-in.jsonl",
+        "element.dependencies.main-out.jsonl",
+        "element.dependencies.memory-store-in.jsonl",
+        "element.dependencies.memory-store-out.jsonl",
+        "element.dependencies.store-in.jsonl",
+        "element.dependencies.store-out.jsonl",
+        "element.dependencies.foreign-cursor.jsonl",
+        "element.dependencyEvidence.catalog-endpoint-catalog.jsonl",
+        "element.dependencyEvidence.catalog-store.jsonl",
+        "element.dependencyEvidence.main-string.jsonl",
+        "element.dependencyEvidence.no-pair.jsonl",
+        "element.describe.method.jsonl",
+        "element.describe.unknown.jsonl"
+      })
+  void asPaginasAsEvidenciasEAsRecusasDoInspetorBatemByteAByte(String arquivo) throws Exception {
+    final List<String> l = linhas(arquivo);
+    assertThat(l).as(arquivo + ": requisição e resposta").hasSize(2);
+
+    assertThat(despacharNoMundo(MULTI_MODULO.get(), l.get(0))).isEqualTo(l.get(1));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @CsvSource({
+    "element.describe.api.jsonl, 4",
+    "element.describe.core.jsonl, 4",
+    "element.describe.core-gen.jsonl, 4",
+    "element.describe.core-spi.jsonl, 4",
+    "element.describe.audited.jsonl, 9",
+    "element.describe.catalog.jsonl, 9",
+    "element.describe.catalog-endpoint.jsonl, 9",
+    "element.describe.catalog-entry.jsonl, 9",
+    "element.describe.catalog-metadata.jsonl, 9",
+    "element.describe.kind.jsonl, 9",
+    "element.describe.main.jsonl, 9",
+    "element.describe.memory-store.jsonl, 9",
+    "element.describe.store.jsonl, 9"
+  })
+  void osDetalhesDoMultiModuloBatemComOPageRankDentroDoLimite(String arquivo, int vertices)
+      throws Exception {
+    final List<String> l = linhas(arquivo);
+    assertThat(l).as(arquivo + ": requisição e resposta").hasSize(2);
+
+    compararDetalhe(l.get(1), despacharNoMundo(MULTI_MODULO.get(), l.get(0)), vertices);
+  }
+
+  @Test
+  void oPageRankDoDetalheEODaFatiaNoGoldenENoEmitido() throws Exception {
+    final Mundo mundo = MULTI_MODULO.get();
+    final Map<String, double[]> daFatia = new LinkedHashMap<>();
+    for (final String arquivo :
+        List.of(
+            "graph.slice.package.jsonl",
+            "graph.slice.type.jsonl",
+            "graph.slice.type-api.jsonl",
+            "graph.slice.type-core-gen.jsonl",
+            "graph.slice.type-core-spi.jsonl")) {
+      daFatia.putAll(pageranksLadoALado(arquivo, mundo));
+    }
+    final Map<String, double[]> doDetalhe = new LinkedHashMap<>();
+    for (final String arquivo : DIRIGIDOS_DA_FASE_32) {
+      final boolean detalheOk =
+          arquivo.startsWith("element.describe.")
+              && !arquivo.endsWith(".method.jsonl")
+              && !arquivo.endsWith(".unknown.jsonl");
+      if (!detalheOk) {
+        continue;
+      }
+      final List<String> l = linhas(arquivo);
+      final JsonNode golden = inbound.readTree(l.get(1)).path("payload");
+      final String saida = despacharNoMundo(mundo, l.get(0));
+      final JsonNode emitido = inbound.readTree(saida).path("payload");
+      assertThat(emitido.path("graph").path("pagerank").isNumber())
+          .as(arquivo + ": a resposta foi " + saida)
+          .isTrue();
+      doDetalhe.put(
+          golden.path("elementId").asText(),
+          new double[] {
+            golden.path("graph").path("pagerank").doubleValue(),
+            emitido.path("graph").path("pagerank").doubleValue()
+          });
+    }
+
+    assertThat(doDetalhe).as("os treze detalhes").hasSize(13);
+    for (final Map.Entry<String, double[]> detalhe : doDetalhe.entrySet()) {
+      final double[] fatia = daFatia.get(detalhe.getKey());
+      assertThat(fatia).as(detalhe.getKey() + ": a fatia desenha o nó").isNotNull();
+      assertThat(bits(detalhe.getValue()[0]))
+          .as(detalhe.getKey() + ": o golden do detalhe é o da fatia")
+          .isEqualTo(bits(fatia[0]));
+      assertThat(bits(detalhe.getValue()[1]))
+          .as(detalhe.getKey() + ": o detalhe emitido é o nó emitido, bit a bit")
+          .isEqualTo(bits(fatia[1]));
+    }
+    verificarEmpates(doDetalhe);
+  }
+
+  private void compararDetalhe(String golden, String emitido, int vertices) throws IOException {
+    final JsonNode doGolden = inbound.readTree(golden).path("payload").path("graph");
+    final JsonNode doEmitido = inbound.readTree(emitido).path("payload").path("graph");
+    final boolean mesmaForma =
+        doEmitido.path("pagerank").isNumber()
+            && tokens(emitido).size() == 1
+            && tokens(golden).size() == 1;
+    if (mesmaForma) {
+      final double porNo =
+          AnalysisConstants.PAGERANK_DAMPING
+              / (1 - AnalysisConstants.PAGERANK_DAMPING)
+              * vertices
+              * AnalysisConstants.PAGERANK_TOLERANCE;
+      assertThat(doEmitido.path("pagerank").doubleValue())
+          .as("dentro de d/(1−d)·N·TOL do oráculo")
+          .isCloseTo(doGolden.path("pagerank").doubleValue(), within(porNo));
+    }
+    assertThat(emitido)
+        .as("os bytes, com o pagerank emitido no lugar do golden")
+        .isEqualTo(mesmaForma ? substituirPageRank(golden, tokens(emitido)) : golden);
   }
 
   private static void escreverOMundoAgregado(Path repositorio) throws Exception {
