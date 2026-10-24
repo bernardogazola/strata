@@ -36,22 +36,28 @@ import {
   type GraphViewParams,
   outlineChildrenQueryOptions,
 } from "@/queries/options";
+import {
+  DRILLED_CHILDREN,
+  DRILLED_PACKAGE_ID,
+  outlinePageOf,
+  ROOT_ITEMS,
+} from "@/test/fixture-graph";
 
 const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
-const BILLING = "pkg:br.pucpr.billing";
-const ORDERS = "pkg:br.pucpr.orders";
-const SHARED = "pkg:br.pucpr.shared";
-const ORDER = "type:br.pucpr.orders.Order";
-const ORDER_SERVICE = "type:br.pucpr.orders.OrderService";
-const PAYMENT_GATEWAY = "type:br.pucpr.orders.PaymentGateway";
-const INVOICE = "type:br.pucpr.billing.Invoice";
+
+const ROOT_IDS = ROOT_ITEMS.map((item) => item.id);
+const DRILLED = DRILLED_PACKAGE_ID;
+const DRILLED_TYPE_IDS = DRILLED_CHILDREN.map((item) => item.id);
+const FIRST_PACKAGE = ROOT_IDS[0] ?? "";
+const LAST_PACKAGE = ROOT_IDS.at(-1) ?? "";
+const SELECTED_TYPE = DRILLED_TYPE_IDS[1] ?? "";
 
 const NEXT_CURSOR = "Y3Vyc29yLTI";
 
 const RIGHT_TO_LEFT_OVERRIDE = String.fromCodePoint(0x20_2e);
 
 const LEVEL_ONE: GraphViewParams = { level: "PACKAGE" };
-const ordersTypes: GraphViewParams = { level: "TYPE", parentId: ORDERS };
+const drilledTypes: GraphViewParams = { level: "TYPE", parentId: DRILLED };
 
 const VIEWPORT = { height: 400, width: 320 } as const;
 
@@ -81,17 +87,35 @@ const typeNode = (id: string, label: string): OutlineNode => ({
   label,
 });
 
-const ROOT_NODES = [
-  packageNode(BILLING, "billing", 12),
-  packageNode(ORDERS, "orders", 3),
-  packageNode(SHARED, "shared", 5),
-] as const;
+const PAGE_ONE = ROOT_ITEMS.slice(0, 2);
+const PAGE_TWO = ROOT_ITEMS.slice(2);
+const FIRST_OF_PAGE_TWO = PAGE_TWO[0]?.id ?? "";
 
-const ORDERS_TYPES = [
-  typeNode(ORDER, "Order"),
-  typeNode(ORDER_SERVICE, "OrderService"),
-  typeNode(PAYMENT_GATEWAY, "PaymentGateway"),
-] as const;
+const withChildren = (
+  parentId: string,
+  childIds: readonly string[]
+): string[] =>
+  ROOT_IDS.flatMap((id) => (id === parentId ? [id, ...childIds] : [id]));
+
+const rootAria = (open: string | null = null) =>
+  ROOT_ITEMS.map((item, index) => ({
+    expanded: String(item.id === open),
+    id: item.id,
+    level: "1",
+    posinset: String(index + 1),
+    selected: "false",
+    setsize: String(ROOT_ITEMS.length),
+  }));
+
+const drilledTypeAria = () =>
+  DRILLED_TYPE_IDS.map((id, index) => ({
+    expanded: null,
+    id,
+    level: "2",
+    posinset: String(index + 1),
+    selected: "false",
+    setsize: String(DRILLED_TYPE_IDS.length),
+  }));
 
 const overrideOutline = (
   entries: readonly (readonly [string | null, unknown])[]
@@ -104,6 +128,14 @@ const overrideOutline = (
       result,
     })) satisfies readonly FakeTranscriptOverride[]
   );
+};
+
+const failChildrenOf = (packageId: string): void => {
+  overrideOutline([[packageId, { notAPage: true }]]);
+};
+
+const serveFixtures = (): void => {
+  overrideOutline([]);
 };
 
 const mockPagedOutline = (
@@ -265,7 +297,7 @@ describe("ArchitectureOutline: o caminho de dados", () => {
     const request = vi.spyOn(transport, "request");
     renderOutline();
 
-    await waitForRows(3);
+    await waitForRows(ROOT_IDS.length);
 
     expect(request.mock.calls.map(([method]) => method)).toStrictEqual([
       "outline.children",
@@ -278,48 +310,25 @@ describe("ArchitectureOutline: o caminho de dados", () => {
     });
   });
 
-  test("nível 1: os três pacotes da fixture, na ordem do Java, com o ARIA exato", async () => {
+  test("nível 1: os pacotes da fixture, na ordem do Java, com o ARIA exato", async () => {
     renderOutline();
 
-    const rows = await waitForRows(3);
+    const rows = await waitForRows(ROOT_IDS.length);
 
     expect(screen.getByRole("tree", { name: t.outline.title })).toBeDefined();
     expect(
       screen.getByRole("heading", { level: 2, name: t.outline.title })
     ).toBeDefined();
-    expect(rows.map(ariaOf)).toStrictEqual([
-      {
-        expanded: "false",
-        id: BILLING,
-        level: "1",
-        posinset: "1",
-        selected: "false",
-        setsize: "3",
-      },
-      {
-        expanded: "false",
-        id: ORDERS,
-        level: "1",
-        posinset: "2",
-        selected: "false",
-        setsize: "3",
-      },
-      {
-        expanded: "false",
-        id: SHARED,
-        level: "1",
-        posinset: "3",
-        selected: "false",
-        setsize: "3",
-      },
-    ]);
-    expect(rows.map(labelOf)).toStrictEqual(["billing", "orders", "shared"]);
+    expect(rows.map(ariaOf)).toStrictEqual(rootAria());
+    expect(rows.map(labelOf)).toStrictEqual(
+      ROOT_ITEMS.map((item) => item.label)
+    );
   });
 
   test("o título nomeia a árvore, e a estrutura não abre um landmark com o mesmo nome dentro do aside", async () => {
     renderOutline();
 
-    await waitForRows(3);
+    await waitForRows(ROOT_IDS.length);
 
     expect(screen.getByRole("tree", { name: t.outline.title })).toBeDefined();
     expect(screen.queryAllByRole("region")).toStrictEqual([]);
@@ -328,7 +337,7 @@ describe("ArchitectureOutline: o caminho de dados", () => {
   test("a dica de teclado fica logo sob o título, no recuo dele, e descreve a árvore", async () => {
     renderOutline();
 
-    await waitForRows(3);
+    await waitForRows(ROOT_IDS.length);
 
     const tree = screen.getByRole("tree", { name: t.outline.title });
     expect(tree).toHaveAccessibleDescription(t.outline.keyboardHint);
@@ -346,73 +355,29 @@ describe("ArchitectureOutline: o caminho de dados", () => {
   test("a contagem de tipos é visível ao olho e dita por extenso ao leitor de tela", async () => {
     renderOutline();
 
-    const [billing] = await waitForRows(3);
-    if (billing === undefined) {
-      throw new Error("sem linha de billing");
-    }
+    await waitForRows(ROOT_IDS.length);
+    const drilled = rowById(DRILLED);
+    const count = String(DRILLED_TYPE_IDS.length);
 
-    const visible = within(billing).getByText("12");
+    const visible = within(drilled).getByText(count);
     expect(visible.closest('[aria-hidden="true"]')).not.toBeNull();
-    expect(within(billing).getByText("12 tipos").className).toContain(
+    expect(within(drilled).getByText(`${count} tipos`).className).toContain(
       "sr-only"
     );
   });
 
-  test("nível TYPE de orders: os filhos logo abaixo do pacote aberto, e os níveis certos", async () => {
+  test("nível TYPE do pacote aberto: os filhos logo abaixo dele, e os níveis certos", async () => {
     const request = vi.spyOn(transport, "request");
-    renderOutline({ view: ordersTypes });
+    renderOutline({ view: drilledTypes });
 
-    const rows = await waitForRows(6);
+    const rows = await waitForRows(ROOT_IDS.length + DRILLED_TYPE_IDS.length);
 
+    const roots = rootAria(DRILLED);
+    const at = ROOT_IDS.indexOf(DRILLED) + 1;
     expect(rows.map(ariaOf)).toStrictEqual([
-      {
-        expanded: "false",
-        id: BILLING,
-        level: "1",
-        posinset: "1",
-        selected: "false",
-        setsize: "3",
-      },
-      {
-        expanded: "true",
-        id: ORDERS,
-        level: "1",
-        posinset: "2",
-        selected: "false",
-        setsize: "3",
-      },
-      {
-        expanded: null,
-        id: ORDER,
-        level: "2",
-        posinset: "1",
-        selected: "false",
-        setsize: "3",
-      },
-      {
-        expanded: null,
-        id: ORDER_SERVICE,
-        level: "2",
-        posinset: "2",
-        selected: "false",
-        setsize: "3",
-      },
-      {
-        expanded: null,
-        id: PAYMENT_GATEWAY,
-        level: "2",
-        posinset: "3",
-        selected: "false",
-        setsize: "3",
-      },
-      {
-        expanded: "false",
-        id: SHARED,
-        level: "1",
-        posinset: "3",
-        selected: "false",
-        setsize: "3",
-      },
+      ...roots.slice(0, at),
+      ...drilledTypeAria(),
+      ...roots.slice(at),
     ]);
     expect(request.mock.calls.map(([method]) => method)).toStrictEqual([
       "outline.children",
@@ -422,28 +387,28 @@ describe("ArchitectureOutline: o caminho de dados", () => {
       request.mock.calls.map(
         ([, payload]) => (payload as { readonly parentId: unknown }).parentId
       )
-    ).toStrictEqual([null, ORDERS]);
+    ).toStrictEqual([null, DRILLED]);
   });
 
   test("aria-selected é o focus da URL, em toda linha real", async () => {
-    renderOutline({ focus: ORDER_SERVICE, view: ordersTypes });
+    renderOutline({ focus: SELECTED_TYPE, view: drilledTypes });
 
-    const rows = await waitForRows(6);
+    const rows = await waitForRows(ROOT_IDS.length + DRILLED_TYPE_IDS.length);
 
     expect(
       rows.filter((row) => row.getAttribute("aria-selected") === "true")
-    ).toStrictEqual([rowById(ORDER_SERVICE)]);
+    ).toStrictEqual([rowById(SELECTED_TYPE)]);
     expect(
       rows.every((row) => row.getAttribute("aria-selected") !== null)
     ).toBe(true);
   });
 
   test("as raias: o tipo recua 20 px e guarda a seta vazia, e o ícone dele cai sob o nome do pacote", async () => {
-    renderOutline({ focus: ORDER_SERVICE, view: ordersTypes });
-    await waitForRows(6);
+    renderOutline({ focus: SELECTED_TYPE, view: drilledTypes });
+    await waitForRows(ROOT_IDS.length + DRILLED_TYPE_IDS.length);
 
-    const [chevron, packageIcon, packageName] = rowById(ORDERS).children;
-    const [emptyChevron, typeIcon, typeName] = rowById(ORDER).children;
+    const [chevron, packageIcon, packageName] = rowById(DRILLED).children;
+    const [emptyChevron, typeIcon, typeName] = rowById(SELECTED_TYPE).children;
     expect(chevron?.hasAttribute("data-chevron")).toBe(true);
     expect(chevron?.classList.contains("w-3.5")).toBe(true);
     expect(emptyChevron?.hasAttribute("data-chevron")).toBe(false);
@@ -454,34 +419,34 @@ describe("ArchitectureOutline: o caminho de dados", () => {
     }
     expect(packageName?.tagName).toBe("BDI");
     expect(typeName?.tagName).toBe("BDI");
-    expect(rowById(ORDERS).classList.contains("pl-2")).toBe(true);
-    expect(rowById(ORDER).classList.contains("pl-7")).toBe(true);
+    expect(rowById(DRILLED).classList.contains("pl-2")).toBe(true);
+    expect(rowById(SELECTED_TYPE).classList.contains("pl-7")).toBe(true);
 
     expect(screen.getByRole("tree").querySelector(".font-mono")).toBeNull();
   });
 
   test("a linha selecionada sobe e marca o ícone no acento; nenhuma outra o faz", async () => {
-    renderOutline({ focus: ORDER_SERVICE, view: ordersTypes });
-    const rows = await waitForRows(6);
+    renderOutline({ focus: SELECTED_TYPE, view: drilledTypes });
+    const rows = await waitForRows(ROOT_IDS.length + DRILLED_TYPE_IDS.length);
 
     const accented = rows.filter(
       (row) => row.querySelector(".border-accent-strong") !== null
     );
-    expect(accented).toStrictEqual([rowById(ORDER_SERVICE)]);
+    expect(accented).toStrictEqual([rowById(SELECTED_TYPE)]);
   });
 });
 
 describe("ArchitectureOutline: páginas", () => {
   const PAGED_ROOT = {
-    first: { items: ROOT_NODES.slice(0, 2), nextCursor: NEXT_CURSOR },
-    next: { items: ROOT_NODES.slice(2), nextCursor: null },
+    first: { items: PAGE_ONE, nextCursor: NEXT_CURSOR },
+    next: { items: PAGE_TWO, nextCursor: null },
   };
 
   test("a raiz com cursor mostra carregar mais; ativá-lo pede a página 2 pelo cursor e foca a primeira linha nova", async () => {
     const request = mockPagedOutline({ root: PAGED_ROOT });
     renderOutline();
 
-    const rows = await waitForRows(3);
+    const rows = await waitForRows(PAGE_ONE.length + 1);
     const [, , more] = rows;
     if (more === undefined) {
       throw new Error("sem linha de carregar mais");
@@ -504,43 +469,45 @@ describe("ArchitectureOutline: páginas", () => {
     fireEvent.click(more);
 
     await waitFor(() =>
-      expect(treeItems().map((row) => row.dataset.elementId)).toStrictEqual([
-        BILLING,
-        ORDERS,
-        SHARED,
-      ])
+      expect(treeItems().map((row) => row.dataset.elementId)).toStrictEqual(
+        ROOT_IDS
+      )
     );
-    expect(treeItems().map((row) => ariaOf(row).setsize)).toStrictEqual([
-      "3",
-      "3",
-      "3",
-    ]);
+    expect(treeItems().map((row) => ariaOf(row).setsize)).toStrictEqual(
+      ROOT_IDS.map(() => String(ROOT_IDS.length))
+    );
     expect(outlineCalls(request).map(([, payload]) => payload)).toStrictEqual([
       { analysisId: AN, cursor: undefined, limit: 500, parentId: null },
       { analysisId: AN, cursor: NEXT_CURSOR, limit: 500, parentId: null },
     ]);
-    await waitFor(() => expect(document.activeElement).toBe(rowById(SHARED)));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(rowById(FIRST_OF_PAGE_TWO))
+    );
   });
 
   test("um pacote com mais tipos que a página: setsize é o childCount e o carregar mais diz quantos", async () => {
     mockPagedOutline({
-      [ORDERS]: {
-        first: { items: ORDERS_TYPES.slice(0, 2), nextCursor: NEXT_CURSOR },
-        next: { items: ORDERS_TYPES.slice(2), nextCursor: null },
+      [DRILLED]: {
+        first: { items: DRILLED_CHILDREN.slice(0, 2), nextCursor: NEXT_CURSOR },
+        next: { items: DRILLED_CHILDREN.slice(2), nextCursor: null },
       },
-      root: { first: { items: ROOT_NODES, nextCursor: null }, next: null },
+      root: { first: { items: ROOT_ITEMS, nextCursor: null }, next: null },
     });
-    renderOutline({ view: ordersTypes });
+    renderOutline({ view: drilledTypes });
 
-    const rows = await waitForRows(6);
-    const [, , , , more] = rows;
+    const rows = await waitForRows(ROOT_IDS.length + 3);
+    const at = ROOT_IDS.indexOf(DRILLED) + 1;
+    const total = String(DRILLED_TYPE_IDS.length);
+    const more = rows[at + 2];
 
-    expect(rows.slice(2, 4).map((row) => ariaOf(row).setsize)).toStrictEqual([
-      "3",
-      "3",
-    ]);
+    expect(
+      rows.slice(at, at + 2).map((row) => ariaOf(row).setsize)
+    ).toStrictEqual([total, total]);
     expect(more?.textContent).toBe(
-      interpolate(t.outline.loadMore.TYPE, { shown: 2, total: 3 })
+      interpolate(t.outline.loadMore.TYPE, {
+        shown: 2,
+        total: DRILLED_TYPE_IDS.length,
+      })
     );
     expect(more === undefined ? null : ariaOf(more)).toStrictEqual({
       expanded: null,
@@ -548,43 +515,38 @@ describe("ArchitectureOutline: páginas", () => {
       level: "2",
       posinset: "3",
       selected: null,
-      setsize: "3",
+      setsize: total,
     });
   });
 
   test("busca até achar: um focus na página 2 traz a página 2 sozinho e a marca selecionada", async () => {
     const request = mockPagedOutline({ root: PAGED_ROOT });
-    renderOutline({ focus: SHARED });
+    renderOutline({ focus: LAST_PACKAGE });
 
     await waitFor(() =>
-      expect(rowById(SHARED).getAttribute("aria-selected")).toBe("true")
+      expect(rowById(LAST_PACKAGE).getAttribute("aria-selected")).toBe("true")
     );
-    expect(treeItems()).toHaveLength(3);
+    expect(treeItems()).toHaveLength(ROOT_IDS.length);
     expect(outlineCalls(request)).toHaveLength(2);
   });
 
   test("busca até achar: o pacote aberto na página 2 traz a página 2 e os filhos dele", async () => {
+    const lastChildren = outlinePageOf(LAST_PACKAGE);
     mockPagedOutline({
-      [SHARED]: {
-        first: {
-          items: [typeNode("type:br.pucpr.shared.Money", "Money")],
-          nextCursor: null,
-        },
-        next: null,
-      },
+      [LAST_PACKAGE]: { first: lastChildren, next: null },
       root: PAGED_ROOT,
     });
-    renderOutline({ view: { level: "TYPE", parentId: SHARED } });
+    renderOutline({ view: { level: "TYPE", parentId: LAST_PACKAGE } });
 
-    const rows = await waitForRows(4);
+    const rows = await waitForRows(ROOT_IDS.length + lastChildren.items.length);
 
-    expect(rows.map((row) => row.dataset.elementId)).toStrictEqual([
-      BILLING,
-      ORDERS,
-      SHARED,
-      "type:br.pucpr.shared.Money",
-    ]);
-    expect(ariaOf(rowById(SHARED)).expanded).toBe("true");
+    expect(rows.map((row) => row.dataset.elementId)).toStrictEqual(
+      withChildren(
+        LAST_PACKAGE,
+        lastChildren.items.map((item) => item.id)
+      )
+    );
+    expect(ariaOf(rowById(LAST_PACKAGE)).expanded).toBe("true");
   });
 
   test("carregar mais durante uma atualização espera ela terminar, então pede a página 2 e foca o primeiro pacote novo", async () => {
@@ -592,7 +554,7 @@ describe("ArchitectureOutline: páginas", () => {
     const refresh = deferred();
     const request = mockPagedOutline({ root: PAGED_ROOT });
     renderOutline({ client });
-    const [, , more] = await waitForRows(3);
+    const [, , more] = await waitForRows(PAGE_ONE.length + 1);
     if (more === undefined) {
       throw new Error("sem linha de carregar mais");
     }
@@ -613,7 +575,9 @@ describe("ArchitectureOutline: páginas", () => {
       await refreshed;
     });
 
-    await waitFor(() => expect(document.activeElement).toBe(rowById(SHARED)));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(rowById(FIRST_OF_PAGE_TWO))
+    );
     expect(cursorsOf(request)).toStrictEqual([
       undefined,
       undefined,
@@ -631,7 +595,7 @@ describe("ArchitectureOutline: páginas", () => {
           : nextPage.promise
       );
     renderOutline();
-    const [, , more] = await waitForRows(3);
+    const [, , more] = await waitForRows(PAGE_ONE.length + 1);
     if (more === undefined) {
       throw new Error("sem linha de carregar mais");
     }
@@ -647,7 +611,9 @@ describe("ArchitectureOutline: páginas", () => {
       await nextPage.promise;
     });
 
-    await waitFor(() => expect(document.activeElement).toBe(rowById(SHARED)));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(rowById(FIRST_OF_PAGE_TWO))
+    );
     await settle();
     expect(cursorsOf(request)).toStrictEqual([undefined, NEXT_CURSOR]);
   });
@@ -658,8 +624,11 @@ describe("ArchitectureOutline: busca até achar, com o bridge que responde na ho
     packageNode(`pkg:${label}`, label, label === "p2" ? 1 : 0)
   );
   const MONEY = typeNode("type:p2.Money", "Money");
-  const FOUR_ORDERS_TYPES = ["T0", "T1", "T2", "T3"].map((label) =>
-    typeNode(`type:br.pucpr.orders.${label}`, label)
+  const FOUR_DRILLED_TYPES = ["T0", "T1", "T2", "T3"].map((label) =>
+    typeNode(`type:${DRILLED.slice("pkg:".length)}.${label}`, label)
+  );
+  const DRILLED_ALONE = ROOT_ITEMS.filter((item) => item.id === DRILLED).map(
+    (item) => ({ ...item, childCount: FOUR_DRILLED_TYPES.length })
   );
 
   test("um focus na página 4 da raiz pede as páginas 2, 3 e 4, cada cursor uma vez, e a marca selecionada", async () => {
@@ -702,18 +671,18 @@ describe("ArchitectureOutline: busca até achar, com o bridge que responde na ho
 
   test("um tipo na página 4 dos filhos: os tipos são pedidos até ele", async () => {
     const request = mockInstantPages({
-      [ORDERS]: FOUR_ORDERS_TYPES,
-      root: [packageNode(ORDERS, "orders", 4)],
+      [DRILLED]: FOUR_DRILLED_TYPES,
+      root: DRILLED_ALONE,
     });
-    const lastType = FOUR_ORDERS_TYPES.at(-1)?.id ?? "";
-    renderOutline({ focus: lastType, view: ordersTypes });
+    const lastType = FOUR_DRILLED_TYPES.at(-1)?.id ?? "";
+    renderOutline({ focus: lastType, view: drilledTypes });
 
     await waitFor(() =>
       expect(rowById(lastType).getAttribute("aria-selected")).toBe("true")
     );
     await settle();
 
-    expect(cursorsOf(request, ORDERS)).toStrictEqual([
+    expect(cursorsOf(request, DRILLED)).toStrictEqual([
       undefined,
       ...PAGE_CURSORS,
     ]);
@@ -805,7 +774,7 @@ describe("ArchitectureOutline: estados", () => {
         const { cursor } = payload as { readonly cursor?: string };
         if (cursor === undefined) {
           return Promise.resolve({
-            items: ROOT_NODES.slice(0, 2),
+            items: PAGE_ONE,
             nextCursor: NEXT_CURSOR,
           });
         }
@@ -814,13 +783,13 @@ describe("ArchitectureOutline: estados", () => {
           return Promise.reject(new Error("a página 2 caiu"));
         }
         return Promise.resolve({
-          items: ROOT_NODES.slice(2),
+          items: PAGE_TWO,
           nextCursor: null,
         });
       });
     renderOutline();
 
-    const [, , more] = await waitForRows(3);
+    const [, , more] = await waitForRows(PAGE_ONE.length + 1);
     if (more === undefined) {
       throw new Error("sem linha de carregar mais");
     }
@@ -836,11 +805,9 @@ describe("ArchitectureOutline: estados", () => {
     fireEvent.click(failed);
 
     await waitFor(() =>
-      expect(treeItems().map((row) => row.dataset.elementId)).toStrictEqual([
-        BILLING,
-        ORDERS,
-        SHARED,
-      ])
+      expect(treeItems().map((row) => row.dataset.elementId)).toStrictEqual(
+        ROOT_IDS
+      )
     );
     expect(
       outlineCalls(request).map(
@@ -851,9 +818,10 @@ describe("ArchitectureOutline: estados", () => {
 
   test("os filhos que falham viram uma linha de erro no nível 2; ativá-la pede de novo", async () => {
     const request = vi.spyOn(transport, "request");
-    renderOutline({ view: { level: "TYPE", parentId: BILLING } });
+    failChildrenOf(FIRST_PACKAGE);
+    renderOutline({ view: { level: "TYPE", parentId: FIRST_PACKAGE } });
 
-    const rows = await waitForRows(4);
+    const rows = await waitForRows(ROOT_IDS.length + 1);
     const [, failed] = rows;
     if (failed === undefined) {
       throw new Error("sem linha de erro");
@@ -867,23 +835,21 @@ describe("ArchitectureOutline: estados", () => {
       selected: null,
     });
 
-    overrideOutline([
-      [BILLING, { items: [typeNode(INVOICE, "Invoice")], nextCursor: null }],
-    ]);
+    serveFixtures();
     fireEvent.click(failed);
 
     await waitFor(() =>
-      expect(treeItems().map((row) => row.dataset.elementId)).toStrictEqual([
-        BILLING,
-        INVOICE,
-        ORDERS,
-        SHARED,
-      ])
+      expect(treeItems().map((row) => row.dataset.elementId)).toStrictEqual(
+        withChildren(
+          FIRST_PACKAGE,
+          outlinePageOf(FIRST_PACKAGE).items.map((item) => item.id)
+        )
+      )
     );
     expect(
       outlineCalls(request).filter(
         ([, payload]) =>
-          (payload as { readonly parentId: unknown }).parentId === BILLING
+          (payload as { readonly parentId: unknown }).parentId === FIRST_PACKAGE
       )
     ).toHaveLength(2);
   });
@@ -891,12 +857,12 @@ describe("ArchitectureOutline: estados", () => {
   test("Enter na linha de erro da raiz: a página que chega leva o foco ao primeiro pacote novo, e não ao <body>", async () => {
     const request = mockPagedOutline({
       root: {
-        first: { items: ROOT_NODES.slice(0, 2), nextCursor: NEXT_CURSOR },
-        next: { items: ROOT_NODES.slice(2), nextCursor: null },
+        first: { items: PAGE_ONE, nextCursor: NEXT_CURSOR },
+        next: { items: PAGE_TWO, nextCursor: null },
       },
     });
     renderOutline();
-    const [, , more] = await waitForRows(3);
+    const [, , more] = await waitForRows(PAGE_ONE.length + 1);
     if (more === undefined) {
       throw new Error("sem linha de carregar mais");
     }
@@ -915,30 +881,35 @@ describe("ArchitectureOutline: estados", () => {
 
     fireEvent.keyDown(failed, { key: "Enter" });
 
-    await waitFor(() => expect(document.activeElement).toBe(rowById(SHARED)));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(rowById(FIRST_OF_PAGE_TWO))
+    );
   });
 
   test("Enter na linha de erro dos tipos: o pedido que dá certo leva o foco ao primeiro tipo, e não ao <body>", async () => {
-    renderOutline({ view: { level: "TYPE", parentId: BILLING } });
-    const [, failed] = await waitForRows(4);
+    failChildrenOf(FIRST_PACKAGE);
+    renderOutline({ view: { level: "TYPE", parentId: FIRST_PACKAGE } });
+    const [, failed] = await waitForRows(ROOT_IDS.length + 1);
     if (failed === undefined) {
       throw new Error("sem linha de erro");
     }
     act(() => failed.focus());
 
-    overrideOutline([
-      [BILLING, { items: [typeNode(INVOICE, "Invoice")], nextCursor: null }],
-    ]);
+    serveFixtures();
     fireEvent.keyDown(failed, { key: "Enter" });
 
-    await waitFor(() => expect(document.activeElement).toBe(rowById(INVOICE)));
+    const [firstChild] = outlinePageOf(FIRST_PACKAGE).items;
+    await waitFor(() =>
+      expect(document.activeElement).toBe(rowById(firstChild?.id ?? ""))
+    );
   });
 
   test("Enter na linha de erro dos tipos: falhando de novo, o foco volta à linha de erro", async () => {
     const retried = deferred();
     const request = vi.spyOn(transport, "request");
-    renderOutline({ view: { level: "TYPE", parentId: BILLING } });
-    const [, failed] = await waitForRows(4);
+    failChildrenOf(FIRST_PACKAGE);
+    renderOutline({ view: { level: "TYPE", parentId: FIRST_PACKAGE } });
+    const [, failed] = await waitForRows(ROOT_IDS.length + 1);
     if (failed === undefined) {
       throw new Error("sem linha de erro");
     }
@@ -962,10 +933,10 @@ describe("ArchitectureOutline: estados", () => {
   test("a atualização da raiz que falha mantém os pacotes e diz que não os atualizou; ativá-la refaz a consulta", async () => {
     const client = createQueryClient();
     const request = mockPagedOutline({
-      root: { first: { items: ROOT_NODES, nextCursor: null }, next: null },
+      root: { first: { items: ROOT_ITEMS, nextCursor: null }, next: null },
     });
     renderOutline({ client });
-    await waitForRows(3);
+    await waitForRows(ROOT_IDS.length);
 
     request.mockImplementationOnce(() =>
       Promise.reject(new Error("a atualização caiu"))
@@ -973,33 +944,31 @@ describe("ArchitectureOutline: estados", () => {
     await act(() =>
       client.invalidateQueries({ queryKey: queryKeys.structure.all(AN) })
     );
-    const rows = await waitForRows(4);
-    const [, , , failed] = rows;
+    const rows = await waitForRows(ROOT_IDS.length + 1);
+    const failed = rows.at(-1);
     if (failed === undefined) {
       throw new Error("sem linha de erro");
     }
 
-    expect(rows.slice(0, 3).map((row) => row.dataset.elementId)).toStrictEqual([
-      BILLING,
-      ORDERS,
-      SHARED,
-    ]);
+    expect(rows.slice(0, -1).map((row) => row.dataset.elementId)).toStrictEqual(
+      ROOT_IDS
+    );
     expect(failed.textContent).toBe(t.outline.failedRefresh);
 
     fireEvent.click(failed);
 
-    await waitForRows(3);
+    await waitForRows(ROOT_IDS.length);
     expect(cursorsOf(request)).toStrictEqual([undefined, undefined, undefined]);
   });
 
   test("os filhos a caminho são só visuais: nenhuma linha focável, e a árvore fica ocupada", async () => {
     mockPagedOutline({
-      [ORDERS]: { first: new Promise(() => undefined), next: null },
-      root: { first: { items: ROOT_NODES, nextCursor: null }, next: null },
+      [DRILLED]: { first: new Promise(() => undefined), next: null },
+      root: { first: { items: ROOT_ITEMS, nextCursor: null }, next: null },
     });
-    renderOutline({ view: ordersTypes });
+    renderOutline({ view: drilledTypes });
 
-    await waitForRows(3);
+    await waitForRows(ROOT_IDS.length);
     const loading = screen.getByText(t.outline.loadingTypes);
 
     expect(loading.closest('[aria-hidden="true"]')).not.toBeNull();
@@ -1007,13 +976,13 @@ describe("ArchitectureOutline: estados", () => {
   });
 
   test("um pacote aberto sem tipos mostra o vazio do nível, sem linha focável", async () => {
-    overrideOutline([[ORDERS, { items: [], nextCursor: null }]]);
-    renderOutline({ view: ordersTypes });
+    overrideOutline([[DRILLED, { items: [], nextCursor: null }]]);
+    renderOutline({ view: drilledTypes });
 
     await waitFor(() =>
       expect(screen.getByText(t.graph.empty.TYPE)).toBeDefined()
     );
-    expect(treeItems()).toHaveLength(3);
+    expect(treeItems()).toHaveLength(ROOT_IDS.length);
     expect(screen.getByRole("tree").getAttribute("aria-busy")).toBe("false");
   });
 
@@ -1062,7 +1031,7 @@ describe("ArchitectureOutline: estados", () => {
 
     fireEvent.click(screen.getByRole("button", { name: t.graph.retry }));
 
-    await waitForRows(3);
+    await waitForRows(ROOT_IDS.length);
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
@@ -1157,43 +1126,30 @@ describe("flattenOutline", () => {
     ...overrides,
   });
 
-  const expandedOrders = (
+  const expandedDrilled = (
     nodes: readonly OutlineNode[] | undefined,
     overrides: Partial<OutlineLevel> = {}
   ): ExpandedOutlineLevel => ({
     ...level(nodes, overrides),
-    parentId: ORDERS,
+    parentId: DRILLED,
   });
 
-  test("sem pacote aberto: um nível só, na ordem do Java, sem reordenar nem cortar", () => {
-    const rows = flattenOutline(level(ROOT_NODES), null);
+  const keysWith = (inserted: readonly string[]): string[] =>
+    ROOT_IDS.flatMap((id) => (id === DRILLED ? [id, ...inserted] : [id]));
 
-    expect(rows).toMatchObject([
-      {
+  test("sem pacote aberto: um nível só, na ordem do Java, sem reordenar nem cortar", () => {
+    const rows = flattenOutline(level(ROOT_ITEMS), null);
+
+    expect(rows).toMatchObject(
+      ROOT_IDS.map((key, index) => ({
         expanded: false,
-        key: BILLING,
+        key,
         level: 1,
-        posInSet: 1,
-        setSize: 3,
+        posInSet: index + 1,
+        setSize: ROOT_IDS.length,
         type: "node",
-      },
-      {
-        expanded: false,
-        key: ORDERS,
-        level: 1,
-        posInSet: 2,
-        setSize: 3,
-        type: "node",
-      },
-      {
-        expanded: false,
-        key: SHARED,
-        level: 1,
-        posInSet: 3,
-        setSize: 3,
-        type: "node",
-      },
-    ]);
+      }))
+    );
   });
 
   test("um pacote sem filhos é nó-folha: expanded indefinido, e não falso", () => {
@@ -1203,14 +1159,10 @@ describe("flattenOutline", () => {
   });
 
   test("raiz com próxima página: setsize -1 e a linha more:root no fim", () => {
-    const rows = flattenOutline(
-      level(ROOT_NODES.slice(0, 2), { hasNextPage: true }),
-      null
-    );
+    const rows = flattenOutline(level(PAGE_ONE, { hasNextPage: true }), null);
 
     expect(rows.map((row) => row.key)).toStrictEqual([
-      BILLING,
-      ORDERS,
+      ...PAGE_ONE.map((item) => item.id),
       "more:root",
     ]);
     expect(rows).toMatchObject([
@@ -1230,122 +1182,114 @@ describe("flattenOutline", () => {
 
   test("os filhos do pacote aberto vêm logo depois dele, no nível 2", () => {
     const rows = flattenOutline(
-      level(ROOT_NODES),
-      expandedOrders(ORDERS_TYPES)
+      level(ROOT_ITEMS),
+      expandedDrilled(DRILLED_CHILDREN)
     );
+    const at = ROOT_IDS.indexOf(DRILLED);
+    const children = DRILLED_TYPE_IDS.length;
 
-    expect(rows.map((row) => row.key)).toStrictEqual([
-      BILLING,
-      ORDERS,
-      ORDER,
-      ORDER_SERVICE,
-      PAYMENT_GATEWAY,
-      SHARED,
-    ]);
-    expect(rows).toMatchObject([
-      { expanded: false, level: 1 },
-      { expanded: true, level: 1 },
-      {
+    expect(rows.map((row) => row.key)).toStrictEqual(
+      keysWith(DRILLED_TYPE_IDS)
+    );
+    expect(rows[at]).toMatchObject({ expanded: true, level: 1 });
+    expect(rows.slice(at + 1, at + 1 + children)).toMatchObject(
+      DRILLED_TYPE_IDS.map((_, index) => ({
         expanded: undefined,
         level: 2,
-        parentId: ORDERS,
-        posInSet: 1,
-        setSize: 3,
-      },
-      { level: 2, posInSet: 2, setSize: 3 },
-      { level: 2, posInSet: 3, setSize: 3 },
-      { expanded: false, level: 1, posInSet: 3 },
-    ]);
+        parentId: DRILLED,
+        posInSet: index + 1,
+        setSize: children,
+      }))
+    );
+    expect(rows[at + 1 + children]).toMatchObject({
+      expanded: false,
+      level: 1,
+      posInSet: at + 2,
+    });
   });
 
   test("filhos a caminho, falhos e vazios: uma pseudo-linha de chave estável cada", () => {
     const keysOf = (expanded: ExpandedOutlineLevel) =>
-      flattenOutline(level(ROOT_NODES), expanded).map((row) => [
+      flattenOutline(level(ROOT_ITEMS), expanded).map((row) => [
         row.key,
         row.type,
       ]);
 
-    expect(keysOf(expandedOrders(undefined))).toContainEqual([
-      `loading:${ORDERS}`,
+    expect(keysOf(expandedDrilled(undefined))).toContainEqual([
+      `loading:${DRILLED}`,
       "loading",
     ]);
     expect(
-      keysOf(expandedOrders(undefined, { failure: "load" }))
-    ).toContainEqual([`error:${ORDERS}`, "error"]);
-    expect(keysOf(expandedOrders([]))).toContainEqual([
-      `empty:${ORDERS}`,
+      keysOf(expandedDrilled(undefined, { failure: "load" }))
+    ).toContainEqual([`error:${DRILLED}`, "error"]);
+    expect(keysOf(expandedDrilled([]))).toContainEqual([
+      `empty:${DRILLED}`,
       "empty",
     ]);
-    expect(keysOf(expandedOrders(undefined))[2]).toStrictEqual([
-      `loading:${ORDERS}`,
-      "loading",
-    ]);
+    expect(
+      keysOf(expandedDrilled(undefined))[ROOT_IDS.indexOf(DRILLED) + 1]
+    ).toStrictEqual([`loading:${DRILLED}`, "loading"]);
   });
 
   test("filhos com próxima página: setsize é o childCount do pai e more:<pai> diz quantos", () => {
     const rows = flattenOutline(
-      level(ROOT_NODES),
-      expandedOrders(ORDERS_TYPES.slice(0, 2), { hasNextPage: true })
+      level(ROOT_ITEMS),
+      expandedDrilled(DRILLED_CHILDREN.slice(0, 2), { hasNextPage: true })
     );
+    const at = ROOT_IDS.indexOf(DRILLED);
+    const total = DRILLED_TYPE_IDS.length;
 
-    expect(rows.map((row) => row.key)).toStrictEqual([
-      BILLING,
-      ORDERS,
-      ORDER,
-      ORDER_SERVICE,
-      `more:${ORDERS}`,
-      SHARED,
-    ]);
-    expect(rows[2]).toMatchObject({ setSize: 3 });
-    expect(rows[4]).toMatchObject({
+    expect(rows.map((row) => row.key)).toStrictEqual(
+      keysWith([...DRILLED_TYPE_IDS.slice(0, 2), `more:${DRILLED}`])
+    );
+    expect(rows[at + 1]).toMatchObject({ setSize: total });
+    expect(rows[at + 3]).toMatchObject({
       level: 2,
-      parentId: ORDERS,
+      parentId: DRILLED,
       posInSet: 3,
-      setSize: 3,
+      setSize: total,
       shown: 2,
-      total: 3,
+      total,
       type: "more",
     });
   });
 
   test("a página seguinte que falha: os filhos carregados ficam, e o erro toma o lugar do carregar mais", () => {
     const rows = flattenOutline(
-      level(ROOT_NODES),
-      expandedOrders(ORDERS_TYPES.slice(0, 2), {
+      level(ROOT_ITEMS),
+      expandedDrilled(DRILLED_CHILDREN.slice(0, 2), {
         failure: "nextPage",
         hasNextPage: true,
       })
     );
 
-    expect(rows.map((row) => row.key)).toStrictEqual([
-      BILLING,
-      ORDERS,
-      ORDER,
-      ORDER_SERVICE,
-      `error:${ORDERS}`,
-      SHARED,
-    ]);
+    expect(rows.map((row) => row.key)).toStrictEqual(
+      keysWith([...DRILLED_TYPE_IDS.slice(0, 2), `error:${DRILLED}`])
+    );
   });
 
   test("o pacote aberto que ainda não chegou não recebe filhos", () => {
     const rows = flattenOutline(
-      level(ROOT_NODES.slice(0, 1), { hasNextPage: true }),
-      expandedOrders(ORDERS_TYPES)
+      level(ROOT_ITEMS.slice(0, 1), { hasNextPage: true }),
+      expandedDrilled(DRILLED_CHILDREN)
     );
 
-    expect(rows.map((row) => row.key)).toStrictEqual([BILLING, "more:root"]);
+    expect(rows.map((row) => row.key)).toStrictEqual([
+      FIRST_PACKAGE,
+      "more:root",
+    ]);
   });
 
   test("a raiz sem dados não tem linha; com dados e a página seguinte falha, error:root", () => {
     expect(flattenOutline(level(undefined), null)).toStrictEqual([]);
     expect(
       flattenOutline(
-        level(ROOT_NODES.slice(0, 2), {
+        level(PAGE_ONE, {
           failure: "nextPage",
           hasNextPage: true,
         }),
         null
       ).map((row) => row.key)
-    ).toStrictEqual([BILLING, ORDERS, "error:root"]);
+    ).toStrictEqual([...PAGE_ONE.map((item) => item.id), "error:root"]);
   });
 });

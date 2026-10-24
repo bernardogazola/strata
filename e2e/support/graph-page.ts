@@ -174,18 +174,15 @@ const mapReadyStatus = (): StatusOverride => {
   const report = analysisStatusReportSchema.parse(
     fixtureResponse("analysis.status.completed.jsonl")
   );
-  return {
-    method: "analysis.status",
-    request: {},
-    result: {
-      ...report,
-      stages: report.stages.map((stage) =>
-        stage.stage === "STRUCTURAL_GRAPH"
-          ? { ...stage, status: "COMPLETED" }
-          : stage
-      ),
-    },
-  };
+  const graph = report.stages.find(
+    (stage) => stage.stage === "STRUCTURAL_GRAPH"
+  );
+  if (report.status !== "COMPLETED" || graph?.status !== "COMPLETED") {
+    throw new Error(
+      `analysis.status.completed.jsonl não abre o mapa: execução ${report.status}, STRUCTURAL_GRAPH ${graph?.status}`
+    );
+  }
+  return { method: "analysis.status", request: {}, result: report };
 };
 
 export const MAP_READY_STATUS = mapReadyStatus();

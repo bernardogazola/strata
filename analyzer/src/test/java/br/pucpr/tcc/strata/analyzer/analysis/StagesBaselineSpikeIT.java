@@ -25,6 +25,7 @@ import br.pucpr.tcc.strata.analyzer.analysis.StagesBaselineReport.Walk;
 import br.pucpr.tcc.strata.analyzer.analysis.StagesBaselineReport.Warnings;
 import br.pucpr.tcc.strata.analyzer.analysis.StagesBaselineReport.WrittenException;
 import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
+import br.pucpr.tcc.strata.analyzer.graph.GraphCounters;
 import br.pucpr.tcc.strata.analyzer.persistence.ElementWriter;
 import br.pucpr.tcc.strata.analyzer.persistence.PersistenceRoot;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.ElementDao;
@@ -967,8 +968,13 @@ final class StagesBaselineSpikeIT {
         .assertThat(counters.get(AnalysisStage.SOURCE_ANALYSIS.name()))
         .as(at + "os contadores do SOURCE_ANALYSIS")
         .isEqualTo(expected.sourceAnalysis());
+    softly
+        .assertThat(counters.get(AnalysisStage.STRUCTURAL_GRAPH.name()))
+        .as(at + "os treze contadores do STRUCTURAL_GRAPH")
+        .containsOnlyKeys(GraphCounters.EMPTY.asMap().keySet());
     for (final AnalysisStage stage : AnalysisStage.values()) {
-      if (stage.ordinal() > AnalysisStage.SOURCE_ANALYSIS.ordinal()) {
+      if (stage.ordinal() > AnalysisStage.SOURCE_ANALYSIS.ordinal()
+          && stage != AnalysisStage.STRUCTURAL_GRAPH) {
         softly.assertThat(counters.get(stage.name())).as(at + stage + ": {}").isEmpty();
       }
     }
@@ -996,9 +1002,13 @@ final class StagesBaselineSpikeIT {
 
   private static String expectedStatus(String stage) {
     return switch (AnalysisStage.valueOf(stage)) {
-      case REPOSITORY_VALIDATION, LAYOUT_DISCOVERY, SOURCE_ANALYSIS, PERSISTENCE -> "COMPLETED";
-      case GIT_HISTORY_CHEAP,
+      case REPOSITORY_VALIDATION,
+          LAYOUT_DISCOVERY,
+          SOURCE_ANALYSIS,
           STRUCTURAL_GRAPH,
+          PERSISTENCE ->
+          "COMPLETED";
+      case GIT_HISTORY_CHEAP,
           GIT_HISTORY_DETAILED,
           EVOLUTIONARY_COUPLING,
           HOTSPOT_PROFILES,

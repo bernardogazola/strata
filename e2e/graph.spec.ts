@@ -14,6 +14,7 @@ import {
   type GraphSlice,
   graphSliceSchema,
 } from "@/protocol/graph";
+import { DRILLED_PACKAGE_ID } from "@/test/fixture-graph";
 import {
   BENCHMARK_OUT_ENV,
   benchmarkTypeBudget,
@@ -72,8 +73,7 @@ import {
 
 const ANALYSIS_ID = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 const LEVEL_ONE_URL = `/repository/repo_AAAAAAAAAAAAAAAAAAAAAQ?analysis=${ANALYSIS_ID}`;
-const ORDERS_ID = "pkg:br.pucpr.orders";
-const BILLING_ID = "pkg:br.pucpr.billing";
+const DRILLED_ID = DRILLED_PACKAGE_ID;
 
 const CYTOSCAPE_STYLESHEET_ID = "__________cytoscape_stylesheet";
 const SELECTED_BORDER_WIDTH = `${GRAPH_STYLE.node.selectedBorderWidth}px`;
@@ -86,6 +86,7 @@ const SOFTWARE_RENDERER = /swiftshader/i;
 
 const PACKAGE_IDS = fixtureNodeIds("graph.slice.package.jsonl");
 const TYPE_IDS = fixtureNodeIds("graph.slice.type.jsonl");
+const OTHER_ID = PACKAGE_IDS.find((id) => id !== DRILLED_ID) ?? "";
 
 const sha256 = (text: string): string =>
   createHash("sha256").update(text).digest("hex");
@@ -95,20 +96,22 @@ const contextOptionsOf = (testInfo: TestInfo): BrowserContextOptions => {
   return { baseURL, deviceScaleFactor, viewport };
 };
 
-const expandOrders = async (page: Page): Promise<void> => {
-  const orders = await renderedPosition(page, ORDERS_ID);
-  await page.mouse.dblclick(orders.x, orders.y);
+const expandDrilled = async (page: Page): Promise<void> => {
+  const drilled = await renderedPosition(page, DRILLED_ID);
+  await page.mouse.dblclick(drilled.x, drilled.y);
   await expect
     .poll(() => searchOf(page))
-    .toMatchObject({ level: "TYPE", parent: ORDERS_ID });
+    .toMatchObject({ level: "TYPE", parent: DRILLED_ID });
   await expectGraph(page, TYPE_IDS);
 };
 
-test("o nível 1 da fixture desenha os três pacotes", async ({ page }) => {
+test("o nível 1 da fixture desenha os quatro pacotes do multi-module", async ({
+  page,
+}) => {
   await page.goto(LEVEL_ONE_URL);
 
   await expectGraph(page, PACKAGE_IDS);
-  expect(PACKAGE_IDS).toHaveLength(3);
+  expect(PACKAGE_IDS).toHaveLength(4);
 });
 
 test("o duplo clique em um pacote navega para os tipos dele e os desenha", async ({
@@ -117,12 +120,12 @@ test("o duplo clique em um pacote navega para os tipos dele e os desenha", async
   await page.goto(LEVEL_ONE_URL);
   await expectGraph(page, PACKAGE_IDS);
 
-  await expandOrders(page);
+  await expandDrilled(page);
 
   expect(searchOf(page)).toMatchObject({
     analysis: ANALYSIS_ID,
     level: "TYPE",
-    parent: ORDERS_ID,
+    parent: DRILLED_ID,
   });
 });
 
@@ -131,7 +134,7 @@ test("voltar restaura o nível 1 do cache, sem pedir a fatia de novo", async ({
 }) => {
   await page.goto(LEVEL_ONE_URL);
   await expectGraph(page, PACKAGE_IDS);
-  await expandOrders(page);
+  await expandDrilled(page);
   const requestsBeforeBack = await countMarks(page, GRAPH_PERF.request);
 
   await page.goBack();
@@ -147,23 +150,23 @@ test("um clique seleciona o nó: focus na URL e a borda de 4 px", async ({
 }) => {
   await page.goto(LEVEL_ONE_URL);
   await expectGraph(page, PACKAGE_IDS);
-  expect(await styleOf(page, BILLING_ID, "border-width")).not.toBe(
+  expect(await styleOf(page, OTHER_ID, "border-width")).not.toBe(
     SELECTED_BORDER_WIDTH
   );
-  const billing = await renderedPosition(page, BILLING_ID);
+  const other = await renderedPosition(page, OTHER_ID);
 
-  await page.mouse.click(billing.x, billing.y);
+  await page.mouse.click(other.x, other.y);
 
-  await expect.poll(() => searchOf(page)).toMatchObject({ focus: BILLING_ID });
+  await expect.poll(() => searchOf(page)).toMatchObject({ focus: OTHER_ID });
   await expect
-    .poll(() => styleOf(page, BILLING_ID, "border-width"))
+    .poll(() => styleOf(page, OTHER_ID, "border-width"))
     .toBe(SELECTED_BORDER_WIDTH);
 });
 
 test("Enter no botão do inspetor expande, e o foco vai para a trilha e não para o <body>", async ({
   page,
 }) => {
-  await page.goto(`${LEVEL_ONE_URL}&focus=${ORDERS_ID}`);
+  await page.goto(`${LEVEL_ONE_URL}&focus=${DRILLED_ID}`);
   await expectGraph(page, PACKAGE_IDS);
   await page.getByRole("button", { name: t.inspector.expand }).focus();
 
@@ -200,7 +203,7 @@ test("o seletor de tema reestiliza o canvas com o token escuro", async ({
   await page.goto(LEVEL_ONE_URL);
   await expectGraph(page, PACKAGE_IDS);
   const lightLabel = await tokenAsCytoscapeRgb(page, LABEL_TOKEN);
-  expect(await styleOf(page, ORDERS_ID, "color")).toBe(lightLabel);
+  expect(await styleOf(page, DRILLED_ID, "color")).toBe(lightLabel);
 
   await page.getByRole("button", { name: "Alternar tema" }).click();
   await page.getByRole("menuitemradio", { name: "Escuro" }).click();
@@ -208,7 +211,7 @@ test("o seletor de tema reestiliza o canvas com o token escuro", async ({
   await expect(page.locator("html")).toHaveClass(DARK_CLASS);
   const darkLabel = await tokenAsCytoscapeRgb(page, LABEL_TOKEN);
   expect(darkLabel).not.toBe(lightLabel);
-  await expect.poll(() => styleOf(page, ORDERS_ID, "color")).toBe(darkLabel);
+  await expect.poll(() => styleOf(page, DRILLED_ID, "color")).toBe(darkLabel);
 });
 
 test("duas páginas novas da mesma vista dão as mesmas posições, byte a byte", async ({

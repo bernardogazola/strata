@@ -33,6 +33,9 @@ const initialStore = useAppStore.getState();
 const OTHER_ANALYSIS = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V2X";
 const WORKSPACE_REGION = "Espaço de trabalho (dublê)";
 const WORKSPACE_TITLE = "Mapa (dublê)";
+const COMPLETED_HEADLINE = "9 arquivos Java analisados";
+
+const DELETED_MAP_CARD = /O mapa da arquitetura ainda não é montado/;
 
 type Answer = () => Promise<unknown>;
 
@@ -143,14 +146,15 @@ describe("AnalysisScreen: a tela pelo relatório", () => {
     ).toBeNull();
   });
 
-  test("o grafo pulado nunca monta o espaço de trabalho", async () => {
+  test("o grafo pulado nunca monta o espaço de trabalho: o resumo, e sem cartão do mapa", async () => {
     serveStatus(mapSkipped());
     renderAnalysis();
 
     expect(
-      await screen.findByRole("heading", { name: t.analysis.map.title })
+      await screen.findByRole("heading", { level: 1, name: COMPLETED_HEADLINE })
     ).toBeDefined();
     expect(screen.queryByRole("main", { name: WORKSPACE_REGION })).toBeNull();
+    expect(screen.queryByText(DELETED_MAP_CARD)).toBeNull();
   });
 
   test("FAILED: o motivo e o selo, e nenhum cartão do mapa", async () => {
@@ -176,9 +180,7 @@ describe("AnalysisScreen: a tela pelo relatório", () => {
       })
     ).toBeDefined();
     expect(banner().getByText(t.header.analysis.FAILED)).toBeDefined();
-    expect(
-      screen.queryByRole("heading", { name: t.analysis.map.title })
-    ).toBeNull();
+    expect(screen.queryByText(DELETED_MAP_CARD)).toBeNull();
   });
 });
 
@@ -253,7 +255,7 @@ describe("AnalysisScreen: o foco quando a tela troca", () => {
     serveStatus(mapSkipped());
     renderAnalysis(false);
 
-    await screen.findByRole("heading", { name: t.analysis.map.title });
+    await screen.findByRole("heading", { level: 1, name: COMPLETED_HEADLINE });
 
     expect(document.activeElement).toBe(document.body);
   });
@@ -264,7 +266,7 @@ describe("AnalysisScreen: o foco quando a tela troca", () => {
 
     const title = await screen.findByRole("heading", {
       level: 1,
-      name: "9 arquivos Java analisados",
+      name: COMPLETED_HEADLINE,
     });
 
     await waitFor(() => {
@@ -287,7 +289,7 @@ describe("AnalysisScreen: o foco quando a tela troca", () => {
     close.focus();
 
     deliver(mapSkipped());
-    await screen.findByRole("heading", { name: t.analysis.map.title });
+    await screen.findByRole("heading", { level: 1, name: COMPLETED_HEADLINE });
 
     expect(document.activeElement).toBe(close);
   });
@@ -403,8 +405,6 @@ describe("AnalysisScreen: o analisador para no meio da execução", () => {
 });
 
 describe("AnalysisScreen: o anúncio do fim da execução", () => {
-  const COMPLETED_HEADLINE = "9 arquivos Java analisados";
-
   const announcer = (): HTMLElement => {
     const regions = [
       ...document.querySelectorAll<HTMLElement>('[aria-live="polite"]'),

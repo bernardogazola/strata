@@ -19,12 +19,12 @@ import {
 } from "@/features/outline/use-outline";
 import type { OutlineNode } from "@/protocol/graph";
 
-const BILLING = "pkg:br.pucpr.billing";
-const ORDERS = "pkg:br.pucpr.orders";
-const SHARED = "pkg:br.pucpr.shared";
-const EMPTY_PACKAGE = "pkg:br.pucpr.empty";
-const ORDER = "type:br.pucpr.orders.Order";
-const ORDER_SERVICE = "type:br.pucpr.orders.OrderService";
+const API = "pkg:br.pucpr.legacy.api";
+const CORE = "pkg:br.pucpr.legacy.core";
+const SPI = "pkg:br.pucpr.legacy.core.spi";
+const EMPTY_PACKAGE = "pkg:br.pucpr.legacy.empty";
+const CATALOG = "type:br.pucpr.legacy.core.Catalog";
+const CATALOG_ENTRY = "type:br.pucpr.legacy.core.CatalogEntry";
 
 const RIGHT_TO_LEFT_OVERRIDE = String.fromCodePoint(0x20_2e);
 
@@ -42,10 +42,10 @@ const typeNode = (id: string, label: string): OutlineNode => ({
 });
 
 const ROOT = [
-  packageNode(BILLING, "billing", 12),
-  packageNode(ORDERS, "orders", 2),
+  packageNode(API, "api", 2),
+  packageNode(CORE, "core", 2),
   packageNode(EMPTY_PACKAGE, "empty", 0),
-  packageNode(SHARED, "shared", 5),
+  packageNode(SPI, "core.spi", 2),
 ];
 
 const settled = (nodes: readonly OutlineNode[] | undefined) => ({
@@ -58,22 +58,22 @@ const OPEN_ROWS = flattenOutline(
   { ...settled(ROOT), hasNextPage: true },
   {
     ...settled([
-      typeNode(ORDER, "Order"),
-      typeNode(ORDER_SERVICE, "OrderService"),
+      typeNode(CATALOG, "Catalog"),
+      typeNode(CATALOG_ENTRY, "CatalogEntry"),
     ]),
-    parentId: ORDERS,
+    parentId: CORE,
   }
 );
 
 const LOADING_ROWS = flattenOutline(settled(ROOT), {
   ...settled(undefined),
-  parentId: ORDERS,
+  parentId: CORE,
 });
 
 const FAILED_ROWS = flattenOutline(settled(ROOT), {
   ...settled(undefined),
   failure: "load",
-  parentId: ORDERS,
+  parentId: CORE,
 });
 
 const indexByKeyOf = (rows: readonly OutlineRow[]) =>
@@ -95,122 +95,119 @@ const moveTarget = (intent: ReturnType<typeof intentOf>) =>
 
 describe("intentOf: setas, Home e End", () => {
   test("↓ e ↑ andam uma linha focável, e passam pelas pseudo-linhas focáveis", () => {
-    const shared = OPEN_ROWS.findIndex((row) => row.key === SHARED);
+    const spi = OPEN_ROWS.findIndex((row) => row.key === SPI);
 
     expect(
-      keyAt(OPEN_ROWS, moveTarget(intentOf("ArrowDown", OPEN_ROWS, 0, ORDERS)))
-    ).toBe(ORDERS);
+      keyAt(OPEN_ROWS, moveTarget(intentOf("ArrowDown", OPEN_ROWS, 0, CORE)))
+    ).toBe(CORE);
     expect(
-      keyAt(
-        OPEN_ROWS,
-        moveTarget(intentOf("ArrowDown", OPEN_ROWS, shared, ORDERS))
-      )
+      keyAt(OPEN_ROWS, moveTarget(intentOf("ArrowDown", OPEN_ROWS, spi, CORE)))
     ).toBe("more:root");
     expect(
-      intentOf("ArrowDown", OPEN_ROWS, OPEN_ROWS.length - 1, ORDERS)
+      intentOf("ArrowDown", OPEN_ROWS, OPEN_ROWS.length - 1, CORE)
     ).toBeNull();
-    expect(intentOf("ArrowUp", OPEN_ROWS, 0, ORDERS)).toBeNull();
+    expect(intentOf("ArrowUp", OPEN_ROWS, 0, CORE)).toBeNull();
   });
 
   test("as linhas só visuais ficam de fora: ↓ do pacote aberto pula os tipos a caminho", () => {
     expect(
       keyAt(
         LOADING_ROWS,
-        moveTarget(intentOf("ArrowDown", LOADING_ROWS, 1, ORDERS))
+        moveTarget(intentOf("ArrowDown", LOADING_ROWS, 1, CORE))
       )
     ).toBe(EMPTY_PACKAGE);
     expect(
       keyAt(
         LOADING_ROWS,
-        moveTarget(intentOf("ArrowUp", LOADING_ROWS, 3, ORDERS))
+        moveTarget(intentOf("ArrowUp", LOADING_ROWS, 3, CORE))
       )
-    ).toBe(ORDERS);
+    ).toBe(CORE);
   });
 
   test("Home vai à primeira linha e End à última, que pode ser o carregar mais", () => {
     expect(
-      keyAt(OPEN_ROWS, moveTarget(intentOf("Home", OPEN_ROWS, 4, ORDERS)))
-    ).toBe(BILLING);
+      keyAt(OPEN_ROWS, moveTarget(intentOf("Home", OPEN_ROWS, 4, CORE)))
+    ).toBe(API);
     expect(
-      keyAt(OPEN_ROWS, moveTarget(intentOf("End", OPEN_ROWS, 0, ORDERS)))
+      keyAt(OPEN_ROWS, moveTarget(intentOf("End", OPEN_ROWS, 0, CORE)))
     ).toBe("more:root");
   });
 
   test("Enter e Espaço ativam; o resto, inclusive o *, não pede nada", () => {
-    expect(intentOf("Enter", OPEN_ROWS, 0, ORDERS)).toStrictEqual({
+    expect(intentOf("Enter", OPEN_ROWS, 0, CORE)).toStrictEqual({
       type: "activate",
     });
-    expect(intentOf(" ", OPEN_ROWS, 0, ORDERS)).toStrictEqual({
+    expect(intentOf(" ", OPEN_ROWS, 0, CORE)).toStrictEqual({
       type: "activate",
     });
-    expect(intentOf("*", OPEN_ROWS, 0, ORDERS)).toBeNull();
-    expect(intentOf("PageDown", OPEN_ROWS, 0, ORDERS)).toBeNull();
+    expect(intentOf("*", OPEN_ROWS, 0, CORE)).toBeNull();
+    expect(intentOf("PageDown", OPEN_ROWS, 0, CORE)).toBeNull();
   });
 });
 
 describe("intentOf: → e ←", () => {
   test("→ em um pacote fechado com tipos pede para abrir; em um pacote sem tipos, nada", () => {
-    expect(intentOf("ArrowRight", OPEN_ROWS, 0, ORDERS)).toStrictEqual({
-      packageId: BILLING,
+    expect(intentOf("ArrowRight", OPEN_ROWS, 0, CORE)).toStrictEqual({
+      packageId: API,
       type: "expand",
     });
     const empty = OPEN_ROWS.findIndex((row) => row.key === EMPTY_PACKAGE);
-    expect(intentOf("ArrowRight", OPEN_ROWS, empty, ORDERS)).toBeNull();
+    expect(intentOf("ArrowRight", OPEN_ROWS, empty, CORE)).toBeNull();
   });
 
   test("→ no pacote aberto vai ao primeiro filho; com os tipos a caminho, fica", () => {
     expect(
-      keyAt(OPEN_ROWS, moveTarget(intentOf("ArrowRight", OPEN_ROWS, 1, ORDERS)))
-    ).toBe(ORDER);
-    expect(intentOf("ArrowRight", LOADING_ROWS, 1, ORDERS)).toBeNull();
+      keyAt(OPEN_ROWS, moveTarget(intentOf("ArrowRight", OPEN_ROWS, 1, CORE)))
+    ).toBe(CATALOG);
+    expect(intentOf("ArrowRight", LOADING_ROWS, 1, CORE)).toBeNull();
     expect(
       keyAt(
         FAILED_ROWS,
-        moveTarget(intentOf("ArrowRight", FAILED_ROWS, 1, ORDERS))
+        moveTarget(intentOf("ArrowRight", FAILED_ROWS, 1, CORE))
       )
-    ).toBe(`error:${ORDERS}`);
+    ).toBe(`error:${CORE}`);
   });
 
   test("→ em um tipo ou em uma pseudo-linha não faz nada", () => {
-    expect(intentOf("ArrowRight", OPEN_ROWS, 2, ORDERS)).toBeNull();
+    expect(intentOf("ArrowRight", OPEN_ROWS, 2, CORE)).toBeNull();
     expect(
-      intentOf("ArrowRight", OPEN_ROWS, OPEN_ROWS.length - 1, ORDERS)
+      intentOf("ArrowRight", OPEN_ROWS, OPEN_ROWS.length - 1, CORE)
     ).toBeNull();
   });
 
   test("← em um filho, real ou pseudo-linha, volta ao pacote", () => {
     expect(
-      keyAt(OPEN_ROWS, moveTarget(intentOf("ArrowLeft", OPEN_ROWS, 3, ORDERS)))
-    ).toBe(ORDERS);
+      keyAt(OPEN_ROWS, moveTarget(intentOf("ArrowLeft", OPEN_ROWS, 3, CORE)))
+    ).toBe(CORE);
     expect(
       keyAt(
         FAILED_ROWS,
-        moveTarget(intentOf("ArrowLeft", FAILED_ROWS, 2, ORDERS))
+        moveTarget(intentOf("ArrowLeft", FAILED_ROWS, 2, CORE))
       )
-    ).toBe(ORDERS);
+    ).toBe(CORE);
   });
 
   test("← no pacote aberto pede para fechar; em um pacote fechado ou na raiz, nada", () => {
-    expect(intentOf("ArrowLeft", OPEN_ROWS, 1, ORDERS)).toStrictEqual({
+    expect(intentOf("ArrowLeft", OPEN_ROWS, 1, CORE)).toStrictEqual({
       type: "collapse",
     });
-    expect(intentOf("ArrowLeft", OPEN_ROWS, 0, ORDERS)).toBeNull();
+    expect(intentOf("ArrowLeft", OPEN_ROWS, 0, CORE)).toBeNull();
     expect(
-      intentOf("ArrowLeft", OPEN_ROWS, OPEN_ROWS.length - 1, ORDERS)
+      intentOf("ArrowLeft", OPEN_ROWS, OPEN_ROWS.length - 1, CORE)
     ).toBeNull();
   });
 });
 
 describe("toggleIntent: a seta clicada", () => {
   test("fecha o aberto, abre o fechado com tipos, e ignora o pacote sem tipos", () => {
-    expect(toggleIntent(nodeRow(OPEN_ROWS, ORDERS), ORDERS)).toStrictEqual({
+    expect(toggleIntent(nodeRow(OPEN_ROWS, CORE), CORE)).toStrictEqual({
       type: "collapse",
     });
-    expect(toggleIntent(nodeRow(OPEN_ROWS, SHARED), ORDERS)).toStrictEqual({
-      packageId: SHARED,
+    expect(toggleIntent(nodeRow(OPEN_ROWS, SPI), CORE)).toStrictEqual({
+      packageId: SPI,
       type: "expand",
     });
-    expect(toggleIntent(nodeRow(OPEN_ROWS, EMPTY_PACKAGE), ORDERS)).toBeNull();
+    expect(toggleIntent(nodeRow(OPEN_ROWS, EMPTY_PACKAGE), CORE)).toBeNull();
   });
 });
 
@@ -248,28 +245,22 @@ describe("type-ahead", () => {
 
   test("uma letra procura a partir da próxima linha e dá a volta; um prefixo inclui a atual", () => {
     const buffer = (text: string) => ({ at: 0, text });
-    const billing = 0;
-    const shared = OPEN_ROWS.findIndex((row) => row.key === SHARED);
+    const api = 0;
+    const spi = OPEN_ROWS.findIndex((row) => row.key === SPI);
 
     expect(
-      keyAt(
-        OPEN_ROWS,
-        moveTarget(typeaheadIntent(OPEN_ROWS, billing, buffer("s")))
-      )
-    ).toBe(SHARED);
+      keyAt(OPEN_ROWS, moveTarget(typeaheadIntent(OPEN_ROWS, api, buffer("e"))))
+    ).toBe(EMPTY_PACKAGE);
+    expect(
+      keyAt(OPEN_ROWS, moveTarget(typeaheadIntent(OPEN_ROWS, spi, buffer("a"))))
+    ).toBe(API);
     expect(
       keyAt(
         OPEN_ROWS,
-        moveTarget(typeaheadIntent(OPEN_ROWS, shared, buffer("b")))
+        moveTarget(typeaheadIntent(OPEN_ROWS, api, buffer("ap")))
       )
-    ).toBe(BILLING);
-    expect(
-      keyAt(
-        OPEN_ROWS,
-        moveTarget(typeaheadIntent(OPEN_ROWS, billing, buffer("bi")))
-      )
-    ).toBe(BILLING);
-    expect(typeaheadIntent(OPEN_ROWS, billing, buffer("z"))).toBeNull();
+    ).toBe(API);
+    expect(typeaheadIntent(OPEN_ROWS, api, buffer("z"))).toBeNull();
   });
 
   test("casa o rótulo que a linha mostra: o controle bidi não conta, e pseudo-linhas nunca casam", () => {
@@ -298,20 +289,17 @@ describe("resolveTabbable", () => {
     expect(
       keyAt(
         OPEN_ROWS,
-        resolveTabbable(OPEN_ROWS, indexByKey, [ORDER, SHARED, ORDERS]) ??
+        resolveTabbable(OPEN_ROWS, indexByKey, [CATALOG, SPI, CORE]) ??
           undefined
       )
-    ).toBe(ORDER);
+    ).toBe(CATALOG);
     expect(
       keyAt(
         OPEN_ROWS,
-        resolveTabbable(OPEN_ROWS, indexByKey, [
-          null,
-          "type:missing",
-          ORDERS,
-        ]) ?? undefined
+        resolveTabbable(OPEN_ROWS, indexByKey, [null, "type:missing", CORE]) ??
+          undefined
       )
-    ).toBe(ORDERS);
+    ).toBe(CORE);
   });
 
   test("sem candidato, a primeira linha focável; sem linhas, nenhuma", () => {
@@ -320,11 +308,11 @@ describe("resolveTabbable", () => {
       keyAt(
         LOADING_ROWS,
         resolveTabbable(LOADING_ROWS, indexByKeyOf(LOADING_ROWS), [
-          `loading:${ORDERS}`,
+          `loading:${CORE}`,
         ]) ?? undefined
       )
-    ).toBe(BILLING);
-    expect(resolveTabbable([], new Map(), [ORDERS])).toBeNull();
+    ).toBe(API);
+    expect(resolveTabbable([], new Map(), [CORE])).toBeNull();
   });
 });
 
@@ -332,7 +320,7 @@ describe("resolveTarget", () => {
   test("uma chave conhecida é o índice dela; uma que não chegou ainda espera", () => {
     const indexByKey = indexByKeyOf(OPEN_ROWS);
 
-    expect(resolveTarget({ key: SHARED }, OPEN_ROWS, indexByKey)).toBe(5);
+    expect(resolveTarget({ key: SPI }, OPEN_ROWS, indexByKey)).toBe(5);
     expect(
       resolveTarget({ key: "pkg:later" }, OPEN_ROWS, indexByKey)
     ).toBeNull();
@@ -344,7 +332,7 @@ describe("resolveTarget", () => {
       null
     );
     const after = flattenOutline(settled(ROOT), null);
-    const target = { after: ORDERS, waitingOn: "more:root" };
+    const target = { after: CORE, waitingOn: "more:root" };
 
     expect(resolveTarget(target, before, indexByKeyOf(before))).toBeNull();
     expect(
@@ -361,7 +349,7 @@ describe("resolveTarget", () => {
       null
     );
     const emptyPage = flattenOutline(settled(ROOT.slice(0, 2)), null);
-    const target = { after: ORDERS, waitingOn: "more:root" };
+    const target = { after: CORE, waitingOn: "more:root" };
 
     expect(
       keyAt(
@@ -374,12 +362,12 @@ describe("resolveTarget", () => {
         emptyPage,
         resolveTarget(target, emptyPage, indexByKeyOf(emptyPage)) ?? undefined
       )
-    ).toBe(ORDERS);
+    ).toBe(CORE);
   });
 });
 
 describe("followTarget: pedir de novo os tipos que falharam", () => {
-  const retry = { after: ORDERS, waitingOn: `error:${ORDERS}` };
+  const retry = { after: CORE, waitingOn: `error:${CORE}` };
 
   test("o alvo segue a linha a caminho que trocou a de erro, e vai à de erro que volta", () => {
     expect(
@@ -395,8 +383,8 @@ describe("followTarget: pedir de novo os tipos que falharam", () => {
       indexByKeyOf(LOADING_ROWS)
     );
     expect(followed).toStrictEqual({
-      after: ORDERS,
-      waitingOn: `loading:${ORDERS}`,
+      after: CORE,
+      waitingOn: `loading:${CORE}`,
     });
     expect(
       resolveTarget(followed, LOADING_ROWS, indexByKeyOf(LOADING_ROWS))
@@ -411,33 +399,33 @@ describe("followTarget: pedir de novo os tipos que falharam", () => {
         resolveTarget(followed, FAILED_ROWS, indexByKeyOf(FAILED_ROWS)) ??
           undefined
       )
-    ).toBe(`error:${ORDERS}`);
+    ).toBe(`error:${CORE}`);
     expect(
       keyAt(
         OPEN_ROWS,
         resolveTarget(followed, OPEN_ROWS, indexByKeyOf(OPEN_ROWS)) ?? undefined
       )
-    ).toBe(ORDER);
+    ).toBe(CATALOG);
   });
 
   test("os tipos pedidos de novo vêm vazios: o foco fica no pacote, sem esperar a linha do vazio", () => {
     const empty = flattenOutline(settled(ROOT), {
       ...settled([]),
-      parentId: ORDERS,
+      parentId: CORE,
     });
-    const followed = { after: ORDERS, waitingOn: `loading:${ORDERS}` };
+    const followed = { after: CORE, waitingOn: `loading:${CORE}` };
 
     expect(
       keyAt(
         empty,
         resolveTarget(followed, empty, indexByKeyOf(empty)) ?? undefined
       )
-    ).toBe(ORDERS);
+    ).toBe(CORE);
   });
 
   test("uma chave conhecida, ou um alvo sem linha a caminho depois dele, não muda", () => {
-    const moved = { key: SHARED };
-    const more = { after: ORDERS, waitingOn: "more:root" };
+    const moved = { key: SPI };
+    const more = { after: CORE, waitingOn: "more:root" };
 
     expect(followTarget(moved, LOADING_ROWS, indexByKeyOf(LOADING_ROWS))).toBe(
       moved

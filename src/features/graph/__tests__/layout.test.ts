@@ -1,21 +1,8 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import cytoscape, { type Core, type NodeSingular } from "cytoscape";
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  test,
-} from "vitest";
-import {
-  GRAPH_SLICE_BUDGETS,
-  type GraphSlice,
-  graphSliceSchema,
-} from "@/protocol/graph";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { GRAPH_SLICE_BUDGETS, type GraphSlice } from "@/protocol/graph";
 import { installCanvasStub } from "@/test/canvas";
+import { PACKAGE_SLICE } from "@/test/fixture-graph";
 import { toGraphElements } from "../adapter";
 import {
   CONCENTRIC_RINGS,
@@ -32,21 +19,6 @@ import {
   graphRuntimeForSlice,
   setGraphRuntime,
 } from "../stylesheet";
-
-const FIXTURES = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../../../protocol/fixtures"
-);
-
-const readSliceFixture = async (stem: string): Promise<GraphSlice> => {
-  const text = await readFile(path.join(FIXTURES, `${stem}.jsonl`), "utf8");
-  const response = text
-    .split("\n")
-    .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as { kind: string; payload: unknown })
-    .find((frame) => frame.kind === "response");
-  return graphSliceSchema.parse(response?.payload);
-};
 
 const CONTAINER_WIDTH = 1280;
 const CONTAINER_HEIGHT = 800;
@@ -133,12 +105,7 @@ const distinctRings = (slice: GraphSlice): number => {
     .size;
 };
 
-let packageSlice: GraphSlice;
 let restoreCanvas: () => void;
-
-beforeAll(async () => {
-  packageSlice = await readSliceFixture("graph.slice.package");
-});
 
 beforeEach(() => {
   restoreCanvas = installCanvasStub();
@@ -177,7 +144,7 @@ describe("pagerankRing", () => {
 
 describe("concentricLayout", () => {
   test("fixa as opções que o determinismo e o enquadramento pedem", () => {
-    const options = concentricLayout(packageSlice);
+    const options = concentricLayout(PACKAGE_SLICE);
 
     expect(options).toMatchObject({
       animate: false,
@@ -222,17 +189,24 @@ describe("concentricLayout", () => {
   });
 
   test("o valor concêntrico é o anel invertido: o mais exposto vale mais", () => {
-    const options = concentricLayout(packageSlice);
+    const options = concentricLayout(PACKAGE_SLICE);
     const ringValueOf = (id: string): number | undefined =>
       options.concentric?.({ id: () => id } as unknown as NodeSingular);
 
-    expect(ringValueOf("pkg:br.pucpr.shared")).toBe(CONCENTRIC_RINGS);
-    expect(ringValueOf("pkg:br.pucpr.billing")).toBe(CONCENTRIC_RINGS);
-    expect(ringValueOf("pkg:br.pucpr.orders")).toBe(CONCENTRIC_RINGS - 1);
+    expect(
+      Object.fromEntries(
+        PACKAGE_SLICE.nodes.map((node) => [node.label, ringValueOf(node.id)])
+      )
+    ).toStrictEqual({
+      api: CONCENTRIC_RINGS - 3,
+      core: CONCENTRIC_RINGS,
+      "core.gen": CONCENTRIC_RINGS - 3,
+      "core.spi": CONCENTRIC_RINGS,
+    });
   });
 
   test("um nó fora da fatia vai para o anel externo, e não para o centro", () => {
-    const options = concentricLayout(packageSlice);
+    const options = concentricLayout(PACKAGE_SLICE);
 
     expect(
       options.concentric?.({ id: () => "pkg:fora" } as unknown as NodeSingular)
@@ -260,7 +234,7 @@ describe("concentricLayout no Cytoscape", () => {
   });
 
   test("a fatia de pacotes do fixture já sai em dois anéis", () => {
-    expect(distinctRadii(layoutPositions(packageSlice))).toBe(2);
+    expect(distinctRadii(layoutPositions(PACKAGE_SLICE))).toBe(2);
   });
 
   test("dentro de um anel a ordem da fatia decide a posição, por isso o adaptador não reordena", () => {

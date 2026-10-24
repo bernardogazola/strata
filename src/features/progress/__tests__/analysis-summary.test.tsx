@@ -1,9 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import {
-  AnalysisSummary,
-  MapUnavailableCard,
-} from "@/features/progress/analysis-summary";
+import { AnalysisSummary } from "@/features/progress/analysis-summary";
 import { t } from "@/i18n/messages";
 import type { AnalysisWarning } from "@/state/app-store";
 import {
@@ -388,90 +385,4 @@ describe("AnalysisSummary, as etapas", () => {
     const list = screen.getByRole("list", { name: t.analysis.stages.toggle });
     expect(within(list).getAllByText(t.analysis.stage.notRun)).toHaveLength(9);
   });
-});
-
-describe("MapUnavailableCard", () => {
-  const withGraph = (stages: StageOverrides) =>
-    statusReport({
-      stages: { ...COMPLETED_STAGES, ...stages },
-      status: "COMPLETED",
-    });
-
-  test("grafo pulado: o que já foi extraído, com as contagens da análise do código", () => {
-    render(
-      <MapUnavailableCard
-        report={withGraph({
-          SOURCE_ANALYSIS: {
-            counters: { files: 256, types: 412 },
-            durationMs: 4500,
-            startedAt: STARTED_AT,
-            status: "COMPLETED",
-          },
-        })}
-      />
-    );
-
-    expect(
-      screen.getByRole("heading", { level: 2, name: t.analysis.map.title })
-    ).toBeDefined();
-    expect(
-      screen.getByText(
-        "A estrutura do código já foi extraída e salva: 256 arquivos e 412 tipos. O mapa aparece aqui quando a etapa do grafo estrutural passar a ser executada."
-      )
-    ).toBeDefined();
-  });
-
-  test("as contagens concordam no singular e dizem 'nenhum' no zero", () => {
-    render(
-      <MapUnavailableCard
-        report={withGraph({
-          SOURCE_ANALYSIS: {
-            counters: { files: 1, types: 0 },
-            durationMs: 10,
-            startedAt: STARTED_AT,
-            status: "COMPLETED",
-          },
-        })}
-      />
-    );
-
-    expect(screen.getByRole("region")).toHaveTextContent(
-      "salva: 1 arquivo e nenhum tipo."
-    );
-  });
-
-  test("sem as contagens, a frase sem números", () => {
-    render(
-      <MapUnavailableCard
-        report={withGraph({
-          SOURCE_ANALYSIS: {
-            counters: {},
-            durationMs: 10,
-            startedAt: STARTED_AT,
-            status: "COMPLETED",
-          },
-        })}
-      />
-    );
-
-    expect(screen.getByText(t.analysis.map.bodyNoCounts)).toBeDefined();
-  });
-
-  test.each(["PENDING", "RUNNING"] as const)(
-    "grafo %s: o mapa aparece quando a etapa terminar",
-    (status) => {
-      render(
-        <MapUnavailableCard
-          report={statusReport({
-            stages: {
-              SOURCE_ANALYSIS: COMPLETED_STAGES.SOURCE_ANALYSIS,
-              STRUCTURAL_GRAPH: { startedAt: STARTED_AT, status },
-            },
-          })}
-        />
-      );
-
-      expect(screen.getByText(t.analysis.map.pending)).toBeDefined();
-    }
-  );
 });

@@ -8,6 +8,15 @@ import {
   fakeSubscribe,
 } from "@/bridge/fake";
 import { graphSliceSchema, outlinePageSchema } from "@/protocol/graph";
+import {
+  DRILLED_PACKAGE_ID,
+  outlinePageOf,
+  PACKAGE_IDS,
+  PACKAGE_SLICE,
+  packageNodeOf,
+  ROOT_ITEMS,
+  typeSliceOf,
+} from "@/test/fixture-graph";
 
 const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 
@@ -36,8 +45,14 @@ describe("a descoberta das transcrições", () => {
       "analysis.start": ["ok"],
       "analysis.status": ["completed"],
       "graph.search": ["hit"],
-      "graph.slice": ["package", "type"],
-      "outline.children": ["orders", "root"],
+      "graph.slice": [
+        "package",
+        "type",
+        "type-api",
+        "type-core-gen",
+        "type-core-spi",
+      ],
+      "outline.children": ["api", "core", "core-gen", "core-spi", "root"],
       "repository.describe": ["ok"],
       "system.ping": ["ok"],
       "system.shutdown": ["ok"],
@@ -67,20 +82,73 @@ describe("servir uma fatia", () => {
     });
   });
 
+  test("o nível 1 servido é o graph.slice.package do mundo, e não outro caso de nível 1", async () => {
+    const slice = graphSliceSchema.parse(
+      await fakeRequest("graph.slice", { analysisId: AN, level: "PACKAGE" })
+    );
+    expect(slice).toStrictEqual(PACKAGE_SLICE);
+    expect([slice.aggregated, slice.truncated]).toStrictEqual([false, false]);
+  });
+
   test("o discriminante escolhe o drill-down, e não a primeira fixture do tópico", async () => {
     const slice = graphSliceSchema.parse(
       await fakeRequest("graph.slice", {
         analysisId: AN,
         level: "TYPE",
-        parentId: "pkg:br.pucpr.orders",
+        parentId: DRILLED_PACKAGE_ID,
       })
     );
     expect([slice.level, slice.parentId]).toStrictEqual([
       "TYPE",
-      "pkg:br.pucpr.orders",
+      DRILLED_PACKAGE_ID,
     ]);
     expect(slice.nodes.every((node) => node.kind === "TYPE")).toBe(true);
   });
+
+  test.each(PACKAGE_IDS)(
+    "todo pacote do nível 1 desce: %s tem a fatia TYPE e os filhos da estrutura dele",
+    async (packageId) => {
+      const slice = graphSliceSchema.parse(
+        await fakeRequest("graph.slice", {
+          analysisId: AN,
+          level: "TYPE",
+          parentId: packageId,
+        })
+      );
+      const page = outlinePageSchema.parse(
+        await fakeRequest("outline.children", {
+          analysisId: AN,
+          parentId: packageId,
+        })
+      );
+
+      expect(slice).toStrictEqual(typeSliceOf(packageId));
+      expect(page).toStrictEqual(outlinePageOf(packageId));
+      expect([slice.level, slice.parentId, slice.truncated]).toStrictEqual([
+        "TYPE",
+        packageId,
+        false,
+      ]);
+      expect(page.nextCursor).toBeNull();
+      expect(page.items.map((item) => item.id).sort()).toStrictEqual(
+        slice.nodes.map((node) => node.id).sort()
+      );
+    }
+  );
+
+  test.each(PACKAGE_IDS)(
+    "childCount, typeCount e totals.nodes de %s são o mesmo número",
+    (packageId) => {
+      const root = ROOT_ITEMS.find((item) => item.id === packageId);
+      const { nodes, totals } = typeSliceOf(packageId);
+
+      expect([
+        root?.childCount,
+        packageNodeOf(packageId).typeCount,
+        nodes.length,
+      ]).toStrictEqual([totals.nodes, totals.nodes, totals.nodes]);
+    }
+  );
 
   test("toda aresta liga dois nós presentes na mesma fatia", async () => {
     const slice = graphSliceSchema.parse(
@@ -101,7 +169,8 @@ describe("servir uma fatia", () => {
       await fakeRequest("outline.children", { analysisId: AN, parentId: null })
     );
     expect(page.nextCursor).toBeNull();
-    expect(page.items.length).toBeGreaterThan(0);
+    expect(page.items).toStrictEqual(ROOT_ITEMS);
+    expect(page.items.map((item) => item.id)).toStrictEqual(PACKAGE_IDS);
   });
 });
 
@@ -182,14 +251,17 @@ describe("os overrides de desenvolvimento", () => {
     installOverrides([
       {
         method: "graph.slice",
-        request: { level: "TYPE", parentId: "pkg:br.pucpr.orders" },
+        request: { level: "TYPE", parentId: DRILLED_PACKAGE_ID },
         result: OVERRIDE_RESULT,
       },
     ]);
     const slice = graphSliceSchema.parse(
       await fakeRequest("graph.slice", PACKAGE_REQUEST)
     );
-    expect([slice.level, slice.nodes.length]).toStrictEqual(["PACKAGE", 3]);
+    expect([slice.level, slice.nodes.length]).toStrictEqual([
+      "PACKAGE",
+      PACKAGE_SLICE.nodes.length,
+    ]);
   });
 
   test("um override de outro método é ignorado", async () => {
@@ -243,7 +315,7 @@ describe("os overrides de desenvolvimento", () => {
     const slice = graphSliceSchema.parse(
       await fakeRequest("graph.slice", PACKAGE_REQUEST)
     );
-    expect(slice.nodes.length).toBe(3);
+    expect(slice.nodes.length).toBe(PACKAGE_SLICE.nodes.length);
   });
 });
 

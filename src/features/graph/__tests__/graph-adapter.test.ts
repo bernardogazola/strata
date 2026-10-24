@@ -1,44 +1,18 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { beforeAll, describe, expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import { t } from "@/i18n/messages";
 import {
   GRAPH_SLICE_BUDGETS,
   type GraphSlice,
   graphEdgeSchema,
   graphNodeSchema,
-  graphSliceSchema,
 } from "@/protocol/graph";
+import { PACKAGE_SLICE, TYPE_SLICE } from "@/test/fixture-graph";
 import {
   GRAPH_LABEL_MAX_CHARS,
   GraphSliceViolationError,
   toGraphElements,
   toGraphView,
 } from "../adapter";
-
-const FIXTURES = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../../../protocol/fixtures"
-);
-
-const readSliceFixture = async (stem: string): Promise<GraphSlice> => {
-  const text = await readFile(path.join(FIXTURES, `${stem}.jsonl`), "utf8");
-  const response = text
-    .split("\n")
-    .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as { kind: string; payload: unknown })
-    .find((frame) => frame.kind === "response");
-  return graphSliceSchema.parse(response?.payload);
-};
-
-let packageSlice: GraphSlice;
-let typeSlice: GraphSlice;
-
-beforeAll(async () => {
-  packageSlice = await readSliceFixture("graph.slice.package");
-  typeSlice = await readSliceFixture("graph.slice.type");
-});
 
 const packageSliceOf = (count: number): GraphSlice => {
   const nodes = Array.from({ length: count }, (_, index) => ({
@@ -97,33 +71,33 @@ const EDGE_KEYS = Object.keys(graphEdgeSchema.shape).sort();
 
 describe("toGraphElements: nunca derruba um elemento", () => {
   test("cada nó e cada aresta da fatia de pacotes viram exatamente um elemento", () => {
-    const elements = toGraphElements(packageSlice);
+    const elements = toGraphElements(PACKAGE_SLICE);
 
-    expect(elements.nodes).toHaveLength(packageSlice.nodes.length);
-    expect(elements.edges).toHaveLength(packageSlice.edges.length);
+    expect(elements.nodes).toHaveLength(PACKAGE_SLICE.nodes.length);
+    expect(elements.edges).toHaveLength(PACKAGE_SLICE.edges.length);
   });
 
   test("a ordem da fatia é preservada, porque o concentric desempata pela ordem de inserção", () => {
-    const elements = toGraphElements(typeSlice);
+    const elements = toGraphElements(TYPE_SLICE);
 
     expect(elements.nodes.map((node) => node.data.id)).toEqual(
-      typeSlice.nodes.map((node) => node.id)
+      TYPE_SLICE.nodes.map((node) => node.id)
     );
     expect(elements.edges.map((edge) => edge.data.id)).toEqual(
-      typeSlice.edges.map((edge) => edge.id)
+      TYPE_SLICE.edges.map((edge) => edge.id)
     );
   });
 
   test("nós e arestas declaram o grupo, e uma aresta liga os mesmos ids da fatia", () => {
-    const elements = toGraphElements(packageSlice);
+    const elements = toGraphElements(PACKAGE_SLICE);
 
     for (const node of elements.nodes) {
       expect(node.group).toBe("nodes");
     }
     for (const [index, edge] of elements.edges.entries()) {
       expect(edge.group).toBe("edges");
-      expect(edge.data.source).toBe(packageSlice.edges[index]?.source);
-      expect(edge.data.target).toBe(packageSlice.edges[index]?.target);
+      expect(edge.data.source).toBe(PACKAGE_SLICE.edges[index]?.source);
+      expect(edge.data.target).toBe(PACKAGE_SLICE.edges[index]?.target);
     }
   });
 
@@ -140,21 +114,21 @@ describe("toGraphElements: nunca derruba um elemento", () => {
 
 describe("toGraphElements: o que pode morar em um nó", () => {
   test("o data de um nó tem exatamente as chaves do graphNodeSchema", () => {
-    for (const node of toGraphElements(packageSlice).nodes) {
+    for (const node of toGraphElements(PACKAGE_SLICE).nodes) {
       expect(Object.keys(node.data).sort()).toEqual(NODE_KEYS);
     }
   });
 
   test("o data de uma aresta tem exatamente as chaves do graphEdgeSchema", () => {
-    for (const edge of toGraphElements(packageSlice).edges) {
+    for (const edge of toGraphElements(PACKAGE_SLICE).edges) {
       expect(Object.keys(edge.data).sort()).toEqual(EDGE_KEYS);
     }
   });
 
   test("nada produzido depois de STRUCTURAL_GRAPH chega ao nó, mesmo que alguém o pendure na fatia", () => {
-    const [first, ...rest] = packageSlice.nodes;
+    const [first, ...rest] = PACKAGE_SLICE.nodes;
     const contaminated = {
-      ...packageSlice,
+      ...PACKAGE_SLICE,
       nodes: [
         { ...first, cochangeWeight: 7, hotspotBand: "HIGH", tourStep: 1 },
         ...rest,
@@ -356,7 +330,7 @@ describe("toGraphElements: afirma o orçamento e lança", () => {
       ...packageSliceOf(1),
       parentId: "pkg:qualquer",
     };
-    const orphanTypes: GraphSlice = { ...typeSlice, parentId: null };
+    const orphanTypes: GraphSlice = { ...TYPE_SLICE, parentId: null };
 
     expect(violationOf(withParent)).toBe("PARENT_MISMATCH");
     expect(violationOf(orphanTypes)).toBe("PARENT_MISMATCH");
@@ -386,10 +360,10 @@ describe("toGraphElements: afirma o orçamento e lança", () => {
 
 describe("toGraphView", () => {
   test("devolve a fatia e os elementos, para o select da query", () => {
-    const view = toGraphView(typeSlice);
+    const view = toGraphView(TYPE_SLICE);
 
-    expect(view.slice).toBe(typeSlice);
-    expect(view.elements.nodes).toHaveLength(typeSlice.nodes.length);
+    expect(view.slice).toBe(TYPE_SLICE);
+    expect(view.elements.nodes).toHaveLength(TYPE_SLICE.nodes.length);
   });
 });
 
@@ -405,8 +379,8 @@ const deepFreeze = <T>(value: T): T => {
 
 describe("toGraphElements: mais garantias do contrato", () => {
   test("não toca na fatia, que é o dado em cache da query", () => {
-    const before = structuredClone(packageSlice);
-    const frozen = deepFreeze(structuredClone(packageSlice));
+    const before = structuredClone(PACKAGE_SLICE);
+    const frozen = deepFreeze(structuredClone(PACKAGE_SLICE));
 
     const elements = toGraphElements(frozen);
 
@@ -418,11 +392,14 @@ describe("toGraphElements: mais garantias do contrato", () => {
   });
 
   test("duas arestas com o mesmo id lançam", () => {
-    const [first] = packageSlice.edges;
+    const [first] = PACKAGE_SLICE.edges;
+    const elsewhere = PACKAGE_SLICE.nodes.find(
+      (node) => node.id !== first.source && node.id !== first.target
+    );
     const slice: GraphSlice = {
-      ...packageSlice,
-      edges: [first, { ...first, target: "pkg:br.pucpr.billing" }],
-      totals: { edges: 2, nodes: packageSlice.nodes.length },
+      ...PACKAGE_SLICE,
+      edges: [first, { ...first, target: elsewhere?.id ?? "" }],
+      totals: { edges: 2, nodes: PACKAGE_SLICE.nodes.length },
     };
 
     expect(violationOf(slice)).toBe("DUPLICATE_ID");
@@ -430,7 +407,7 @@ describe("toGraphElements: mais garantias do contrato", () => {
 
   test("a vizinhança de um tipo sem pai lança, como o nível de tipos", () => {
     const slice: GraphSlice = {
-      ...typeSlice,
+      ...TYPE_SLICE,
       budget: { ...GRAPH_SLICE_BUDGETS.TYPE_NEIGHBORHOOD },
       level: "TYPE_NEIGHBORHOOD",
       parentId: null,
@@ -440,14 +417,14 @@ describe("toGraphElements: mais garantias do contrato", () => {
   });
 
   test("a unicidade é conferida antes das pontas, em uma fatia com os dois defeitos", () => {
-    const [first, second] = packageSlice.edges;
+    const [first, second] = PACKAGE_SLICE.edges;
     const slice: GraphSlice = {
-      ...packageSlice,
+      ...PACKAGE_SLICE,
       edges: [
         { ...first, target: "pkg:fora.da.fatia" },
         { ...second, id: first.id },
       ],
-      totals: { edges: 2, nodes: packageSlice.nodes.length },
+      totals: { edges: 2, nodes: PACKAGE_SLICE.nodes.length },
     };
 
     expect(violationOf(slice)).toBe("DUPLICATE_ID");
@@ -455,8 +432,8 @@ describe("toGraphElements: mais garantias do contrato", () => {
 
   test("o nome do pacote padrão é só do pacote: um tipo de rótulo vazio continua vazio", () => {
     const slice: GraphSlice = {
-      ...typeSlice,
-      nodes: typeSlice.nodes.map((node, index) =>
+      ...TYPE_SLICE,
+      nodes: TYPE_SLICE.nodes.map((node, index) =>
         index === 0 ? { ...node, label: RLO } : node
       ),
     };

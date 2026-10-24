@@ -421,8 +421,12 @@ final class StructuralGraphStageTest {
   }
 
   @Test
-  void aProducaoAindaNaoLigaOEstagioDoGrafo() {
-    assertThat(Stages.production().executor(STRUCTURAL_GRAPH)).isSameAs(SkippedStage.INSTANCE);
+  void aProducaoLigaOEstagioDoGrafo() {
+    final StageExecutor executor = Stages.production().executor(STRUCTURAL_GRAPH);
+
+    assertThat(executor)
+        .isNotSameAs(SkippedStage.INSTANCE)
+        .isInstanceOf(StructuralGraphStage.class);
   }
 
   @Test

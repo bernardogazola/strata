@@ -986,8 +986,8 @@ describe("varreduras", () => {
       expect(isAbsolutePathLike(bad), bad).toBe(true);
     }
     for (const good of [
-      "src/main/java/br/pucpr/orders/PaymentService.java",
-      "pkg:br.pucpr.orders",
+      "core/src/main/java/br/pucpr/legacy/core/Catalog.java",
+      "pkg:br.pucpr.legacy.core",
       "req_home123",
       "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W",
     ]) {

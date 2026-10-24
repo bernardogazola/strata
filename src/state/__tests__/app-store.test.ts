@@ -172,9 +172,9 @@ describe("releaseActiveElementId", () => {
   test("solta o destaque do elemento que ainda o tem", () => {
     const { releaseActiveElementId, setActiveElementId } =
       useAppStore.getState();
-    setActiveElementId("pkg:br.pucpr.orders");
+    setActiveElementId("pkg:br.pucpr.legacy.core");
 
-    releaseActiveElementId("pkg:br.pucpr.orders");
+    releaseActiveElementId("pkg:br.pucpr.legacy.core");
 
     expect(useAppStore.getState().activeElementId).toBeNull();
   });
@@ -182,13 +182,13 @@ describe("releaseActiveElementId", () => {
   test("não apaga o destaque que outro escritor pôs depois", () => {
     const { releaseActiveElementId, setActiveElementId } =
       useAppStore.getState();
-    setActiveElementId("pkg:br.pucpr.orders");
-    setActiveElementId("type:br.pucpr.orders.Order");
+    setActiveElementId("pkg:br.pucpr.legacy.core");
+    setActiveElementId("type:br.pucpr.legacy.core.Catalog");
 
-    releaseActiveElementId("pkg:br.pucpr.orders");
+    releaseActiveElementId("pkg:br.pucpr.legacy.core");
 
     expect(useAppStore.getState().activeElementId).toBe(
-      "type:br.pucpr.orders.Order"
+      "type:br.pucpr.legacy.core.Catalog"
     );
   });
 
@@ -198,7 +198,7 @@ describe("releaseActiveElementId", () => {
       notifications += 1;
     });
 
-    useAppStore.getState().releaseActiveElementId("pkg:br.pucpr.orders");
+    useAppStore.getState().releaseActiveElementId("pkg:br.pucpr.legacy.core");
     stop();
 
     expect(notifications).toBe(0);

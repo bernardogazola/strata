@@ -87,11 +87,26 @@ final class PipelineTest {
   private static final List<AnalysisStage> SKIPPED_IN_P27 =
       List.of(
           GIT_HISTORY_CHEAP,
-          STRUCTURAL_GRAPH,
           GIT_HISTORY_DETAILED,
           EVOLUTIONARY_COUPLING,
           HOTSPOT_PROFILES,
           GUIDED_TOUR);
+
+  private static final Map<String, Long> STRUCTURAL_GRAPH_MULTI_MODULE =
+      Map.ofEntries(
+          Map.entry("betweennessSkipped", 0L),
+          Map.entry("denylistedPairs", 4L),
+          Map.entry("externalPairs", 0L),
+          Map.entry("packageCycles", 1L),
+          Map.entry("packageEdges", 4L),
+          Map.entry("packageNodes", 4L),
+          Map.entry("packagesInCycles", 2L),
+          Map.entry("pagerankUnconverged", 0L),
+          Map.entry("selfPairs", 0L),
+          Map.entry("typeCycles", 0L),
+          Map.entry("typeEdges", 13L),
+          Map.entry("typeNodes", 9L),
+          Map.entry("typesInCycles", 0L));
 
   private static final List<AnalysisStage> AFTER_THE_PAIR =
       List.of(
@@ -371,6 +386,13 @@ final class PipelineTest {
       assertThat(pulado.path("status").asText()).as(stage.name()).isEqualTo("SKIPPED");
       assertThat(contadores(pulado)).as(stage + ": um SKIPPED não conta nada").isEmpty();
     }
+    final JsonNode grafo = concluido.get(STRUCTURAL_GRAPH.name()).payload();
+    assertThat(grafo.path("status").asText())
+        .as("a produção liga o STRUCTURAL_GRAPH")
+        .isEqualTo("COMPLETED");
+    assertThat(contadores(grafo))
+        .as("os treze contadores do grafo estrutural do multi-module")
+        .isEqualTo(STRUCTURAL_GRAPH_MULTI_MODULE);
     final JsonNode persistencia = concluido.get(PERSISTENCE.name()).payload();
     assertThat(persistencia.path("status").asText()).isEqualTo("COMPLETED");
     assertThat(contadores(persistencia)).isEmpty();
@@ -496,12 +518,18 @@ final class PipelineTest {
     final List<Frame> passos =
         daAnalise.stream().filter(frame -> "analysis.progress".equals(frame.event())).toList();
     assertThat(passos.stream().map(Frame::stage).distinct())
-        .as("só REPOSITORY_VALIDATION e SOURCE_ANALYSIS contam; LD, PERSISTENCE e os SKIPPED não")
-        .containsExactlyInAnyOrder(REPOSITORY_VALIDATION.name(), SOURCE_ANALYSIS.name());
+        .as(
+            "só REPOSITORY_VALIDATION, SOURCE_ANALYSIS e STRUCTURAL_GRAPH"
+                + " contam; LD, PERSISTENCE e os SKIPPED não")
+        .containsExactlyInAnyOrder(
+            REPOSITORY_VALIDATION.name(), SOURCE_ANALYSIS.name(), STRUCTURAL_GRAPH.name());
     for (final Frame passo : passos) {
-      assertThat(passo.payload().path("unit").asText()).isEqualTo("JAVA_FILES");
+      assertThat(passo.payload().path("unit").asText())
+          .as(passo.stage() + ": a unidade do estágio")
+          .isEqualTo(STRUCTURAL_GRAPH.name().equals(passo.stage()) ? "TYPES" : "JAVA_FILES");
       assertThat(passo.index()).isLessThan(terminal.index());
     }
+    verificarPassosDoGrafo(passos, concluido);
 
     final long javaVistos = esperado.snapshot().inventory().javaSources().size();
     final List<Frame> daValidacao =
@@ -536,6 +564,26 @@ final class PipelineTest {
     assertThat(ultimo.index())
         .as("o passo terminal precede o stage.completed do estágio")
         .isLessThan(concluido.get(SOURCE_ANALYSIS.name()).index());
+  }
+
+  private static void verificarPassosDoGrafo(List<Frame> passos, Map<String, Frame> concluido) {
+    final long tipos = STRUCTURAL_GRAPH_MULTI_MODULE.get("typeNodes");
+    final List<String> doGrafo =
+        passos.stream()
+            .filter(p -> STRUCTURAL_GRAPH.name().equals(p.stage()))
+            .map(p -> p.payload().path("completed").asLong() + "/" + p.payload().path("total"))
+            .toList();
+    assertThat(doGrafo)
+        .as("o STRUCTURAL_GRAPH conta (0, n) e (n, n) em TYPES")
+        .containsExactly("0/" + tipos, tipos + "/" + tipos);
+    final Frame ultimoDoGrafo =
+        passos.stream()
+            .filter(p -> STRUCTURAL_GRAPH.name().equals(p.stage()))
+            .reduce((primeiro, segundo) -> segundo)
+            .orElseThrow();
+    assertThat(ultimoDoGrafo.index())
+        .as("o passo terminal do grafo precede o stage.completed dele")
+        .isLessThan(concluido.get(STRUCTURAL_GRAPH.name()).index());
   }
 
   @Test

@@ -1,11 +1,12 @@
 import { expect, type Page, test } from "@playwright/test";
 import { formatProtocolError } from "@/i18n/errors";
 import { t } from "@/i18n/messages";
+import { expectGraph, fixtureNodeIds } from "./support/graph-page";
 
 const HANDLE = "repo_AAAAAAAAAAAAAAAAAAAAAQ";
 const ANALYSIS_ID = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 const REPOSITORY_NAME = "multi-module";
-const COMPLETED_HEADLINE = "9 arquivos Java analisados";
+const PACKAGE_IDS = fixtureNodeIds("graph.slice.package.jsonl");
 
 const mainNamed = (page: Page, name: string) =>
   page.getByRole("main", { name });
@@ -26,7 +27,7 @@ const openFakeRepository = async (page: Page): Promise<void> => {
   await expect(mainNamed(page, t.shell.regions.prepare)).toBeVisible();
 };
 
-test("do início à análise: a preparação com core e api, Analisar, e o resumo com o cartão do mapa", async ({
+test("do início ao mapa: a preparação com core e api, Analisar, e o mapa com os pacotes", async ({
   page,
 }) => {
   await openFakeRepository(page);
@@ -47,36 +48,31 @@ test("do início à análise: a preparação com core e api, Analisar, e o resum
   await expect(analyze).not.toHaveAttribute("aria-disabled", "true");
   await analyze.click();
 
-  const analysis = mainNamed(page, t.shell.regions.analysis);
-  const headline = analysis.getByRole("heading", {
+  const map = mainNamed(page, t.shell.regions.canvas);
+  const headline = map.getByRole("heading", {
     level: 1,
-    name: COMPLETED_HEADLINE,
+    name: t.shell.regions.canvas,
   });
-  await expect(headline).toBeVisible();
+  await expect(map).toBeVisible();
   expect(Object.fromEntries(new URL(page.url()).searchParams)).toStrictEqual({
     analysis: ANALYSIS_ID,
     level: "PACKAGE",
   });
   await expect(headline).toBeFocused();
-  await expect(
-    analysis.getByRole("heading", { name: t.analysis.map.title })
-  ).toBeVisible();
-  await expect(mainNamed(page, t.shell.regions.canvas)).toHaveCount(0);
-  await expect(page.locator("[data-graph-state]")).toHaveCount(0);
+  await expectGraph(page, PACKAGE_IDS);
+  expect(PACKAGE_IDS).toHaveLength(4);
+  await expect(mainNamed(page, t.shell.regions.analysis)).toHaveCount(0);
   await expect(page.getByRole("main")).toHaveCount(1);
 });
 
-test("o voltar do navegador desfaz a entrada na análise, e Analisar de novo empilha a preparação", async ({
+test("o voltar do navegador desfaz a entrada na análise, e Analisar de novo, no cabeçalho do mapa, empilha a preparação", async ({
   page,
 }) => {
   await openFakeRepository(page);
   await mainNamed(page, t.shell.regions.prepare)
     .getByRole("button", { name: t.config.analyze })
     .click();
-  const analysis = mainNamed(page, t.shell.regions.analysis);
-  await expect(
-    analysis.getByRole("heading", { level: 1, name: COMPLETED_HEADLINE })
-  ).toBeVisible();
+  await expectGraph(page, PACKAGE_IDS);
 
   await page.goBack();
 
@@ -88,7 +84,11 @@ test("o voltar do navegador desfaz a entrada na análise, e Analisar de novo emp
   ).toBeVisible();
 
   await page.goForward();
-  await analysis.getByRole("button", { name: t.analysis.again }).click();
+  await expectGraph(page, PACKAGE_IDS);
+  await page
+    .getByRole("banner")
+    .getByRole("button", { name: t.analysis.again })
+    .click();
 
   await expect(
     mainNamed(page, t.shell.regions.prepare).getByRole("heading", {

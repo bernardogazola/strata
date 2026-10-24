@@ -45,12 +45,35 @@ import { graphSliceQueryOptions } from "@/queries/options";
 import type { RouterContext } from "@/router";
 import { Route as RepositoryRoute } from "@/routes/repository.$handle";
 import { type BackendState, useAppStore } from "@/state/app-store";
+import { labelOf, PACKAGE_SLICE, TYPE_SLICE } from "@/test/fixture-graph";
 
-const IDS = vi.hoisted(() => ({
-  BILLING: "pkg:br.pucpr.billing",
-  ORDER_TYPE: "type:br.pucpr.orders.Order",
-  ORDERS: "pkg:br.pucpr.orders",
-}));
+const IDS = await vi.hoisted(async () => {
+  const world = await import("@/test/fixture-graph");
+  const drilled = world.DRILLED_PACKAGE_ID;
+  const typeHit = world.SEARCH_HITS.find(
+    (hit) => hit.kind === "TYPE" && hit.packageId === drilled
+  );
+  const other = world.PACKAGE_IDS.find((id) => id !== drilled);
+  if (typeHit === undefined || other === undefined) {
+    throw new Error(
+      "o mundo das fixtures não tem um resultado de tipo no pacote aberto ou um segundo pacote"
+    );
+  }
+  const otherHit: SearchHit = {
+    elementId: other,
+    kind: "PACKAGE",
+    label: world.labelOf(other),
+    packageId: null,
+    qualifiedName: other.slice("pkg:".length),
+  };
+  return {
+    DRILLED: drilled,
+    OTHER: other,
+    OTHER_HIT: otherHit,
+    TYPE: typeHit.elementId,
+    TYPE_HIT: typeHit,
+  };
+});
 
 const focusOutline = vi.hoisted(() => vi.fn<() => void>());
 
@@ -126,9 +149,9 @@ vi.mock("@/features/graph/architecture-graph", async (importOriginal) => {
 vi.mock("@/features/outline/architecture-outline", async () => {
   const { useImperativeHandle } = await import("react");
   const rows = [
-    { id: IDS.ORDERS, kind: "PACKAGE" },
-    { id: IDS.BILLING, kind: "PACKAGE" },
-    { id: IDS.ORDER_TYPE, kind: "TYPE" },
+    { id: IDS.DRILLED, kind: "PACKAGE" },
+    { id: IDS.OTHER, kind: "PACKAGE" },
+    { id: IDS.TYPE, kind: "TYPE" },
   ] as const;
   let current: ArchitectureOutlineProps | null = null;
   const onClick = (event: MouseEvent<HTMLButtonElement>): void => {
@@ -187,22 +210,7 @@ vi.mock("@/features/outline/architecture-outline", async () => {
 });
 
 vi.mock("@/features/outline/node-search", () => {
-  const hits = [
-    {
-      elementId: IDS.ORDER_TYPE,
-      kind: "TYPE",
-      label: "Order",
-      packageId: IDS.ORDERS,
-      qualifiedName: "br.pucpr.orders.Order",
-    },
-    {
-      elementId: IDS.BILLING,
-      kind: "PACKAGE",
-      label: "billing",
-      packageId: null,
-      qualifiedName: "br.pucpr.billing",
-    },
-  ] as const satisfies readonly SearchHit[];
+  const hits: readonly SearchHit[] = [IDS.TYPE_HIT, IDS.OTHER_HIT];
   let current: NodeSearchProps | null = null;
   const onClick = (event: MouseEvent<HTMLButtonElement>): void => {
     const hit = hits[Number(event.currentTarget.dataset.index)];
@@ -236,7 +244,12 @@ vi.mock("@/features/outline/node-search", () => {
 
 const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 const HANDLE = "repo_AAAAAAAAAAAAAAAAAAAAAQ";
-const { BILLING, ORDER_TYPE, ORDERS } = IDS;
+const { DRILLED, OTHER, TYPE } = IDS;
+const DRILLED_LABEL = labelOf(DRILLED);
+const OTHER_LABEL = labelOf(OTHER);
+const TYPE_LABEL = labelOf(TYPE);
+const PACKAGES = PACKAGE_SLICE.nodes.length;
+const TYPES = TYPE_SLICE.nodes.length;
 const SCREEN_URL = `/repository/${HANDLE}?analysis=${AN}`;
 const BIDI_OVERRIDE = String.fromCodePoint(0x20_2e);
 
@@ -262,8 +275,15 @@ const withStructuralGraph = (
   ),
 });
 
-const mapReadyStatus = async (): Promise<AnalysisStatusReport> =>
-  withStructuralGraph(await fixtureStatus(), "COMPLETED");
+const cancelledAfterGraph = async (): Promise<AnalysisStatusReport> => ({
+  ...(await fixtureStatus()),
+  status: "CANCELLED",
+});
+
+const cancelledBeforeGraph = async (): Promise<AnalysisStatusReport> =>
+  withStructuralGraph(await cancelledAfterGraph(), "CANCELLED");
+
+const DELETED_MAP_CARD = /O mapa da arquitetura ainda não é montado/;
 
 let requestSpy: MockInstance<typeof transport.request>;
 
@@ -276,7 +296,7 @@ const serveStatus = (answer: () => Promise<unknown>): void => {
 beforeEach(() => {
   useAppStore.setState({ ...initialStore, backend: READY }, true);
   requestSpy = vi.spyOn(transport, "request");
-  serveStatus(mapReadyStatus);
+  serveStatus(fixtureStatus);
 });
 
 afterEach(() => {
@@ -374,10 +394,8 @@ const slicePayloads = (request: ReturnType<typeof spyRequests>) =>
     .filter(([method]) => method === "graph.slice")
     .map(([, payload]) => payload);
 
-const LEVEL_ONE_LABEL =
-  "Mapa da arquitetura, pacotes: 3 pacotes e 3 dependências.";
-const ORDERS_TYPES_LABEL =
-  "Mapa da arquitetura, tipos: 3 tipos e 2 dependências.";
+const LEVEL_ONE_LABEL = `Mapa da arquitetura, pacotes: ${PACKAGES} pacotes e ${PACKAGE_SLICE.edges.length} dependências.`;
+const DRILLED_TYPES_LABEL = `Mapa da arquitetura, tipos: ${TYPES} tipos e ${TYPE_SLICE.edges.length} dependências.`;
 
 describe("/repository/$handle: a moldura", () => {
   test("monta os landmarks, o cabeçalho e a legenda, e a fatia chega ao canvas", async () => {
@@ -405,7 +423,7 @@ describe("/repository/$handle: a moldura", () => {
     expect(header.getByRole("button", { name: "Alternar tema" })).toBeDefined();
     expect(within(mapRegion()).getByText(t.graph.legend.title)).toBeDefined();
 
-    await waitForCanvas(3, "3 pacotes");
+    await waitForCanvas(PACKAGES, `${PACKAGES} pacotes`);
     expect(
       within(breadcrumb())
         .getByText(t.shell.breadcrumb.root)
@@ -447,12 +465,12 @@ describe("/repository/$handle: a moldura", () => {
 
   test("um level inválido cai em PACKAGE sem apagar o parent", async () => {
     const { router } = await renderAt(
-      `${SCREEN_URL}&level=PACOTE&parent=${ORDERS}`
+      `${SCREEN_URL}&level=PACOTE&parent=${DRILLED}`
     );
 
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     const match = router.state.matches.at(-1);
-    expect(match?.search).toMatchObject({ level: "PACKAGE", parent: ORDERS });
+    expect(match?.search).toMatchObject({ level: "PACKAGE", parent: DRILLED });
     expect(
       within(breadcrumb())
         .getByText(t.shell.breadcrumb.root)
@@ -465,10 +483,10 @@ describe("/repository/$handle: a vizinhança de um tipo", () => {
   test("TYPE_NEIGHBORHOOD cai no nível 1 até haver a vista da vizinhança", async () => {
     const request = spyRequests();
     const { router } = await renderAt(
-      `${SCREEN_URL}&level=TYPE_NEIGHBORHOOD&parent=${ORDER_TYPE}`
+      `${SCREEN_URL}&level=TYPE_NEIGHBORHOOD&parent=${TYPE}`
     );
 
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     expect(slicePayloads(request)).toStrictEqual([
       { analysisId: AN, level: "PACKAGE" },
     ]);
@@ -476,7 +494,7 @@ describe("/repository/$handle: a vizinhança de um tipo", () => {
     expect(within(breadcrumb()).queryByRole("link")).toBeNull();
     expect(urlSearch(router)).toMatchObject({
       level: "TYPE_NEIGHBORHOOD",
-      parent: ORDER_TYPE,
+      parent: TYPE,
     });
   });
 });
@@ -485,20 +503,20 @@ describe("/repository/$handle: navegação", () => {
   test("expandir empilha level=TYPE&parent=…, e voltar acha o nível 1 no cache", async () => {
     const request = spyRequests();
     const { router } = await renderAt(SCREEN_URL);
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     const lengthBefore = router.history.length;
     const levelOneSearch = urlSearch(router);
 
-    fireEvent.click(screen.getByRole("button", { name: `expand:${ORDERS}` }));
+    fireEvent.click(screen.getByRole("button", { name: `expand:${DRILLED}` }));
 
-    await waitForCanvas(3, "tipos");
+    await waitForCanvas(TYPES, "tipos");
     expect(urlSearch(router)).toStrictEqual({
       analysis: AN,
       level: "TYPE",
-      parent: ORDERS,
+      parent: DRILLED,
     });
     expect(router.history.length).toBe(lengthBefore + 1);
-    const parent = within(breadcrumb()).getByText("orders");
+    const parent = within(breadcrumb()).getByText(DRILLED_LABEL);
     expect(parent.tagName).toBe("BDI");
     expect(parent.getAttribute("lang")).toBe("");
     expect(parent.getAttribute("translate")).toBe("no");
@@ -506,7 +524,7 @@ describe("/repository/$handle: navegação", () => {
 
     router.history.back();
 
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     expect(urlSearch(router)).toStrictEqual(levelOneSearch);
     expect(levelOneSearch).toMatchObject({ analysis: AN });
     expect(slicePayloads(request)).toHaveLength(2);
@@ -514,17 +532,17 @@ describe("/repository/$handle: navegação", () => {
 
   test("selecionar substitui a entrada e o inspetor mostra o nó", async () => {
     const { router } = await renderAt(SCREEN_URL);
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     const lengthBefore = router.history.length;
 
-    fireEvent.click(screen.getByRole("button", { name: `select:${BILLING}` }));
+    fireEvent.click(screen.getByRole("button", { name: `select:${OTHER}` }));
 
     await waitFor(() =>
-      expect(canvas().getAttribute("data-selected")).toBe(BILLING)
+      expect(canvas().getAttribute("data-selected")).toBe(OTHER)
     );
-    expect(urlSearch(router)).toMatchObject({ focus: BILLING });
+    expect(urlSearch(router)).toMatchObject({ focus: OTHER });
     expect(router.history.length).toBe(lengthBefore);
-    expect(within(inspector()).getByText("billing").tagName).toBe("BDI");
+    expect(within(inspector()).getByText(OTHER_LABEL).tagName).toBe("BDI");
 
     fireEvent.click(screen.getByRole("button", { name: "select:none" }));
 
@@ -536,42 +554,42 @@ describe("/repository/$handle: navegação", () => {
   });
 
   test("com um pacote já selecionado, o botão do inspetor expande sem ponteiro", async () => {
-    const { router } = await renderAt(`${SCREEN_URL}&focus=${ORDERS}`);
-    await waitForCanvas(3, "pacotes");
+    const { router } = await renderAt(`${SCREEN_URL}&focus=${DRILLED}`);
+    await waitForCanvas(PACKAGES, "pacotes");
 
     fireEvent.click(
       within(inspector()).getByRole("button", { name: t.inspector.expand })
     );
 
-    await waitForCanvas(3, "tipos");
+    await waitForCanvas(TYPES, "tipos");
     expect(urlSearch(router)).toStrictEqual({
       analysis: AN,
       level: "TYPE",
-      parent: ORDERS,
+      parent: DRILLED,
     });
   });
 
   test("um focus que não está na fatia deixa o inspetor vazio", async () => {
     await renderAt(`${SCREEN_URL}&focus=pkg:br.pucpr.inexistente`);
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
 
     expect(within(inspector()).getByText(t.inspector.empty)).toBeDefined();
   });
 
   test("a raiz da trilha volta ao nível 1 com o pacote de onde se saiu selecionado", async () => {
     const { router } = await renderAt(
-      `${SCREEN_URL}&level=TYPE&parent=${ORDERS}`
+      `${SCREEN_URL}&level=TYPE&parent=${DRILLED}`
     );
-    await waitForCanvas(3, "tipos");
+    await waitForCanvas(TYPES, "tipos");
 
     fireEvent.click(
       within(breadcrumb()).getByRole("link", { name: t.shell.breadcrumb.root })
     );
 
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     expect(urlSearch(router)).toStrictEqual({
       analysis: AN,
-      focus: ORDERS,
+      focus: DRILLED,
       level: "PACKAGE",
     });
   });
@@ -580,14 +598,14 @@ describe("/repository/$handle: navegação", () => {
 describe("/repository/$handle: o foco em uma troca de nível", () => {
   test("a montagem não move o foco", async () => {
     await renderAt(SCREEN_URL);
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
 
     expect(document.activeElement).toBe(document.body);
   });
 
   test("expandir pelo inspetor leva o foco à trilha e anuncia a vista nova", async () => {
-    await renderAt(`${SCREEN_URL}&focus=${ORDERS}`);
-    await waitForCanvas(3, "pacotes");
+    await renderAt(`${SCREEN_URL}&focus=${DRILLED}`);
+    await waitForCanvas(PACKAGES, "pacotes");
     expect(liveRegion()?.textContent).toBe(LEVEL_ONE_LABEL);
     const expand = within(inspector()).getByRole("button", {
       name: t.inspector.expand,
@@ -596,17 +614,17 @@ describe("/repository/$handle: o foco em uma troca de nível", () => {
 
     fireEvent.click(expand);
 
-    await waitForCanvas(3, "tipos");
+    await waitForCanvas(TYPES, "tipos");
     await waitFor(() => expect(document.activeElement).toBe(currentCrumb()));
-    expect(currentCrumb()?.textContent).toBe("orders");
+    expect(currentCrumb()?.textContent).toBe(DRILLED_LABEL);
     expect(currentCrumb()?.tabIndex).toBe(-1);
     expect(currentCrumb()?.className).toContain("text-muted-foreground");
-    expect(liveRegion()?.textContent).toBe(ORDERS_TYPES_LABEL);
+    expect(liveRegion()?.textContent).toBe(DRILLED_TYPES_LABEL);
   });
 
   test("voltar pela raiz da trilha leva o foco ao item da raiz", async () => {
-    await renderAt(`${SCREEN_URL}&level=TYPE&parent=${ORDERS}`);
-    await waitForCanvas(3, "tipos");
+    await renderAt(`${SCREEN_URL}&level=TYPE&parent=${DRILLED}`);
+    await waitForCanvas(TYPES, "tipos");
     const root = within(breadcrumb()).getByRole("link", {
       name: t.shell.breadcrumb.root,
     });
@@ -614,7 +632,7 @@ describe("/repository/$handle: o foco em uma troca de nível", () => {
 
     fireEvent.click(root);
 
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     await waitFor(() => expect(document.activeElement).toBe(currentCrumb()));
     expect(currentCrumb()?.textContent).toBe(t.shell.breadcrumb.root);
     expect(currentCrumb()?.className).toContain("text-muted-foreground");
@@ -623,23 +641,23 @@ describe("/repository/$handle: o foco em uma troca de nível", () => {
 
   test("uma troca de nível com o foco em outro controle não o rouba", async () => {
     const { router } = await renderAt(
-      `${SCREEN_URL}&level=TYPE&parent=${ORDERS}`
+      `${SCREEN_URL}&level=TYPE&parent=${DRILLED}`
     );
-    await waitForCanvas(3, "tipos");
+    await waitForCanvas(TYPES, "tipos");
     const toggle = screen.getByRole("button", { name: "Alternar tema" });
     toggle.focus();
 
     router.history.push(SCREEN_URL);
 
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     expect(document.activeElement).toBe(toggle);
   });
 });
 
 describe("/repository/$handle: a falha de render e a fatia", () => {
   test("a falha de render vale só para a fatia dela: o drill-down desenha", async () => {
-    await renderAt(`${SCREEN_URL}&focus=${ORDERS}`);
-    await waitForCanvas(3, "pacotes");
+    await renderAt(`${SCREEN_URL}&focus=${DRILLED}`);
+    await waitForCanvas(PACKAGES, "pacotes");
 
     fireEvent.click(screen.getByRole("button", { name: "render-error" }));
     await screen.findByRole("alert");
@@ -649,7 +667,7 @@ describe("/repository/$handle: a falha de render e a fatia", () => {
       within(inspector()).getByRole("button", { name: t.inspector.expand })
     );
 
-    await waitForCanvas(3, "tipos");
+    await waitForCanvas(TYPES, "tipos");
     expect(screen.queryByRole("alert")).toBeNull();
     expect(canvas().getAttribute("data-slice-level")).toBe("TYPE");
   });
@@ -660,9 +678,9 @@ describe("/repository/$handle: o inspetor e o adaptador", () => {
     const adapt = vi.mocked(toGraphView);
     adapt.mockClear();
     const request = spyRequests();
-    await renderAt(`${SCREEN_URL}&focus=${ORDERS}`);
-    await waitForCanvas(3, "pacotes");
-    await within(inspector()).findByText("orders");
+    await renderAt(`${SCREEN_URL}&focus=${DRILLED}`);
+    await waitForCanvas(PACKAGES, "pacotes");
+    await within(inspector()).findByText(DRILLED_LABEL);
 
     expect(slicePayloads(request)).toHaveLength(1);
     expect(adapt).toHaveBeenCalledTimes(1);
@@ -670,11 +688,9 @@ describe("/repository/$handle: o inspetor e o adaptador", () => {
     fireEvent.click(
       within(inspector()).getByRole("button", { name: t.inspector.expand })
     );
-    await waitForCanvas(3, "tipos");
-    fireEvent.click(
-      screen.getByRole("button", { name: `select:${ORDER_TYPE}` })
-    );
-    await within(inspector()).findByText("Order");
+    await waitForCanvas(TYPES, "tipos");
+    fireEvent.click(screen.getByRole("button", { name: `select:${TYPE}` }));
+    await within(inspector()).findByText(TYPE_LABEL);
 
     expect(slicePayloads(request)).toHaveLength(2);
     expect(adapt).toHaveBeenCalledTimes(2);
@@ -694,7 +710,7 @@ describe("/repository/$handle: o rótulo do pai na trilha", () => {
           {
             fanIn: 0,
             fanOut: 0,
-            id: ORDERS,
+            id: DRILLED,
             kind: "PACKAGE",
             label,
             loc: 1,
@@ -714,7 +730,7 @@ describe("/repository/$handle: o rótulo do pai na trilha", () => {
     };
 
   test("em um link direto, sem o nível 1 em cache, o texto genérico", async () => {
-    await renderAt(`${SCREEN_URL}&level=TYPE&parent=${ORDERS}`);
+    await renderAt(`${SCREEN_URL}&level=TYPE&parent=${DRILLED}`);
 
     expect(
       within(breadcrumb()).getByText(t.shell.breadcrumb.selectedPackage)
@@ -722,17 +738,19 @@ describe("/repository/$handle: o rótulo do pai na trilha", () => {
   });
 
   test("um rótulo hostil chega saneado", async () => {
-    await renderAt(`${SCREEN_URL}&level=TYPE&parent=${ORDERS}`, {
-      seed: seedLevelOne(`ord${BIDI_OVERRIDE}ers`),
+    await renderAt(`${SCREEN_URL}&level=TYPE&parent=${DRILLED}`, {
+      seed: seedLevelOne(
+        `${DRILLED_LABEL.slice(0, 2)}${BIDI_OVERRIDE}${DRILLED_LABEL.slice(2)}`
+      ),
     });
 
-    const label = within(breadcrumb()).getByText("orders");
+    const label = within(breadcrumb()).getByText(DRILLED_LABEL);
     expect(label.tagName).toBe("BDI");
     expect(label.className).not.toContain("font-mono");
   });
 
   test("o pacote padrão, de rótulo vazio, recebe o nome que o canvas lhe dá", async () => {
-    await renderAt(`${SCREEN_URL}&level=TYPE&parent=${ORDERS}`, {
+    await renderAt(`${SCREEN_URL}&level=TYPE&parent=${DRILLED}`, {
       seed: seedLevelOne(""),
     });
 
@@ -747,9 +765,10 @@ describe("/repository/$handle: o rótulo do pai na trilha", () => {
       level: "PACKAGE",
     })) as GraphSlice;
 
-    expect(fixture.nodes.find((node) => node.id === ORDERS)?.label).toBe(
-      "orders"
+    expect(fixture.nodes.find((node) => node.id === DRILLED)?.label).toBe(
+      "core"
     );
+    expect(DRILLED_LABEL).toBe("core");
   });
 });
 
@@ -760,19 +779,17 @@ describe("/repository/$handle: a barra lateral", () => {
     );
 
   test("com uma análise, a busca e depois a estrutura, com a vista resolvida e o focus da URL", async () => {
-    await renderAt(
-      `${SCREEN_URL}&level=TYPE&parent=${ORDERS}&focus=${ORDER_TYPE}`
-    );
+    await renderAt(`${SCREEN_URL}&level=TYPE&parent=${DRILLED}&focus=${TYPE}`);
 
     expect(sidebarChildren()).toStrictEqual(["search", "outline"]);
     const outline = within(sidebar()).getByTestId("outline");
     expect(outline.getAttribute("data-analysis")).toBe(AN);
     expect(outline.getAttribute("data-level")).toBe("TYPE");
-    expect(outline.getAttribute("data-parent")).toBe(ORDERS);
-    expect(outline.getAttribute("data-focus")).toBe(ORDER_TYPE);
+    expect(outline.getAttribute("data-parent")).toBe(DRILLED);
+    expect(outline.getAttribute("data-focus")).toBe(TYPE);
     const search = within(sidebar()).getByTestId("search");
     expect(search.getAttribute("data-analysis")).toBe(AN);
-    expect(search.getAttribute("data-focus")).toBe(ORDER_TYPE);
+    expect(search.getAttribute("data-focus")).toBe(TYPE);
   });
 
   test("a coluna da barra lateral tem altura limitada, para a árvore virtualizada rolar nela", async () => {
@@ -785,9 +802,7 @@ describe("/repository/$handle: a barra lateral", () => {
   });
 
   test("a estrutura recebe a vista resolvida: TYPE_NEIGHBORHOOD é o nível 1", async () => {
-    await renderAt(
-      `${SCREEN_URL}&level=TYPE_NEIGHBORHOOD&parent=${ORDER_TYPE}`
-    );
+    await renderAt(`${SCREEN_URL}&level=TYPE_NEIGHBORHOOD&parent=${TYPE}`);
 
     const outline = within(sidebar()).getByTestId("outline");
     expect(outline.getAttribute("data-level")).toBe("PACKAGE");
@@ -796,7 +811,7 @@ describe("/repository/$handle: a barra lateral", () => {
   });
 
   test("sem análise, nem busca, nem estrutura, nem botão de pular: só o describe é pedido", async () => {
-    await renderAt(`/repository/${HANDLE}?level=TYPE&parent=${ORDERS}`, {
+    await renderAt(`/repository/${HANDLE}?level=TYPE&parent=${DRILLED}`, {
       main: t.shell.regions.prepare,
     });
     await screen.findByRole("heading", { level: 1, name: "multi-module" });
@@ -816,45 +831,45 @@ describe("/repository/$handle: a barra lateral", () => {
 describe("/repository/$handle: a estrutura muda a URL pelas transições", () => {
   test("Enter em um tipo do pacote aberto substitui a entrada: só o focus muda", async () => {
     const { router } = await renderAt(
-      `${SCREEN_URL}&level=TYPE&parent=${ORDERS}`
+      `${SCREEN_URL}&level=TYPE&parent=${DRILLED}`
     );
-    await waitForCanvas(3, "tipos");
+    await waitForCanvas(TYPES, "tipos");
     const lengthBefore = router.history.length;
 
     fireEvent.click(
-      screen.getByRole("button", { name: `outline:select:${ORDER_TYPE}` })
+      screen.getByRole("button", { name: `outline:select:${TYPE}` })
     );
 
     await waitFor(() =>
-      expect(canvas().getAttribute("data-selected")).toBe(ORDER_TYPE)
+      expect(canvas().getAttribute("data-selected")).toBe(TYPE)
     );
     expect(urlSearch(router)).toStrictEqual({
       analysis: AN,
-      focus: ORDER_TYPE,
+      focus: TYPE,
       level: "TYPE",
-      parent: ORDERS,
+      parent: DRILLED,
     });
     expect(router.history.length).toBe(lengthBefore);
     expect(
       within(sidebar()).getByTestId("outline").getAttribute("data-focus")
-    ).toBe(ORDER_TYPE);
+    ).toBe(TYPE);
   });
 
   test("Enter em um pacote no nível 1 substitui a entrada", async () => {
     const { router } = await renderAt(SCREEN_URL);
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     const lengthBefore = router.history.length;
 
     fireEvent.click(
-      screen.getByRole("button", { name: `outline:select:${BILLING}` })
+      screen.getByRole("button", { name: `outline:select:${OTHER}` })
     );
 
     await waitFor(() =>
-      expect(canvas().getAttribute("data-selected")).toBe(BILLING)
+      expect(canvas().getAttribute("data-selected")).toBe(OTHER)
     );
     expect(urlSearch(router)).toStrictEqual({
       analysis: AN,
-      focus: BILLING,
+      focus: OTHER,
       level: "PACKAGE",
     });
     expect(router.history.length).toBe(lengthBefore);
@@ -862,126 +877,126 @@ describe("/repository/$handle: a estrutura muda a URL pelas transições", () =>
 
   test("Enter em um pacote enquanto o mapa mostra tipos empilha o nível 1, com ele selecionado", async () => {
     const { router } = await renderAt(
-      `${SCREEN_URL}&level=TYPE&parent=${ORDERS}`
+      `${SCREEN_URL}&level=TYPE&parent=${DRILLED}`
     );
-    await waitForCanvas(3, "tipos");
+    await waitForCanvas(TYPES, "tipos");
     const lengthBefore = router.history.length;
 
     fireEvent.click(
-      screen.getByRole("button", { name: `outline:select:${BILLING}` })
+      screen.getByRole("button", { name: `outline:select:${OTHER}` })
     );
 
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     expect(urlSearch(router)).toStrictEqual({
       analysis: AN,
-      focus: BILLING,
+      focus: OTHER,
       level: "PACKAGE",
     });
     expect(router.history.length).toBe(lengthBefore + 1);
-    expect(canvas().getAttribute("data-selected")).toBe(BILLING);
+    expect(canvas().getAttribute("data-selected")).toBe(OTHER);
 
     router.history.back();
 
-    await waitForCanvas(3, "tipos");
+    await waitForCanvas(TYPES, "tipos");
     expect(urlSearch(router)).toStrictEqual({
       analysis: AN,
       level: "TYPE",
-      parent: ORDERS,
+      parent: DRILLED,
     });
   });
 
   test("a seta para a direita empilha o pacote aberto, e voltar desfaz", async () => {
-    const { router } = await renderAt(`${SCREEN_URL}&focus=${BILLING}`);
-    await waitForCanvas(3, "pacotes");
+    const { router } = await renderAt(`${SCREEN_URL}&focus=${OTHER}`);
+    await waitForCanvas(PACKAGES, "pacotes");
     const lengthBefore = router.history.length;
     const levelOneSearch = urlSearch(router);
 
     fireEvent.click(
-      screen.getByRole("button", { name: `outline:expand:${ORDERS}` })
+      screen.getByRole("button", { name: `outline:expand:${DRILLED}` })
     );
 
-    await waitForCanvas(3, "tipos");
+    await waitForCanvas(TYPES, "tipos");
     expect(urlSearch(router)).toStrictEqual({
       analysis: AN,
       level: "TYPE",
-      parent: ORDERS,
+      parent: DRILLED,
     });
     expect(router.history.length).toBe(lengthBefore + 1);
 
     router.history.back();
 
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     expect(urlSearch(router)).toStrictEqual(levelOneSearch);
-    expect(levelOneSearch).toMatchObject({ focus: BILLING });
+    expect(levelOneSearch).toMatchObject({ focus: OTHER });
   });
 
   test("a seta para a esquerda empilha a volta ao nível 1, com o pacote de onde se saiu selecionado", async () => {
     const { router } = await renderAt(
-      `${SCREEN_URL}&level=TYPE&parent=${ORDERS}&focus=${ORDER_TYPE}`
+      `${SCREEN_URL}&level=TYPE&parent=${DRILLED}&focus=${TYPE}`
     );
-    await waitForCanvas(3, "tipos");
+    await waitForCanvas(TYPES, "tipos");
     const lengthBefore = router.history.length;
 
     fireEvent.click(screen.getByRole("button", { name: "outline:collapse" }));
 
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     expect(urlSearch(router)).toStrictEqual({
       analysis: AN,
-      focus: ORDERS,
+      focus: DRILLED,
       level: "PACKAGE",
     });
     expect(router.history.length).toBe(lengthBefore + 1);
 
     router.history.back();
 
-    await waitForCanvas(3, "tipos");
-    expect(urlSearch(router)).toMatchObject({ focus: ORDER_TYPE });
+    await waitForCanvas(TYPES, "tipos");
+    expect(urlSearch(router)).toMatchObject({ focus: TYPE });
   });
 });
 
 describe("/repository/$handle: a busca leva o mapa até o resultado", () => {
   test("um tipo de outro pacote empilha os tipos dele, com o tipo selecionado", async () => {
     const { router } = await renderAt(SCREEN_URL);
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     const lengthBefore = router.history.length;
     const levelOneSearch = urlSearch(router);
 
     fireEvent.click(
-      screen.getByRole("button", { name: `search:reveal:${ORDER_TYPE}` })
+      screen.getByRole("button", { name: `search:reveal:${TYPE}` })
     );
 
-    await waitForCanvas(3, "tipos");
+    await waitForCanvas(TYPES, "tipos");
     expect(urlSearch(router)).toStrictEqual({
       analysis: AN,
-      focus: ORDER_TYPE,
+      focus: TYPE,
       level: "TYPE",
-      parent: ORDERS,
+      parent: DRILLED,
     });
     expect(router.history.length).toBe(lengthBefore + 1);
-    expect(canvas().getAttribute("data-selected")).toBe(ORDER_TYPE);
-    expect(await within(inspector()).findByText("Order")).toBeDefined();
+    expect(canvas().getAttribute("data-selected")).toBe(TYPE);
+    expect(await within(inspector()).findByText(TYPE_LABEL)).toBeDefined();
 
     router.history.back();
 
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     expect(urlSearch(router)).toStrictEqual(levelOneSearch);
   });
 
   test("um pacote no nível 1 substitui a entrada: só a seleção muda", async () => {
     const { router } = await renderAt(SCREEN_URL);
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     const lengthBefore = router.history.length;
 
     fireEvent.click(
-      screen.getByRole("button", { name: `search:reveal:${BILLING}` })
+      screen.getByRole("button", { name: `search:reveal:${OTHER}` })
     );
 
     await waitFor(() =>
-      expect(canvas().getAttribute("data-selected")).toBe(BILLING)
+      expect(canvas().getAttribute("data-selected")).toBe(OTHER)
     );
     expect(urlSearch(router)).toStrictEqual({
       analysis: AN,
-      focus: BILLING,
+      focus: OTHER,
       level: "PACKAGE",
     });
     expect(router.history.length).toBe(lengthBefore);
@@ -994,7 +1009,7 @@ describe("/repository/$handle: o botão de pular para a estrutura", () => {
 
   test("é o primeiro focável do <main>, fora do canvas, e leva o foco à estrutura sem tocar no histórico", async () => {
     const { router } = await renderAt(SCREEN_URL);
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
     const skip = within(mapRegion()).getByRole("button", {
       name: t.shell.skipToOutline,
     });
@@ -1014,18 +1029,18 @@ describe("/repository/$handle: o botão de pular para a estrutura", () => {
 });
 
 describe("/repository/$handle: um elemento que o mapa cortou", () => {
-  const CUT_TYPE = "type:br.pucpr.orders.Cut";
+  const CUT_TYPE = `type:${DRILLED.slice("pkg:".length)}.Cut`;
 
   const truncateOrders = async (): Promise<void> => {
     const fixture = (await fakeRequest("graph.slice", {
       analysisId: AN,
       level: "TYPE",
-      parentId: ORDERS,
+      parentId: DRILLED,
     })) as GraphSlice;
     vi.stubGlobal("__STRATA_FAKE_TRANSCRIPTS__", [
       {
         method: "graph.slice",
-        request: { level: "TYPE", parentId: ORDERS },
+        request: { level: "TYPE", parentId: DRILLED },
         result: {
           ...fixture,
           totals: { edges: 9120, nodes: 1842 },
@@ -1038,9 +1053,9 @@ describe("/repository/$handle: um elemento que o mapa cortou", () => {
   test("fora de uma fatia truncada, o inspetor diz que o limite o deixou de fora", async () => {
     await truncateOrders();
     await renderAt(
-      `${SCREEN_URL}&level=TYPE&parent=${ORDERS}&focus=${CUT_TYPE}`
+      `${SCREEN_URL}&level=TYPE&parent=${DRILLED}&focus=${CUT_TYPE}`
     );
-    await waitForCanvas(3, "tipos");
+    await waitForCanvas(TYPES, "tipos");
 
     expect(
       await within(inspector()).findByText(t.inspector.notOnMap.truncated)
@@ -1050,12 +1065,10 @@ describe("/repository/$handle: um elemento que o mapa cortou", () => {
 
   test("em uma fatia truncada, um tipo que está no mapa mostra o resumo dele", async () => {
     await truncateOrders();
-    await renderAt(
-      `${SCREEN_URL}&level=TYPE&parent=${ORDERS}&focus=${ORDER_TYPE}`
-    );
-    await waitForCanvas(3, "tipos");
+    await renderAt(`${SCREEN_URL}&level=TYPE&parent=${DRILLED}&focus=${TYPE}`);
+    await waitForCanvas(TYPES, "tipos");
 
-    expect(await within(inspector()).findByText("Order")).toBeDefined();
+    expect(await within(inspector()).findByText(TYPE_LABEL)).toBeDefined();
     expect(
       within(inspector()).queryByText(t.inspector.notOnMap.truncated)
     ).toBeNull();
@@ -1078,7 +1091,7 @@ describe("/repository/$handle: um elemento que o mapa cortou", () => {
       },
     ] satisfies readonly FakeTranscriptOverride[]);
     await renderAt(`${SCREEN_URL}&focus=pkg:br.pucpr.legacy.deep`);
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
 
     expect(
       await within(inspector()).findByText(t.inspector.notOnMap.aggregated)
@@ -1088,9 +1101,9 @@ describe("/repository/$handle: um elemento que o mapa cortou", () => {
 
   test("em uma fatia completa, um focus ausente continua sendo seleção nenhuma", async () => {
     await renderAt(
-      `${SCREEN_URL}&level=TYPE&parent=${ORDERS}&focus=${CUT_TYPE}`
+      `${SCREEN_URL}&level=TYPE&parent=${DRILLED}&focus=${CUT_TYPE}`
     );
-    await waitForCanvas(3, "tipos");
+    await waitForCanvas(TYPES, "tipos");
 
     expect(within(inspector()).getByText(t.inspector.empty)).toBeDefined();
     expect(
@@ -1102,7 +1115,7 @@ describe("/repository/$handle: um elemento que o mapa cortou", () => {
 describe("/repository/$handle: a legenda", () => {
   test("mora no painel do mapa, depois do canvas, e não mais na barra lateral", async () => {
     await renderAt(SCREEN_URL);
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
 
     const legend = within(mapRegion()).getByRole("region", {
       name: t.graph.legend.title,
@@ -1133,23 +1146,17 @@ describe("a tela pelo analysis.status em /repository/$handle?analysis=", () => {
       },
     });
 
-  test("SKIPPED: o resumo com o cartão do mapa, e nenhum pedido de fatia, estrutura ou busca", async () => {
-    serveStatus(fixtureStatus);
+  test("cancelada depois do grafo: o resumo, sem cartão do mapa, e nenhum pedido de fatia, estrutura ou busca", async () => {
+    serveStatus(cancelledAfterGraph);
     await renderAt(SCREEN_URL, { main: t.shell.regions.analysis });
 
     expect(
       await within(analysisRegion()).findByRole("heading", {
         level: 1,
-        name: interpolate(plural(9, t.analysis.completed.headline), {
-          total: 9,
-        }),
+        name: t.analysis.cancelled.headline,
       })
     ).toBeDefined();
-    expect(
-      within(analysisRegion()).getByRole("heading", {
-        name: t.analysis.map.title,
-      })
-    ).toBeDefined();
+    expect(within(analysisRegion()).queryByText(DELETED_MAP_CARD)).toBeNull();
     expect(screen.queryByRole("img")).toBeNull();
     expect(
       screen.queryByRole("main", { name: t.shell.regions.canvas })
@@ -1157,12 +1164,12 @@ describe("a tela pelo analysis.status em /repository/$handle?analysis=", () => {
     expect(
       requestedMethods().filter((method) => READ_METHODS.includes(method))
     ).toStrictEqual([]);
-    expect(banner().queryByText(t.header.analysis.PARTIAL)).toBeNull();
+    expect(banner().getByText(t.header.analysis.CANCELLED)).toBeDefined();
   });
 
-  test("COMPLETED: o mapa monta, e os três métodos de leitura saem", async () => {
+  test("COMPLETED, a fixture do Java como está: o mapa monta, e os três métodos de leitura saem", async () => {
     await renderAt(SCREEN_URL);
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
 
     expect(requestedMethods()).toStrictEqual(
       expect.arrayContaining(["analysis.status", "graph.slice"])
@@ -1192,11 +1199,7 @@ describe("a tela pelo analysis.status em /repository/$handle?analysis=", () => {
         name: t.analysis.cancelled.headline,
       })
     ).toBeDefined();
-    expect(
-      within(analysisRegion()).queryByRole("heading", {
-        name: t.analysis.map.title,
-      })
-    ).toBeNull();
+    expect(within(analysisRegion()).queryByText(DELETED_MAP_CARD)).toBeNull();
     expect(banner().getByText(t.header.analysis.CANCELLED)).toBeDefined();
   });
 
@@ -1326,7 +1329,7 @@ describe("a tela pelo analysis.status em /repository/$handle?analysis=", () => {
   test("RUNNING com o grafo concluído: o mapa monta, e o andamento é o selo do cabeçalho", async () => {
     serveStatus(() => Promise.resolve(runningReport("COMPLETED")));
     await renderAt(SCREEN_URL);
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
 
     expect(banner().getByText(t.header.analysis.RUNNING)).toBeDefined();
     expect(mapRegion().firstElementChild).toBe(
@@ -1336,7 +1339,7 @@ describe("a tela pelo analysis.status em /repository/$handle?analysis=", () => {
 
   test("parcial com o mapa: o selo parcial e a ressalva compacta no inspetor", async () => {
     serveStatus(async () => ({
-      ...(await mapReadyStatus()),
+      ...(await fixtureStatus()),
       completeness: {
         historyTruncatedAtCommits: null,
         parseFailures: 0,
@@ -1402,7 +1405,7 @@ describe("a tela pelo analysis.status em /repository/$handle?analysis=", () => {
     });
     const close = vi.spyOn(transport, "closeRepository");
     const { router } = await renderAt(SCREEN_URL);
-    await waitForCanvas(3, "pacotes");
+    await waitForCanvas(PACKAGES, "pacotes");
 
     fireEvent.click(banner().getByRole("button", { name: t.header.close }));
 
@@ -1413,12 +1416,13 @@ describe("a tela pelo analysis.status em /repository/$handle?analysis=", () => {
   });
 
   test("do resumo, Fechar repositório não pede cancelamento nenhum", async () => {
-    serveStatus(fixtureStatus);
+    serveStatus(cancelledBeforeGraph);
     const cancel = vi.spyOn(transport, "analyzerCancel");
     const close = vi.spyOn(transport, "closeRepository");
     await renderAt(SCREEN_URL, { main: t.shell.regions.analysis });
     await within(analysisRegion()).findByRole("heading", {
-      name: t.analysis.map.title,
+      level: 1,
+      name: t.analysis.cancelled.headline,
     });
 
     fireEvent.click(banner().getByRole("button", { name: t.header.close }));
@@ -1428,8 +1432,7 @@ describe("a tela pelo analysis.status em /repository/$handle?analysis=", () => {
     expect(cancel).not.toHaveBeenCalled();
   });
 
-  test("do Analisar ao resumo: a tela troca e o foco que caiu vai ao título novo", async () => {
-    serveStatus(fixtureStatus);
+  test("do Analisar ao mapa: a tela troca e o foco que caiu vai ao título novo", async () => {
     const { router } = await renderAt(`/repository/${HANDLE}`, {
       main: t.shell.regions.prepare,
     });
@@ -1443,12 +1446,9 @@ describe("a tela pelo analysis.status em /repository/$handle?analysis=", () => {
 
     fireEvent.click(analyze);
 
-    const title = await screen.findByRole("heading", {
-      level: 1,
-      name: interpolate(plural(9, t.analysis.completed.headline), {
-        total: 9,
-      }),
-    });
+    const title = await within(
+      await screen.findByRole("main", { name: t.shell.regions.canvas })
+    ).findByRole("heading", { level: 1, name: t.shell.regions.canvas });
     expect(urlSearch(router)).toStrictEqual({
       analysis: AN,
       level: "PACKAGE",

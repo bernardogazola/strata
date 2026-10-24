@@ -31,9 +31,15 @@ import {
   repositoryQueryOptions,
   SEARCH_KINDS,
 } from "@/queries/options";
+import {
+  DRILLED_PACKAGE_ID,
+  PACKAGE_IDS,
+  SEARCH_QUERY,
+  TYPE_IDS,
+} from "@/test/fixture-graph";
 
 const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
-const ORDERS = "pkg:br.pucpr.orders";
+const DRILLED = DRILLED_PACKAGE_ID;
 const HANDLE = "repo_AAAAAAAAAAAAAAAAAAAAAQ";
 
 afterEach(() => {
@@ -81,10 +87,10 @@ describe("graphSliceQueryOptions: a chave", () => {
   test("o pai entra na chave, então cada pacote aberto tem a sua entrada", () => {
     const { queryKey } = graphSliceQueryOptions(AN, {
       level: "TYPE",
-      parentId: ORDERS,
+      parentId: DRILLED,
     });
 
-    expect(queryKey.at(-1)).toStrictEqual({ level: "TYPE", parentId: ORDERS });
+    expect(queryKey.at(-1)).toStrictEqual({ level: "TYPE", parentId: DRILLED });
   });
 
   test("uma invalidação de structure.all alcança a fatia em cache", async () => {
@@ -118,13 +124,13 @@ describe("graphSliceQueryOptions: o pedido", () => {
 
   test("o drill-down manda o pai", async () => {
     const request = vi.spyOn(transport, "request");
-    const { result } = renderSliceQuery({ level: "TYPE", parentId: ORDERS });
+    const { result } = renderSliceQuery({ level: "TYPE", parentId: DRILLED });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(request.mock.calls[0]?.[1]).toStrictEqual({
       analysisId: AN,
       level: "TYPE",
-      parentId: ORDERS,
+      parentId: DRILLED,
     });
   });
 
@@ -177,19 +183,19 @@ describe("graphSliceQueryOptions: o select", () => {
     const view = result.current.data;
     expect(view?.slice).toStrictEqual(fixture);
     expect(view?.elements).toStrictEqual(toGraphElements(fixture));
-    expect(view?.elements.nodes.map((node) => node.data.id)).toStrictEqual([
-      "pkg:br.pucpr.billing",
-      ORDERS,
-      "pkg:br.pucpr.shared",
-    ]);
+    expect(view?.elements.nodes.map((node) => node.data.id)).toStrictEqual(
+      PACKAGE_IDS
+    );
   });
 
   test("resolve os tipos do pacote aberto", async () => {
-    const { result } = renderSliceQuery({ level: "TYPE", parentId: ORDERS });
+    const { result } = renderSliceQuery({ level: "TYPE", parentId: DRILLED });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(result.current.data?.slice.parentId).toBe(ORDERS);
-    expect(result.current.data?.elements.nodes).toHaveLength(3);
+    expect(result.current.data?.slice.parentId).toBe(DRILLED);
+    expect(
+      result.current.data?.elements.nodes.map((node) => node.data.id)
+    ).toStrictEqual(TYPE_IDS);
   });
 
   test("uma fatia acima do orçamento vira o erro da query, não um throw no render", async () => {
@@ -220,7 +226,7 @@ describe("graphSliceQueryOptions: o select", () => {
     const first = graphSliceQueryOptions(AN, { level: "PACKAGE" });
     const second = graphSliceQueryOptions(AN, {
       level: "TYPE",
-      parentId: ORDERS,
+      parentId: DRILLED,
     });
 
     expect(first.select).toBe(second.select);
@@ -363,9 +369,9 @@ describe("analysisStartMutationOptions", () => {
 
 describe("outlineChildrenQueryOptions", () => {
   test("a chave fica sob structure.all e não carrega cursor", () => {
-    const { queryKey } = outlineChildrenQueryOptions(AN, ORDERS);
+    const { queryKey } = outlineChildrenQueryOptions(AN, DRILLED);
 
-    expect(queryKey).toStrictEqual(queryKeys.structure.outline(AN, ORDERS));
+    expect(queryKey).toStrictEqual(queryKeys.structure.outline(AN, DRILLED));
     expect(queryKey.slice(0, 3)).toStrictEqual(queryKeys.structure.all(AN));
   });
 
@@ -390,11 +396,9 @@ describe("outlineChildrenQueryOptions", () => {
       parentId: null,
     });
     expect((payload as { cursor?: unknown }).cursor).toBeUndefined();
-    expect(result.current.data?.map((node) => node.id)).toStrictEqual([
-      "pkg:br.pucpr.billing",
-      ORDERS,
-      "pkg:br.pucpr.shared",
-    ]);
+    expect(result.current.data?.map((node) => node.id)).toStrictEqual(
+      PACKAGE_IDS
+    );
     expect(result.current.hasNextPage).toBe(false);
   });
 
@@ -418,7 +422,7 @@ describe("outlineChildrenQueryOptions", () => {
       });
     const queryClient = createQueryClient();
     const { result } = renderHook(
-      () => useInfiniteQuery(outlineChildrenQueryOptions(AN, ORDERS)),
+      () => useInfiniteQuery(outlineChildrenQueryOptions(AN, DRILLED)),
       { wrapper: wrapperFor(queryClient) }
     );
     await waitFor(() => {
@@ -436,11 +440,11 @@ describe("outlineChildrenQueryOptions", () => {
     expect(result.current.hasNextPage).toBe(false);
     expect(request.mock.calls[1]?.[1]).toMatchObject({
       cursor: nextCursor,
-      parentId: ORDERS,
+      parentId: DRILLED,
     });
     expect(
       queryClient.getQueryCache().findAll({
-        queryKey: queryKeys.structure.outline(AN, ORDERS),
+        queryKey: queryKeys.structure.outline(AN, DRILLED),
       })
     ).toHaveLength(1);
   });
@@ -448,9 +452,11 @@ describe("outlineChildrenQueryOptions", () => {
 
 describe("graphSearchQueryOptions", () => {
   test("a chave fica sob structure.all", () => {
-    const { queryKey } = graphSearchQueryOptions(AN, "order");
+    const { queryKey } = graphSearchQueryOptions(AN, SEARCH_QUERY);
 
-    expect(queryKey).toStrictEqual(queryKeys.structure.search(AN, "order"));
+    expect(queryKey).toStrictEqual(
+      queryKeys.structure.search(AN, SEARCH_QUERY)
+    );
     expect(queryKey.slice(0, 3)).toStrictEqual(queryKeys.structure.all(AN));
   });
 
@@ -458,15 +464,15 @@ describe("graphSearchQueryOptions", () => {
     const request = vi.spyOn(transport, "request");
 
     const result = await createQueryClient().fetchQuery(
-      graphSearchQueryOptions(AN, "order")
+      graphSearchQueryOptions(AN, SEARCH_QUERY)
     );
 
     expect(request).toHaveBeenCalledWith("graph.search", {
       analysisId: AN,
       kinds: [...SEARCH_KINDS],
-      query: "order",
+      query: SEARCH_QUERY,
     });
-    expect(result.results.map((hit) => hit.elementId)).toContain(ORDERS);
+    expect(result.results.map((hit) => hit.elementId)).toContain(DRILLED);
   });
 
   test("a consulta vazia não vira pedido", async () => {
