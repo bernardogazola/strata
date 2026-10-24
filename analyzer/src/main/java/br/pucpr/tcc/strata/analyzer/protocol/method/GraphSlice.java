@@ -35,7 +35,7 @@ public final class GraphSlice implements MethodHandler<GraphSlice.Params> {
   @Override
   public Object handle(Params params, Envelope.Request request) {
     final AnalysisId id = AnalysisCancel.analysisId(METHOD, params.analysisId());
-    final CodeElementId parent = StructureReads.elementId(METHOD, params.parentId());
+    final CodeElementId parent = StructureReads.elementId(METHOD, "parentId", params.parentId());
     final GraphLevel level = params.level();
     final SliceBudget budget;
     try {

@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { z } from "zod";
 import {
   graphNodeIdSchema,
+  methodIdSchema,
   prefixIdSchema,
   SEARCH_QUERY_MAX_CHARS,
   searchQuerySchema,
@@ -83,5 +84,38 @@ describe("graphNodeIdSchema", () => {
   test("recusa um grupo malformado e um prefixo de id desconhecido", () => {
     expect(graphNodeIdSchema.safeParse("pfx:").success).toBe(false);
     expect(graphNodeIdSchema.safeParse("grp:a").success).toBe(false);
+  });
+});
+
+describe("methodIdSchema", () => {
+  test("aceita um método, um construtor e um método sem parâmetro", () => {
+    for (const id of [
+      "method:br.pucpr.orders.OrderService#pay(br.pucpr.orders.Order,java.util.UUID)",
+      "method:br.pucpr.orders.Order#<init>(java.util.UUID)",
+      "method:br.pucpr.orders.OrderService#total()",
+    ]) {
+      expect(methodIdSchema.safeParse(id).success, id).toBe(true);
+    }
+  });
+
+  test("recusa todo outro prefixo: um tipo ou um pacote ali é divergência de versão", () => {
+    for (const id of [
+      "type:a.T",
+      "pkg:a",
+      "file:a/T.java",
+      "pfx:a",
+      "a.T#m()",
+    ]) {
+      expect(methodIdSchema.safeParse(id).success, id).toBe(false);
+    }
+  });
+
+  test("o teto é o do id de elemento", () => {
+    const prefix = "method:a.T#m(";
+    const atCeiling = `${prefix}${"a".repeat(MAX_ID_CHARS - prefix.length - 1)})`;
+
+    expect(atCeiling).toHaveLength(MAX_ID_CHARS);
+    expect(methodIdSchema.safeParse(atCeiling).success).toBe(true);
+    expect(methodIdSchema.safeParse(`${atCeiling}a`).success).toBe(false);
   });
 });

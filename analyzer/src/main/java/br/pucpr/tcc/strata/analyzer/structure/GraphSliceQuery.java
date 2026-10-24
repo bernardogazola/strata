@@ -9,15 +9,11 @@ import br.pucpr.tcc.strata.analyzer.persistence.dao.SliceTypeRow;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.StructureDao;
 import br.pucpr.tcc.strata.analyzer.persistence.dao.StructureElementRow;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
-import br.pucpr.tcc.strata.analyzer.sourceanalysis.DependencyAggregator;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.Dependency;
-import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyEdge;
-import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -152,26 +148,19 @@ public final class GraphSliceQuery {
 
   private static List<SliceEdge> packageEdges(
       List<SlicePackageRow> packages, List<PackageEdgeRow> rows) {
-    final Map<Long, String> idByPk = HashMap.newHashMap(packages.size());
-    packages.forEach(row -> idByPk.put(row.pk(), row.elementId().value()));
+    final Map<Long, CodeElementId> idByPk = HashMap.newHashMap(packages.size());
+    packages.forEach(row -> idByPk.put(row.pk(), row.elementId()));
     final List<SliceEdge> edges = new ArrayList<>(rows.size());
     for (final PackageEdgeRow row : rows) {
-      final String source = endpoint(idByPk, row.sourcePk());
-      final String target = endpoint(idByPk, row.targetPk());
-      edges.add(
-          new SliceEdge(
-              EdgeIds.of(source, target),
-              source,
-              target,
-              widened(row.occurrences()),
-              row.typePairCount(),
-              row.resolution()));
+      final CodeElementId source = endpoint(idByPk, row.sourcePk());
+      final CodeElementId target = endpoint(idByPk, row.targetPk());
+      edges.add(sliceEdge(PairEdges.packageEdge(source, target, row)));
     }
     return edges;
   }
 
-  private static String endpoint(Map<Long, String> idByPk, long packagePk) {
-    final String id = idByPk.get(packagePk);
+  private static CodeElementId endpoint(Map<Long, CodeElementId> idByPk, long packagePk) {
+    final CodeElementId id = idByPk.get(packagePk);
     if (id == null) {
       throw new IllegalStateException(
           "uma aresta de pacote para um pacote fora do conjunto de nós");
@@ -180,31 +169,17 @@ public final class GraphSliceQuery {
   }
 
   private static List<SliceEdge> typeEdges(List<Dependency> rows) {
-    final Map<CodeElementId, List<Dependency>> bySource = new HashMap<>();
-    for (final Dependency row : rows) {
-      bySource.computeIfAbsent(row.source(), source -> new ArrayList<>()).add(row);
-    }
-    final List<SliceEdge> edges = new ArrayList<>();
-    for (final List<Dependency> group : bySource.values()) {
-      for (final DependencyEdge edge : DependencyAggregator.aggregate(group)) {
-        final String source = edge.source().value();
-        final String target = edge.target().value();
-        edges.add(
-            new SliceEdge(
-                EdgeIds.of(source, target),
-                source,
-                target,
-                widened(edge.types()),
-                edge.weight(),
-                edge.resolution()));
-      }
-    }
-    return edges;
+    final List<PairRow> pairRows = rows.stream().map(PairRow::unambiguous).toList();
+    return PairEdges.aggregate(pairRows).stream().map(GraphSliceQuery::sliceEdge).toList();
   }
 
-  private static Map<DependencyType, Long> widened(Map<DependencyType, Integer> occurrences) {
-    final Map<DependencyType, Long> types = new EnumMap<>(DependencyType.class);
-    occurrences.forEach((type, count) -> types.put(type, count.longValue()));
-    return types;
+  private static SliceEdge sliceEdge(PairEdge pair) {
+    return new SliceEdge(
+        pair.id(),
+        pair.source().value(),
+        pair.target().value(),
+        pair.types(),
+        pair.weight(),
+        pair.resolution());
   }
 }

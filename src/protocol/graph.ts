@@ -14,6 +14,7 @@ import {
   elementLabelSchema,
   filePathSchema,
   graphNodeIdSchema,
+  methodIdSchema,
   pageOf,
   qualifiedNameSchema,
 } from "./primitives";
@@ -101,79 +102,115 @@ export const searchResultSchema = z.strictObject({
 });
 export type SearchResult = z.infer<typeof searchResultSchema>;
 
+const ELEMENT_METHODS_MAX = 1000;
+
+export const DEPENDENCY_PAGE_MAX = 2000;
+
+export const DEPENDENCY_EVIDENCE_RESULTS_MAX = 50;
+
+export const lineRangeSchema = z
+  .strictObject({
+    end: z.number().int().positive(),
+    start: z.number().int().positive(),
+  })
+  .refine(({ end, start }) => start <= end, {
+    error: "um intervalo de linhas não pode terminar antes de começar",
+  });
+export type LineRange = z.infer<typeof lineRangeSchema>;
+
 export const methodSummarySchema = z.strictObject({
-  cc: z.number().int().nonnegative(),
-  elementId: elementIdSchema,
-  endLine: z.number().int().nonnegative(),
+  cc: z.number().int().positive().nullable(),
+  elementId: methodIdSchema,
+  lines: lineRangeSchema.nullable(),
   signature: elementLabelSchema,
-  startLine: z.number().int().nonnegative(),
 });
+export type MethodSummary = z.infer<typeof methodSummarySchema>;
+
+export const dependencyCycleSchema = z.strictObject({
+  id: z.number().int().positive(),
+  size: z.number().int().min(2),
+});
+export type DependencyCycle = z.infer<typeof dependencyCycleSchema>;
 
 export const elementDetailSchema = z.strictObject({
   elementId: elementIdSchema,
-  endLine: z.number().int().nonnegative(),
   filePath: filePathSchema.nullable(),
   graph: z.strictObject({
+    cycle: dependencyCycleSchema.nullable(),
     fanIn: z.number().int().nonnegative(),
     fanOut: z.number().int().nonnegative(),
-    isEntryPoint: z.boolean(),
-    pagerank: z.number().min(0).max(1),
-    sccId: z.number().int().nonnegative().nullable(),
-    sccSize: z.number().int().nonnegative().nullable(),
+    pagerank: z.number().positive().max(1),
+    resolutionMix: resolutionMixSchema,
   }),
   isTest: z.boolean(),
   kind: elementKindSchema,
-  methods: z.array(methodSummarySchema),
+  label: elementLabelSchema,
+  lines: lineRangeSchema.nullable(),
+  methods: z.array(methodSummarySchema).max(ELEMENT_METHODS_MAX),
+  methodTotal: z.number().int().nonnegative(),
   metrics: z.strictObject({
     ccMax: z.number().int().nonnegative(),
     ccMean: z.number().nonnegative(),
-    ccP90: z.number().nonnegative(),
+    ccP90: z.number().int().nonnegative().nullable(),
     ccSum: z.number().int().nonnegative(),
-    commentLines: z.number().int().nonnegative(),
-    fieldCount: z.number().int().nonnegative(),
     loc: z.number().int().nonnegative(),
-    methodCount: z.number().int().nonnegative(),
-    nestingMax: z.number().int().nonnegative(),
-    sourceLines: z.number().int().nonnegative(),
+    unitCount: z.number().int().nonnegative(),
   }),
   modifiers: z.array(z.string().max(32)),
   packageId: elementIdSchema.nullable(),
   qualifiedName: qualifiedNameSchema,
-  simpleName: elementLabelSchema,
-  startLine: z.number().int().nonnegative(),
   typeKind: typeKindSchema.nullable(),
 });
 export type ElementDetail = z.infer<typeof elementDetailSchema>;
 
+export const evidenceMethodSchema = z.strictObject({
+  elementId: methodIdSchema,
+  ownerId: elementIdSchema,
+  ownerLabel: elementLabelSchema,
+  signature: elementLabelSchema,
+});
+export type EvidenceMethod = z.infer<typeof evidenceMethodSchema>;
+
 export const relationshipEvidenceSchema = z.strictObject({
   filePath: filePathSchema.nullable(),
-  fromMethod: elementIdSchema.nullable(),
+  fromMethod: evidenceMethodSchema.nullable(),
   line: z.number().int().positive().nullable(),
   resolution: resolutionQualitySchema,
-  toMethod: elementIdSchema.nullable(),
+  toMethod: evidenceMethodSchema.nullable(),
+  type: dependencyTypeSchema,
 });
 export type RelationshipEvidence = z.infer<typeof relationshipEvidenceSchema>;
 
 export const dependencyEvidenceResultSchema = z.strictObject({
-  evidence: z.array(relationshipEvidenceSchema).max(50),
+  evidence: z
+    .array(relationshipEvidenceSchema)
+    .max(DEPENDENCY_EVIDENCE_RESULTS_MAX),
 });
+export type DependencyEvidenceResult = z.infer<
+  typeof dependencyEvidenceResultSchema
+>;
 
 export const dependencyEntrySchema = z.strictObject({
+  ambiguous: z.boolean(),
   edgeId: edgeIdSchema,
   elementId: elementIdSchema,
+  isExternal: z.boolean(),
   kind: elementKindSchema,
   label: elementLabelSchema,
+  packageId: elementIdSchema.nullable(),
+  qualifiedName: qualifiedNameSchema,
   resolution: resolutionQualitySchema,
   types: z.partialRecord(dependencyTypeSchema, z.number().int().positive()),
-  weight: z.number().int().nonnegative(),
+  weight: z.number().int().positive(),
 });
 export type DependencyEntry = z.infer<typeof dependencyEntrySchema>;
 
 export const dependencyPageSchema = pageOf(dependencyEntrySchema).extend({
+  items: z.array(dependencyEntrySchema).max(DEPENDENCY_PAGE_MAX),
   totals: z.strictObject({
     in: z.number().int().nonnegative(),
     out: z.number().int().nonnegative(),
+    outExternal: z.number().int().nonnegative().nullable(),
   }),
-  truncated: z.boolean(),
 });
 export type DependencyPage = z.infer<typeof dependencyPageSchema>;

@@ -61,6 +61,18 @@ final class AnalysisConstantsTest {
   }
 
   @Test
+  void osLimitesDasLeiturasDaFase32SaoEcoadosNosMetadados() {
+    assertThat(AnalysisConstants.asMetadata())
+        .containsAllEntriesOf(
+            Map.ofEntries(
+                Map.entry("DEPENDENCY_PAGE_DEFAULT", 500),
+                Map.entry("DEPENDENCY_PAGE_MAX", 2_000),
+                Map.entry("DEPENDENCY_EVIDENCE_RESULTS_MAX", 50),
+                Map.entry("ELEMENT_METHODS_MAX", 1_000),
+                Map.entry("DEPENDENCY_EVIDENCE_CAP", 20)));
+  }
+
+  @Test
   void oTetoDeEntradasDoBancoDeObjetosSubstituiODeObjetosSoltos() {
     assertThat(AnalysisConstants.asMetadata()).doesNotContainKey("MAX_LOOSE_OBJECTS");
   }

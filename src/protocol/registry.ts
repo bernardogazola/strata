@@ -20,6 +20,8 @@ import {
 } from "./envelope";
 import { type ErrorCode, protocolErrorSchema } from "./errors";
 import {
+  DEPENDENCY_EVIDENCE_RESULTS_MAX,
+  DEPENDENCY_PAGE_MAX,
   dependencyEvidenceResultSchema,
   dependencyPageSchema,
   elementDetailSchema,
@@ -35,7 +37,6 @@ import {
 import {
   analysisIdSchema,
   cursorSchema,
-  edgeIdSchema,
   elementIdSchema,
   percentileSchema,
   searchQuerySchema,
@@ -105,7 +106,7 @@ export const METHODS = {
       cursor: cursorSchema.optional(),
       direction: dependencyDirectionSchema,
       elementId: elementIdSchema,
-      limit: z.number().int().positive().max(2000).optional(),
+      limit: z.number().int().positive().max(DEPENDENCY_PAGE_MAX).optional(),
     }),
     requiresRepository: false,
     result: dependencyPageSchema,
@@ -113,8 +114,14 @@ export const METHODS = {
   "element.dependencyEvidence": {
     params: z.strictObject({
       analysisId: analysisIdSchema,
-      edgeId: edgeIdSchema,
-      limit: z.number().int().positive().max(50).optional(),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .max(DEPENDENCY_EVIDENCE_RESULTS_MAX)
+        .optional(),
+      source: elementIdSchema,
+      target: elementIdSchema,
     }),
     requiresRepository: false,
     result: dependencyEvidenceResultSchema,

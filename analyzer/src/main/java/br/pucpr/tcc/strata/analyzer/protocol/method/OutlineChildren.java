@@ -34,7 +34,7 @@ public final class OutlineChildren implements MethodHandler<OutlineChildren.Para
   @Override
   public Object handle(Params params, Envelope.Request request) {
     final AnalysisId id = AnalysisCancel.analysisId(METHOD, params.analysisId());
-    final CodeElementId parent = StructureReads.elementId(METHOD, params.parentId());
+    final CodeElementId parent = StructureReads.elementId(METHOD, "parentId", params.parentId());
     final int limit;
     final OutlineCursor after;
     try {

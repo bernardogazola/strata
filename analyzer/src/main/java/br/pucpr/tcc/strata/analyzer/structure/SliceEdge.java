@@ -15,16 +15,13 @@ public record SliceEdge(
     long weight,
     ResolutionQuality resolution) {
 
-  private static final String ID_PREFIX = "e_";
-  private static final int ID_HEX_DIGITS = 16;
-
   public SliceEdge {
     Objects.requireNonNull(id, "id");
     Objects.requireNonNull(source, "source");
     Objects.requireNonNull(target, "target");
     Objects.requireNonNull(types, "types");
     Objects.requireNonNull(resolution, "resolution");
-    if (!isEdgeId(id)) {
+    if (!EdgeIds.isEdgeId(id)) {
       throw new IllegalArgumentException("não é um id de aresta: " + id);
     }
     if (source.equals(target)) {
@@ -46,18 +43,5 @@ public record SliceEdge(
       throw new IllegalArgumentException(
           "uma aresta do recorte nunca é UNRESOLVED_EXTERNAL: " + id);
     }
-  }
-
-  private static boolean isEdgeId(String id) {
-    if (id.length() != ID_PREFIX.length() + ID_HEX_DIGITS || !id.startsWith(ID_PREFIX)) {
-      return false;
-    }
-    for (int i = ID_PREFIX.length(); i < id.length(); i++) {
-      final char digit = id.charAt(i);
-      if (!(digit >= '0' && digit <= '9') && !(digit >= 'a' && digit <= 'f')) {
-        return false;
-      }
-    }
-    return true;
   }
 }

@@ -772,6 +772,20 @@ final class StructureReadsTest {
                 "outline.children", "o cursor não aponta para uma linha desta listagem"));
   }
 
+  @Test
+  void aFraseNomeiaOCampoEONuloExplicitoEObrigatorio() {
+    final String metodo = "element.describe";
+    final String acima = "type:" + "a".repeat(AnalysisConstants.MAX_ELEMENT_ID_BYTES);
+
+    assertThat(recusa(() -> StructureReads.elementId(metodo, "elementId", acima)))
+        .isEqualTo(ErrorCodes.invalidPayload(metodo, "elementId passa de 4096 bytes em UTF-8"));
+    assertThat(recusa(() -> StructureReads.elementId(metodo, "source", "pfx:a")))
+        .isEqualTo(ErrorCodes.invalidPayload(metodo, "source não é um id de elemento"));
+    assertThat(recusa(() -> StructureReads.required(metodo, "target", null)))
+        .isEqualTo(ErrorCodes.invalidPayload(metodo, "target é obrigatório"));
+    assertThat(StructureReads.required(metodo, "elementId", "type:a.B")).isEqualTo("type:a.B");
+  }
+
   private static ProtocolError recusa(Runnable chamada) {
     try {
       chamada.run();
@@ -785,14 +799,25 @@ final class StructureReadsTest {
   @ValueSource(strings = {"graph.slice", "outline.children"})
   void asConferenciasPurasDaPorta(String metodo) {
     final int teto = AnalysisConstants.MAX_ELEMENT_ID_BYTES;
-    assertThat(StructureReads.elementId(metodo, null)).isNull();
+    assertThat(StructureReads.elementId(metodo, "parentId", null)).isNull();
     final String noTeto = "pkg:" + "a".repeat(teto - 4);
-    assertThat(StructureReads.elementId(metodo, noTeto)).isEqualTo(new CodeElementId(noTeto));
-    assertThat(StructureReads.elementId(metodo, "pkg:")).isEqualTo(new CodeElementId("pkg:"));
-    for (final String recusado : List.of(noTeto + "a", "pfx:br.pucpr", "nope")) {
-      final ProtocolError erro = recusa(() -> StructureReads.elementId(metodo, recusado));
-      assertThat(erro.code()).as(recusado).isEqualTo(ErrorCodes.PROTO_INVALID_PAYLOAD);
-      assertThat(erro.params()).isEqualTo(Map.of("method", metodo));
+    assertThat(StructureReads.elementId(metodo, "parentId", noTeto))
+        .isEqualTo(new CodeElementId(noTeto));
+    assertThat(StructureReads.elementId(metodo, "parentId", "pkg:"))
+        .isEqualTo(new CodeElementId("pkg:"));
+    final Map<String, String> fraseDe =
+        Map.of(
+            noTeto + "a",
+            "parentId passa de 4096 bytes em UTF-8",
+            "pfx:br.pucpr",
+            "parentId não é um id de elemento",
+            "nope",
+            "parentId não é um id de elemento");
+    for (final Map.Entry<String, String> caso : fraseDe.entrySet()) {
+      final String recusado = caso.getKey();
+      final ProtocolError erro =
+          recusa(() -> StructureReads.elementId(metodo, "parentId", recusado));
+      assertThat(erro).as(recusado).isEqualTo(ErrorCodes.invalidPayload(metodo, caso.getValue()));
       assertThat(erro.detail()).doesNotContain(recusado);
     }
 

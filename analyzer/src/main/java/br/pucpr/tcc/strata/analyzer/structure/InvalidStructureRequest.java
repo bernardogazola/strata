@@ -34,7 +34,12 @@ public final class InvalidStructureRequest extends RuntimeException {
     QUERY_REQUIRED("query é obrigatório"),
     QUERY_TOO_LONG(
         "query passa de " + AnalysisConstants.MAX_SEARCH_QUERY_CODE_POINTS + " code points"),
-    KIND_REQUIRED("kinds não pode conter null");
+    KIND_REQUIRED("kinds não pode conter null"),
+    ELEMENT_KIND("elementId deve ser um id de pacote ou de tipo"),
+    SOURCE_KIND("source deve ser um id de tipo"),
+    TARGET_KIND("target deve ser um id de tipo"),
+    SAME_ENDS("source e target devem ser diferentes"),
+    PAIR_WITHOUT_DEPENDENCY("o par não tem dependência");
 
     private final String detail;
 

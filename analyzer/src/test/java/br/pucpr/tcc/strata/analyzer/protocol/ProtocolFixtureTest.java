@@ -888,7 +888,7 @@ final class ProtocolFixtureTest {
   }
 
   @Test
-  void oDespachanteRegistraExatamenteOsNoveMetodosJaImplementados() {
+  void oDespachanteRegistraExatamenteOsDozeMetodosJaImplementados() {
     assertThat(dispatcher.registeredMethods())
         .containsExactlyInAnyOrder(
             "system.ping",
@@ -899,7 +899,10 @@ final class ProtocolFixtureTest {
             "analysis.status",
             "graph.slice",
             "outline.children",
-            "graph.search");
+            "graph.search",
+            "element.describe",
+            "element.dependencies",
+            "element.dependencyEvidence");
   }
 
   @Test

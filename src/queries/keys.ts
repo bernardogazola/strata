@@ -65,13 +65,14 @@ export const queryKeys = {
         "deps",
         direction,
       ] as const,
-    dependencyEvidence: (analysisId: string, edgeId: string) =>
+    dependencyEvidence: (analysisId: string, source: string, target: string) =>
       [
         "analysis",
         analysisId,
         "structure",
         "edge",
-        edgeId,
+        source,
+        target,
         "evidence",
       ] as const,
     element: (analysisId: string, elementId: string) =>

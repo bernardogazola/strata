@@ -360,6 +360,124 @@ describe("os overrides de desenvolvimento", () => {
   });
 });
 
+describe("os discriminantes de element.*", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const CATALOG = "type:nowhere.Catalog";
+  const STORE = "type:nowhere.Store";
+  const IN_PAGE = { marker: "in" };
+  const OUT_PAGE = { marker: "out" };
+  const EVIDENCE = { marker: "evidence" };
+
+  const installOverrides = (
+    overrides: readonly FakeTranscriptOverride[]
+  ): void => {
+    vi.stubGlobal("__STRATA_FAKE_TRANSCRIPTS__", overrides);
+  };
+
+  test("element.dependencies escolhe pelo elemento e pela direção", async () => {
+    installOverrides([
+      {
+        method: "element.dependencies",
+        request: { direction: "IN", elementId: CATALOG },
+        result: IN_PAGE,
+      },
+      {
+        method: "element.dependencies",
+        request: { direction: "OUT", elementId: CATALOG },
+        result: OUT_PAGE,
+      },
+    ]);
+
+    expect(
+      await fakeRequest("element.dependencies", {
+        analysisId: AN,
+        direction: "OUT",
+        elementId: CATALOG,
+      })
+    ).toBe(OUT_PAGE);
+    expect(
+      await fakeRequest("element.dependencies", {
+        analysisId: AN,
+        direction: "IN",
+        elementId: CATALOG,
+      })
+    ).toBe(IN_PAGE);
+  });
+
+  test("cursor e limit não escolhem caso: a página seguinte casa com a mesma transcrição", async () => {
+    installOverrides([
+      {
+        method: "element.dependencies",
+        request: { direction: "IN", elementId: CATALOG },
+        result: IN_PAGE,
+      },
+    ]);
+
+    expect(
+      await fakeRequest("element.dependencies", {
+        analysisId: AN,
+        cursor: "AgAAAAAAAAAAAQAAAAAAAAAC",
+        direction: "IN",
+        elementId: CATALOG,
+        limit: 1,
+      })
+    ).toBe(IN_PAGE);
+  });
+
+  test("element.describe escolhe pelo elemento", async () => {
+    installOverrides([
+      {
+        method: "element.describe",
+        request: { elementId: CATALOG },
+        result: OUT_PAGE,
+      },
+    ]);
+    const error = await protocolErrorOf("element.describe", {
+      analysisId: AN,
+      elementId: STORE,
+    });
+
+    expect(
+      await fakeRequest("element.describe", {
+        analysisId: AN,
+        elementId: CATALOG,
+      })
+    ).toBe(OUT_PAGE);
+    expect([error.code, error.origin]).toStrictEqual([
+      "INTERNAL_UNEXPECTED",
+      "frontend",
+    ]);
+  });
+
+  test("element.dependencyEvidence escolhe pelo par ordenado: o par trocado é outra aresta", async () => {
+    installOverrides([
+      {
+        method: "element.dependencyEvidence",
+        request: { source: CATALOG, target: STORE },
+        result: EVIDENCE,
+      },
+    ]);
+    const swapped = await protocolErrorOf("element.dependencyEvidence", {
+      analysisId: AN,
+      source: STORE,
+      target: CATALOG,
+    });
+
+    expect(
+      await fakeRequest("element.dependencyEvidence", {
+        analysisId: AN,
+        limit: 5,
+        source: CATALOG,
+        target: STORE,
+      })
+    ).toBe(EVIDENCE);
+    expect(swapped.code).toBe("INTERNAL_UNEXPECTED");
+  });
+});
+
 describe("os eventos", () => {
   test("um evento com fixture chega ao assinante, e desassinar cala", () => {
     const seen: unknown[] = [];

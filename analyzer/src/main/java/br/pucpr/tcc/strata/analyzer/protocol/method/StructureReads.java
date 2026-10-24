@@ -19,9 +19,11 @@ import java.sql.SQLException;
 final class StructureReads {
 
   private static final String ID_TOO_LONG =
-      "parentId passa de " + AnalysisConstants.MAX_ELEMENT_ID_BYTES + " bytes em UTF-8";
+      " passa de " + AnalysisConstants.MAX_ELEMENT_ID_BYTES + " bytes em UTF-8";
 
-  private static final String ID_MALFORMED = "parentId não é um id de elemento";
+  private static final String ID_MALFORMED = " não é um id de elemento";
+
+  private static final String FIELD_REQUIRED = " é obrigatório";
 
   private StructureReads() {}
 
@@ -74,18 +76,25 @@ final class StructureReads {
     return analysis;
   }
 
-  static CodeElementId elementId(String method, String wire) {
+  static CodeElementId elementId(String method, String field, String wire) {
     if (wire == null) {
       return null;
     }
     if (exceedsIdCeiling(wire)) {
-      throw new RequestRejected(ErrorCodes.invalidPayload(method, ID_TOO_LONG));
+      throw new RequestRejected(ErrorCodes.invalidPayload(method, field + ID_TOO_LONG));
     }
     try {
       return new CodeElementId(wire);
     } catch (IllegalArgumentException malformed) {
-      throw new RequestRejected(ErrorCodes.invalidPayload(method, ID_MALFORMED));
+      throw new RequestRejected(ErrorCodes.invalidPayload(method, field + ID_MALFORMED));
     }
+  }
+
+  static <T> T required(String method, String field, T value) {
+    if (value == null) {
+      throw new RequestRejected(ErrorCodes.invalidPayload(method, field + FIELD_REQUIRED));
+    }
+    return value;
   }
 
   private static boolean exceedsIdCeiling(String wire) {

@@ -56,6 +56,12 @@ export const elementIdSchema = z
   .regex(/^(?:pkg:|type:|method:|file:)/);
 export type ElementId = z.infer<typeof elementIdSchema>;
 
+export const methodIdSchema = z
+  .string()
+  .max(4096)
+  .regex(/^method:/);
+export type MethodId = z.infer<typeof methodIdSchema>;
+
 export const prefixIdSchema = z
   .string()
   .max(4096)

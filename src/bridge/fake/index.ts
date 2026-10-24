@@ -17,6 +17,9 @@ const FIXTURE_SOURCES: Record<string, string> = import.meta.glob(
 );
 
 const DISCRIMINANTS: Partial<Record<ProtocolMethod, readonly string[]>> = {
+  "element.dependencies": ["elementId", "direction"],
+  "element.dependencyEvidence": ["source", "target"],
+  "element.describe": ["elementId"],
   "graph.slice": ["level", "parentId"],
   "outline.children": ["parentId"],
 };
