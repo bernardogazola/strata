@@ -109,11 +109,19 @@ function PathSeparator() {
   );
 }
 
+const SHORT_NAME_CODE_POINTS = 8;
+
+const LONG_NAME_SHRINK_CLASS = "min-w-16 shrink-[100]";
+
 function RepositoryName({ displayName }: { readonly displayName: string }) {
   const name = clampText(sanitizeUntrusted(displayName));
+  const short = [...name].length <= SHORT_NAME_CODE_POINTS;
   return (
     <bdi
-      className="min-w-0 max-w-70 truncate font-medium text-foreground group-data-inactive/titlebar:text-muted-foreground"
+      className={cn(
+        "max-w-70 truncate font-medium text-foreground group-data-inactive/titlebar:text-muted-foreground",
+        short ? "shrink-0" : LONG_NAME_SHRINK_CLASS
+      )}
       lang=""
       title={name}
       translate="no"

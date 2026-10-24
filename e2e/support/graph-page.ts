@@ -11,6 +11,7 @@ import type { GraphSlice, OutlinePage } from "@/protocol/graph";
 import {
   type AnalysisStatusReport,
   analysisStatusReportSchema,
+  type RepositoryDescription,
 } from "@/protocol/repository";
 import { recordGesture } from "./frames";
 import { mulberry32 } from "./synthetic-slice";
@@ -165,7 +166,14 @@ export interface StatusOverride {
   readonly result: AnalysisStatusReport;
 }
 
+export interface DescribeOverride {
+  readonly method: "repository.describe";
+  readonly request: Record<string, never>;
+  readonly result: RepositoryDescription;
+}
+
 export type TranscriptOverride =
+  | DescribeOverride
   | SliceOverride
   | OutlineOverride
   | StatusOverride;

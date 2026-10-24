@@ -289,14 +289,14 @@ const ptBR = {
         "Este repositório tem {total} pacotes, mais do que o primeiro nível comporta. Eles aparecem agrupados por prefixo de pacote. Use a estrutura da arquitetura ou a busca para abrir um pacote.",
       truncated:
         "Este nível tem mais elementos do que o mapa mostra: {nodesShown} de {nodes} e {edgesShown} de {edges}. O limite de exibição do nível deixou o restante de fora.",
-      truncatedEdges: {
+      truncatedAggregated: {
         shown: {
-          one: "{count} está à vista",
-          other: "{count} estão à vista",
-          zero: "nenhuma está à vista",
+          one: "{count} dependência está à vista",
+          other: "{count} dependências estão à vista",
+          zero: "nenhuma dependência está à vista",
         },
         template:
-          "Este nível tem mais dependências do que o mapa mostra: {shown}, e o limite de exibição do nível deixou as outras de fora.",
+          "Este nível tem mais do que o mapa mostra: {shown}, e o limite de exibição do nível deixou o restante de fora.",
       },
     },
     retry: "Tentar de novo",

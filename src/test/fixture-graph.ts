@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { type ProtocolError, protocolErrorSchema } from "@/protocol/errors";
 import {
   type GraphNode,
   type GraphSlice,
@@ -200,3 +201,32 @@ export const labelOf = (id: string): string => {
   }
   return node.label;
 };
+
+export interface UnknownParent {
+  readonly error: ProtocolError;
+  readonly parentId: string;
+}
+
+const unknownParentFixture = (): UnknownParent => {
+  const stem = "outline.children.unknown-parent";
+  const frames = readFileSync(
+    path.join(FIXTURES_DIR, `${stem}${JSONL_SUFFIX}`),
+    "utf8"
+  )
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => JSON.parse(line) as Frame & { readonly error?: unknown });
+  const request = frames.find((frame) => frame.kind === "request");
+  const response = frames.find(
+    (frame) => frame.kind === "response" && frame.ok === false
+  );
+  const { parentId } = (request?.payload ?? {}) as { parentId?: unknown };
+  if (typeof parentId !== "string" || response === undefined) {
+    throw new Error(
+      `${stem}${JSONL_SUFFIX} não é uma página recusada da estrutura`
+    );
+  }
+  return { error: protocolErrorSchema.parse(response.error), parentId };
+};
+
+export const UNKNOWN_PARENT: UnknownParent = unknownParentFixture();

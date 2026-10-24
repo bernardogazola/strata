@@ -31,8 +31,8 @@ const SHAPE_GLYPHS = {
   ellipse: <circle cx="8" cy="8" r="6" />,
   "round-hexagon": (
     <polygon
-      points="4.5,2 1,8 4.5,14 11.5,14 15,8 11.5,2"
-      strokeLinejoin="round"
+      points="3.75,0.5 -0.5,8 3.75,15.5 12.25,15.5 16.5,8 12.25,0.5"
+      strokeLinejoin="miter"
     />
   ),
   "round-rectangle": <rect height="12" rx="3" width="14" x="1" y="2" />,

@@ -68,6 +68,16 @@ const OVERSCAN = 8;
 
 const estimateRowSize = (): number => ROW_HEIGHT;
 
+const measureRow = (
+  element: Element,
+  entry: ResizeObserverEntry | undefined
+): number => {
+  const height =
+    entry?.borderBoxSize[0]?.blockSize ??
+    element.getBoundingClientRect().height;
+  return height > 0 ? Math.round(height) : ROW_HEIGHT;
+};
+
 const rowIndexOf = (target: EventTarget | null): number | null => {
   if (!(target instanceof Element)) {
     return null;
@@ -202,6 +212,7 @@ function OutlineTree({
     estimateSize: estimateRowSize,
     getItemKey,
     getScrollElement: () => treeRef.current,
+    measureElement: measureRow,
     overscan: OVERSCAN,
     rangeExtractor,
   });
@@ -464,6 +475,7 @@ function OutlineTree({
               focus={focus}
               index={index}
               key={row.key}
+              measureRef={virtualizer.measureElement}
               refusal={
                 row.type === "error" && row.parentId !== null
                   ? childrenRefusal

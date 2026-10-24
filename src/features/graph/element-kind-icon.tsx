@@ -11,8 +11,7 @@ const SHAPE_CLASS = {
   "round-rectangle": "h-[9px] w-[11px] rounded-[2px]",
 } as const satisfies Record<BoxShape, string>;
 
-const HEXAGON_POINTS =
-  "3.25,0.75 0.75,4.5 3.25,8.25 7.75,8.25 10.25,4.5 7.75,0.75";
+const HEXAGON_POINTS = "4,0.5 1,6 4,11.5 10,11.5 13,6 10,0.5";
 
 export interface ElementKindIconProps {
   readonly kind: ElementKind | GraphNodeKind;
@@ -35,11 +34,11 @@ function ShapeMark({
           "block shrink-0 fill-none",
           selected ? "stroke-accent-strong" : "stroke-subtle-foreground"
         )}
-        height="9"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-        viewBox="0 0 11 9"
-        width="11"
+        height="12"
+        strokeLinejoin="miter"
+        strokeWidth="1"
+        viewBox="0 0 14 12"
+        width="14"
       >
         <polygon points={HEXAGON_POINTS} />
       </svg>
@@ -60,12 +59,16 @@ export function ElementKindIcon({
   kind,
   selected = false,
 }: ElementKindIconProps) {
+  const shape = NODE_SHAPES[kind];
   return (
     <span
       aria-hidden="true"
-      className="flex w-3 shrink-0 items-center justify-center"
+      className={cn(
+        "flex shrink-0 items-center justify-center",
+        shape === "round-hexagon" ? "w-3.5" : "w-3"
+      )}
     >
-      <ShapeMark selected={selected} shape={NODE_SHAPES[kind]} />
+      <ShapeMark selected={selected} shape={shape} />
     </span>
   );
 }

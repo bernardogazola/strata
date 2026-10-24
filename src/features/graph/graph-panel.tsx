@@ -78,7 +78,7 @@ const truncationNotice = ({
   totals,
 }: GraphSlice): string => {
   if (aggregated) {
-    const { shown, template } = t.graph.notice.truncatedEdges;
+    const { shown, template } = t.graph.notice.truncatedAggregated;
     return interpolate(template, { shown: countPhrase(edges.length, shown) });
   }
   return interpolate(t.graph.notice.truncated, {

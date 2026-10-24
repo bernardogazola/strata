@@ -194,17 +194,49 @@ describe("GraphPanel: os avisos de um nível 1 agrupado", () => {
     ]);
   });
 
-  test('agrupada e truncada: uma segunda frase, só das arestas, sem "de" e o total', async () => {
+  test('agrupada e truncada: uma segunda frase, sem "de" e o total, com as dependências à vista', async () => {
     serveSlice(AGGREGATED_SLICE);
     renderPanel();
     await waitForNodes(3);
 
     const [, truncated, ...rest] = notices();
     expect(rest).toStrictEqual([]);
+    expect(truncated).toBe(
+      "Este nível tem mais do que o mapa mostra: 3 dependências estão à vista, e o limite de exibição do nível deixou o restante de fora."
+    );
     expect(truncated).toMatch(EDGE_WORD);
     expect(truncated).not.toContain("de 9.120");
     expect(truncated).not.toContain("1.842");
-    expect(truncated).not.toContain("pacotes e");
+  });
+
+  test("o estouro que também corta grupos: a mesma frase continua verdadeira, sem dizer que só faltam dependências", async () => {
+    const [kept] = AGGREGATED_SLICE.edges;
+    serveSlice({
+      ...AGGREGATED_SLICE,
+      budget: { edges: 1200, nodes: 2 },
+      edges: kept === undefined ? [] : [kept],
+      nodes: [ALPHA_NODE, BETA_NODE],
+    });
+    renderPanel();
+    await waitForNodes(2);
+
+    const [, truncated] = notices();
+    expect(truncated).toBe(
+      "Este nível tem mais do que o mapa mostra: 1 dependência está à vista, e o limite de exibição do nível deixou o restante de fora."
+    );
+    expect(truncated).not.toContain("mais dependências");
+    expect(truncated).not.toContain("as outras");
+  });
+
+  test("nenhuma dependência à vista: a forma zero, e não 0 dependência", async () => {
+    serveSlice({ ...AGGREGATED_SLICE, edges: [] });
+    renderPanel();
+    await waitForNodes(3);
+
+    const [, truncated] = notices();
+    expect(truncated).toBe(
+      "Este nível tem mais do que o mapa mostra: nenhuma dependência está à vista, e o limite de exibição do nível deixou o restante de fora."
+    );
   });
 });
 
@@ -268,6 +300,34 @@ describe("GraphPanel: a legenda de um nível 1 agrupado", () => {
     expect(glyphOf(group)).not.toBe("");
     expect(glyphOf(group)).not.toBe(glyphOf(packageItem));
     expect(glyphOf(group)).not.toBe(glyphOf(typeItem));
+  });
+
+  test("a amostra do grupo é um hexágono de topo e base retos, maior que o círculo do tipo e com pontas em quina", async () => {
+    serveSlice(AGGREGATED_SLICE);
+    renderPanel();
+    await waitForNodes(3);
+
+    const items = legendItems(t.graph.legend.kind);
+    const sampleOf = (name: string): Element | null | undefined =>
+      items
+        .find((item) => shownName(item) === name)
+        ?.querySelector(":scope > svg > *");
+    const hexagon = sampleOf(t.graph.legend.kindNames.PACKAGE_PREFIX);
+    const circle = sampleOf(t.graph.legend.kindNames.TYPE);
+    const vertices = (hexagon?.getAttribute("points") ?? "")
+      .split(" ")
+      .map((pair) => pair.split(",").map(Number));
+    const xs = vertices.map(([x]) => x ?? Number.NaN);
+    const ys = vertices.map(([, y]) => y ?? Number.NaN);
+    const diameter = 2 * Number(circle?.getAttribute("r"));
+
+    expect(hexagon?.tagName.toLowerCase()).toBe("polygon");
+    expect(vertices).toHaveLength(6);
+    expect(ys.filter((y) => y === Math.min(...ys))).toHaveLength(2);
+    expect(ys.filter((y) => y === Math.max(...ys))).toHaveLength(2);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(diameter);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(diameter);
+    expect(hexagon?.getAttribute("stroke-linejoin")).toBe("miter");
   });
 
   test("uma fatia sem grupos mantém só pacote, tipo e seleção", async () => {
@@ -344,6 +404,21 @@ describe("NodeSummary: o ramo do grupo de pacotes", () => {
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("alpha");
     expect(screen.getByText(graphNodeKindLabels.PACKAGE_PREFIX)).toBeDefined();
+  });
+
+  test("o ícone do grupo é o hexágono de 14 × 12 com pontas em quina, e não cabe no encaixe do círculo", () => {
+    const { container } = render(
+      <NodeSummary node={ALPHA_NODE} onExpand={vi.fn()} />
+    );
+
+    const icon = container.querySelector("dl svg");
+    expect(icon?.getAttribute("width")).toBe("14");
+    expect(icon?.getAttribute("height")).toBe("12");
+    expect(icon?.getAttribute("stroke-linejoin")).toBe("miter");
+    expect(
+      icon?.querySelector("polygon")?.getAttribute("points")?.split(" ")
+    ).toHaveLength(6);
+    expect(icon?.parentElement?.className.split(" ")).toContain("w-3.5");
   });
 });
 

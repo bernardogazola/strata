@@ -364,9 +364,10 @@ export function AnalysisScreen({
   );
 
   if (view.kind === "workspace") {
+    const terminal = view.report.status !== "RUNNING";
     const workspaceHeader: AnalysisHeader = {
       ...header,
-      repository: { ...repository, onAnalyzeAgain },
+      repository: terminal ? { ...repository, onAnalyzeAgain } : repository,
     };
     return (
       <>

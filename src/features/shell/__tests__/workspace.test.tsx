@@ -32,6 +32,7 @@ import {
   statusReport,
 } from "@/features/progress/__tests__/status-report";
 import { t } from "@/i18n/messages";
+import type { AnalysisStatusReport } from "@/protocol/repository";
 import { createQueryClient } from "@/queries/client";
 import type { RouterContext } from "@/router";
 import { Route as RepositoryRoute } from "@/routes/repository.$handle";
@@ -117,13 +118,31 @@ const MAP_READY = statusReport({
   status: "COMPLETED",
 });
 
-beforeEach(() => {
-  useAppStore.setState({ ...initialStore, backend: READY }, true);
+const MAP_READY_RUNNING = statusReport({
+  completeness: { totalFiles: 9 },
+  stages: {
+    ...COMPLETED_STAGES,
+    PERSISTENCE: { startedAt: STARTED_AT, status: "RUNNING" },
+    STRUCTURAL_GRAPH: {
+      durationMs: 3,
+      startedAt: STARTED_AT,
+      status: "COMPLETED",
+    },
+  },
+  status: "RUNNING",
+});
+
+const serveStatus = (report: AnalysisStatusReport): void => {
   vi.spyOn(transport, "request").mockImplementation((method, payload) =>
     method === "analysis.status"
-      ? Promise.resolve(MAP_READY)
+      ? Promise.resolve(report)
       : fakeRequest(method, payload)
   );
+};
+
+beforeEach(() => {
+  useAppStore.setState({ ...initialStore, backend: READY }, true);
+  serveStatus(MAP_READY);
 });
 
 afterEach(() => {
@@ -210,6 +229,19 @@ describe("o espaço de trabalho: Analisar de novo no cabeçalho", () => {
     expect(new Set(again.className.split(CLASS_SEPARATOR))).toStrictEqual(
       new Set(close.className.split(CLASS_SEPARATOR))
     );
+  });
+
+  test('só em uma execução terminada: com o mapa aberto no meio dela, o cabeçalho tem "Fechar repositório" e não "Analisar de novo"', async () => {
+    serveStatus(MAP_READY_RUNNING);
+    await renderAt(SCREEN_URL);
+
+    expect(await banner().findByText(t.header.analysis.RUNNING)).toBeDefined();
+    expect(
+      banner().getByRole("button", { name: t.header.close })
+    ).toBeDefined();
+    expect(
+      banner().queryByRole("button", { name: t.analysis.again })
+    ).toBeNull();
   });
 
   test("clicar faz a transição do resumo, leaveAnalysis: empilha, e a URL volta à preparação sem nada do mapa", async () => {

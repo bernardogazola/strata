@@ -7,6 +7,7 @@ import { graphNodeKindLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
 import { DEFAULT_UNTRUSTED_MAX_CHARS } from "@/lib/untrusted";
 import { cn } from "@/lib/utils";
+import type { GraphLevel } from "@/protocol/enums";
 import type { GraphNode } from "@/protocol/graph";
 import { ElementKindIcon } from "./element-kind-icon";
 import { ElementLabel } from "./element-label";
@@ -17,6 +18,8 @@ export interface NodeSummaryProps {
   readonly caveat?: ReactNode;
 
   readonly focus?: string | null;
+
+  readonly level?: GraphLevel;
 
   readonly node: GraphNode | null;
 
@@ -147,10 +150,12 @@ function SelectedNode({
 
 function EmptySummary({
   focus,
+  level,
   notOnMap,
   onExpand,
 }: {
   readonly focus: string | null;
+  readonly level: GraphLevel;
   readonly notOnMap: NotOnMapReason | undefined;
   readonly onExpand: (elementId: string) => void;
 }) {
@@ -173,7 +178,9 @@ function EmptySummary({
   return (
     <div className="flex flex-col gap-2">
       <p className="text-muted-foreground">{t.inspector.empty}</p>
-      <p className="text-muted-foreground">{t.graph.legend.expandHint}</p>
+      {level === "PACKAGE" ? (
+        <p className="text-muted-foreground">{t.graph.legend.expandHint}</p>
+      ) : null}
     </div>
   );
 }
@@ -181,6 +188,7 @@ function EmptySummary({
 export function NodeSummary({
   caveat,
   focus = null,
+  level = "PACKAGE",
   node,
   notOnMap,
   onExpand,
@@ -188,7 +196,12 @@ export function NodeSummary({
   return (
     <div className="flex flex-1 flex-col gap-5">
       {node === null ? (
-        <EmptySummary focus={focus} notOnMap={notOnMap} onExpand={onExpand} />
+        <EmptySummary
+          focus={focus}
+          level={level}
+          notOnMap={notOnMap}
+          onExpand={onExpand}
+        />
       ) : (
         <SelectedNode node={node} onExpand={onExpand} />
       )}

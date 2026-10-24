@@ -25,6 +25,12 @@ const rowStyle = (start: number) => ({
   transform: `translateY(${start}px)`,
 });
 
+const wrappingRowStyle = (start: number) => ({
+  minHeight: ROW_HEIGHT,
+  transform: `translateY(${start}px)`,
+});
+const WRAPPING_TEXT_CLASS = "min-w-0 break-words py-1 pl-0.5";
+
 const indentOf = (level: 1 | 2): string => (level === 2 ? "pl-7" : "pl-2");
 
 const ChevronSlot = () => (
@@ -124,13 +130,16 @@ const ActionLanes = () => (
 
 function ActionRow({
   index,
+  measureRef,
   row,
   start,
   tabbable,
   text,
 }: PositionedRow<OutlineErrorRow | OutlineMoreRow> & {
+  readonly measureRef: ((element: HTMLElement | null) => void) | undefined;
   readonly text: string;
 }) {
+  const failure = row.type === "error";
   return (
     <div
       aria-level={row.level}
@@ -143,34 +152,44 @@ function ActionRow({
         row.type === "more" ? "text-accent-strong" : "text-muted-foreground"
       )}
       data-index={index}
+      ref={failure ? measureRef : undefined}
       role="treeitem"
-      style={rowStyle(start)}
+      style={failure ? wrappingRowStyle(start) : rowStyle(start)}
       tabIndex={tabbable ? 0 : -1}
     >
       <ActionLanes />
-      <span className="min-w-0 truncate pl-0.5">{text}</span>
+      <span
+        className={failure ? WRAPPING_TEXT_CLASS : "min-w-0 truncate pl-0.5"}
+      >
+        {text}
+      </span>
     </div>
   );
 }
 
 function RefusalRow({
   index,
+  measureRef,
   refusal,
   row,
   start,
   tabbable,
-}: PositionedRow<OutlineErrorRow> & { readonly refusal: ErrorMessage }) {
+}: PositionedRow<OutlineErrorRow> & {
+  readonly measureRef: ((element: HTMLElement | null) => void) | undefined;
+  readonly refusal: ErrorMessage;
+}) {
   return (
     <div
       aria-level={row.level}
       className={cn(ROW_CLASS, indentOf(row.level), "text-muted-foreground")}
       data-index={index}
+      ref={measureRef}
       role="treeitem"
-      style={rowStyle(start)}
+      style={wrappingRowStyle(start)}
       tabIndex={tabbable ? 0 : -1}
     >
       <ActionLanes />
-      <span className="min-w-0 truncate pl-0.5">
+      <span className={WRAPPING_TEXT_CLASS}>
         <MessageSegments segments={refusal.body} />
       </span>
     </div>
@@ -217,12 +236,15 @@ const errorText = (row: OutlineErrorRow): string => {
 export interface OutlineTreeRowProps extends PositionedRow<OutlineRow> {
   readonly focus: string | null;
 
+  readonly measureRef?: (element: HTMLElement | null) => void;
+
   readonly refusal?: ErrorMessage | null;
 }
 
 export function OutlineTreeRow({
   focus,
   index,
+  measureRef,
   refusal = null,
   row,
   start,
@@ -243,6 +265,7 @@ export function OutlineTreeRow({
       return (
         <ActionRow
           index={index}
+          measureRef={undefined}
           row={row}
           start={start}
           tabbable={tabbable}
@@ -253,6 +276,7 @@ export function OutlineTreeRow({
       return refusal === null ? (
         <ActionRow
           index={index}
+          measureRef={measureRef}
           row={row}
           start={start}
           tabbable={tabbable}
@@ -261,6 +285,7 @@ export function OutlineTreeRow({
       ) : (
         <RefusalRow
           index={index}
+          measureRef={measureRef}
           refusal={refusal}
           row={row}
           start={start}

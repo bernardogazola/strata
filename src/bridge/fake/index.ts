@@ -25,7 +25,7 @@ const UNSERVED: ReadonlySet<string> = new Set([
   "graph.slice.package-aggregated",
 ]);
 
-interface Transcript {
+export interface Transcript {
   readonly caseName: string;
   readonly request: Record<string, unknown>;
   readonly result: unknown;
@@ -74,10 +74,13 @@ const caseNameOf = (stem: string, topic: string): string =>
 
 const EVENT_NAMES = Object.keys(EVENTS) as ProtocolEventName[];
 
-const readMethodTranscripts = (): Map<ProtocolMethod, Transcript[]> => {
+export const readMethodTranscripts = (
+  sources: Readonly<Record<string, string>>,
+  unserved: ReadonlySet<string>
+): Map<ProtocolMethod, Transcript[]> => {
   const routes = new Map<ProtocolMethod, Transcript[]>();
   const unservedSeen = new Set<string>();
-  for (const [filePath, text] of Object.entries(FIXTURE_SOURCES)) {
+  for (const [filePath, text] of Object.entries(sources)) {
     const stem = stemOf(filePath);
     const topic = resolveTopic(stem, PROTOCOL_METHODS);
     if (topic === undefined) {
@@ -100,7 +103,7 @@ const readMethodTranscripts = (): Map<ProtocolMethod, Transcript[]> => {
       contract.result === null
         ? parsedResponse.payload
         : contract.result.parse(parsedResponse.payload);
-    if (UNSERVED.has(stem)) {
+    if (unserved.has(stem)) {
       unservedSeen.add(stem);
       continue;
     }
@@ -113,7 +116,7 @@ const readMethodTranscripts = (): Map<ProtocolMethod, Transcript[]> => {
       },
     ]);
   }
-  const stale = [...UNSERVED].filter((stem) => !unservedSeen.has(stem));
+  const stale = [...unserved].filter((stem) => !unservedSeen.has(stem));
   if (stale.length > 0) {
     throw new Error(
       `UNSERVED cita fixtures que não existem: ${stale.join(", ")}`
@@ -147,7 +150,7 @@ const readEventTranscripts = (): Map<ProtocolEventName, EventTranscript[]> => {
   return routes;
 };
 
-const METHOD_ROUTES = readMethodTranscripts();
+const METHOD_ROUTES = readMethodTranscripts(FIXTURE_SOURCES, UNSERVED);
 const EVENT_ROUTES = readEventTranscripts();
 
 const matchesDiscriminants = (

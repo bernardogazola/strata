@@ -503,6 +503,13 @@ describe("NodeSummary", () => {
     expect(hint.className).toContain("text-muted-foreground");
   });
 
+  test("no nível TYPE, o vazio não manda clicar duas vezes em um pacote", () => {
+    render(<NodeSummary level="TYPE" node={null} onExpand={vi.fn()} />);
+
+    expect(screen.getByText(t.inspector.empty)).toBeDefined();
+    expect(screen.queryByText(t.graph.legend.expandHint)).toBeNull();
+  });
+
   test("com uma seleção, dentro ou fora do mapa, a dica do duplo clique sai", async () => {
     const { rerender } = render(
       <NodeSummary node={null} notOnMap="truncated" onExpand={vi.fn()} />

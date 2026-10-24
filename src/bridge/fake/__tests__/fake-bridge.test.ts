@@ -6,6 +6,7 @@ import {
   fakeEmit,
   fakeRequest,
   fakeSubscribe,
+  readMethodTranscripts,
 } from "@/bridge/fake";
 import { graphSliceSchema, outlinePageSchema } from "@/protocol/graph";
 import {
@@ -17,6 +18,7 @@ import {
   ROOT_ITEMS,
   typeSliceOf,
 } from "@/test/fixture-graph";
+import aggregatedSource from "../../../../protocol/fixtures/graph.slice.package-aggregated.jsonl?raw";
 
 const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 
@@ -63,6 +65,45 @@ describe("a descoberta das transcrições", () => {
     for (const method of Object.keys(fakeBridgeRoutes())) {
       expect(method.startsWith("protocol")).toBe(false);
     }
+  });
+});
+
+describe("o conjunto UNSERVED: validada na carga, nunca servida", () => {
+  const AGGREGATED_STEM = "graph.slice.package-aggregated";
+  const sources = {
+    [`../../../protocol/fixtures/${AGGREGATED_STEM}.jsonl`]: aggregatedSource,
+  };
+
+  test("um nome sem fixture reprova a carga, e diz qual: um arquivo renomeado não passa calado", () => {
+    expect(() =>
+      readMethodTranscripts(
+        sources,
+        new Set([AGGREGATED_STEM, "graph.slice.renamed"])
+      )
+    ).toThrow("UNSERVED cita fixtures que não existem: graph.slice.renamed");
+  });
+
+  test("sem fixture nenhuma, todo nome do conjunto é velho", () => {
+    expect(() => readMethodTranscripts({}, new Set([AGGREGATED_STEM]))).toThrow(
+      `UNSERVED cita fixtures que não existem: ${AGGREGATED_STEM}`
+    );
+  });
+
+  test("a fixture que o conjunto nomeia é lida e não vira rota", () => {
+    const routes = readMethodTranscripts(sources, new Set([AGGREGATED_STEM]));
+
+    expect(routes.get("graph.slice")).toBeUndefined();
+  });
+
+  test("fora do conjunto, a mesma fixture viraria o caso package-aggregated do nível 1", () => {
+    const routes = readMethodTranscripts(sources, new Set());
+
+    expect(
+      routes.get("graph.slice")?.map((route) => route.caseName)
+    ).toStrictEqual(["package-aggregated"]);
+    expect(routes.get("graph.slice")?.[0]?.request).toMatchObject({
+      level: "PACKAGE",
+    });
   });
 });
 

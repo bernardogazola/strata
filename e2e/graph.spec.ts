@@ -13,7 +13,9 @@ import {
   GRAPH_SLICE_BUDGETS,
   type GraphSlice,
   graphSliceSchema,
+  outlinePageSchema,
 } from "@/protocol/graph";
+import { repositoryDescriptionSchema } from "@/protocol/repository";
 import { DRILLED_PACKAGE_ID } from "@/test/fixture-graph";
 import {
   BENCHMARK_OUT_ENV,
@@ -41,6 +43,7 @@ import {
   findEmptyPoint,
   fitGraph,
   fixtureNodeIds,
+  fixtureResponse,
   GESTURE_INPUT,
   GRAPH_CONTAINER,
   listClickableNodes,
@@ -55,6 +58,7 @@ import {
   searchOf,
   serveMap,
   serveSlices,
+  serveTranscripts,
   settle,
   setZoom,
   styleOf,
@@ -230,6 +234,132 @@ test("duas páginas novas da mesma vista dão as mesmas posições, byte a byte"
 
   expect(Object.keys(JSON.parse(first))).toStrictEqual(PACKAGE_IDS);
   expect(second).toBe(first);
+});
+
+const CORPUS_LABEL = "xpack.security.authc.support.mapper.expressiondsl";
+const CORPUS_REPOSITORY = "elasticsearch";
+const MIN_WINDOW = { height: 600, width: 960 } as const;
+const HEADER_HEIGHT_PX = 48;
+const REPOSITORY_NAME_FLOOR_PX = 64;
+
+test("a 960 px, com nomes do corpus, a trilha corta com reticências e nada quebra linha nem vaza da barra", async ({
+  browser,
+}, testInfo) => {
+  const relabel = <T extends { readonly id: string; readonly label: string }>(
+    item: T
+  ): T => (item.id === DRILLED_ID ? { ...item, label: CORPUS_LABEL } : item);
+  const levelOne = graphSliceSchema.parse(
+    fixtureResponse("graph.slice.package.jsonl")
+  );
+  const root = outlinePageSchema.parse(
+    fixtureResponse("outline.children.root.jsonl")
+  );
+  const describe = repositoryDescriptionSchema.parse(
+    fixtureResponse("repository.describe.ok.jsonl")
+  );
+
+  const layout = await withFreshPage(
+    browser,
+    {
+      ...contextOptionsOf(testInfo),
+      deviceScaleFactor: 1,
+      viewport: MIN_WINDOW,
+    },
+    async (page) => {
+      await serveTranscripts(page, [
+        {
+          method: "graph.slice",
+          request: { level: "PACKAGE" },
+          result: { ...levelOne, nodes: levelOne.nodes.map(relabel) },
+        },
+        {
+          method: "outline.children",
+          request: { parentId: null },
+          result: { ...root, items: root.items.map(relabel) },
+        },
+        {
+          method: "repository.describe",
+          request: {},
+          result: { ...describe, displayName: CORPUS_REPOSITORY },
+        },
+      ]);
+      await page.goto(`${LEVEL_ONE_URL}&level=TYPE&parent=${DRILLED_ID}`);
+      await expectGraph(page, TYPE_IDS);
+      const current = page
+        .getByRole("navigation", { name: t.shell.breadcrumb.label })
+        .locator('[aria-current="page"]');
+      await expect(current).toHaveText(CORPUS_LABEL);
+      await page.evaluate(() => document.fonts.ready);
+      return page.evaluate(
+        ({
+          again,
+          close,
+        }: {
+          readonly again: string;
+          readonly close: string;
+        }) => {
+          const lines = (element: Element): number => {
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            return new Set(
+              [...range.getClientRects()].map((rect) => Math.round(rect.top))
+            ).size;
+          };
+          const header = document.querySelector("header");
+          const nav = header?.querySelector("nav");
+          const repository = header?.querySelector("bdi[title]");
+          const rootCrumb = nav?.querySelector("li:first-child > *");
+          const crumb = nav?.querySelector<HTMLElement>(
+            '[aria-current="page"]'
+          );
+          const buttons = [
+            ...(header?.querySelectorAll("button") ?? []),
+          ].filter((button) =>
+            [again, close].includes(button.textContent ?? "")
+          );
+          const right = header?.children[1];
+          if (!(header && nav && repository && rootCrumb && crumb && right)) {
+            throw new Error("o cabeçalho do workspace está incompleto");
+          }
+          const bar = header.getBoundingClientRect();
+          const parts = [repository, rootCrumb, crumb, ...buttons];
+          return {
+            buttonLines: buttons.map(lines),
+            crumbClipped: crumb.scrollWidth > crumb.clientWidth,
+            crumbLines: lines(crumb),
+            crumbTitle: crumb.title,
+            headerHeight: Math.round(bar.height),
+            repositoryClipped: repository.scrollWidth > repository.clientWidth,
+            repositoryTitle: repository.getAttribute("title"),
+            repositoryWidth: repository.getBoundingClientRect().width,
+            rootLines: lines(rootCrumb),
+            spills: parts.some((part) => {
+              const box = part.getBoundingClientRect();
+              return box.top < bar.top || box.bottom > bar.bottom;
+            }),
+            trailOverlapsRight:
+              nav.getBoundingClientRect().right >
+              right.getBoundingClientRect().left,
+          };
+        },
+        { again: t.analysis.again, close: t.header.close }
+      );
+    }
+  );
+
+  expect(layout).toStrictEqual({
+    buttonLines: [1, 1],
+    crumbClipped: true,
+    crumbLines: 1,
+    crumbTitle: CORPUS_LABEL,
+    headerHeight: HEADER_HEIGHT_PX,
+    repositoryClipped: true,
+    repositoryTitle: CORPUS_REPOSITORY,
+    repositoryWidth: REPOSITORY_NAME_FLOOR_PX,
+    rootLines: 1,
+    spills: false,
+    trailOverlapsRight: false,
+  });
 });
 
 const AT_BUDGET_SLICES: readonly SyntheticSliceOptions[] = (

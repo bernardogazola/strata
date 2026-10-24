@@ -20,6 +20,7 @@ import {
 import { FakeBridgeError } from "@/bridge/fake";
 import { transport } from "@/bridge/transport";
 import { ArchitectureOutline } from "@/features/outline/architecture-outline";
+import { ROW_HEIGHT } from "@/features/outline/outline-row";
 import {
   type ExpandedOutlineLevel,
   flattenOutline,
@@ -763,6 +764,26 @@ describe("ArchitectureOutline: busca até achar, com o bridge que responde na ho
 
     expect(cursorsOf(request)).toStrictEqual([undefined]);
   });
+
+  test.each([
+    ["um grupo pfx:", "pfx:p2"],
+    ["um pacote", "pkg:p0"],
+  ])(
+    "no nível TYPE, %s no focus nunca é filho: nenhuma página de tipos além da primeira",
+    async (_case, focus) => {
+      const request = mockInstantPages({
+        [DRILLED]: FOUR_DRILLED_TYPES,
+        root: DRILLED_ALONE,
+      });
+      renderOutline({ focus, view: drilledTypes });
+
+      const [firstType] = FOUR_DRILLED_TYPES;
+      await waitFor(() => expect(rowById(firstType?.id ?? "")).toBeDefined());
+      await settle();
+
+      expect(cursorsOf(request, DRILLED)).toStrictEqual([undefined]);
+    }
+  );
 });
 
 describe("ArchitectureOutline: estados", () => {
@@ -814,6 +835,20 @@ describe("ArchitectureOutline: estados", () => {
         ([, payload]) => (payload as { readonly cursor?: string }).cursor
       )
     ).toStrictEqual([undefined, NEXT_CURSOR, NEXT_CURSOR]);
+  });
+
+  test("a linha de erro quebra o texto em vez de cortá-lo: sem truncate, e altura mínima, não fixa", async () => {
+    failChildrenOf(FIRST_PACKAGE);
+    renderOutline({ view: { level: "TYPE", parentId: FIRST_PACKAGE } });
+
+    const [, failed] = await waitForRows(ROOT_IDS.length + 1);
+    const text = failed?.querySelector("span:last-child");
+
+    expect(text?.textContent).toBe(t.outline.failed);
+    expect(text?.className.split(" ")).not.toContain("truncate");
+    expect(text?.className.split(" ")).toContain("break-words");
+    expect(failed?.style.height).toBe("");
+    expect(failed?.style.minHeight).toBe(`${ROW_HEIGHT}px`);
   });
 
   test("os filhos que falham viram uma linha de erro no nível 2; ativá-la pede de novo", async () => {

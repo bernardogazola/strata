@@ -60,8 +60,8 @@ const GROUP_COPY: readonly CatalogueString[] = [
   ),
   ...collectStrings(t.graph.notice.aggregated, "graph.notice.aggregated"),
   ...collectStrings(
-    t.graph.notice.truncatedEdges,
-    "graph.notice.truncatedEdges"
+    t.graph.notice.truncatedAggregated,
+    "graph.notice.truncatedAggregated"
   ),
   ...collectStrings(t.inspector.group, "inspector.group"),
   ...collectStrings(
@@ -93,7 +93,7 @@ describe("a redação do catálogo", () => {
     const paths = SCOPED_COPY.map(({ path }) => path);
 
     expect(paths).toContain("graph.notice.aggregated");
-    expect(paths).toContain("graph.notice.truncatedEdges.template");
+    expect(paths).toContain("graph.notice.truncatedAggregated.template");
     expect(paths).toContain("graph.legend.kindNames.PACKAGE_PREFIX");
     expect(paths).toContain("inspector.notOnMap.aggregated");
     expect(paths).toContain("graphNodeKindLabels.PACKAGE_PREFIX");
