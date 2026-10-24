@@ -102,7 +102,7 @@ public final class CodeMetricDao {
     return List.copyOf(metrics);
   }
 
-  private static CodeMetricRow read(ResultSet rows) throws SQLException {
+  static CodeMetricRow read(ResultSet rows) throws SQLException {
     return new CodeMetricRow(
         rows.getLong("element_pk"),
         rows.getInt("loc"),

@@ -90,7 +90,7 @@ public final class GraphMetricDao {
     return List.copyOf(metrics);
   }
 
-  private static GraphMetricRow read(ResultSet rows) throws SQLException {
+  static GraphMetricRow read(ResultSet rows) throws SQLException {
     return new GraphMetricRow(
         rows.getLong("element_pk"),
         ElementKind.valueOf(rows.getString("granularity")),

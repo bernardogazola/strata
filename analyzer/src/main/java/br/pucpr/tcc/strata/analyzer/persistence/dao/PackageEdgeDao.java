@@ -25,6 +25,17 @@ public final class PackageEdgeDao {
           DependencyType.RETURN_TYPE,
           DependencyType.ANNOTATION_REFERENCE);
 
+  private static final List<String> OCCURRENCE_COLUMNS =
+      List.of(
+          "imports",
+          "extends",
+          "implements",
+          "calls",
+          "field_type",
+          "parameter_type",
+          "return_type",
+          "annotation_reference");
+
   private static final String INSERT_HEAD =
       """
       INSERT INTO package_edge (source_pk, target_pk, analysis_pk, type_pair_count,
@@ -43,8 +54,6 @@ public final class PackageEdgeDao {
         FROM package_edge
        WHERE analysis_pk = ?
        ORDER BY source_pk, target_pk""";
-
-  private static final int FIRST_LISTED_OCCURRENCE = 6;
 
   private PackageEdgeDao() {}
 
@@ -91,7 +100,7 @@ public final class PackageEdgeDao {
     return List.copyOf(edges);
   }
 
-  private static PackageEdgeRow read(ResultSet rows) throws SQLException {
+  static PackageEdgeRow read(ResultSet rows) throws SQLException {
     return new PackageEdgeRow(
         rows.getLong("source_pk"),
         rows.getLong("target_pk"),
@@ -105,7 +114,7 @@ public final class PackageEdgeDao {
       throws SQLException {
     final Map<DependencyType, Integer> present = new EnumMap<>(DependencyType.class);
     for (int i = 0; i < OCCURRENCE_TYPES.size(); i++) {
-      final int occurrences = rows.getInt(FIRST_LISTED_OCCURRENCE + i);
+      final int occurrences = rows.getInt(OCCURRENCE_COLUMNS.get(i));
       if (occurrences > 0) {
         present.put(OCCURRENCE_TYPES.get(i), occurrences);
       }

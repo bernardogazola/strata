@@ -41,7 +41,7 @@ public record OutlineCursor(long elementPk) {
     return new OutlineCursor(elementPk);
   }
 
-  private static boolean isUrlAlphabet(String wire) {
+  static boolean isUrlAlphabet(String wire) {
     for (int index = 0; index < wire.length(); index++) {
       final char c = wire.charAt(index);
       final boolean allowed =
