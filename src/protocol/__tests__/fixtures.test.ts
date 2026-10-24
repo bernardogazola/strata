@@ -563,9 +563,6 @@ const coverageGap = coverageTopics.filter((topic) => !coveredTopics.has(topic));
 const EXPECTED_COVERAGE_GAP = [
   "archaeology.timeline",
   "diagnostics.report",
-  "element.dependencies",
-  "element.dependencyEvidence",
-  "element.describe",
   "evolution.changeMetrics",
   "evolution.cochange",
   "hotspot.profile",

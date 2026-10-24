@@ -1,0 +1,2 @@
+{"id":"req_01JQ8ZJ1B2C3D4E5F6G7H8J9KE","kind":"request","method":"element.describe","payload":{"analysisId":"an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W","elementId":"method:br.pucpr.legacy.core.Catalog#add(br.pucpr.legacy.core.CatalogEntry)"},"protocol":1}
+{"error":{"code":"PROTO_INVALID_PAYLOAD","detail":"elementId deve ser um id de pacote ou de tipo","origin":"analyzer","params":{"method":"element.describe"}},"id":"req_01JQ8ZJ1B2C3D4E5F6G7H8J9KE","kind":"response","ok":false,"protocol":1}

@@ -1,0 +1,2 @@
+{"id":"req_01JQ8ZJ2B2C3D4E5F6G7H8J9K0","kind":"request","method":"element.dependencies","payload":{"analysisId":"an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W","direction":"IN","elementId":"pkg:br.pucpr.legacy.api"},"protocol":1}
+{"id":"req_01JQ8ZJ2B2C3D4E5F6G7H8J9K0","kind":"response","ok":true,"payload":{"items":[],"nextCursor":null,"totals":{"in":0,"out":2,"outExternal":null}},"protocol":1}
