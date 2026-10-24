@@ -423,6 +423,7 @@ describe("os discriminantes de element.*", () => {
 
   const CATALOG = "type:nowhere.Catalog";
   const STORE = "type:nowhere.Store";
+  const ENTRY = "type:nowhere.CatalogEntry";
   const IN_PAGE = { marker: "in" };
   const OUT_PAGE = { marker: "out" };
   const EVIDENCE = { marker: "evidence" };
@@ -508,6 +509,67 @@ describe("os discriminantes de element.*", () => {
     ]);
   });
 
+  test.each([
+    {
+      field: "elementId",
+      method: "element.describe",
+      requests: [{ elementId: CATALOG }, { elementId: STORE }],
+    },
+    {
+      field: "elementId",
+      method: "element.dependencies",
+      requests: [
+        { direction: "IN", elementId: CATALOG },
+        { direction: "IN", elementId: STORE },
+      ],
+    },
+    {
+      field: "direction",
+      method: "element.dependencies",
+      requests: [
+        { direction: "IN", elementId: CATALOG },
+        { direction: "OUT", elementId: CATALOG },
+      ],
+    },
+    {
+      field: "source",
+      method: "element.dependencyEvidence",
+      requests: [
+        { source: CATALOG, target: ENTRY },
+        { source: STORE, target: ENTRY },
+      ],
+    },
+    {
+      field: "target",
+      method: "element.dependencyEvidence",
+      requests: [
+        { source: CATALOG, target: STORE },
+        { source: CATALOG, target: ENTRY },
+      ],
+    },
+  ] as const)(
+    "$method: $field sozinho separa dois casos que dividem o resto",
+    async ({ method, requests }) => {
+      installOverrides(
+        requests.map((request, index) => ({
+          method,
+          request,
+          result: { marker: index },
+        }))
+      );
+
+      const answers = await Promise.all(
+        requests.map((request) =>
+          fakeRequest(method, { analysisId: AN, ...request })
+        )
+      );
+
+      expect(answers).toStrictEqual(
+        requests.map((_request, index) => ({ marker: index }))
+      );
+    }
+  );
+
   test("element.dependencyEvidence escolhe pelo par ordenado: o par trocado é outra aresta", async () => {
     installOverrides([
       {
@@ -543,22 +605,30 @@ describe("o mundo do inspetor servido pelas fixtures", () => {
   const MARKER = { marker: "override" };
   const PACKAGE_ID = PACKAGE_IDS[0] ?? "";
   const TYPE_ID = TYPE_IDS[0] ?? "";
+  const OTHER_TYPE_ID = TYPE_IDS[1] ?? "";
   const GROUP_ID = `pfx:${detailOf(PACKAGE_ID).qualifiedName}`;
   const ELEMENT_METHODS = [
     "element.dependencies",
     "element.dependencyEvidence",
     "element.describe",
   ] as const;
+  type ElementMethod = (typeof ELEMENT_METHODS)[number];
 
   const discriminantsOf = (
-    method: (typeof ELEMENT_METHODS)[number],
+    method: ElementMethod,
     elementId: string
   ): Record<string, unknown> =>
     ({
       "element.dependencies": { direction: "IN", elementId },
-      "element.dependencyEvidence": { source: elementId, target: TYPE_ID },
+      "element.dependencyEvidence": {
+        source: elementId,
+        target: OTHER_TYPE_ID,
+      },
       "element.describe": { elementId },
     })[method];
+
+  const acceptedIdOf = (method: ElementMethod): string =>
+    method === "element.dependencyEvidence" ? TYPE_ID : PACKAGE_ID;
 
   test.each(DESCRIBED_IDS)(
     "element.describe de %s devolve o detalhe dele",
@@ -610,17 +680,48 @@ describe("o mundo do inspetor servido pelas fixtures", () => {
     ]);
   });
 
+  const FAKE_ANSWER_OF_REFUSAL: Readonly<
+    Record<string, readonly [code: string, origin: string]>
+  > = {
+    "element.dependencyEvidence.no-pair": ["INTERNAL_UNEXPECTED", "frontend"],
+    "element.describe.method": ["PROTO_INVALID_PAYLOAD", "analyzer"],
+    "element.describe.unknown": ["INTERNAL_UNEXPECTED", "frontend"],
+  };
+
+  test("a tabela das respostas falsas cobre toda recusa gravada sem cursor", () => {
+    expect(
+      ELEMENT_REFUSALS.filter(({ request }) => !("cursor" in request)).map(
+        ({ stem }) => stem
+      )
+    ).toStrictEqual(Object.keys(FAKE_ANSWER_OF_REFUSAL).sort());
+  });
+
   test.each(ELEMENT_REFUSALS.filter(({ request }) => !("cursor" in request)))(
-    "$stem: o pedido recusado não tem caso, e o bridge falso nunca toca a resposta de erro",
-    async ({ method, request }) => {
+    "$stem: o bridge falso nunca toca a resposta de erro gravada",
+    async ({ method, request, stem }) => {
       const error = await protocolErrorOf(method, request);
 
-      expect([error.code, error.origin]).toStrictEqual([
-        "INTERNAL_UNEXPECTED",
-        "frontend",
+      expect([error.code, error.origin, error.params]).toStrictEqual([
+        ...(FAKE_ANSWER_OF_REFUSAL[stem] ?? []),
+        { method },
       ]);
     }
   );
+
+  test("um id de método no describe é recusado como o Java o recusa: o mesmo código e os mesmos params", async () => {
+    const refusal = ELEMENT_REFUSALS.find(
+      ({ stem }) => stem === "element.describe.method"
+    );
+    const error = await protocolErrorOf(
+      refusal?.method ?? "",
+      refusal?.request
+    );
+
+    expect([error.code, error.params]).toStrictEqual([
+      refusal?.error.code,
+      refusal?.error.params,
+    ]);
+  });
 
   test("o cursor estrangeiro não é recusado pelo bridge falso: cursor não escolhe caso", async () => {
     const refusal = ELEMENT_REFUSALS.find(({ request }) => "cursor" in request);
@@ -641,7 +742,7 @@ describe("o mundo do inspetor servido pelas fixtures", () => {
         { method, request: discriminantsOf(method, GROUP_ID), result: MARKER },
         {
           method,
-          request: discriminantsOf(method, PACKAGE_ID),
+          request: discriminantsOf(method, acceptedIdOf(method)),
           result: MARKER,
         },
       ] satisfies FakeTranscriptOverride[]);
@@ -657,7 +758,7 @@ describe("o mundo do inspetor servido pelas fixtures", () => {
       expect(
         await fakeRequest(method, {
           analysisId: AN,
-          ...discriminantsOf(method, PACKAGE_ID),
+          ...discriminantsOf(method, acceptedIdOf(method)),
         })
       ).toBe(MARKER);
     }

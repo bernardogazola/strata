@@ -38,8 +38,10 @@ import {
   analysisIdSchema,
   cursorSchema,
   elementIdSchema,
+  packageOrTypeIdSchema,
   percentileSchema,
   searchQuerySchema,
+  typeIdSchema,
 } from "./primitives";
 import {
   analysisConfigurationSchema,
@@ -105,29 +107,37 @@ export const METHODS = {
       analysisId: analysisIdSchema,
       cursor: cursorSchema.optional(),
       direction: dependencyDirectionSchema,
-      elementId: elementIdSchema,
+      elementId: packageOrTypeIdSchema,
       limit: z.number().int().positive().max(DEPENDENCY_PAGE_MAX).optional(),
     }),
     requiresRepository: false,
     result: dependencyPageSchema,
   },
   "element.dependencyEvidence": {
-    params: z.strictObject({
-      analysisId: analysisIdSchema,
-      limit: z
-        .number()
-        .int()
-        .positive()
-        .max(DEPENDENCY_EVIDENCE_RESULTS_MAX)
-        .optional(),
-      source: elementIdSchema,
-      target: elementIdSchema,
-    }),
+    params: z
+      .strictObject({
+        analysisId: analysisIdSchema,
+        limit: z
+          .number()
+          .int()
+          .positive()
+          .max(DEPENDENCY_EVIDENCE_RESULTS_MAX)
+          .optional(),
+        source: typeIdSchema,
+        target: typeIdSchema,
+      })
+      .refine(({ source, target }) => source !== target, {
+        error: "source e target precisam ser diferentes",
+        path: ["target"],
+      }),
     requiresRepository: false,
     result: dependencyEvidenceResultSchema,
   },
   "element.describe": {
-    params: elementRefSchema,
+    params: z.strictObject({
+      analysisId: analysisIdSchema,
+      elementId: packageOrTypeIdSchema,
+    }),
     requiresRepository: false,
     result: elementDetailSchema,
   },

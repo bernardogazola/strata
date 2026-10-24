@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import type { z } from "zod";
 import {
   dependencyEvidenceResultSchema,
   dependencyPageSchema,
@@ -191,7 +192,10 @@ const methodOf = (detail: ReturnType<typeof typeDetail>) =>
 
 const withMethod = (overrides: Record<string, unknown>) => {
   const base = typeDetail();
-  return { ...base, methods: [{ ...methodOf(base), ...overrides }] };
+  return {
+    ...base,
+    methods: [{ ...methodOf(base), ...overrides }, ...base.methods.slice(1)],
+  };
 };
 
 const withGraph = (overrides: Record<string, unknown>) => {
@@ -546,5 +550,541 @@ describe("os pedidos de element.*", () => {
     expect(dependencyParams.safeParse(request(2000)).success).toBe(true);
     expect(dependencyParams.safeParse(request(2001)).success).toBe(false);
     expect(dependencyParams.safeParse(request(0)).success).toBe(false);
+  });
+});
+
+const LABEL_MAX = 512;
+const MAX_ID_CHARS = 4096;
+const EMOJI = String.fromCodePoint(0x1_f6_00);
+
+describe("element.describe: o tipo do elemento decide o que é nulo", () => {
+  test("em um pacote, o que só um tipo tem é nulo: typeKind, packageId, filePath, lines e ccP90", () => {
+    const packageWith: [string, Record<string, unknown>][] = [
+      ["typeKind", { ...packageDetail, typeKind: "CLASS" }],
+      ["packageId", { ...packageDetail, packageId: "pkg:a" }],
+      ["filePath", { ...packageDetail, filePath: "a/package-info.java" }],
+      ["lines", { ...packageDetail, lines: { end: 1, start: 1 } }],
+      [
+        "ccP90",
+        { ...packageDetail, metrics: { ...packageDetail.metrics, ccP90: 0 } },
+      ],
+    ];
+
+    for (const [field, detail] of packageWith) {
+      expect(elementDetailSchema.safeParse(detail).success, field).toBe(false);
+    }
+  });
+
+  test("em um pacote, methods é [] e methodTotal é 0", () => {
+    const withOneMethod = {
+      ...packageDetail,
+      methods: [methodOf(typeDetail())],
+      methodTotal: 1,
+    };
+
+    expect(elementDetailSchema.safeParse(withOneMethod).success).toBe(false);
+  });
+
+  test("em um tipo, typeKind, packageId, filePath e ccP90 nunca são nulos; lines pode ser", () => {
+    const typeWithout: [string, Record<string, unknown>][] = [
+      ["typeKind", typeDetail({ typeKind: null })],
+      ["packageId", typeDetail({ packageId: null })],
+      ["filePath", typeDetail({ filePath: null })],
+      ["ccP90", withMetrics({ ccP90: null })],
+    ];
+
+    for (const [field, detail] of typeWithout) {
+      expect(elementDetailSchema.safeParse(detail).success, field).toBe(false);
+    }
+    expect(
+      elementDetailSchema.safeParse(typeDetail({ lines: null })).success
+    ).toBe(true);
+  });
+
+  test("o packageId de um tipo é um id de pacote", () => {
+    expect(
+      elementDetailSchema.safeParse(typeDetail({ packageId: "type:a.Outer" }))
+        .success
+    ).toBe(false);
+  });
+
+  test("kind é o do prefixo do id, e só PACKAGE ou TYPE se descrevem", () => {
+    const mismatched: [string, Record<string, unknown>][] = [
+      ["kind PACKAGE com id type:", typeDetail({ kind: "PACKAGE" })],
+      ["kind METHOD", typeDetail({ kind: "METHOD" })],
+      ["kind FILE", typeDetail({ kind: "FILE" })],
+      ["kind fora do enum", typeDetail({ kind: "CLASS" })],
+      ["id pkg: em um TYPE", typeDetail({ elementId: "pkg:a" })],
+      ["id method:", typeDetail({ elementId: "method:a.Catalog#size()" })],
+      ["id file:", typeDetail({ elementId: "file:a/Catalog.java" })],
+      ["id pfx:", typeDetail({ elementId: "pfx:a" })],
+      ["id sem prefixo", typeDetail({ elementId: "a.Catalog" })],
+    ];
+
+    for (const [label, detail] of mismatched) {
+      expect(elementDetailSchema.safeParse(detail).success, label).toBe(false);
+    }
+  });
+
+  test("um método ou um arquivo não se descreve, nem com o kind que o id diz", () => {
+    expect(
+      elementDetailSchema.safeParse(
+        typeDetail({ elementId: "method:a.Catalog#size()", kind: "METHOD" })
+      ).success
+    ).toBe(false);
+    expect(
+      elementDetailSchema.safeParse(
+        typeDetail({ elementId: "file:a/Catalog.java", kind: "FILE" })
+      ).success
+    ).toBe(false);
+  });
+
+  test("o id descrito tem o teto de todo id: 4 096", () => {
+    const atCeiling = `type:${"a".repeat(MAX_ID_CHARS - "type:".length)}`;
+
+    expect(
+      elementDetailSchema.safeParse(typeDetail({ elementId: atCeiling }))
+        .success
+    ).toBe(true);
+    expect(
+      elementDetailSchema.safeParse(typeDetail({ elementId: `${atCeiling}a` }))
+        .success
+    ).toBe(false);
+  });
+
+  test("methods tem min(methodTotal, 1 000) linhas: abaixo do teto não há corte", () => {
+    expect(
+      elementDetailSchema.safeParse(typeDetail({ methodTotal: 3 })).success
+    ).toBe(false);
+    expect(
+      elementDetailSchema.safeParse(typeDetail({ methodTotal: 1 })).success
+    ).toBe(false);
+  });
+
+  test("um modificador é uma palavra: nunca vazio, nunca acima de 32", () => {
+    expect(
+      elementDetailSchema.safeParse(typeDetail({ modifiers: [""] })).success
+    ).toBe(false);
+    expect(
+      elementDetailSchema.safeParse(typeDetail({ modifiers: ["x".repeat(33)] }))
+        .success
+    ).toBe(false);
+    expect(
+      elementDetailSchema.safeParse(typeDetail({ modifiers: ["x".repeat(32)] }))
+        .success
+    ).toBe(true);
+  });
+
+  test("rótulo e assinatura cortam em 512 code points, e não em unidades UTF-16", () => {
+    expect(
+      elementDetailSchema.safeParse(
+        typeDetail({ label: EMOJI.repeat(LABEL_MAX) })
+      ).success
+    ).toBe(true);
+    expect(
+      elementDetailSchema.safeParse(
+        typeDetail({ label: "x".repeat(LABEL_MAX + 1) })
+      ).success
+    ).toBe(false);
+    expect(
+      elementDetailSchema.safeParse(
+        withMethod({ signature: "x".repeat(LABEL_MAX + 1) })
+      ).success
+    ).toBe(false);
+  });
+
+  test("typeKind é do vocabulário do Java", () => {
+    expect(
+      elementDetailSchema.safeParse(typeDetail({ typeKind: "WIDGET" })).success
+    ).toBe(false);
+  });
+
+  test("o arquivo é relativo à raiz: uma barra inicial reprova", () => {
+    expect(
+      elementDetailSchema.safeParse(
+        typeDetail({ filePath: "/Users/x/repo/core/A.java" })
+      ).success
+    ).toBe(false);
+  });
+});
+
+const methodRef = (overrides: Record<string, unknown> = {}) => ({
+  ...evidenceMethod,
+  ...overrides,
+});
+
+describe("element.dependencyEvidence: a ocorrência afirma o que o Java afirma", () => {
+  test("só uma ocorrência CALLS nomeia o método chamado", () => {
+    const callee = methodRef({
+      elementId: "method:a.Store#put(a.Entry)",
+      ownerId: "type:a.Store",
+      ownerLabel: "Store",
+      signature: "put(Entry)",
+    });
+
+    expect(
+      relationshipEvidenceSchema.safeParse(evidence({ toMethod: callee }))
+        .success
+    ).toBe(true);
+    expect(
+      relationshipEvidenceSchema.safeParse(
+        evidence({ toMethod: callee, type: "FIELD_TYPE" })
+      ).success
+    ).toBe(false);
+  });
+
+  test("o tipo é uma aresta entre tipos do vocabulário: MODULE_DEPENDENCY e o desconhecido reprovam", () => {
+    for (const type of ["MODULE_DEPENDENCY", "USES"]) {
+      expect(
+        relationshipEvidenceSchema.safeParse(evidence({ type })).success,
+        type
+      ).toBe(false);
+    }
+  });
+
+  test("a linha é 1-based, ou nula", () => {
+    expect(
+      relationshipEvidenceSchema.safeParse(evidence({ line: 0 })).success
+    ).toBe(false);
+    expect(
+      relationshipEvidenceSchema.safeParse(evidence({ line: null })).success
+    ).toBe(true);
+  });
+
+  test("a qualidade é do vocabulário", () => {
+    expect(
+      relationshipEvidenceSchema.safeParse(evidence({ resolution: "UNKNOWN" }))
+        .success
+    ).toBe(false);
+  });
+
+  test("o dono de um método é um tipo", () => {
+    for (const ownerId of [
+      "pkg:a",
+      "method:a.Catalog#add(a.Entry)",
+      "a.Catalog",
+    ]) {
+      expect(
+        relationshipEvidenceSchema.safeParse(
+          evidence({ fromMethod: methodRef({ ownerId }) })
+        ).success,
+        ownerId
+      ).toBe(false);
+    }
+  });
+
+  test("assinatura e rótulo do dono cortam em 512 code points", () => {
+    for (const field of ["ownerLabel", "signature"]) {
+      expect(
+        relationshipEvidenceSchema.safeParse(
+          evidence({
+            fromMethod: methodRef({ [field]: "x".repeat(LABEL_MAX + 1) }),
+          })
+        ).success,
+        field
+      ).toBe(false);
+    }
+  });
+
+  test("o arquivo é relativo à raiz: uma barra inicial reprova", () => {
+    expect(
+      relationshipEvidenceSchema.safeParse(
+        evidence({ filePath: "/Users/x/repo/core/A.java" })
+      ).success
+    ).toBe(false);
+  });
+
+  test("o resultado nunca é vazio: um par sem linha é uma recusa, não []", () => {
+    expect(
+      dependencyEvidenceResultSchema.safeParse({ evidence: [] }).success
+    ).toBe(false);
+  });
+});
+
+const externalEntry = (overrides: Record<string, unknown> = {}) =>
+  entry({
+    elementId: "type:Foo",
+    isExternal: true,
+    label: "Foo",
+    packageId: null,
+    qualifiedName: "Foo",
+    resolution: "UNRESOLVED_EXTERNAL",
+    ...overrides,
+  });
+
+const packageEntry = (overrides: Record<string, unknown> = {}) =>
+  entry({
+    elementId: "pkg:b",
+    kind: "PACKAGE",
+    label: "b",
+    packageId: null,
+    qualifiedName: "b",
+    ...overrides,
+  });
+
+const entryAccepted = (row: Record<string, unknown>): boolean =>
+  dependencyPageSchema.safeParse(page({ items: [row] })).success;
+
+describe("element.dependencies: a linha afirma o que o Java afirma da ponta", () => {
+  test("os três casos de base passam: interno, externo e de pacote", () => {
+    expect(entryAccepted(entry())).toBe(true);
+    expect(entryAccepted(externalEntry())).toBe(true);
+    expect(entryAccepted(packageEntry())).toBe(true);
+  });
+
+  test("ambiguous só em uma ponta externa UNRESOLVED_EXTERNAL", () => {
+    expect(entryAccepted(externalEntry({ ambiguous: true }))).toBe(true);
+    expect(entryAccepted(entry({ ambiguous: true }))).toBe(false);
+    expect(
+      entryAccepted(externalEntry({ ambiguous: true, resolution: "INFERRED" }))
+    ).toBe(false);
+  });
+
+  test("uma ponta externa é um tipo sem pacote", () => {
+    expect(entryAccepted(externalEntry({ packageId: "pkg:java.lang" }))).toBe(
+      false
+    );
+    expect(entryAccepted(packageEntry({ isExternal: true }))).toBe(false);
+  });
+
+  test("uma ponta interna nunca é UNRESOLVED_EXTERNAL", () => {
+    expect(entryAccepted(entry({ resolution: "UNRESOLVED_EXTERNAL" }))).toBe(
+      false
+    );
+    expect(
+      entryAccepted(packageEntry({ resolution: "UNRESOLVED_EXTERNAL" }))
+    ).toBe(false);
+  });
+
+  test("o pacote de uma ponta interna: um tipo tem o dele, um pacote não tem", () => {
+    expect(entryAccepted(entry({ packageId: null }))).toBe(false);
+    expect(entryAccepted(entry({ packageId: "type:a.Outer" }))).toBe(false);
+    expect(entryAccepted(packageEntry({ packageId: "pkg:a" }))).toBe(false);
+  });
+
+  test("kind é o do prefixo do id, e uma ponta é só pacote ou tipo", () => {
+    const mismatched: [string, Record<string, unknown>][] = [
+      ["kind PACKAGE com id type:", entry({ kind: "PACKAGE" })],
+      ["kind METHOD", entry({ kind: "METHOD" })],
+      ["kind fora do enum", entry({ kind: "CLASS" })],
+      ["id pkg: em um TYPE", entry({ elementId: "pkg:a" })],
+      ["id pfx:", entry({ elementId: "pfx:a" })],
+      ["id method:", entry({ elementId: "method:a.Store#put(a.Entry)" })],
+      ["id file:", entry({ elementId: "file:a/Store.java" })],
+    ];
+
+    for (const [label, row] of mismatched) {
+      expect(entryAccepted(row), label).toBe(false);
+    }
+  });
+
+  test("um método ou um arquivo não é ponta, nem com o kind que o id diz", () => {
+    expect(
+      entryAccepted(
+        entry({ elementId: "method:a.Store#put(a.Entry)", kind: "METHOD" })
+      )
+    ).toBe(false);
+    expect(
+      entryAccepted(entry({ elementId: "file:a/Store.java", kind: "FILE" }))
+    ).toBe(false);
+  });
+
+  test("a outra ponta tem o teto de todo id: 4 096", () => {
+    const atCeiling = `type:${"a".repeat(MAX_ID_CHARS - "type:".length)}`;
+
+    expect(entryAccepted(entry({ elementId: atCeiling }))).toBe(true);
+    expect(entryAccepted(entry({ elementId: `${atCeiling}a` }))).toBe(false);
+  });
+
+  test("types tem ao menos um tipo de aresta entre tipos, cada um com 1 ou mais", () => {
+    for (const types of [{}, { MODULE_DEPENDENCY: 1 }, { CALLS: 0 }]) {
+      expect(entryAccepted(entry({ types })), JSON.stringify(types)).toBe(
+        false
+      );
+    }
+  });
+
+  test("o edgeId tem a forma do FNV do par", () => {
+    for (const edgeId of ["e_AF63DC4C8601EC8C", "edge-1"]) {
+      expect(entryAccepted(entry({ edgeId })), edgeId).toBe(false);
+    }
+  });
+
+  test("o rótulo corta em 512 code points", () => {
+    expect(entryAccepted(entry({ label: EMOJI.repeat(LABEL_MAX) }))).toBe(true);
+    expect(entryAccepted(entry({ label: "x".repeat(LABEL_MAX + 1) }))).toBe(
+      false
+    );
+  });
+
+  test("a qualidade é do vocabulário", () => {
+    expect(entryAccepted(entry({ resolution: "UNKNOWN" }))).toBe(false);
+  });
+});
+
+const withEachKeyDropped = (
+  value: Record<string, unknown>
+): [string, Record<string, unknown>][] =>
+  Object.keys(value).map((key) => {
+    const { [key]: _dropped, ...rest } = value;
+    return [key, rest];
+  });
+
+describe("nulo, nunca ausente, em toda profundidade", () => {
+  test("ElementDetail: toda chave aninhada é obrigatória", () => {
+    const base = typeDetail();
+    const dropped: [string, Record<string, unknown>][] = [
+      ...withEachKeyDropped(base.graph).map(
+        ([key, graph]): [string, Record<string, unknown>] => [
+          `graph.${key}`,
+          { ...base, graph },
+        ]
+      ),
+      ...withEachKeyDropped(base.metrics).map(
+        ([key, metrics]): [string, Record<string, unknown>] => [
+          `metrics.${key}`,
+          { ...base, metrics },
+        ]
+      ),
+      ...withEachKeyDropped(methodOf(base)).map(
+        ([key, method]): [string, Record<string, unknown>] => [
+          `methods[].${key}`,
+          { ...base, methods: [method, base.methods[1]] },
+        ]
+      ),
+    ];
+
+    for (const [at, detail] of dropped) {
+      expect(elementDetailSchema.safeParse(detail).success, at).toBe(false);
+    }
+  });
+
+  test("RelationshipEvidence: toda chave, e as da referência de método, é obrigatória", () => {
+    const dropped = [
+      ...withEachKeyDropped(evidence()),
+      ...withEachKeyDropped(evidenceMethod).map(
+        ([key, fromMethod]): [string, Record<string, unknown>] => [
+          `fromMethod.${key}`,
+          evidence({ fromMethod }),
+        ]
+      ),
+    ];
+
+    for (const [at, row] of dropped) {
+      expect(relationshipEvidenceSchema.safeParse(row).success, at).toBe(false);
+    }
+  });
+
+  test("DependencyPage: toda chave da linha e dos totais é obrigatória", () => {
+    for (const [key, row] of withEachKeyDropped(entry())) {
+      expect(entryAccepted(row), `items[].${key}`).toBe(false);
+    }
+    for (const [key, totals] of withEachKeyDropped(page().totals)) {
+      expect(
+        dependencyPageSchema.safeParse(page({ totals })).success,
+        `totals.${key}`
+      ).toBe(false);
+    }
+  });
+});
+
+describe("os pedidos de element.* são tão estreitos quanto o Java", () => {
+  const evidenceParams = METHODS["element.dependencyEvidence"].params;
+  const dependencyParams = METHODS["element.dependencies"].params;
+  const describeParams = METHODS["element.describe"].params;
+  const describeRequest = { analysisId: AN, elementId: "type:a.Catalog" };
+  const dependencyRequest = {
+    analysisId: AN,
+    direction: "IN",
+    elementId: "type:a.Catalog",
+  };
+  const pair = {
+    analysisId: AN,
+    source: "type:a.Catalog",
+    target: "type:a.Store",
+  };
+
+  test("describe e dependencies pedem um pacote ou um tipo: um método ou um arquivo reprova", () => {
+    for (const elementId of ["pkg:a", "type:a.Catalog"]) {
+      expect(
+        describeParams.safeParse({ ...describeRequest, elementId }).success,
+        elementId
+      ).toBe(true);
+      expect(
+        dependencyParams.safeParse({ ...dependencyRequest, elementId }).success,
+        elementId
+      ).toBe(true);
+    }
+    for (const elementId of [
+      "method:a.Catalog#size()",
+      "file:a/Catalog.java",
+    ]) {
+      expect(
+        describeParams.safeParse({ ...describeRequest, elementId }).success,
+        elementId
+      ).toBe(false);
+      expect(
+        dependencyParams.safeParse({ ...dependencyRequest, elementId }).success,
+        elementId
+      ).toBe(false);
+    }
+  });
+
+  test("as duas pontas da evidência são tipos: pacote, método, arquivo e grupo reprovam", () => {
+    for (const end of [
+      "pkg:a",
+      "method:a.Catalog#size()",
+      "file:a/Catalog.java",
+      "pfx:a",
+    ]) {
+      expect(
+        evidenceParams.safeParse({ ...pair, source: end }).success,
+        `source ${end}`
+      ).toBe(false);
+      expect(
+        evidenceParams.safeParse({ ...pair, target: end }).success,
+        `target ${end}`
+      ).toBe(false);
+    }
+  });
+
+  test("um alvo externo é um tipo como outro qualquer", () => {
+    expect(
+      evidenceParams.safeParse({ ...pair, target: "type:java.lang.String" })
+        .success
+    ).toBe(true);
+  });
+
+  test("as pontas da evidência são diferentes: o Java não guarda par de um tipo consigo", () => {
+    expect(
+      evidenceParams.safeParse({ ...pair, target: pair.source }).success
+    ).toBe(false);
+  });
+
+  test("todo campo obrigatório é obrigatório, e um nulo explícito não o supre", () => {
+    const required: [string, z.ZodType, Record<string, unknown>][] = [
+      ["element.describe", describeParams, describeRequest],
+      ["element.dependencies", dependencyParams, dependencyRequest],
+      ["element.dependencyEvidence", evidenceParams, pair],
+    ];
+
+    for (const [method, schema, request] of required) {
+      for (const [key, rest] of withEachKeyDropped(request)) {
+        expect(schema.safeParse(rest).success, `${method} sem ${key}`).toBe(
+          false
+        );
+        expect(
+          schema.safeParse({ ...rest, [key]: null }).success,
+          `${method} com ${key} nulo`
+        ).toBe(false);
+      }
+    }
+  });
+
+  test("a direção é do vocabulário", () => {
+    expect(
+      dependencyParams.safeParse({ ...dependencyRequest, direction: "BOTH" })
+        .success
+    ).toBe(false);
   });
 });
