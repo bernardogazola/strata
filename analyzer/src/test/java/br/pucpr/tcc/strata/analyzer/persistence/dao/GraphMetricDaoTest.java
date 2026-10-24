@@ -50,7 +50,10 @@ final class GraphMetricDaoTest {
           "internal_cohesion",
           "betweenness",
           "is_entry_point",
-          "entry_point_kind");
+          "entry_point_kind",
+          "resolved_occurrences",
+          "inferred_occurrences",
+          "unresolved_external_occurrences");
 
   private static final String INSERT_CRU =
       "INSERT INTO graph_metric (element_pk, analysis_pk, "
@@ -73,8 +76,9 @@ final class GraphMetricDaoTest {
           pacote(1, 1, 1, 0.1 + 0.2, 3.81e-6, 1, 2, 1, 3, 1.0),
           pacote(2, 1, 0, Double.MIN_NORMAL, 1.0, null, null, 2, 0, null),
           tipo(3, 2, 1, 1, 1, 0, 2, 9.0 / 37.0, 0.15 / 39_364, 1, 3, 3),
-          tipo(4, 0, 0, 0, 0, 0, 0, 1.0, Math.nextDown(1.0), null, null, 0),
-          tipo(5, 5, 7, 0, 7, 12, 5, Double.MIN_VALUE, 0.5, 2, 2, 4),
+          comMistura(tipo(4, 0, 0, 0, 0, 0, 0, 1.0, Math.nextDown(1.0), null, null, 0), 0, 0, 0),
+          comMistura(
+              tipo(5, 5, 7, 0, 7, 12, 5, Double.MIN_VALUE, 0.5, 2, 2, 4), 3_000_000_000L, 1, 2),
           tipo(6, 3, 3, 3, 3, 0, 0, 1.0 / 3.0, 2.0 / 3.0, 2, 2, 0));
 
   @TempDir private Path temp;
@@ -129,7 +133,10 @@ final class GraphMetricDaoTest {
         bridgeSpan,
         null,
         null,
-        null);
+        null,
+        7 * pk,
+        3 * pk,
+        pk);
   }
 
   private static GraphMetricRow pacote(
@@ -159,7 +166,34 @@ final class GraphMetricDaoTest {
         null,
         componentId,
         internalCohesion,
-        betweenness);
+        betweenness,
+        7 * pk,
+        3 * pk,
+        pk);
+  }
+
+  private static GraphMetricRow comMistura(
+      GraphMetricRow linha, long resolved, long inferred, long unresolvedExternal) {
+    return new GraphMetricRow(
+        linha.elementPk(),
+        linha.granularity(),
+        linha.fanIn(),
+        linha.fanOut(),
+        linha.fanInResolved(),
+        linha.fanOutResolved(),
+        linha.fanOutExternal(),
+        linha.externalFanIn(),
+        linha.pagerank(),
+        linha.pagerankOut(),
+        linha.sccId(),
+        linha.sccSize(),
+        linha.bridgeSpan(),
+        linha.componentId(),
+        linha.internalCohesion(),
+        linha.betweenness(),
+        resolved,
+        inferred,
+        unresolvedExternal);
   }
 
   private static List<ElementRow> pacoteETipos(int quantos) {
@@ -290,8 +324,8 @@ final class GraphMetricDaoTest {
           banco,
           analise,
           List.of(
-              pacote(1, 30, 29, 0.5, 0.0625, 28, 27, 26, 25, 24.5),
-              tipo(3, 20, 19, 18, 17, 16, 15, 0.25, 0.125, 14, 13, 12)));
+              comMistura(pacote(1, 30, 29, 0.5, 0.0625, 28, 27, 26, 25, 24.5), 23, 22, 21),
+              comMistura(tipo(3, 20, 19, 18, 17, 16, 15, 0.25, 0.125, 14, 13, 12), 11, 10, 9)));
 
       assertThat(colunasCruas(banco, 1))
           .containsExactlyEntriesOf(
@@ -312,7 +346,10 @@ final class GraphMetricDaoTest {
                   "integer:25",
                   "real:24.5",
                   "null:NULL",
-                  "null:NULL"));
+                  "null:NULL",
+                  "integer:23",
+                  "integer:22",
+                  "integer:21"));
       assertThat(colunasCruas(banco, 3))
           .containsExactlyEntriesOf(
               linhaEsperada(
@@ -332,7 +369,10 @@ final class GraphMetricDaoTest {
                   "null:NULL",
                   "null:NULL",
                   "null:NULL",
-                  "null:NULL"));
+                  "null:NULL",
+                  "integer:11",
+                  "integer:10",
+                  "integer:9"));
     }
   }
 
@@ -506,6 +546,9 @@ final class GraphMetricDaoTest {
     valores.put("betweenness", null);
     valores.put("is_entry_point", null);
     valores.put("entry_point_kind", null);
+    valores.put("resolved_occurrences", 3);
+    valores.put("inferred_occurrences", 2);
+    valores.put("unresolved_external_occurrences", 1);
     return Collections.unmodifiableMap(valores);
   }
 
@@ -553,7 +596,10 @@ final class GraphMetricDaoTest {
         (Integer) v.get("bridge_span"),
         (Integer) v.get("component_id"),
         (Integer) v.get("internal_cohesion"),
-        (Double) v.get("betweenness"));
+        (Double) v.get("betweenness"),
+        (Integer) v.get("resolved_occurrences"),
+        (Integer) v.get("inferred_occurrences"),
+        (Integer) v.get("unresolved_external_occurrences"));
   }
 
   private static void inserirCru(
@@ -649,7 +695,17 @@ final class GraphMetricDaoTest {
         Arguments.of("bridge_span negativo", com(t, "bridge_span", -1), check),
         Arguments.of("component_id zero", com(p, "component_id", 0), check),
         Arguments.of("internal_cohesion negativo", com(p, "internal_cohesion", -1), check),
-        Arguments.of("betweenness negativa", com(p, "betweenness", -0.5), check));
+        Arguments.of("betweenness negativa", com(p, "betweenness", -0.5), check),
+        Arguments.of("resolved_occurrences negativo", com(t, "resolved_occurrences", -1), check),
+        Arguments.of("inferred_occurrences negativo", com(p, "inferred_occurrences", -1), check),
+        Arguments.of(
+            "unresolved_external_occurrences negativo",
+            com(t, "unresolved_external_occurrences", -1),
+            check),
+        Arguments.of(
+            "PACKAGE com resolved_occurrences negativo",
+            com(p, "resolved_occurrences", -1),
+            check));
   }
 
   @ParameterizedTest(name = "{0}")
@@ -701,6 +757,16 @@ final class GraphMetricDaoTest {
         Arguments.of("fan_out NULL", com(t, "fan_out", null), notNull),
         Arguments.of("pagerank NULL", com(t, "pagerank", null), notNull),
         Arguments.of("pagerank_out NULL", com(t, "pagerank_out", null), notNull),
+        Arguments.of("resolved_occurrences NULL", com(t, "resolved_occurrences", null), notNull),
+        Arguments.of("inferred_occurrences NULL", com(t, "inferred_occurrences", null), notNull),
+        Arguments.of(
+            "unresolved_external_occurrences NULL",
+            com(t, "unresolved_external_occurrences", null),
+            notNull),
+        Arguments.of(
+            "PACKAGE sem resolved_occurrences",
+            com(pacoteValido(), "resolved_occurrences", null),
+            notNull),
         Arguments.of("is_entry_point 2", com(t, "is_entry_point", 2), check),
         Arguments.of(
             "tipo de entrada em um não ponto",

@@ -220,6 +220,71 @@ final class ElementDaoTest {
 
       assertThat(ElementDao.list(banco, analise)).isEqualTo(esperadas);
       assertThat(ElementDao.nextId(banco)).isEqualTo(linhas + 1L);
+      assertThat(
+              DaoTestDatabase.scalar(
+                  banco,
+                  "SELECT count(*) FROM code_element WHERE search_name = lower(simple_name)"))
+          .isEqualTo(Integer.toString(linhas));
+    }
+  }
+
+  @Test
+  void oNomeDeBuscaEhODobradoDoNomeSimplesSoNoPacoteENoTipoInterno() throws Exception {
+    final ElementRow acao =
+        new ElementRow(
+            6,
+            new CodeElementId("type:a.Ação"),
+            ElementKind.TYPE,
+            1L,
+            "Ação",
+            "a.Ação",
+            "a.Ação",
+            TypeKind.ENUM,
+            "",
+            false,
+            false,
+            1L,
+            1L,
+            null,
+            null);
+    final ElementRow externo =
+        new ElementRow(
+            7,
+            new CodeElementId("type:java.util.UUID"),
+            ElementKind.TYPE,
+            null,
+            "UUID",
+            "java.util.UUID",
+            "java.util.UUID",
+            null,
+            "",
+            true,
+            false,
+            null,
+            null,
+            null,
+            null);
+
+    try (Connection banco = DaoTestDatabase.create(temp)) {
+      final long analise = analiseComRaizEArquivo(banco, "an_01");
+
+      ElementDao.insert(
+          banco,
+          analise,
+          List.of(PACOTE_A, ORDER, CONSTRUTOR, ARQUIVO, PACOTE_PADRAO, acao, externo));
+
+      assertThat(
+              DaoTestDatabase.scalar(
+                  banco,
+                  "SELECT group_concat(element_id || '=' || quote(search_name), ' ' ORDER BY id)"
+                      + " FROM code_element"))
+          .isEqualTo(
+              "pkg:a='a' type:a.Order='order' method:a.Order#<init>()=NULL"
+                  + " file:src/main/java/a/Order.java=NULL pkg:='' type:a.Ação='acao'"
+                  + " type:java.util.UUID=NULL");
+      assertThat(List.of(PACOTE_A, ORDER, CONSTRUTOR, ARQUIVO, PACOTE_PADRAO, acao, externo))
+          .extracting(ElementRow::searchName)
+          .containsExactly("a", "order", null, null, "", "acao", null);
     }
   }
 

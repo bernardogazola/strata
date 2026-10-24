@@ -14,10 +14,12 @@ public record PackageMetrics(
     Cycle cycle,
     int componentId,
     int internalCohesion,
-    Double betweenness) {
+    Double betweenness,
+    ResolutionMix resolutionMix) {
 
   public PackageMetrics {
     Objects.requireNonNull(id, "id");
+    Objects.requireNonNull(resolutionMix, "resolutionMix");
     if (id.kind() != ElementKind.PACKAGE) {
       throw new IllegalArgumentException("as métricas de pacote pedem um id de pacote: " + id);
     }

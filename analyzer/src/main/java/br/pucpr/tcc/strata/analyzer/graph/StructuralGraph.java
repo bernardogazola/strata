@@ -24,6 +24,7 @@ public final class StructuralGraph {
   private final ResolutionQuality[] edgeResolutions;
   private final int[] edgeOccurrences;
   private final int[] fanOutExternal;
+  private final ResolutionMix[] resolutionMixes;
   private final long selfPairs;
   private final long externalPairs;
   private final long denylistedPairs;
@@ -35,6 +36,7 @@ public final class StructuralGraph {
       CodeElementId[] packageIds,
       TypeEdges edges,
       int[] fanOutExternal,
+      ResolutionMix[] resolutionMixes,
       long selfPairs,
       long denylistedPairs) {
     this.typeIds = typeIds;
@@ -45,6 +47,7 @@ public final class StructuralGraph {
     this.edgeResolutions = edges.resolutions();
     this.edgeOccurrences = edges.occurrences();
     this.fanOutExternal = fanOutExternal;
+    this.resolutionMixes = resolutionMixes;
     this.selfPairs = selfPairs;
     long external = 0;
     for (final int count : fanOutExternal) {
@@ -109,6 +112,10 @@ public final class StructuralGraph {
 
   public int fanOutExternal(int type) {
     return fanOutExternal[type];
+  }
+
+  public ResolutionMix resolutionMix(int type) {
+    return resolutionMixes[type];
   }
 
   public long selfPairs() {

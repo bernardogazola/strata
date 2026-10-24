@@ -5,6 +5,7 @@ import br.pucpr.tcc.strata.analyzer.sourceanalysis.DependencyAggregator;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.ExternalPackages;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.Dependency;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyEdge;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -46,6 +47,7 @@ public final class StructuralGraphBuilder {
         packageIds,
         aggregation.edges,
         aggregation.fanOutExternal,
+        aggregation.resolutionMixes(),
         aggregation.selfPairs,
         aggregation.denylistedPairs);
   }
@@ -85,11 +87,17 @@ public final class StructuralGraphBuilder {
 
     private final TypeEdges edges = new TypeEdges();
     private final int[] fanOutExternal;
+    private final long[] resolved;
+    private final long[] inferred;
+    private final long[] unresolvedExternal;
     private long selfPairs;
     private long denylistedPairs;
 
     private Aggregation(int typeCount) {
       this.fanOutExternal = new int[typeCount];
+      this.resolved = new long[typeCount];
+      this.inferred = new long[typeCount];
+      this.unresolvedExternal = new long[typeCount];
     }
 
     private void addSource(
@@ -99,6 +107,9 @@ public final class StructuralGraphBuilder {
         ExternalPackages packages) {
       if (rows.isEmpty()) {
         return;
+      }
+      for (final Dependency row : rows) {
+        countResolution(source, row.resolution(), row.occurrences());
       }
       boolean selfPair = false;
       for (final DependencyEdge pair : DependencyAggregator.aggregate(rows)) {
@@ -114,6 +125,23 @@ public final class StructuralGraphBuilder {
       if (selfPair) {
         selfPairs++;
       }
+    }
+
+    private void countResolution(int source, ResolutionQuality resolution, int occurrences) {
+      switch (resolution) {
+        case RESOLVED -> resolved[source] = Math.addExact(resolved[source], occurrences);
+        case INFERRED -> inferred[source] = Math.addExact(inferred[source], occurrences);
+        case UNRESOLVED_EXTERNAL ->
+            unresolvedExternal[source] = Math.addExact(unresolvedExternal[source], occurrences);
+      }
+    }
+
+    private ResolutionMix[] resolutionMixes() {
+      final ResolutionMix[] mixes = new ResolutionMix[resolved.length];
+      for (int type = 0; type < mixes.length; type++) {
+        mixes[type] = new ResolutionMix(resolved[type], inferred[type], unresolvedExternal[type]);
+      }
+      return mixes;
     }
 
     private void countExternal(int source, CodeElementId target, ExternalPackages packages) {

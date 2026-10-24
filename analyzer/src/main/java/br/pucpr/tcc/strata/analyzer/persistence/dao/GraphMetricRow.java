@@ -19,7 +19,10 @@ public record GraphMetricRow(
     Integer bridgeSpan,
     Integer componentId,
     Integer internalCohesion,
-    Double betweenness) {
+    Double betweenness,
+    long resolvedOccurrences,
+    long inferredOccurrences,
+    long unresolvedExternalOccurrences) {
 
   public GraphMetricRow {
     Objects.requireNonNull(granularity, "granularity");
@@ -29,6 +32,9 @@ public record GraphMetricRow(
     }
     if (fanIn < 0 || fanOut < 0) {
       throw new IllegalArgumentException("um fan negativo na linha do grafo de " + elementPk);
+    }
+    if (resolvedOccurrences < 0 || inferredOccurrences < 0 || unresolvedExternalOccurrences < 0) {
+      throw new IllegalArgumentException("uma contagem de ocorrências negativa: " + elementPk);
     }
     if (!isRank(pagerank) || !isRank(pagerankOut)) {
       throw new IllegalArgumentException("um pagerank fora de (0, 1]: " + elementPk);

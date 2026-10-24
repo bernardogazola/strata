@@ -4,6 +4,7 @@ import br.pucpr.tcc.strata.analyzer.bootstrap.AnalysisConstants;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.ExternalPackages;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -52,7 +53,7 @@ public final class StructuralGraphAnalysis {
     requireNotCancelled(cancelled);
     return new StructuralGraphResult(
         typeMetrics(graph, packageGraph, typeMeasures),
-        packageMetrics(packageGraph, packageMeasures, components, betweenness),
+        packageMetrics(packageGraph, packageMeasures, components, betweenness, packageMixes(graph)),
         packageGraph.edges(),
         counters(graph, packageGraph, typeMeasures, packageMeasures, betweenness.isEmpty()));
   }
@@ -100,7 +101,8 @@ public final class StructuralGraphAnalysis {
               measures.pagerank().score(type),
               measures.pagerankOut().score(type),
               measures.cycles().cycleOf(type).orElse(null),
-              packageGraph.bridgeSpan(type)));
+              packageGraph.bridgeSpan(type),
+              graph.resolutionMix(type)));
     }
     return metrics;
   }
@@ -109,7 +111,8 @@ public final class StructuralGraphAnalysis {
       PackageGraph packageGraph,
       Measures measures,
       int[] components,
-      Optional<double[]> betweenness) {
+      Optional<double[]> betweenness,
+      ResolutionMix[] mixes) {
     final Graph<Integer, DefaultEdge> forward = packageGraph.forward();
     final double[] intermediation = betweenness.orElse(null);
     final List<PackageMetrics> metrics = new ArrayList<>(packageGraph.packageCount());
@@ -124,9 +127,20 @@ public final class StructuralGraphAnalysis {
               measures.cycles().cycleOf(pkg).orElse(null),
               components[pkg],
               packageGraph.internalCohesion(pkg),
-              intermediation == null ? null : Double.valueOf(intermediation[pkg])));
+              intermediation == null ? null : Double.valueOf(intermediation[pkg]),
+              mixes[pkg]));
     }
     return metrics;
+  }
+
+  private static ResolutionMix[] packageMixes(StructuralGraph graph) {
+    final ResolutionMix[] mixes = new ResolutionMix[graph.packageCount()];
+    Arrays.fill(mixes, ResolutionMix.NONE);
+    for (int type = 0; type < graph.typeCount(); type++) {
+      final int pkg = graph.packageOf(type);
+      mixes[pkg] = mixes[pkg].plus(graph.resolutionMix(type));
+    }
+    return mixes;
   }
 
   private static GraphCounters counters(

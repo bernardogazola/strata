@@ -16,10 +16,12 @@ public record TypeMetrics(
     double pagerank,
     double pagerankOut,
     Cycle cycle,
-    int bridgeSpan) {
+    int bridgeSpan,
+    ResolutionMix resolutionMix) {
 
   public TypeMetrics {
     Objects.requireNonNull(id, "id");
+    Objects.requireNonNull(resolutionMix, "resolutionMix");
     if (id.kind() != ElementKind.TYPE) {
       throw new IllegalArgumentException("as métricas de tipo pedem um id de tipo: " + id);
     }

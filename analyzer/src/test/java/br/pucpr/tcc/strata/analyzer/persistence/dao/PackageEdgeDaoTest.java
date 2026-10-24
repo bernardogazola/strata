@@ -284,7 +284,10 @@ final class PackageEdgeDaoTest {
               null,
               1,
               0,
-              0.0));
+              0.0,
+              0,
+              0,
+              0));
     }
     final AtomicInteger consultas = new AtomicInteger();
     final AtomicLong naSegundaConsulta = new AtomicLong(-1);

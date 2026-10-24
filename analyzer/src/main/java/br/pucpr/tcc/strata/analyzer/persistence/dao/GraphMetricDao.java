@@ -18,16 +18,18 @@ public final class GraphMetricDao {
                                 fan_in_resolved, fan_out_resolved, fan_out_external,
                                 external_fan_in, pagerank, pagerank_out, scc_id, scc_size,
                                 bridge_span, component_id, internal_cohesion, betweenness,
-                                is_entry_point, entry_point_kind)
+                                is_entry_point, entry_point_kind, resolved_occurrences,
+                                inferred_occurrences, unresolved_external_occurrences)
       VALUES""";
 
-  private static final int COLUMNS = 19;
+  private static final int COLUMNS = 22;
 
   private static final String LIST =
       """
       SELECT element_pk, granularity, fan_in, fan_out, fan_in_resolved, fan_out_resolved,
              fan_out_external, external_fan_in, pagerank, pagerank_out, scc_id, scc_size,
-             bridge_span, component_id, internal_cohesion, betweenness
+             bridge_span, component_id, internal_cohesion, betweenness, resolved_occurrences,
+             inferred_occurrences, unresolved_external_occurrences
         FROM graph_metric
        WHERE analysis_pk = ?
        ORDER BY element_pk""";
@@ -67,6 +69,9 @@ public final class GraphMetricDao {
           bindNullableDouble(statement, first + 16, row.betweenness());
           statement.setNull(first + 17, Types.INTEGER);
           statement.setNull(first + 18, Types.VARCHAR);
+          statement.setLong(first + 19, row.resolvedOccurrences());
+          statement.setLong(first + 20, row.inferredOccurrences());
+          statement.setLong(first + 21, row.unresolvedExternalOccurrences());
         },
         cancelled);
   }
@@ -102,7 +107,10 @@ public final class GraphMetricDao {
         nullableInt(rows, "bridge_span"),
         nullableInt(rows, "component_id"),
         nullableInt(rows, "internal_cohesion"),
-        nullableDouble(rows, "betweenness"));
+        nullableDouble(rows, "betweenness"),
+        rows.getLong("resolved_occurrences"),
+        rows.getLong("inferred_occurrences"),
+        rows.getLong("unresolved_external_occurrences"));
   }
 
   private static void bindNullableDouble(PreparedStatement statement, int index, Double value)

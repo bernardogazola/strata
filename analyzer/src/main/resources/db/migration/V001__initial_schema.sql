@@ -108,6 +108,7 @@ CREATE TABLE code_element (
   simple_name    TEXT    NOT NULL,
   qualified_name TEXT    NOT NULL,
   sort_key       TEXT    NOT NULL,
+  search_name    TEXT,
   type_kind      TEXT    CHECK (type_kind IN
                    ('CLASS','INTERFACE','ENUM','RECORD','ANNOTATION')),
   modifiers      TEXT    NOT NULL DEFAULT '',
@@ -117,13 +118,15 @@ CREATE TABLE code_element (
   file_pk        INTEGER REFERENCES source_file(id) ON DELETE SET NULL,
   start_line     INTEGER,
   end_line       INTEGER,
+  CHECK ((search_name IS NOT NULL) = (kind IN ('PACKAGE','TYPE') AND is_external = 0)),
   UNIQUE (analysis_pk, element_id)
 ) STRICT;
 CREATE INDEX idx_element_parent      ON code_element(analysis_pk, parent_pk, kind, sort_key);
-CREATE INDEX idx_element_name        ON code_element(analysis_pk, simple_name);
 CREATE INDEX idx_element_file        ON code_element(file_pk);
 CREATE INDEX idx_fk_element_parent   ON code_element(parent_pk);
 CREATE INDEX idx_fk_element_root     ON code_element(source_root_pk);
+CREATE INDEX idx_element_search      ON code_element(analysis_pk, search_name, kind, element_id)
+  WHERE kind IN ('PACKAGE','TYPE') AND is_external = 0;
 
 CREATE TABLE dependency (
   id          INTEGER PRIMARY KEY,
@@ -209,6 +212,9 @@ CREATE TABLE graph_metric (
   betweenness       REAL    CHECK (betweenness BETWEEN 0 AND 1e308),
   is_entry_point    INTEGER CHECK (is_entry_point IN (0,1)),
   entry_point_kind  TEXT,
+  resolved_occurrences            INTEGER NOT NULL CHECK (resolved_occurrences >= 0),
+  inferred_occurrences            INTEGER NOT NULL CHECK (inferred_occurrences >= 0),
+  unresolved_external_occurrences INTEGER NOT NULL CHECK (unresolved_external_occurrences >= 0),
   CHECK ((scc_id IS NULL) = (scc_size IS NULL)),
   CHECK ((granularity = 'TYPE') = (fan_in_resolved IS NOT NULL)),
   CHECK ((fan_in_resolved IS NULL) = (fan_out_resolved IS NULL)),

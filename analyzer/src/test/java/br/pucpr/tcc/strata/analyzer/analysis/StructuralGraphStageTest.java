@@ -341,9 +341,28 @@ final class StructuralGraphStageTest {
         inteiro(linha.get("bridge_span")),
         inteiro(linha.get("component_id")),
         inteiro(linha.get("internal_cohesion")),
-        linha.get("betweenness") == null
-            ? null
-            : ((Number) linha.get("betweenness")).doubleValue());
+        linha.get("betweenness") == null ? null : ((Number) linha.get("betweenness")).doubleValue(),
+        numero(linha.get("resolved_occurrences")),
+        numero(linha.get("inferred_occurrences")),
+        numero(linha.get("unresolved_external_occurrences")));
+  }
+
+  private static Map<String, String> misturas(List<Map<String, Object>> linhas) {
+    final Map<String, String> porId = new LinkedHashMap<>();
+    for (final Map<String, Object> linha : linhas) {
+      porId.put(
+          (String) linha.get("element_id"),
+          "R=%s I=%s U=%s"
+              .formatted(
+                  valor(linha, "resolved_occurrences"),
+                  valor(linha, "inferred_occurrences"),
+                  valor(linha, "unresolved_external_occurrences")));
+    }
+    return porId;
+  }
+
+  private static String mistura(int resolved, int inferred, int unresolvedExternal) {
+    return "R=%d I=%d U=%d".formatted(resolved, inferred, unresolvedExternal);
   }
 
   private static String retratoDeAresta(Map<String, Object> linha) {
@@ -549,6 +568,27 @@ final class StructuralGraphStageTest {
     aDaoLeAsArestasGravadas(analise, linhas);
   }
 
+  @Test
+  void aMisturaDeResolucaoDoCyclicEhADerivadaAMaoDoGolden() throws Exception {
+    final Analise analise = analisarComOGrafo(fixture("cyclic"), defaults());
+
+    completou(analise);
+    final List<Map<String, Object>> linhas = metricas(analise);
+    final Map<String, String> esperado = new LinkedHashMap<>();
+    esperado.put("pkg:com.x.app", mistura(4, 0, 0));
+    esperado.put("pkg:com.x.billing", mistura(6, 0, 0));
+    esperado.put("pkg:com.x.orders", mistura(3, 0, 0));
+    esperado.put("pkg:com.x.orders.dto", mistura(3, 0, 0));
+    esperado.put("type:com.x.app.Main", mistura(4, 0, 0));
+    esperado.put("type:com.x.billing.Invoice", mistura(2, 0, 0));
+    esperado.put("type:com.x.billing.Ledger", mistura(2, 0, 0));
+    esperado.put("type:com.x.billing.Posting", mistura(2, 0, 0));
+    esperado.put("type:com.x.orders.Order", mistura(3, 0, 0));
+    esperado.put("type:com.x.orders.dto.OrderDto", mistura(3, 0, 0));
+    assertThat(misturas(linhas)).containsExactlyEntriesOf(esperado);
+    aDaoLeOQueEstaGravado(analise, linhas);
+  }
+
   private static String t(String nome) {
     return "type:br.pucpr.legacy." + nome;
   }
@@ -688,6 +728,36 @@ final class StructuralGraphStageTest {
     final List<Map<String, Object>> linhas = arestas(analise);
     assertThat(retratosDeAresta(linhas)).containsExactlyEntriesOf(esperado);
     aDaoLeAsArestasGravadas(analise, linhas);
+  }
+
+  @Test
+  void aMisturaDeResolucaoDoMultiModuleEhADerivadaAMao() throws Exception {
+    final Analise analise = analisarComOGrafo(fixture("multi-module"), defaults());
+
+    assertThat(paresDasLinhas(analise)).isEqualTo(paresDoMultiModulePadrao());
+    completou(analise);
+    final List<Map<String, Object>> linhas = metricas(analise);
+    final Map<String, String> esperado = new LinkedHashMap<>();
+    esperado.put(p("api"), mistura(4, 11, 0));
+    esperado.put(p("core"), mistura(8, 0, 0));
+    esperado.put(p("core.gen"), mistura(1, 0, 0));
+    esperado.put(p("core.spi"), mistura(5, 0, 0));
+    esperado.put(t("api.CatalogEndpoint"), mistura(1, 7, 0));
+    esperado.put(t("api.Main"), mistura(3, 4, 0));
+    esperado.put(t("core.Audited"), mistura(0, 0, 0));
+    esperado.put(t("core.Catalog"), mistura(6, 0, 0));
+    esperado.put(t("core.CatalogEntry"), mistura(2, 0, 0));
+    esperado.put(t("core.Kind"), mistura(0, 0, 0));
+    esperado.put(t("core.gen.CatalogMetadata"), mistura(1, 0, 0));
+    esperado.put(t("core.spi.MemoryStore"), mistura(3, 0, 0));
+    esperado.put(t("core.spi.Store"), mistura(2, 0, 0));
+    assertThat(misturas(linhas)).containsExactlyEntriesOf(esperado);
+    aDaoLeOQueEstaGravado(analise, linhas);
+    final JsonNode extracao =
+        analise.concluidos().get("SOURCE_ANALYSIS").payload().path("counters");
+    assertThat(extracao.path("resolvedRefs").asLong()).isEqualTo(18);
+    assertThat(extracao.path("inferredRefs").asLong()).isEqualTo(11);
+    assertThat(extracao.path("unresolvedRefs").asLong()).isZero();
   }
 
   private static Map<String, String> ocorrenciasPorAresta(Analise analise) throws Exception {

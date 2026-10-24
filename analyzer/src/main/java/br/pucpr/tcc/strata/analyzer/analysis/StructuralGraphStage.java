@@ -5,6 +5,7 @@ import br.pucpr.tcc.strata.analyzer.graph.Cycle;
 import br.pucpr.tcc.strata.analyzer.graph.GraphInput;
 import br.pucpr.tcc.strata.analyzer.graph.PackageEdge;
 import br.pucpr.tcc.strata.analyzer.graph.PackageMetrics;
+import br.pucpr.tcc.strata.analyzer.graph.ResolutionMix;
 import br.pucpr.tcc.strata.analyzer.graph.StructuralGraphAnalysis;
 import br.pucpr.tcc.strata.analyzer.graph.StructuralGraphResult;
 import br.pucpr.tcc.strata.analyzer.graph.TypeMetrics;
@@ -126,6 +127,7 @@ public final class StructuralGraphStage implements StageExecutor {
 
   private static GraphMetricRow typeRow(long pk, TypeMetrics type) {
     final Cycle cycle = type.cycle();
+    final ResolutionMix mix = type.resolutionMix();
     return new GraphMetricRow(
         pk,
         ElementKind.TYPE,
@@ -142,11 +144,15 @@ public final class StructuralGraphStage implements StageExecutor {
         type.bridgeSpan(),
         null,
         null,
-        null);
+        null,
+        mix.resolved(),
+        mix.inferred(),
+        mix.unresolvedExternal());
   }
 
   private static GraphMetricRow packageRow(long pk, PackageMetrics pkg) {
     final Cycle cycle = pkg.cycle();
+    final ResolutionMix mix = pkg.resolutionMix();
     return new GraphMetricRow(
         pk,
         ElementKind.PACKAGE,
@@ -163,7 +169,10 @@ public final class StructuralGraphStage implements StageExecutor {
         null,
         pkg.componentId(),
         pkg.internalCohesion(),
-        pkg.betweenness());
+        pkg.betweenness(),
+        mix.resolved(),
+        mix.inferred(),
+        mix.unresolvedExternal());
   }
 
   private static List<PackageEdgeRow> edgeRows(
