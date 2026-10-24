@@ -25,6 +25,8 @@ final class ArchitectureRulesTest {
 
   private static final String PACOTE_DO_GRAFO = "br.pucpr.tcc.strata.analyzer.graph..";
 
+  private static final String PACOTE_DA_ESTRUTURA = "br.pucpr.tcc.strata.analyzer.structure..";
+
   private static final Set<String> PESOS =
       Set.of(
           "br.pucpr.tcc.strata.analyzer.sourceanalysis.DependencyAggregator#weightOf",
@@ -123,6 +125,18 @@ final class ArchitectureRulesTest {
               "o grafo é simples e sem peso: um peso no PageRank premiaria o laço mais tagarela, e"
                   + " a intermediação o leria como distância");
 
+  @ArchTest
+  static final ArchRule aEstruturaNaoDependeDoProtocoloNemDoPipeline =
+      noClasses()
+          .that()
+          .resideInAPackage(PACOTE_DA_ESTRUTURA)
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage("..protocol..", PACOTE_DO_PIPELINE)
+          .because(
+              "a consulta é uma função da conexão e devolve valores; o handler abre a unidade e"
+                  + " fala o fio");
+
   private static ArchRule semPeso(String pacote) {
     return noClasses().that().resideInAPackage(pacote).should().accessTargetWhere(UM_PESO);
   }
@@ -168,7 +182,11 @@ final class ArchitectureRulesTest {
         .contains("br.pucpr.tcc.strata.analyzer.graph.StructuralGraphAnalysis")
         .contains("br.pucpr.tcc.strata.analyzer.sourceanalysis.DependencyAggregator")
         .contains("br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyEdge")
-        .contains("br.pucpr.tcc.strata.analyzer.persistence.DependencyFlush");
+        .contains("br.pucpr.tcc.strata.analyzer.persistence.DependencyFlush")
+        .as("os dois lados da décima regra, a do structure/")
+        .contains("br.pucpr.tcc.strata.analyzer.structure.GraphSliceQuery")
+        .contains("br.pucpr.tcc.strata.analyzer.structure.GraphLevel")
+        .contains("br.pucpr.tcc.strata.analyzer.protocol.method.GraphSlice");
   }
 
   @Test
@@ -217,6 +235,20 @@ final class ArchitectureRulesTest {
                 assertThat(detalhe)
                     .contains("br.pucpr.tcc.strata.analyzer.analysis.RunInputs")
                     .contains("br.pucpr.tcc.strata.analyzer.repository.ValidatedRepository"));
+  }
+
+  @Test
+  void aFronteiraInvertidaDaEstruturaReprovaNoGraphSlice() {
+    final EvaluationResult invertida =
+        semDependencia("..protocol..", PACOTE_DA_ESTRUTURA).evaluate(importar());
+
+    assertThat(invertida.hasViolation()).isTrue();
+    assertThat(invertida.getFailureReport().getDetails())
+        .anySatisfy(
+            detalhe ->
+                assertThat(detalhe)
+                    .contains("br.pucpr.tcc.strata.analyzer.protocol.method.GraphSlice")
+                    .contains("br.pucpr.tcc.strata.analyzer.structure.GraphLevel"));
   }
 
   @Test

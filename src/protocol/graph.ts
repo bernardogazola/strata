@@ -4,6 +4,7 @@ import {
   elementKindSchema,
   type GraphLevel,
   graphLevelSchema,
+  graphNodeKindSchema,
   resolutionQualitySchema,
   typeKindSchema,
 } from "./enums";
@@ -12,6 +13,7 @@ import {
   elementIdSchema,
   elementLabelSchema,
   filePathSchema,
+  graphNodeIdSchema,
   pageOf,
   qualifiedNameSchema,
 } from "./primitives";
@@ -25,8 +27,8 @@ export const resolutionMixSchema = z.strictObject({
 export const graphNodeSchema = z.strictObject({
   fanIn: z.number().int().nonnegative(),
   fanOut: z.number().int().nonnegative(),
-  id: elementIdSchema,
-  kind: elementKindSchema,
+  id: graphNodeIdSchema,
+  kind: graphNodeKindSchema,
   label: elementLabelSchema,
   loc: z.number().int().nonnegative(),
   pagerank: z.number().min(0).max(1),
@@ -38,8 +40,8 @@ export type GraphNode = z.infer<typeof graphNodeSchema>;
 export const graphEdgeSchema = z.strictObject({
   id: edgeIdSchema,
   resolution: resolutionQualitySchema,
-  source: elementIdSchema,
-  target: elementIdSchema,
+  source: graphNodeIdSchema,
+  target: graphNodeIdSchema,
   types: z.partialRecord(dependencyTypeSchema, z.number().int().positive()),
   weight: z.number().int().nonnegative(),
 });

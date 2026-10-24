@@ -8,10 +8,8 @@ import {
   type CacheInvalidationReason,
   cacheInvalidationReasonSchema,
   dependencyDirectionSchema,
-  dependencyTypeSchema,
   elementKindSchema,
   graphLevelSchema,
-  resolutionQualitySchema,
   stageStatusSchema,
 } from "./enums";
 import {
@@ -155,10 +153,8 @@ export const METHODS = {
   "graph.slice": {
     params: z.strictObject({
       analysisId: analysisIdSchema,
-      edgeTypes: z.array(dependencyTypeSchema).optional(),
       level: graphLevelSchema,
-      limit: z.number().int().positive().max(5000).optional(),
-      minResolution: resolutionQualitySchema.optional(),
+      limit: z.number().int().positive().max(1000).optional(),
       parentId: elementIdSchema.optional(),
     }),
     requiresRepository: false,

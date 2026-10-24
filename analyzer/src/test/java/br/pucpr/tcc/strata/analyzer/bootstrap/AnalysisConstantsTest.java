@@ -40,6 +40,27 @@ final class AnalysisConstantsTest {
   }
 
   @Test
+  void osLimitesDasLeiturasDaFase31SaoEcoadosNosMetadados() {
+    assertThat(AnalysisConstants.asMetadata())
+        .containsAllEntriesOf(
+            Map.ofEntries(
+                Map.entry("GRAPH_SLICE_PACKAGE_MAX_NODES", 300),
+                Map.entry("GRAPH_SLICE_PACKAGE_MAX_EDGES", 1_200),
+                Map.entry("GRAPH_SLICE_TYPE_MAX_NODES", 1_000),
+                Map.entry("GRAPH_SLICE_TYPE_MAX_EDGES", 5_000),
+                Map.entry("OUTLINE_PAGE_DEFAULT", 200),
+                Map.entry("OUTLINE_PAGE_MAX", 500),
+                Map.entry("SEARCH_RESULTS_MAX", 50),
+                Map.entry("MAX_CURSOR_CHARS", 256),
+                Map.entry("MAX_SEARCH_QUERY_CODE_POINTS", 128)))
+        .doesNotContainKeys(
+            "GRAPH_SLICE_EXCEPTIONAL_MAX_NODES",
+            "GRAPH_SLICE_EXCEPTIONAL_MAX_EDGES",
+            "MAX_CURSOR_BYTES",
+            "MAX_SEARCH_QUERY_CHARS");
+  }
+
+  @Test
   void oTetoDeEntradasDoBancoDeObjetosSubstituiODeObjetosSoltos() {
     assertThat(AnalysisConstants.asMetadata()).doesNotContainKey("MAX_LOOSE_OBJECTS");
   }

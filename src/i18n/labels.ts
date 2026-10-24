@@ -14,6 +14,7 @@ import type {
   ElementKind,
   EntryPointKind,
   GraphLevel,
+  GraphNodeKind,
   HistoryScope,
   HotspotDimension,
   HotspotEvidenceCode,
@@ -110,6 +111,12 @@ export const elementKindLabels = {
   PACKAGE: "pacote",
   TYPE: "tipo",
 } as const satisfies Record<ElementKind, string>;
+
+export const graphNodeKindLabels = {
+  PACKAGE: "pacote",
+  PACKAGE_PREFIX: "grupo de pacotes",
+  TYPE: "tipo",
+} as const satisfies Record<GraphNodeKind, string>;
 
 export const stageStatusLabels = {
   CANCELLED: "cancelada",

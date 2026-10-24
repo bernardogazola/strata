@@ -3,7 +3,7 @@ import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
 import { countPhrase } from "@/features/repository/count-phrase";
 import { formatInteger } from "@/i18n/format";
-import { elementKindLabels } from "@/i18n/labels";
+import { graphNodeKindLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
 import { DEFAULT_UNTRUSTED_MAX_CHARS } from "@/lib/untrusted";
 import { cn } from "@/lib/utils";
@@ -79,7 +79,7 @@ function SelectedNode({
           <dt className="sr-only">{t.inspector.kind}</dt>
           <dd className="flex items-center gap-1.5">
             <ElementKindIcon kind={node.kind} />
-            <span className="capitalize">{elementKindLabels[node.kind]}</span>
+            <span className="capitalize">{graphNodeKindLabels[node.kind]}</span>
           </dd>
         </dl>
         <h2 className="break-words font-medium text-lg" id={titleId}>

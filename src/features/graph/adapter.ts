@@ -5,7 +5,7 @@ import type {
 } from "cytoscape";
 import { t } from "@/i18n/messages";
 import { clampText, sanitizeUntrusted } from "@/lib/untrusted";
-import type { ElementKind } from "@/protocol/enums";
+import type { ElementKind, GraphNodeKind } from "@/protocol/enums";
 import {
   GRAPH_SLICE_BUDGETS,
   type GraphEdge,
@@ -133,7 +133,7 @@ const assertIdentity = ({ edges, nodes }: GraphSlice): void => {
 };
 
 export const elementDisplayLabel = (
-  kind: ElementKind,
+  kind: ElementKind | GraphNodeKind,
   label: string,
   maxChars: number = GRAPH_LABEL_MAX_CHARS
 ): string => {

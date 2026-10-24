@@ -50,6 +50,13 @@ export type TypeKind = z.infer<typeof typeKindSchema>;
 export const elementKindSchema = z.enum(["PACKAGE", "TYPE", "METHOD", "FILE"]);
 export type ElementKind = z.infer<typeof elementKindSchema>;
 
+export const graphNodeKindSchema = z.enum([
+  "PACKAGE",
+  "TYPE",
+  "PACKAGE_PREFIX",
+]);
+export type GraphNodeKind = z.infer<typeof graphNodeKindSchema>;
+
 export const stageStatusSchema = z.enum([
   "PENDING",
   "RUNNING",

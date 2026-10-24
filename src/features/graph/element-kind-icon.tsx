@@ -1,8 +1,8 @@
 import { cn } from "@/lib/utils";
-import type { ElementKind } from "@/protocol/enums";
+import type { ElementKind, GraphNodeKind } from "@/protocol/enums";
 import { NODE_SHAPES } from "./stylesheet";
 
-type NodeShape = (typeof NODE_SHAPES)[ElementKind];
+type NodeShape = (typeof NODE_SHAPES)[ElementKind | GraphNodeKind];
 
 const SHAPE_CLASS = {
   ellipse: "size-[9px] rounded-full",
@@ -10,7 +10,7 @@ const SHAPE_CLASS = {
 } as const satisfies Record<NodeShape, string>;
 
 export interface ElementKindIconProps {
-  readonly kind: ElementKind;
+  readonly kind: ElementKind | GraphNodeKind;
 
   readonly selected?: boolean;
 }

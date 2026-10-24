@@ -122,6 +122,24 @@ public final class AnalysisConstants {
 
   public static final int GRAPH_READ_CHECK_STRIDE_ROWS = 8_192;
 
+  public static final int GRAPH_SLICE_PACKAGE_MAX_NODES = 300;
+
+  public static final int GRAPH_SLICE_PACKAGE_MAX_EDGES = 1_200;
+
+  public static final int GRAPH_SLICE_TYPE_MAX_NODES = 1_000;
+
+  public static final int GRAPH_SLICE_TYPE_MAX_EDGES = 5_000;
+
+  public static final int OUTLINE_PAGE_DEFAULT = 200;
+
+  public static final int OUTLINE_PAGE_MAX = 500;
+
+  public static final int SEARCH_RESULTS_MAX = 50;
+
+  public static final int MAX_CURSOR_CHARS = 256;
+
+  public static final int MAX_SEARCH_QUERY_CODE_POINTS = 128;
+
   private AnalysisConstants() {}
 
   public static Map<String, Object> asMetadata() {

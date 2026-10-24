@@ -56,6 +56,15 @@ export const elementIdSchema = z
   .regex(/^(?:pkg:|type:|method:|file:)/);
 export type ElementId = z.infer<typeof elementIdSchema>;
 
+export const prefixIdSchema = z
+  .string()
+  .max(4096)
+  .regex(/^pfx:[^.]+(?:\.[^.]+)*$/);
+export type PrefixId = z.infer<typeof prefixIdSchema>;
+
+export const graphNodeIdSchema = z.union([elementIdSchema, prefixIdSchema]);
+export type GraphNodeId = z.infer<typeof graphNodeIdSchema>;
+
 export const cursorSchema = z.base64url().min(1).max(256);
 export type Cursor = z.infer<typeof cursorSchema>;
 
