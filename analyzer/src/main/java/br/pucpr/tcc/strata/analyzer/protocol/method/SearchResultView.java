@@ -14,7 +14,16 @@ public record SearchResultView(List<Hit> results) {
   }
 
   public static SearchResultView of(List<SearchHit> hits) {
-    throw new UnsupportedOperationException("ainda não implementado: graph.search (no fio)");
+    return new SearchResultView(hits.stream().map(SearchResultView::hit).toList());
+  }
+
+  private static Hit hit(SearchHit hit) {
+    return new Hit(
+        hit.elementId().value(),
+        hit.kind(),
+        hit.label(),
+        hit.packageId() == null ? null : hit.packageId().value(),
+        hit.qualifiedName());
   }
 
   public record Hit(

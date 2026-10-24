@@ -1,5 +1,6 @@
 package br.pucpr.tcc.strata.analyzer.structure;
 
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
 import java.util.Objects;
 
 public record PackageGroup(String name, boolean isPrefix) {
@@ -20,10 +21,10 @@ public record PackageGroup(String name, boolean isPrefix) {
   }
 
   public String nodeId() {
-    throw new UnsupportedOperationException("ainda não implementado: o agrupamento de pacotes");
+    return isPrefix ? SliceNode.PREFIX_ID_PREFIX + name : CodeElementId.ofPackage(name).value();
   }
 
   public GraphNodeKind kind() {
-    throw new UnsupportedOperationException("ainda não implementado: o agrupamento de pacotes");
+    return isPrefix ? GraphNodeKind.PACKAGE_PREFIX : GraphNodeKind.PACKAGE;
   }
 }

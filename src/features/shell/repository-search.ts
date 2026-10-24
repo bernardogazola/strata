@@ -9,6 +9,7 @@ import type { SearchHit } from "@/protocol/graph";
 import {
   analysisIdSchema,
   elementIdSchema,
+  graphNodeIdSchema,
   type RepositoryHandle,
   repositoryHandleSchema,
 } from "@/protocol/primitives";
@@ -33,7 +34,7 @@ export const REPOSITORY_SEARCH_DEFAULTS = {
 export const repositorySearchSchema = z.object({
   analysis: analysisIdSchema.optional().catch(undefined),
 
-  focus: elementIdSchema.optional().catch(undefined),
+  focus: graphNodeIdSchema.optional().catch(undefined),
 
   level: graphLevelSchema.default("PACKAGE").catch("PACKAGE"),
 

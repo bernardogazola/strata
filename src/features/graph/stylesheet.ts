@@ -76,7 +76,7 @@ export const NODE_SHAPES = {
   FILE: "ellipse",
   METHOD: "ellipse",
   PACKAGE: "round-rectangle",
-  PACKAGE_PREFIX: "round-rectangle",
+  PACKAGE_PREFIX: "round-hexagon",
   TYPE: "ellipse",
 } as const satisfies Record<ElementKind | GraphNodeKind, Css.NodeShape>;
 

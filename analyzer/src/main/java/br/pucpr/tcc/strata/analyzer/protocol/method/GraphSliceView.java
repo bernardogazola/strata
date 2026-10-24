@@ -1,10 +1,13 @@
 package br.pucpr.tcc.strata.analyzer.protocol.method;
 
+import br.pucpr.tcc.strata.analyzer.graph.ResolutionMix;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyType;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ResolutionQuality;
 import br.pucpr.tcc.strata.analyzer.structure.GraphLevel;
 import br.pucpr.tcc.strata.analyzer.structure.GraphNodeKind;
 import br.pucpr.tcc.strata.analyzer.structure.Slice;
+import br.pucpr.tcc.strata.analyzer.structure.SliceEdge;
+import br.pucpr.tcc.strata.analyzer.structure.SliceNode;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +32,34 @@ public record GraphSliceView(
   }
 
   public static GraphSliceView of(Slice slice) {
-    throw new UnsupportedOperationException("ainda não implementado: graph.slice (no fio)");
+    return new GraphSliceView(
+        slice.aggregated(),
+        new Budget(slice.budget().edges(), slice.budget().nodes()),
+        slice.edges().stream().map(GraphSliceView::edge).toList(),
+        slice.level(),
+        slice.nodes().stream().map(GraphSliceView::node).toList(),
+        slice.parentId() == null ? null : slice.parentId().value(),
+        new Totals(slice.totals().edges(), slice.totals().nodes()),
+        slice.truncated());
+  }
+
+  private static Node node(SliceNode node) {
+    final ResolutionMix mix = node.mix();
+    return new Node(
+        node.fanIn(),
+        node.fanOut(),
+        node.id(),
+        node.kind(),
+        node.label(),
+        node.loc(),
+        node.pagerank(),
+        new Mix(mix.inferred(), mix.resolved(), mix.unresolvedExternal()),
+        node.typeCount());
+  }
+
+  private static Edge edge(SliceEdge edge) {
+    return new Edge(
+        edge.id(), edge.resolution(), edge.source(), edge.target(), edge.types(), edge.weight());
   }
 
   public record Budget(int edges, int nodes) {}

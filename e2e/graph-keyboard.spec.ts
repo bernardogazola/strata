@@ -48,6 +48,7 @@ const SELECTED_BORDER_WIDTH = `${GRAPH_STYLE.node.selectedBorderWidth}px`;
 
 const MAX_TAB_STOPS = 11;
 const CLOSE_STOP: TabStop = { name: t.header.close, role: "button" };
+const AGAIN_STOP: TabStop = { name: t.analysis.again, role: "button" };
 const THEME_STOP: TabStop = { name: t.theme.label, role: "button" };
 const SEARCH_STOP: TabStop = { name: t.search.label, role: "searchbox" };
 const ROOT_CRUMB_STOP: TabStop = {
@@ -137,7 +138,7 @@ test.describe("A estrutura da arquitetura pelo teclado, par do canvas", () => {
 
     expect(
       await tabUntil(page, tabbableRow(page), MAX_TAB_STOPS)
-    ).toStrictEqual([CLOSE_STOP, THEME_STOP, SEARCH_STOP]);
+    ).toStrictEqual([AGAIN_STOP, CLOSE_STOP, THEME_STOP, SEARCH_STOP]);
     await expect(rowOf(page, FIRST_ID)).toBeFocused();
     await expect
       .poll(() => styleOf(page, FIRST_ID, "border-width"))
@@ -163,7 +164,13 @@ test.describe("A estrutura da arquitetura pelo teclado, par do canvas", () => {
 
     expect(
       await tabUntil(page, tabbableRow(page), MAX_TAB_STOPS)
-    ).toStrictEqual([ROOT_CRUMB_STOP, CLOSE_STOP, THEME_STOP, SEARCH_STOP]);
+    ).toStrictEqual([
+      ROOT_CRUMB_STOP,
+      AGAIN_STOP,
+      CLOSE_STOP,
+      THEME_STOP,
+      SEARCH_STOP,
+    ]);
     await expect(drilled).toBeFocused();
   });
 

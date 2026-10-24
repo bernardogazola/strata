@@ -15,6 +15,7 @@ export interface ErrorParamsByCode {
   CACHE_CORRUPT: Record<string, never>;
   CACHE_MIGRATION_FAILED: { fromVersion: number; toVersion: number };
   CACHE_UNAVAILABLE: { cause: CacheUnavailableCause };
+  ELEMENT_NOT_FOUND: Record<string, never>;
   INTERNAL_UNEXPECTED: Record<string, never>;
   PROC_ANALYZER_CRASHED: { exitCode: number | null };
   PROC_ANALYZER_NOT_FOUND: Record<string, never>;
@@ -59,6 +60,7 @@ export const errorParamsSchemaByCode = {
     toVersion: z.number().int().nonnegative(),
   }),
   CACHE_UNAVAILABLE: z.object({ cause: cacheUnavailableCauseSchema }),
+  ELEMENT_NOT_FOUND: z.object({}),
   INTERNAL_UNEXPECTED: z.object({}),
   PROC_ANALYZER_CRASHED: z.object({ exitCode: z.number().int().nullable() }),
   PROC_ANALYZER_NOT_FOUND: z.object({}),

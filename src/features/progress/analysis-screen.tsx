@@ -22,6 +22,7 @@ import {
   type AnalysisChipState,
   AppHeader,
   type AppHeaderProps,
+  type AppHeaderRepository,
 } from "@/features/shell/app-header";
 import { useFocusTitleOnScreenChange } from "@/features/shell/focus-title";
 import { leaveAnalysis } from "@/features/shell/repository-search";
@@ -36,7 +37,7 @@ import {
   repositoryDescribeQueryOptions,
 } from "@/queries/options";
 import { selectAnalyzerUsable, useAppStore } from "@/state/app-store";
-import { AnalysisSummary, MapUnavailableCard } from "./analysis-summary";
+import { AnalysisSummary } from "./analysis-summary";
 import { StageProgress } from "./stage-progress";
 import type { StageTicks } from "./stage-rows";
 
@@ -72,6 +73,7 @@ const useNow = (): number => {
 };
 
 const isMapReady = (report: AnalysisStatusReport): boolean =>
+  (report.status === "RUNNING" || report.status === "COMPLETED") &&
   report.stages.some(
     (stage) =>
       stage.stage === "STRUCTURAL_GRAPH" && stage.status === "COMPLETED"
@@ -346,8 +348,12 @@ export function AnalysisScreen({
   const interrupted = view.kind === "running" && !backendReady;
   const chip =
     view.kind === "gone" || interrupted ? null : chipStateOf(status.data);
+  const repository: AppHeaderRepository = {
+    displayName: describe.data?.displayName,
+    onClose,
+  };
   const header: AnalysisHeader = {
-    repository: { displayName: describe.data?.displayName, onClose },
+    repository,
     status: chip === null ? undefined : <AnalysisChip state={chip} />,
   };
 
@@ -358,9 +364,13 @@ export function AnalysisScreen({
   );
 
   if (view.kind === "workspace") {
+    const workspaceHeader: AnalysisHeader = {
+      ...header,
+      repository: { ...repository, onAnalyzeAgain },
+    };
     return (
       <>
-        <Workspace header={header} report={view.report} />
+        <Workspace header={workspaceHeader} report={view.report} />
         {announcer}
       </>
     );
@@ -413,11 +423,7 @@ export function AnalysisScreen({
           onAnalyzeAgain={onAnalyzeAgain}
           report={view.report}
           warnings={warnings}
-        >
-          {view.report.status === "COMPLETED" ? (
-            <MapUnavailableCard report={view.report} />
-          ) : null}
-        </AnalysisSummary>
+        />
       );
       break;
     default:

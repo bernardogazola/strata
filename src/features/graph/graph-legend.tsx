@@ -3,7 +3,7 @@ import { sentenceCase } from "@/i18n/format";
 import { resolutionQualityLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
-import { resolutionQualitySchema } from "@/protocol/enums";
+import type { ResolutionQuality } from "@/protocol/enums";
 import {
   EDGE_LINES,
   type EdgeLine,
@@ -13,21 +13,34 @@ import {
 
 const LEGEND_KINDS = [
   "PACKAGE",
+  "PACKAGE_PREFIX",
   "TYPE",
 ] as const satisfies readonly (keyof typeof t.graph.legend.kindShapes)[];
 
 type LegendKind = (typeof LEGEND_KINDS)[number];
 type LegendShape = (typeof NODE_SHAPES)[LegendKind];
 
+const WIRE_EDGE_QUALITIES = [
+  "RESOLVED",
+  "INFERRED",
+] as const satisfies readonly ResolutionQuality[];
+
 const SAMPLE_EDGE_WIDTH = 1.5;
 
 const SHAPE_GLYPHS = {
   ellipse: <circle cx="8" cy="8" r="6" />,
+  "round-hexagon": (
+    <polygon
+      points="4.5,2 1,8 4.5,14 11.5,14 15,8 11.5,2"
+      strokeLinejoin="round"
+    />
+  ),
   "round-rectangle": <rect height="12" rx="3" width="14" x="1" y="2" />,
 } as const satisfies Record<LegendShape, ReactElement>;
 
 const KIND_FILLS = {
   PACKAGE: "fill-(--graph-node-package)",
+  PACKAGE_PREFIX: "fill-(--graph-node-package)",
   TYPE: "fill-(--graph-node)",
 } as const satisfies Record<LegendKind, string>;
 
@@ -103,8 +116,15 @@ const GROUP_CLASS = "flex items-center";
 const LIST_CLASS = "flex flex-wrap items-center gap-x-5 gap-y-1";
 const ITEM_CLASS = "flex items-center gap-1.5 whitespace-nowrap";
 
-export function GraphLegend() {
+export interface GraphLegendProps {
+  readonly drawsGroups?: boolean;
+}
+
+export function GraphLegend({ drawsGroups = false }: GraphLegendProps) {
   const titleId = useId();
+  const kinds = LEGEND_KINDS.filter(
+    (kind) => drawsGroups || kind !== "PACKAGE_PREFIX"
+  );
 
   return (
     <section
@@ -118,7 +138,7 @@ export function GraphLegend() {
       <div className={GROUP_CLASS}>
         <h3 className="sr-only">{t.graph.legend.kind}</h3>
         <ul className={LIST_CLASS}>
-          {LEGEND_KINDS.map((kind) => (
+          {kinds.map((kind) => (
             <li className={ITEM_CLASS} key={kind}>
               <NodeSample kind={kind} selected={false} />
               <ItemName
@@ -140,7 +160,7 @@ export function GraphLegend() {
       <div className={GROUP_CLASS}>
         <h3 className="sr-only">{t.graph.legend.resolution}</h3>
         <ul className={LIST_CLASS}>
-          {resolutionQualitySchema.options.map((quality) => (
+          {WIRE_EDGE_QUALITIES.map((quality) => (
             <li className={ITEM_CLASS} key={quality}>
               <EdgeSample line={EDGE_LINES[quality]} />
               {sentenceCase(resolutionQualityLabels[quality])}

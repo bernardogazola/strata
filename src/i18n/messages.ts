@@ -28,27 +28,6 @@ const ptBR = {
     failed: {
       headline: "A análise não terminou",
     },
-    map: {
-      body: {
-        files: {
-          one: "{count} arquivo",
-          other: "{count} arquivos",
-          zero: "nenhum arquivo",
-        },
-        template:
-          "A estrutura do código já foi extraída e salva: {files} e {types}. O mapa aparece aqui quando a etapa do grafo estrutural passar a ser executada.",
-        types: {
-          one: "{count} tipo",
-          other: "{count} tipos",
-          zero: "nenhum tipo",
-        },
-      },
-      bodyNoCounts:
-        "A estrutura do código já foi extraída e salva. O mapa aparece aqui quando a etapa do grafo estrutural passar a ser executada.",
-      pending:
-        "O mapa aparece aqui quando a etapa do grafo estrutural terminar.",
-      title: "O mapa da arquitetura ainda não é montado nesta versão",
-    },
     notFound: {
       body: "O analisador foi reiniciado, e as análises feitas antes disso não podem ser reabertas nesta sessão. Analise o repositório de novo.",
       title: "Esta análise não está mais disponível",
@@ -254,7 +233,14 @@ const ptBR = {
         other: "{count} dependências",
         zero: "nenhuma dependência",
       },
+      groups: {
+        one: "{count} grupo de pacotes",
+        other: "{count} grupos de pacotes",
+        zero: "nenhum grupo de pacotes",
+      },
       label: "Mapa da arquitetura, {level}: {nodes} e {edges}.",
+      labelAggregated:
+        "Mapa da arquitetura, {level}: {groups}, {nodes} e {edges}.",
       nodes: {
         PACKAGE: {
           one: "{count} pacote",
@@ -284,10 +270,12 @@ const ptBR = {
       kind: "Forma do elemento",
       kindNames: {
         PACKAGE: "Pacote",
+        PACKAGE_PREFIX: "Grupo de pacotes",
         TYPE: "Tipo",
       },
       kindShapes: {
         PACKAGE: "Retângulo: pacote",
+        PACKAGE_PREFIX: "Hexágono: grupo de pacotes",
         TYPE: "Círculo: tipo",
       },
       resolution: "Qualidade de resolução",
@@ -298,9 +286,18 @@ const ptBR = {
     loading: "Carregando o mapa…",
     notice: {
       aggregated:
-        "Este repositório tem {total} pacotes, mais do que o primeiro nível comporta. Eles aparecem agrupados pelos prefixos de pacote de topo.",
+        "Este repositório tem {total} pacotes, mais do que o primeiro nível comporta. Eles aparecem agrupados por prefixo de pacote. Use a estrutura da arquitetura ou a busca para abrir um pacote.",
       truncated:
         "Este nível tem mais elementos do que o mapa mostra: {nodesShown} de {nodes} e {edgesShown} de {edges}. O limite de exibição do nível deixou o restante de fora.",
+      truncatedEdges: {
+        shown: {
+          one: "{count} está à vista",
+          other: "{count} estão à vista",
+          zero: "nenhuma está à vista",
+        },
+        template:
+          "Este nível tem mais dependências do que o mapa mostra: {shown}, e o limite de exibição do nível deixou as outras de fora.",
+      },
     },
     retry: "Tentar de novo",
   },
@@ -325,10 +322,14 @@ const ptBR = {
     dependsOn: "Depende de",
     empty: "Selecione um elemento no mapa para ver os detalhes.",
     expand: "Ver os tipos deste pacote",
+    group: {
+      loc: "linhas de código",
+      typeCount: "tipos neste grupo",
+    },
     kind: "Elemento",
     notOnMap: {
       aggregated:
-        "Este pacote não aparece sozinho no mapa: o primeiro nível agrupa os pacotes pelos prefixos de topo.",
+        "Este pacote não aparece sozinho no mapa: o primeiro nível agrupa os pacotes por prefixo. A estrutura da arquitetura e a busca alcançam cada pacote.",
       truncated:
         "Este elemento não aparece no mapa: o limite de exibição do nível o deixou de fora.",
     },

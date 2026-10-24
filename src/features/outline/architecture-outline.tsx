@@ -22,7 +22,7 @@ import {
 import { protocolErrorOf } from "@/bridge/analyzer";
 import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
-import { formatProtocolError } from "@/i18n/errors";
+import { type ErrorMessage, formatProtocolError } from "@/i18n/errors";
 import { t } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 import type { ElementKind } from "@/protocol/enums";
@@ -85,6 +85,16 @@ const elementIdOf = (target: EventTarget | null): string | null => {
   );
 };
 
+const refusalOf = (error: Error | null): ErrorMessage | null => {
+  if (error === null) {
+    return null;
+  }
+  const protocolError = protocolErrorOf(error);
+  return protocolError.code === "ELEMENT_NOT_FOUND"
+    ? formatProtocolError(protocolError)
+    : null;
+};
+
 const useCrossHighlight = (treeRef: RefObject<HTMLDivElement | null>) => {
   const written = useRef<string | null>(null);
   const write = useCallback((elementId: string) => {
@@ -122,6 +132,8 @@ const useCrossHighlight = (treeRef: RefObject<HTMLDivElement | null>) => {
 
 interface OutlineTreeProps {
   readonly busy: boolean;
+
+  readonly childrenRefusal: ErrorMessage | null;
   readonly expandedId: string | null;
   readonly focus: string | null;
   readonly headingId: string;
@@ -140,6 +152,7 @@ interface OutlineTreeProps {
 
 function OutlineTree({
   busy,
+  childrenRefusal,
   expandedId,
   focus,
   headingId,
@@ -263,6 +276,9 @@ function OutlineTree({
         }
         onLoadMore(row.parentId);
       } else if (row?.type === "error") {
+        if (row.parentId !== null && childrenRefusal !== null) {
+          return;
+        }
         const previous = rows[index - 1];
         if (previous !== undefined) {
           setFocusTarget({ after: previous.key, waitingOn: row.key });
@@ -270,7 +286,15 @@ function OutlineTree({
         onRetry(row.parentId);
       }
     },
-    [armRefocus, onLoadMore, onRetry, onSelect, rows, view.level]
+    [
+      armRefocus,
+      childrenRefusal,
+      onLoadMore,
+      onRetry,
+      onSelect,
+      rows,
+      view.level,
+    ]
   );
 
   const run = useCallback(
@@ -440,6 +464,11 @@ function OutlineTree({
               focus={focus}
               index={index}
               key={row.key}
+              refusal={
+                row.type === "error" && row.parentId !== null
+                  ? childrenRefusal
+                  : null
+              }
               row={row}
               start={start}
               tabbable={index === tabbableIndex}
@@ -503,7 +532,11 @@ export function ArchitectureOutline({
   const headingRef = useRef<HTMLHeadingElement>(null);
   const treeRef = useRef<HTMLDivElement>(null);
   const outline = useOutline(analysisId, view, focus);
-  const { retry, rootError, rootStatus, rows } = outline;
+  const { childrenError, retry, rootError, rootStatus, rows } = outline;
+  const childrenRefusal = useMemo(
+    () => refusalOf(childrenError),
+    [childrenError]
+  );
 
   useImperativeHandle(
     ref,
@@ -529,6 +562,7 @@ export function ArchitectureOutline({
         </p>
         <OutlineTree
           busy={outline.busy}
+          childrenRefusal={childrenRefusal}
           expandedId={outline.expandedId}
           focus={focus}
           headingId={headingId}

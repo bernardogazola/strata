@@ -12,7 +12,11 @@ public record OutlinePageView(List<Item> items, String nextCursor) {
   }
 
   public static OutlinePageView of(OutlinePage page) {
-    throw new UnsupportedOperationException("ainda não implementado: outline.children (no fio)");
+    return new OutlinePageView(
+        page.items().stream()
+            .map(item -> new Item(item.childCount(), item.id().value(), item.kind(), item.label()))
+            .toList(),
+        page.next() == null ? null : page.next().encode());
   }
 
   public record Item(int childCount, String id, ElementKind kind, String label) {}

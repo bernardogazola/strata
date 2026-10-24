@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 export interface AppHeaderRepository {
   readonly displayName: string | undefined;
+  readonly onAnalyzeAgain?: () => void;
   readonly onClose: () => void;
 }
 
@@ -122,6 +123,9 @@ function RepositoryName({ displayName }: { readonly displayName: string }) {
   );
 }
 
+const HEADER_ACTION_CLASS =
+  "h-7 px-2.5 text-muted-foreground text-xs hover:text-foreground";
+
 const TRAILING_INSET = {
   browser: "pr-4",
   linux: "pr-3",
@@ -173,9 +177,19 @@ export function AppHeader({ repository, status, trail }: AppHeaderProps) {
       <div className="flex shrink-0 items-center gap-1 self-stretch">
         {status}
         <AnalyzerStatus offersRestart={repository !== undefined} />
+        {repository?.onAnalyzeAgain === undefined ? null : (
+          <Button
+            className={HEADER_ACTION_CLASS}
+            onClick={repository.onAnalyzeAgain}
+            size="sm"
+            variant="ghost"
+          >
+            {t.analysis.again}
+          </Button>
+        )}
         {repository === undefined ? null : (
           <Button
-            className="h-7 px-2.5 text-muted-foreground text-xs hover:text-foreground"
+            className={HEADER_ACTION_CLASS}
             onClick={repository.onClose}
             size="sm"
             variant="ghost"

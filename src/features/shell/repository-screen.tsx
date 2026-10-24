@@ -195,6 +195,7 @@ function FocusedNodeSummary({
   return (
     <NodeSummary
       caveat={caveat}
+      focus={focus}
       node={data?.node ?? null}
       notOnMap={data?.notOnMap}
       onExpand={onExpand}

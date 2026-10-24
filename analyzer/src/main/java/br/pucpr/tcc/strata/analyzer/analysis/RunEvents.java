@@ -112,6 +112,10 @@ final class RunEvents implements WarningSink {
       sink.emit(envelope);
     } catch (JsonLines.FrameTooLargeException oversized) {
       Log.error("a análise " + id.value() + " descartou um frame grande demais", oversized);
+    } catch (IllegalArgumentException unserializable) {
+      Log.error(
+          "a análise " + id.value() + " descartou um frame que não pode ser serializado",
+          unserializable);
     } catch (IOException failure) {
       if (broken.compareAndSet(false, true)) {
         Log.error(

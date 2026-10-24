@@ -20,6 +20,7 @@ public final class ErrorCodes {
   public static final String ANALYSIS_NOT_FOUND = "ANALYSIS_NOT_FOUND";
   public static final String ANALYSIS_TOO_MANY_JAVA_SOURCES = "ANALYSIS_TOO_MANY_JAVA_SOURCES";
   public static final String ANALYSIS_CACHE_CORRUPTED = "ANALYSIS_CACHE_CORRUPTED";
+  public static final String ELEMENT_NOT_FOUND = "ELEMENT_NOT_FOUND";
 
   public static final String ORIGIN_ANALYZER = "analyzer";
 
@@ -108,6 +109,14 @@ public final class ErrorCodes {
     return new ProtocolError(
         ANALYSIS_NOT_FOUND,
         "nenhuma análise com este id está disponível neste processo do analisador",
+        ORIGIN_ANALYZER,
+        Map.of());
+  }
+
+  public static ProtocolError elementNotFound() {
+    return new ProtocolError(
+        ELEMENT_NOT_FOUND,
+        "o elemento não é um elemento interno desta análise",
         ORIGIN_ANALYZER,
         Map.of());
   }

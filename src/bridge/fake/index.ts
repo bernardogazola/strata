@@ -21,6 +21,10 @@ const DISCRIMINANTS: Partial<Record<ProtocolMethod, readonly string[]>> = {
   "outline.children": ["parentId"],
 };
 
+const UNSERVED: ReadonlySet<string> = new Set([
+  "graph.slice.package-aggregated",
+]);
+
 interface Transcript {
   readonly caseName: string;
   readonly request: Record<string, unknown>;
@@ -72,6 +76,7 @@ const EVENT_NAMES = Object.keys(EVENTS) as ProtocolEventName[];
 
 const readMethodTranscripts = (): Map<ProtocolMethod, Transcript[]> => {
   const routes = new Map<ProtocolMethod, Transcript[]>();
+  const unservedSeen = new Set<string>();
   for (const [filePath, text] of Object.entries(FIXTURE_SOURCES)) {
     const stem = stemOf(filePath);
     const topic = resolveTopic(stem, PROTOCOL_METHODS);
@@ -90,20 +95,29 @@ const readMethodTranscripts = (): Map<ProtocolMethod, Transcript[]> => {
     const parsedRequest = requestEnvelopeSchema.parse(request);
     const parsedResponse = okResponseEnvelopeSchema.parse(response);
     const contract = METHODS[method];
+    const parsedParams = contract.params.parse(parsedRequest.payload);
+    const parsedResult =
+      contract.result === null
+        ? parsedResponse.payload
+        : contract.result.parse(parsedResponse.payload);
+    if (UNSERVED.has(stem)) {
+      unservedSeen.add(stem);
+      continue;
+    }
     routes.set(method, [
       ...(routes.get(method) ?? []),
       {
         caseName: caseNameOf(stem, topic),
-        request: contract.params.parse(parsedRequest.payload) as Record<
-          string,
-          unknown
-        >,
-        result:
-          contract.result === null
-            ? parsedResponse.payload
-            : contract.result.parse(parsedResponse.payload),
+        request: parsedParams as Record<string, unknown>,
+        result: parsedResult,
       },
     ]);
+  }
+  const stale = [...UNSERVED].filter((stem) => !unservedSeen.has(stem));
+  if (stale.length > 0) {
+    throw new Error(
+      `UNSERVED cita fixtures que não existem: ${stale.join(", ")}`
+    );
   }
   return routes;
 };

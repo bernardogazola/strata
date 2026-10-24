@@ -12,7 +12,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ErrorSurface } from "@/features/errors/error-surface";
-import { countPhrase, typesInFiles } from "@/features/repository/count-phrase";
+import { countPhrase } from "@/features/repository/count-phrase";
 import { formatPreciseDuration, interpolate, plural } from "@/i18n/format";
 import { t } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
@@ -261,93 +261,5 @@ export function AnalysisSummary({
       <Warnings report={report} warnings={runWarnings} />
       <Stages report={report} />
     </div>
-  );
-}
-
-const MAP_SKETCH = (
-  <svg
-    aria-hidden="true"
-    fill="none"
-    height="56"
-    viewBox="0 0 80 56"
-    width="80"
-  >
-    <path
-      className="stroke-subtle-foreground/50"
-      d="M20 16L40 28M40 28L60 14M40 28L58 42M20 16L22 42M22 42L40 28"
-      strokeWidth="1.2"
-    />
-    <rect
-      className="fill-card stroke-subtle-foreground/50"
-      height="12"
-      rx="3"
-      width="16"
-      x="12"
-      y="9"
-    />
-    <circle
-      className="fill-card stroke-subtle-foreground/50"
-      cx="40"
-      cy="28"
-      r="6"
-    />
-    <circle
-      className="fill-card stroke-subtle-foreground/50"
-      cx="60"
-      cy="14"
-      r="5"
-    />
-    <circle
-      className="fill-card stroke-subtle-foreground/50"
-      cx="58"
-      cy="42"
-      r="5"
-    />
-    <circle
-      className="fill-card stroke-subtle-foreground/50"
-      cx="22"
-      cy="42"
-      r="4.5"
-    />
-  </svg>
-);
-
-export interface MapUnavailableCardProps {
-  readonly report: AnalysisStatusReport;
-}
-
-const mapBody = (report: AnalysisStatusReport): string => {
-  const byStage = new Map(report.stages.map((stage) => [stage.stage, stage]));
-  const graph = byStage.get("STRUCTURAL_GRAPH")?.status ?? "PENDING";
-  if (graph === "PENDING" || graph === "RUNNING") {
-    return t.analysis.map.pending;
-  }
-  const { files, types } = byStage.get("SOURCE_ANALYSIS")?.counters ?? {};
-  if (files === undefined || types === undefined) {
-    return t.analysis.map.bodyNoCounts;
-  }
-  return typesInFiles(t.analysis.map.body, types, files);
-};
-
-export function MapUnavailableCard({ report }: MapUnavailableCardProps) {
-  const titleId = useId();
-  return (
-    <section
-      aria-labelledby={titleId}
-      className="flex items-center gap-5 rounded-lg border border-card-border bg-card p-5 shadow-card"
-    >
-      <div
-        aria-hidden="true"
-        className="flex h-20 w-28 shrink-0 items-center justify-center rounded-md bg-muted"
-      >
-        {MAP_SKETCH}
-      </div>
-      <div className="flex min-w-0 flex-col gap-1">
-        <h2 className="font-medium text-base text-foreground" id={titleId}>
-          {t.analysis.map.title}
-        </h2>
-        <p className="text-muted-foreground text-sm/5">{mapBody(report)}</p>
-      </div>
-    </section>
   );
 }

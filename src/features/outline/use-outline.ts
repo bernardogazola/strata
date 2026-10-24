@@ -184,6 +184,8 @@ export const flattenOutline = (
 export interface OutlineModel {
   readonly busy: boolean;
 
+  readonly childrenError: Error | null;
+
   readonly expandedId: string | null;
 
   readonly loadMore: (parentId: string | null) => void;
@@ -335,6 +337,7 @@ export function useOutline(
 
   return {
     busy: root.isFetching || children.isFetching,
+    childrenError: children.error,
     expandedId,
     loadMore,
     retry,

@@ -20,6 +20,7 @@ export type GraphSliceViolation =
   | "DANGLING_ENDPOINT"
   | "DUPLICATE_ID"
   | "EDGES_OVER_BUDGET"
+  | "KIND_ID_MISMATCH"
   | "NODES_OVER_BUDGET"
   | "PARENT_MISMATCH";
 
@@ -132,6 +133,20 @@ const assertIdentity = ({ edges, nodes }: GraphSlice): void => {
   }
 };
 
+const PREFIX_ID_PREFIX = "pfx:";
+
+const assertKinds = ({ nodes }: GraphSlice): void => {
+  for (const [index, node] of nodes.entries()) {
+    const isGroup = node.kind === "PACKAGE_PREFIX";
+    if (isGroup !== node.id.startsWith(PREFIX_ID_PREFIX)) {
+      fail(
+        "KIND_ID_MISMATCH",
+        `o nó ${index}, de kind ${node.kind}, tem o id na gramática de outro kind`
+      );
+    }
+  }
+};
+
 export const elementDisplayLabel = (
   kind: ElementKind | GraphNodeKind,
   label: string,
@@ -180,6 +195,7 @@ export const toGraphElements = (slice: GraphSlice): ElementsDefinition => {
   assertTotals(slice);
   assertParent(slice);
   assertIdentity(slice);
+  assertKinds(slice);
 
   return {
     edges: slice.edges.map(toEdgeDefinition),

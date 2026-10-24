@@ -1,6 +1,8 @@
 import { IconChevronRight } from "@tabler/icons-react";
+import { MessageSegments } from "@/features/errors/message-segment";
 import { ElementKindIcon } from "@/features/graph/element-kind-icon";
 import { ElementLabel } from "@/features/graph/element-label";
+import type { ErrorMessage } from "@/i18n/errors";
 import { formatInteger, interpolate, plural } from "@/i18n/format";
 import { t } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
@@ -151,6 +153,30 @@ function ActionRow({
   );
 }
 
+function RefusalRow({
+  index,
+  refusal,
+  row,
+  start,
+  tabbable,
+}: PositionedRow<OutlineErrorRow> & { readonly refusal: ErrorMessage }) {
+  return (
+    <div
+      aria-level={row.level}
+      className={cn(ROW_CLASS, indentOf(row.level), "text-muted-foreground")}
+      data-index={index}
+      role="treeitem"
+      style={rowStyle(start)}
+      tabIndex={tabbable ? 0 : -1}
+    >
+      <ActionLanes />
+      <span className="min-w-0 truncate pl-0.5">
+        <MessageSegments segments={refusal.body} />
+      </span>
+    </div>
+  );
+}
+
 function StatusRow({
   index,
   row,
@@ -190,11 +216,14 @@ const errorText = (row: OutlineErrorRow): string => {
 
 export interface OutlineTreeRowProps extends PositionedRow<OutlineRow> {
   readonly focus: string | null;
+
+  readonly refusal?: ErrorMessage | null;
 }
 
 export function OutlineTreeRow({
   focus,
   index,
+  refusal = null,
   row,
   start,
   tabbable,
@@ -221,13 +250,21 @@ export function OutlineTreeRow({
         />
       );
     case "error":
-      return (
+      return refusal === null ? (
         <ActionRow
           index={index}
           row={row}
           start={start}
           tabbable={tabbable}
           text={errorText(row)}
+        />
+      ) : (
+        <RefusalRow
+          index={index}
+          refusal={refusal}
+          row={row}
+          start={start}
+          tabbable={tabbable}
         />
       );
     default:

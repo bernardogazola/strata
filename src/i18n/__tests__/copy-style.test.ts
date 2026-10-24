@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { stageStatusLabels } from "../labels";
+import { graphNodeKindLabels, stageStatusLabels } from "../labels";
 import { t } from "../messages";
 
 const MIDDLE_DOT = String.fromCodePoint(0xb7);
@@ -48,6 +48,31 @@ const BASE_COPY: readonly CatalogueString[] = [
   ...collectStrings(stageStatusLabels, "stageStatusLabels"),
 ];
 
+const GROUP_COPY: readonly CatalogueString[] = [
+  ...collectStrings(t.graph.canvas.groups, "graph.canvas.groups"),
+  ...collectStrings(
+    t.graph.canvas.labelAggregated,
+    "graph.canvas.labelAggregated"
+  ),
+  ...collectStrings(
+    t.graph.legend.kindShapes.PACKAGE_PREFIX,
+    "graph.legend.kindShapes.PACKAGE_PREFIX"
+  ),
+  ...collectStrings(t.graph.notice.aggregated, "graph.notice.aggregated"),
+  ...collectStrings(
+    t.graph.notice.truncatedEdges,
+    "graph.notice.truncatedEdges"
+  ),
+  ...collectStrings(t.inspector.group, "inspector.group"),
+  ...collectStrings(
+    t.inspector.notOnMap.aggregated,
+    "inspector.notOnMap.aggregated"
+  ),
+  ...collectStrings(graphNodeKindLabels, "graphNodeKindLabels"),
+];
+
+const SCOPED_COPY: readonly CatalogueString[] = [...BASE_COPY, ...GROUP_COPY];
+
 const contractionsIn = (text: string): string[] =>
   text
     .toLowerCase()
@@ -64,20 +89,32 @@ describe("a redação do catálogo", () => {
     expect(paths).toContain("stageStatusLabels.COMPLETED");
   });
 
+  test("o escopo alcança a copy do nível 1 agrupado", () => {
+    const paths = SCOPED_COPY.map(({ path }) => path);
+
+    expect(paths).toContain("graph.notice.aggregated");
+    expect(paths).toContain("graph.notice.truncatedEdges.template");
+    expect(paths).toContain("graph.legend.kindNames.PACKAGE_PREFIX");
+    expect(paths).toContain("inspector.notOnMap.aggregated");
+    expect(paths).toContain("graphNodeKindLabels.PACKAGE_PREFIX");
+  });
+
   test("nenhuma frase tem ponto médio", () => {
-    const offending = BASE_COPY.filter(({ text }) => text.includes(MIDDLE_DOT));
+    const offending = SCOPED_COPY.filter(({ text }) =>
+      text.includes(MIDDLE_DOT)
+    );
 
     expect(offending).toStrictEqual([]);
   });
 
   test("nenhuma frase tem travessão", () => {
-    const offending = BASE_COPY.filter(({ text }) => text.includes(EM_DASH));
+    const offending = SCOPED_COPY.filter(({ text }) => text.includes(EM_DASH));
 
     expect(offending).toStrictEqual([]);
   });
 
   test('nenhuma frase contrai "em um" ou "em uma"', () => {
-    const offending = BASE_COPY.filter(
+    const offending = SCOPED_COPY.filter(
       ({ text }) => contractionsIn(text).length > 0
     );
 
