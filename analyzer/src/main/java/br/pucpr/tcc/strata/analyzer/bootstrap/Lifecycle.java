@@ -93,7 +93,24 @@ public final class Lifecycle {
         Log.error("descartando um frame grande demais que não traz id para responder", tooLarge);
       }
       return false;
+    } catch (IllegalArgumentException unserializable) {
+      switch (envelope) {
+        case Envelope.OkResponse response -> answerUnserializable(response.id(), unserializable);
+        case Envelope.ErrorResponse response -> answerUnserializable(response.id(), unserializable);
+        case Envelope.Event _, Envelope.Request _ ->
+            Log.error("descartando um frame que não pode ser serializado", unserializable);
+      }
+      return false;
     }
+  }
+
+  private void answerUnserializable(String id, IllegalArgumentException unserializable)
+      throws IOException {
+    Log.error(
+        "a resposta a " + id + " não pode ser serializada; respondendo INTERNAL_UNEXPECTED",
+        unserializable);
+    sink.emit(
+        Envelope.error(id, ErrorCodes.internalUnexpected(unserializable.getClass().getName())));
   }
 
   private static void runAfterEmit(Runnable afterEmit) {
