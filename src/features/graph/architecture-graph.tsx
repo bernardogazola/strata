@@ -125,7 +125,11 @@ const createGraphHandle = (
       return;
     }
     cy.fit(present, FIT_PADDING_PX);
-    settleViewport(cy);
+    if (cy.zoom() > MAX_FIT_ZOOM) {
+      cy.zoom(MAX_FIT_ZOOM);
+      cy.center(present);
+    }
+    setGraphRuntime(cy, { dashScale: 1 / cy.zoom() });
   },
   nodeIds: () =>
     cy
