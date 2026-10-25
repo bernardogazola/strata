@@ -120,7 +120,7 @@ export function ElementOverview({
 
   return (
     <div className="flex flex-col gap-6 pt-4">
-      <p className="sr-only" id={openDescriptionId}>
+      <p hidden id={openDescriptionId}>
         {graphFacts.openDependencies}
       </p>
 

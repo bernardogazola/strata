@@ -56,20 +56,27 @@ const caveatLines = (
   return candidates.filter((line): line is CaveatLine => line !== null);
 };
 
+const linesOf = (
+  report: AnalysisStatusReport | undefined,
+  percentiles: boolean
+): readonly CaveatLine[] =>
+  report === undefined ||
+  report.status !== "COMPLETED" ||
+  !isAnalysisPartial(report.completeness)
+    ? []
+    : caveatLines(report.completeness, percentiles);
+
+export const hasCompletenessCaveat = (
+  report: AnalysisStatusReport | undefined,
+  percentiles = false
+): boolean => linesOf(report, percentiles).length > 0;
+
 export function CompletenessCaveat({
   compact = false,
   percentiles = false,
   report,
 }: CompletenessCaveatProps) {
-  if (
-    report === undefined ||
-    report.status !== "COMPLETED" ||
-    !isAnalysisPartial(report.completeness)
-  ) {
-    return null;
-  }
-
-  const lines = caveatLines(report.completeness, percentiles);
+  const lines = linesOf(report, percentiles);
   if (lines.length === 0) {
     return null;
   }

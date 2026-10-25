@@ -1,16 +1,13 @@
 import { expect, type Page, test } from "@playwright/test";
 import { formatProtocolError } from "@/i18n/errors";
 import { t } from "@/i18n/messages";
-import { openFakeRepository } from "./support/fake-run";
+import { mainNamed, openFakeRepository } from "./support/fake-run";
 import { expectGraph, fixtureNodeIds } from "./support/graph-page";
 
 const HANDLE = "repo_AAAAAAAAAAAAAAAAAAAAAQ";
 const ANALYSIS_ID = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 const REPOSITORY_NAME = "multi-module";
 const PACKAGE_IDS = fixtureNodeIds("graph.slice.package.jsonl");
-
-const mainNamed = (page: Page, name: string) =>
-  page.getByRole("main", { name });
 
 const factValue = (page: Page, label: string) =>
   page

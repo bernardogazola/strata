@@ -40,6 +40,7 @@ import {
   countDelta,
   emit,
   type LoggedRequest,
+  mainNamed,
   openFakeRepository,
   requests,
   requestsTo,
@@ -116,9 +117,6 @@ const truncatedCoreSlice = (): GraphSlice =>
     nodes: CORE_SLICE.nodes.filter((node) => node.id !== ENTRY),
     truncated: true,
   });
-
-const mainNamed = (page: Page, name: string) =>
-  page.getByRole("main", { name });
 
 const inspectorOf = (page: Page) =>
   page.getByRole("complementary", { name: t.shell.regions.inspector });

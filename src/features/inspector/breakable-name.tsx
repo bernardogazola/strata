@@ -7,10 +7,11 @@ import type { ElementKind } from "@/protocol/enums";
 const AFTER_SEPARATOR = /(?<=[./])/u;
 
 const segmentsOf = (
-  text: string
+  text: string,
+  breakAfter: RegExp
 ): readonly { readonly offset: number; readonly text: string }[] => {
   let offset = 0;
-  return text.split(AFTER_SEPARATOR).map((segment) => {
+  return text.split(breakAfter).map((segment) => {
     const start = offset;
     offset += segment.length;
     return { offset: start, text: segment };
@@ -18,6 +19,8 @@ const segmentsOf = (
 };
 
 export interface BreakableNameProps {
+  readonly breakAfter?: RegExp;
+
   readonly className?: string;
 
   readonly kind?: ElementKind;
@@ -28,6 +31,7 @@ export interface BreakableNameProps {
 }
 
 export function BreakableName({
+  breakAfter = AFTER_SEPARATOR,
   className,
   kind = "TYPE",
   maxChars = DEFAULT_UNTRUSTED_MAX_CHARS,
@@ -37,7 +41,7 @@ export function BreakableName({
   if (kind === "PACKAGE" && text === "") {
     return <span className={className}>{shown}</span>;
   }
-  const segments = segmentsOf(shown);
+  const segments = segmentsOf(shown, breakAfter);
   return (
     <bdi className={cn("break-words", className)} lang="" translate="no">
       {segments.map((segment, position) => (

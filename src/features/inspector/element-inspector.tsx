@@ -13,6 +13,7 @@ import type {
 import { t } from "@/i18n/messages";
 import type { DependencyDirection } from "@/protocol/enums";
 import type { GraphNode, GraphSlice } from "@/protocol/graph";
+import { packageIdSchema } from "@/protocol/primitives";
 import {
   elementDetailQueryOptions,
   type GraphViewParams,
@@ -78,8 +79,6 @@ const describeFocus = (
   return { node: null, notOnMap: slice.truncated ? "truncated" : undefined };
 };
 
-const PACKAGE_ID_PREFIX = "pkg:";
-
 const TAB_CLASS =
   "-mb-px border-transparent border-b-2 pt-2 pb-2 text-muted-foreground text-sm transition-[color,border-color] duration-150 ease-out-quart hover:text-foreground data-active:border-foreground data-active:font-medium data-active:text-foreground motion-reduce:transition-none";
 
@@ -92,6 +91,7 @@ interface DescribedElementProps
   extends Omit<ElementInspectorProps, "caveat" | "focus" | "view"> {
   readonly elementId: string;
   readonly handoff: RefObject<FocusHandoff | null>;
+  readonly inspectorRef: RefObject<HTMLElement | null>;
   readonly node: GraphNode | null;
 }
 
@@ -100,6 +100,7 @@ function DescribedElement({
   direction,
   elementId,
   handoff,
+  inspectorRef,
   node,
   onExpand,
   onReveal,
@@ -107,7 +108,7 @@ function DescribedElement({
   onSelectTab,
   tab,
 }: DescribedElementProps) {
-  const kind: InspectedKind = elementId.startsWith(PACKAGE_ID_PREFIX)
+  const kind: InspectedKind = packageIdSchema.safeParse(elementId).success
     ? "PACKAGE"
     : "TYPE";
   const {
@@ -155,6 +156,7 @@ function DescribedElement({
         detail={detail}
         elementId={elementId}
         handoff={handoff}
+        inspectorRef={inspectorRef}
         kind={kind}
         label={label}
         settled={detail !== undefined || error !== null}
@@ -220,6 +222,7 @@ function DescribedElement({
         </Tabs.Panel>
         <Tabs.Panel
           className="flex min-h-0 flex-1 flex-col"
+          tabIndex={-1}
           value="dependencies"
         >
           {shownTab === "dependencies" ? dependencyPanel : null}
@@ -253,6 +256,7 @@ export function ElementInspector({
   const notOnMap = data?.notOnMap;
 
   const handoff = useRef<FocusHandoff | null>(null);
+  const inspectorRef = useRef<HTMLDivElement>(null);
   const reveal = useCallback(
     (target: RevealTarget) => {
       if (focus !== null) {
@@ -279,13 +283,17 @@ export function ElementInspector({
   }
 
   return (
-    <div className={`@container ${columnClass(shownTabOf(tab))}`}>
+    <div
+      className={`@container ${columnClass(shownTabOf(tab))}`}
+      ref={inspectorRef}
+    >
       {notOnMap === undefined ? null : <NotOnMapNote reason={notOnMap} />}
       <DescribedElement
         analysisId={analysisId}
         direction={direction}
         elementId={focus}
         handoff={handoff}
+        inspectorRef={inspectorRef}
         node={node}
         onExpand={onExpand}
         onReveal={reveal}

@@ -1,37 +1,47 @@
 import { useId } from "react";
 import { formatInteger, interpolate } from "@/i18n/format";
 import { t } from "@/i18n/messages";
-import { clampText, sanitizeUntrusted } from "@/lib/untrusted";
 import type { MethodSummary } from "@/protocol/graph";
+import { BreakableName } from "./breakable-name";
 import { lineRangeText } from "./inspector-labels";
 
 const SIGNATURE_MAX_CHARS = 512;
+
+const AFTER_SIGNATURE_SEPARATOR = /(?<=[(,.])/u;
+
+function MethodCc({ cc }: { readonly cc: number | null }) {
+  const shown =
+    cc === null ? t.inspector.methods.ccNotApplicable : formatInteger(cc);
+  return (
+    <span
+      className={
+        cc === null
+          ? "shrink-0 whitespace-nowrap text-muted-foreground text-xs leading-5"
+          : "shrink-0 whitespace-nowrap font-medium text-foreground text-sm tabular-nums"
+      }
+    >
+      <span className="sr-only">{`${t.inspector.methods.ccHeader} ${shown}`}</span>
+      <span aria-hidden="true">{shown}</span>
+    </span>
+  );
+}
 
 function MethodRow({ method }: { readonly method: MethodSummary }) {
   const { cc, lines, signature } = method;
   return (
     <li className="flex items-start justify-between gap-3 border-b py-2">
       <span className="flex min-w-0 flex-col gap-0.5">
-        <bdi
-          className="break-words text-foreground text-sm"
-          lang=""
-          translate="no"
-        >
-          {clampText(sanitizeUntrusted(signature), SIGNATURE_MAX_CHARS)}
-        </bdi>
+        <BreakableName
+          breakAfter={AFTER_SIGNATURE_SEPARATOR}
+          className="text-foreground text-sm"
+          maxChars={SIGNATURE_MAX_CHARS}
+          text={signature}
+        />
         <span className="text-muted-foreground text-xs">
           {lineRangeText(lines)}
         </span>
       </span>
-      {cc === null ? (
-        <span className="shrink-0 whitespace-nowrap text-muted-foreground text-xs leading-5">
-          {t.inspector.methods.ccNotApplicable}
-        </span>
-      ) : (
-        <span className="shrink-0 whitespace-nowrap font-medium text-foreground text-sm tabular-nums">
-          {formatInteger(cc)}
-        </span>
-      )}
+      <MethodCc cc={cc} />
     </li>
   );
 }
@@ -44,7 +54,6 @@ export interface MethodListProps {
 
 export function MethodList({ methodTotal, methods }: MethodListProps) {
   const titleId = useId();
-  const headerId = useId();
   const noteId = useId();
   const cut = methodTotal > methods.length;
   const explains = methods.some((method) => method.cc === null);
@@ -56,7 +65,7 @@ export function MethodList({ methodTotal, methods }: MethodListProps) {
           {interpolate(t.inspector.methods.title, { count: methodTotal })}
         </h3>
         {methods.length === 0 ? null : (
-          <span className="ml-auto text-right" id={headerId}>
+          <span className="ml-auto text-right">
             {t.inspector.methods.ccHeader}
           </span>
         )}
@@ -75,7 +84,7 @@ export function MethodList({ methodTotal, methods }: MethodListProps) {
         </p>
       ) : (
         <ol
-          aria-describedby={explains ? `${headerId} ${noteId}` : headerId}
+          aria-describedby={explains ? noteId : undefined}
           aria-labelledby={titleId}
         >
           {methods.map((method) => (

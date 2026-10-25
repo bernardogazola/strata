@@ -176,7 +176,7 @@ export const countDelta = (
   );
 };
 
-const mainNamed = (page: Page, name: string) =>
+export const mainNamed = (page: Page, name: string) =>
   page.getByRole("main", { name });
 
 export const openFakeRepository = async (page: Page): Promise<void> => {

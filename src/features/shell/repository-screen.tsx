@@ -27,7 +27,10 @@ import {
   AnalysisScreen,
   type AnalysisWorkspaceProps,
 } from "@/features/progress/analysis-screen";
-import { CompletenessCaveat } from "@/features/progress/completeness-caveat";
+import {
+  CompletenessCaveat,
+  hasCompletenessCaveat,
+} from "@/features/progress/completeness-caveat";
 import { PrepareScreen } from "@/features/repository/prepare-screen";
 import { t } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
@@ -257,7 +260,11 @@ function RepositoryWorkspace({ header, report }: AnalysisWorkspaceProps) {
       inspector={
         <ElementInspector
           analysisId={analysisId}
-          caveat={<CompletenessCaveat compact report={report} />}
+          caveat={
+            hasCompletenessCaveat(report) ? (
+              <CompletenessCaveat compact report={report} />
+            ) : undefined
+          }
           direction={search.direction}
           focus={focus}
           onExpand={onExpand}

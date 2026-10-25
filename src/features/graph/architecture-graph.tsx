@@ -73,10 +73,10 @@ const afterTwoFrames = (callback: () => void): void => {
 const hasSize = (container: HTMLElement): boolean =>
   container.clientWidth > 0 && container.clientHeight > 0;
 
-const settleViewport = (cy: Core): void => {
+const settleViewport = (cy: Core, centreOn?: CollectionReturnValue): void => {
   if (cy.zoom() > MAX_FIT_ZOOM) {
     cy.zoom(MAX_FIT_ZOOM);
-    cy.center();
+    cy.center(centreOn);
   }
   setGraphRuntime(cy, { dashScale: 1 / cy.zoom() });
 };
@@ -125,11 +125,7 @@ const createGraphHandle = (
       return;
     }
     cy.fit(present, FIT_PADDING_PX);
-    if (cy.zoom() > MAX_FIT_ZOOM) {
-      cy.zoom(MAX_FIT_ZOOM);
-      cy.center(present);
-    }
-    setGraphRuntime(cy, { dashScale: 1 / cy.zoom() });
+    settleViewport(cy, present);
   },
   nodeIds: () =>
     cy

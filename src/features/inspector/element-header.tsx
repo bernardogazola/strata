@@ -15,6 +15,20 @@ export interface FocusHandoff {
   readonly to: string;
 }
 
+const isFocusUnclaimed = (inspector: HTMLElement | null): boolean => {
+  const active = document.activeElement;
+  if (active === null || active === document.body) {
+    return true;
+  }
+  if (inspector?.contains(active) === true) {
+    return true;
+  }
+  return (
+    active.closest("nav")?.getAttribute("aria-label") ===
+    t.shell.breadcrumb.label
+  );
+};
+
 const headerTermClass = "sr-only";
 
 const kindTextOf = (
@@ -29,12 +43,14 @@ const kindTextOf = (
     : sentenceCase(typeKindLabels[detail.typeKind]);
 };
 
-const TITLE_CLASS = "rounded-sm font-medium text-foreground text-xl";
+const TITLE_CLASS =
+  "rounded-sm font-medium text-foreground text-xl tracking-[-0.01em]";
 
 export function ElementHeader({
   detail,
   elementId,
   handoff,
+  inspectorRef,
   kind,
   label,
   settled,
@@ -42,6 +58,8 @@ export function ElementHeader({
   readonly detail: ElementDetail | undefined;
   readonly elementId: string;
   readonly handoff: RefObject<FocusHandoff | null>;
+
+  readonly inspectorRef: RefObject<HTMLElement | null>;
   readonly kind: InspectedKind;
   readonly label: string;
 
@@ -55,13 +73,19 @@ export function ElementHeader({
     if (pending === null) {
       return;
     }
-    if (pending.to === elementId) {
-      const heading = headingRef.current;
-      if (heading !== null) {
-        heading.focus();
+    if (pending.to !== elementId) {
+      if (pending.from !== elementId) {
         handoff.current = null;
       }
-    } else if (pending.from !== elementId) {
+      return;
+    }
+    if (!isFocusUnclaimed(inspectorRef.current)) {
+      handoff.current = null;
+      return;
+    }
+    const heading = headingRef.current;
+    if (heading !== null) {
+      heading.focus();
       handoff.current = null;
     }
   });
@@ -118,7 +142,7 @@ function HeaderFacts({ detail }: { readonly detail: ElementDetail }) {
       {filePath === null ? null : (
         <>
           <dt className={headerTermClass}>{t.inspector.header.file}</dt>
-          <dd className="pt-2">
+          <dd className="pt-3">
             <BreakableName text={filePath} />
           </dd>
         </>
