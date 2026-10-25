@@ -186,7 +186,7 @@ const edgeRules = (palette: GraphPalette): StylesheetStyle[] => [
     selector: "edge",
     style: {
       "arrow-scale": GRAPH_STYLE.edge.arrowScale,
-      "curve-style": "straight",
+      "curve-style": "bezier",
       "line-color": palette["--graph-edge-structural"],
       "target-arrow-color": palette["--graph-edge-structural"],
       "target-arrow-shape": "triangle",
