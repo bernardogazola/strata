@@ -12,12 +12,13 @@ export const highlightIdOf = (target: Element): string | null =>
   target.closest<HTMLElement>("[data-highlight-id]")?.dataset.highlightId ??
   null;
 
-export const highlightIdOfTarget = (
-  target: EventTarget | null
-): string | null => (target instanceof Element ? highlightIdOf(target) : null);
+export const hasControl = (row: DependencyTableRow | undefined): boolean =>
+  row?.type === "row" ||
+  (row?.type === "tail" && (row.state === "loading" || row.retryable));
 
 export const isFocusable = (row: DependencyTableRow | undefined): boolean =>
-  row?.type === "row" || (row?.type === "tail-error" && row.retryable);
+  row?.type === "row" ||
+  (row?.type === "tail" && row.state === "failed" && row.retryable);
 
 export type FocusTarget = { readonly key: string } | { readonly after: string };
 
@@ -33,8 +34,16 @@ export const resolveTarget = (
   if (before === undefined) {
     return null;
   }
-  const next = rows[before + 1];
-  return isFocusable(next) ? before + 1 : null;
+  for (let at = before + 1; at < rows.length; at += 1) {
+    const row = rows[at];
+    if (row?.type === "row") {
+      return at;
+    }
+    if (row?.type === "tail") {
+      return hasControl(row) ? null : before;
+    }
+  }
+  return before;
 };
 
 const lastRowIndexOf = (rows: readonly DependencyTableRow[]): number => {

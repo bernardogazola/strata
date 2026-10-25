@@ -10,11 +10,7 @@ import { t } from "@/i18n/messages";
 import type { DependencyEntry, DependencyPage } from "@/protocol/graph";
 import { useAppStore } from "@/state/app-store";
 import { internalTypeRow, NEXT_CURSOR, pageOf } from "@/test/dependency-rows";
-import {
-  DESCRIBED_IDS,
-  detailOf,
-  ELEMENT_REFUSALS,
-} from "@/test/fixture-graph";
+import { DESCRIBED_IDS, detailOf } from "@/test/fixture-graph";
 import {
   pressKey,
   renderWithQuery,
@@ -49,18 +45,21 @@ const totalsOf = (total: number): DependencyPage["totals"] => ({
   outExternal: 0,
 });
 
-const pageTwoRefusal = () => {
-  const refusal = ELEMENT_REFUSALS.find(
-    ({ method, request }) =>
-      method === "element.dependencies" && request.cursor !== undefined
-  );
-  if (refusal === undefined) {
-    throw new Error("o mundo não tem uma página de dependências recusada");
-  }
-  return new FakeBridgeError(refusal.error);
-};
+const pageTwoTimeout = () =>
+  new FakeBridgeError({
+    code: "PROC_REQUEST_TIMEOUT",
+    origin: "shell",
+    params: { method: "element.dependencies", timeoutMs: 30_000 },
+  });
 
 type Answer = () => Promise<DependencyPage>;
+
+const later = (work: () => Promise<DependencyPage>): Promise<DependencyPage> =>
+  new Promise((resolve, reject) => {
+    setTimeout(() => {
+      work().then(resolve, reject);
+    }, 0);
+  });
 
 const mockPaging = (first: DependencyPage, next: readonly Answer[]) => {
   const queue = [...next];
@@ -72,12 +71,12 @@ const mockPaging = (first: DependencyPage, next: readonly Answer[]) => {
       }
       const { cursor } = payload as { readonly cursor?: string };
       if (cursor === undefined) {
-        return Promise.resolve(first);
+        return later(() => Promise.resolve(first));
       }
       const answer = queue.shift();
       return answer === undefined
         ? Promise.reject(new Error("não sobrou página"))
-        : answer();
+        : later(answer);
     });
 };
 
@@ -196,25 +195,27 @@ describe("as páginas que dão errado", () => {
       ]
     );
     renderTable();
+    const table = await screen.findByRole("table");
 
-    const failures = await screen.findAllByText(
-      (_, element) =>
-        element?.textContent === t.inspector.dependencies.failed ||
-        element?.textContent === t.inspector.dependencies.failedMore
+    const message = await within(table).findByText(
+      t.inspector.dependencies.failedMore
     );
-    expect(failures.length).toBeGreaterThan(0);
     await settle();
+    const tail = message.closest("tr") as HTMLElement;
+    expect(tail.textContent).toBe(t.inspector.dependencies.failedMore);
+    expect(within(tail).queryByRole("button")).toBeNull();
+    expect(shownLabels(table)).toHaveLength(PAGE_ONE_ROWS);
 
     expect(cursorsOf(request)).toStrictEqual([undefined, NEXT_CURSOR]);
   });
 
-  test("a página 2 recusada: uma linha final focável, que pede a página 2 de novo", async () => {
+  test("a página 2 falhou: uma linha final focável, que pede a página 2 de novo", async () => {
     stubTableLayout({ rowHeight: ROW_HEIGHT, viewport: TALL_VIEWPORT });
     const total = PAGE_ONE_ROWS + PAGE_TWO_ROWS;
     const request = mockPaging(
       pageOf(rows(0, PAGE_ONE_ROWS), totalsOf(total), NEXT_CURSOR),
       [
-        () => Promise.reject(pageTwoRefusal()),
+        () => Promise.reject(pageTwoTimeout()),
         () =>
           Promise.resolve(
             pageOf(rows(PAGE_ONE_ROWS, PAGE_TWO_ROWS), totalsOf(total))

@@ -6,10 +6,7 @@ import type {
   ReactNode,
   Ref,
 } from "react";
-import {
-  elementDisplayLabel,
-  GRAPH_LABEL_MAX_CHARS,
-} from "@/features/graph/adapter";
+import { GRAPH_LABEL_MAX_CHARS } from "@/features/graph/adapter";
 import { ElementKindIcon } from "@/features/graph/element-kind-icon";
 import { interpolate, plural } from "@/i18n/format";
 import { resolutionQualityLabels } from "@/i18n/labels";
@@ -21,7 +18,7 @@ import { useAppStore } from "@/state/app-store";
 import { BreakableName } from "./breakable-name";
 import { InfoGlyph, ResolutionGlyph } from "./inspector-glyphs";
 import { packageLineOf, verbsOf } from "./inspector-model";
-import type { DependencyTableRow } from "./use-dependencies";
+import type { DependencyTableRow, TailModel } from "./use-dependencies";
 
 const RESOLUTION_TEXT_CLASS = {
   INFERRED: "font-medium text-foreground",
@@ -42,12 +39,14 @@ function ExternalTypeIcon() {
 
 function PackageGlyph() {
   return (
-    <span
-      aria-hidden="true"
-      className="block h-[7px] w-2.5 shrink-0 rounded-[1.5px] border-[1.2px] border-subtle-foreground"
-    />
+    <span aria-hidden="true" className="flex h-4 shrink-0 items-center">
+      <span className="block h-[7px] w-2.5 rounded-[1.5px] border-[1.2px] border-subtle-foreground" />
+    </span>
   );
 }
+
+const [PACKAGE_PHRASE_BEFORE, PACKAGE_PHRASE_AFTER = ""] =
+  t.inspector.dependencies.packageOf.split("{name}");
 
 export interface RowControlHandlers {
   readonly onBlur: FocusEventHandler<HTMLButtonElement>;
@@ -64,7 +63,7 @@ interface MeasuredRowProps {
 }
 
 const ROW_CONTROL_CLASS =
-  "-mx-2 flex w-[calc(100%+1rem)] cursor-default gap-2 rounded-sm px-2 py-2 text-left transition-[background-color] duration-150 ease-out-quart hover:bg-accent focus-visible:bg-accent data-active:bg-accent motion-reduce:transition-none";
+  "-mx-2 flex w-[calc(100%+1rem)] cursor-default gap-2 rounded-sm px-2 py-2 text-left transition-[background-color] duration-150 ease-out-quart hover:bg-accent focus-visible:bg-accent data-active:bg-accent aria-disabled:not-focus-visible:hover:bg-transparent motion-reduce:transition-none";
 
 export interface DependencyRowProps extends MeasuredRowProps {
   readonly controlHandlers: RowControlHandlers;
@@ -124,15 +123,14 @@ export function DependencyRow({
               text={label}
             />
             {packageLine === null ? null : (
-              <span className="flex items-center gap-[5px] text-muted-foreground text-xs">
+              <span className="flex items-start gap-[5px] text-muted-foreground text-xs">
                 <PackageGlyph />
-                <span className="sr-only">
-                  {interpolate(t.inspector.dependencies.packageOf, {
-                    name: elementDisplayLabel("PACKAGE", packageLine),
-                  })}
-                </span>
-                <span aria-hidden="true" className="min-w-0">
+                <span className="min-w-0">
+                  <span className="sr-only">{PACKAGE_PHRASE_BEFORE}</span>
                   <BreakableName kind="PACKAGE" text={packageLine} />
+                  {PACKAGE_PHRASE_AFTER === "" ? null : (
+                    <span className="sr-only">{PACKAGE_PHRASE_AFTER}</span>
+                  )}
                 </span>
               </span>
             )}
@@ -187,42 +185,44 @@ export function ExternalsHeadingRow({
   );
 }
 
-export function LoadingTailRow({ index, measureRef }: MeasuredRowProps) {
-  return (
-    <tr aria-rowindex={index + 2} data-index={index} ref={measureRef}>
-      <td className="py-2.5 text-muted-foreground text-xs">
-        {t.inspector.dependencies.loadingMore}
-      </td>
-    </tr>
-  );
-}
+const TAIL_LOADING_CLASS =
+  "cursor-default rounded-sm text-left text-muted-foreground text-xs";
 
-export function ErrorTailRow({
+const TAIL_RETRY_CLASS =
+  "shrink-0 rounded-sm font-medium text-foreground text-sm underline decoration-1 underline-offset-[3px]";
+
+export function TailRow({
   controlHandlers,
   index,
   measureRef,
-  retryable,
   tabbable,
+  tail,
 }: MeasuredRowProps & {
   readonly controlHandlers: RowControlHandlers;
-  readonly retryable: boolean;
   readonly tabbable: boolean;
+  readonly tail: TailModel;
 }) {
+  const failed = tail.state === "failed";
+  const hasButton = !failed || tail.retryable;
   return (
     <tr aria-rowindex={index + 2} data-index={index} ref={measureRef}>
-      <td className="border-b py-2.5">
+      <td className={cn("py-2.5", failed && "border-b")}>
         <span className="flex items-center justify-between gap-2">
-          <span className="text-muted-foreground text-xs">
-            {t.inspector.dependencies.failedMore}
-          </span>
-          {retryable ? (
+          {failed ? (
+            <span className="flex flex-col gap-0.5 text-muted-foreground text-xs">
+              <span>{t.inspector.dependencies.failedMore}</span>
+              {tail.title === null ? null : <span>{tail.title}</span>}
+            </span>
+          ) : null}
+          {hasButton ? (
             <button
-              className="shrink-0 rounded-sm font-medium text-foreground text-sm underline decoration-1 underline-offset-[3px]"
+              aria-disabled={failed ? undefined : true}
+              className={failed ? TAIL_RETRY_CLASS : TAIL_LOADING_CLASS}
               tabIndex={tabbable ? 0 : -1}
               type="button"
               {...controlHandlers}
             >
-              {t.graph.retry}
+              {failed ? t.graph.retry : t.inspector.dependencies.loadingMore}
             </button>
           ) : null}
         </span>
@@ -279,23 +279,15 @@ export const renderDependencyRow = (
           measureRef={context.measureRef}
         />
       );
-    case "tail-loading":
+    case "tail":
       return (
-        <LoadingTailRow
-          index={index}
-          key={key}
-          measureRef={context.measureRef}
-        />
-      );
-    case "tail-error":
-      return (
-        <ErrorTailRow
+        <TailRow
           controlHandlers={context.controlHandlers}
           index={index}
           key={key}
           measureRef={context.measureRef}
-          retryable={row.retryable}
           tabbable={index === context.tabbableIndex}
+          tail={row}
         />
       );
     default:

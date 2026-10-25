@@ -6,7 +6,6 @@ import {
   type Virtualizer,
 } from "@tanstack/react-virtual";
 import {
-  type FocusEvent,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
@@ -20,7 +19,7 @@ import {
 } from "react";
 import type { RevealTarget } from "@/features/shell/repository-search";
 import { t } from "@/i18n/messages";
-import { useCrossHighlight } from "@/lib/cross-highlight";
+import { useRowHighlightHandlers } from "@/lib/cross-highlight";
 import { pinIndexes } from "@/lib/virtual-range";
 import type { DependencyDirection } from "@/protocol/enums";
 import {
@@ -33,8 +32,8 @@ import type { InspectedKind } from "./inspector-model";
 import { DependenciesFailure, LoadingFirstPage } from "./inspector-states";
 import {
   type FocusTarget,
+  hasControl,
   highlightIdOf,
-  highlightIdOfTarget,
   isFocusable,
   keyTargetOf,
   resolveTarget,
@@ -44,6 +43,7 @@ import {
   type Dependencies,
   type DependencyTableRow,
   rowKeyOf,
+  TAIL_ROW_KEY,
   useDependencies,
 } from "./use-dependencies";
 
@@ -97,11 +97,18 @@ function DependencyGrid({
   const theadRef = useRef<HTMLTableSectionElement>(null);
   const hintId = useId();
   const externalDescriptionId = useId();
-  const { release, write } = useCrossHighlight(scrollRef, highlightIdOf);
 
-  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const keyOf = useCallback(
+    (target: Element) => {
+      const index = rowIndexOf(target);
+      const row = index === null ? undefined : rows[index];
+      return row === undefined ? null : rowKeyOf(row);
+    },
+    [rows]
+  );
+  const { activeKey, onBlur, onFocus, onMouseOut, onMouseOver, setActiveKey } =
+    useRowHighlightHandlers(scrollRef, highlightIdOf, { keyOf });
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
-  const [containsFocus, setContainsFocus] = useState(false);
 
   const [scrollMargin, setScrollMargin] = useState(0);
   useLayoutEffect(() => {
@@ -117,7 +124,7 @@ function DependencyGrid({
   const firstFocusable = rows.findIndex(isFocusable);
   let tabbableIndex: number | null =
     firstFocusable === -1 ? null : firstFocusable;
-  if (activeIndex !== undefined && isFocusable(rows[activeIndex])) {
+  if (activeIndex !== undefined && hasControl(rows[activeIndex])) {
     tabbableIndex = activeIndex;
   }
   const targetIndex =
@@ -159,25 +166,35 @@ function DependencyGrid({
   }, [canFetchMore, endIndex, fetchMore, loaded]);
 
   useLayoutEffect(() => {
+    if (focusTarget === null) {
+      return;
+    }
+    if ("after" in focusTarget && activeKey !== TAIL_ROW_KEY) {
+      setFocusTarget(null);
+      return;
+    }
     if (targetIndex === null) {
       return;
     }
+    const row = rows[targetIndex];
     const control = scrollRef.current?.querySelector<HTMLElement>(
       `tr[data-index="${targetIndex}"] button`
     );
-    if (control === null || control === undefined) {
+    if (row === undefined || control === null || control === undefined) {
       return;
     }
-    control.focus({ preventScroll: true });
     setFocusTarget(null);
-  }, [targetIndex]);
-
-  useLayoutEffect(() => {
-    if (containsFocus && !scrollRef.current?.contains(document.activeElement)) {
-      setContainsFocus(false);
-      release();
+    const active = document.activeElement;
+    const focusIsFree =
+      active === null ||
+      active === document.body ||
+      scrollRef.current?.contains(active) === true;
+    if (focusIsFree) {
+      control.focus({ preventScroll: true });
+    } else {
+      setActiveKey(rowKeyOf(row));
     }
-  });
+  }, [activeKey, focusTarget, rows, setActiveKey, targetIndex]);
 
   const moveTo = useCallback(
     (index: number) => {
@@ -196,7 +213,7 @@ function DependencyGrid({
       const row = rows[index];
       if (row?.type === "row" && !row.entry.isExternal) {
         onReveal(row.entry);
-      } else if (row?.type === "tail-error" && row.retryable) {
+      } else if (row?.type === "tail" && isFocusable(row)) {
         const previous = rows[index - 1];
         if (previous !== undefined) {
           setFocusTarget({ after: rowKeyOf(previous) });
@@ -235,88 +252,16 @@ function DependencyGrid({
     [activate]
   );
 
-  const handleFocus = useCallback(
-    (event: FocusEvent<HTMLButtonElement>) => {
-      const index = rowIndexOf(event.currentTarget);
-      const row = index === null ? undefined : rows[index];
-      if (row === undefined) {
-        return;
-      }
-      setContainsFocus(true);
-      setActiveKey(rowKeyOf(row));
-      const highlightId = highlightIdOfTarget(event.target);
-      if (highlightId === null) {
-        release();
-      } else {
-        write(highlightId);
-      }
-    },
-    [release, rows, write]
-  );
-
-  const handleBlur = useCallback(
-    (event: FocusEvent<HTMLButtonElement>) => {
-      if (scrollRef.current?.contains(event.relatedTarget)) {
-        return;
-      }
-      setContainsFocus(false);
-      release();
-    },
-    [release]
-  );
-
-  const handleMouseOver = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
-      const highlightId = highlightIdOfTarget(event.target);
-      if (highlightId !== null) {
-        write(highlightId);
-      }
-    },
-    [write]
-  );
-
-  const handleMouseOut = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
-      const scroller = scrollRef.current;
-      const { relatedTarget } = event;
-      if (
-        relatedTarget instanceof Node &&
-        scroller?.contains(relatedTarget) &&
-        highlightIdOfTarget(relatedTarget) !== null
-      ) {
-        return;
-      }
-      const active = document.activeElement;
-      const focused =
-        active !== null && scroller?.contains(active)
-          ? highlightIdOf(active)
-          : null;
-      if (focused === null) {
-        release();
-      } else {
-        write(focused);
-      }
-    },
-    [release, write]
-  );
-
   const controlHandlers = useMemo(
     (): RowControlHandlers => ({
-      onBlur: handleBlur,
+      onBlur,
       onClick: handleClick,
-      onFocus: handleFocus,
+      onFocus,
       onKeyDown: handleKeyDown,
-      onMouseOut: handleMouseOut,
-      onMouseOver: handleMouseOver,
+      onMouseOut,
+      onMouseOver,
     }),
-    [
-      handleBlur,
-      handleClick,
-      handleFocus,
-      handleKeyDown,
-      handleMouseOut,
-      handleMouseOver,
-    ]
+    [handleClick, handleKeyDown, onBlur, onFocus, onMouseOut, onMouseOver]
   );
   const context: RowContext = {
     controlHandlers,
@@ -330,10 +275,10 @@ function DependencyGrid({
 
   return (
     <>
-      <p className="sr-only" id={hintId}>
+      <p hidden id={hintId}>
         {t.inspector.dependencies.keyboardHint}
       </p>
-      <p className="sr-only" id={externalDescriptionId}>
+      <p hidden id={externalDescriptionId}>
         {t.inspector.dependencies.externalDescription}
       </p>
       <div
@@ -389,32 +334,39 @@ export function DependencyTable({
     element.elementId,
     direction
   );
-  const { rows } = dependencies;
+  const { refreshError, retryFirst, rows } = dependencies;
 
   if (rows === undefined) {
     return dependencies.status === "pending" ? (
       <LoadingFirstPage />
     ) : (
-      <DependenciesFailure
-        error={dependencies.error}
-        onRetry={dependencies.retryFirst}
-      />
+      <DependenciesFailure error={dependencies.error} onRetry={retryFirst} />
     );
   }
+  const refreshFailure =
+    refreshError === null ? null : (
+      <DependenciesFailure error={refreshError} onRetry={retryFirst} />
+    );
   if (rows.length === 0) {
     return (
-      <p className="border-t py-3 text-muted-foreground text-sm">
-        {t.inspector.dependencies.empty[direction][element.kind]}
-      </p>
+      <>
+        {refreshFailure}
+        <p className="border-t py-3 text-muted-foreground text-sm">
+          {t.inspector.dependencies.empty[direction][element.kind]}
+        </p>
+      </>
     );
   }
   return (
-    <DependencyGrid
-      dependencies={dependencies}
-      direction={direction}
-      element={element}
-      onReveal={onReveal}
-      rows={rows}
-    />
+    <>
+      {refreshFailure}
+      <DependencyGrid
+        dependencies={dependencies}
+        direction={direction}
+        element={element}
+        onReveal={onReveal}
+        rows={rows}
+      />
+    </>
   );
 }

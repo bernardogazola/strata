@@ -187,6 +187,9 @@ function DescribedElement({
   return (
     <>
       {header}
+      <p className="sr-only" role="status">
+        {detail === undefined && error === null ? t.inspector.loading : ""}
+      </p>
       <Tabs.Root
         className={columnClass(shownTab)}
         onValueChange={handleTabChange}

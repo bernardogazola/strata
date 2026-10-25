@@ -7,7 +7,7 @@ import { formatProtocolError } from "@/i18n/errors";
 import { t } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
 import { InfoGlyph } from "./inspector-glyphs";
-import { DependencyPageContractError } from "./inspector-model";
+import { dependencyFailureOf } from "./inspector-model";
 
 const SKELETON_ROWS = ["first", "second", "third", "fourth"] as const;
 
@@ -23,9 +23,6 @@ export function NotOnMapNote({ reason }: { readonly reason: NotOnMapReason }) {
 export function LoadingDetail() {
   return (
     <div aria-busy="true" className="flex flex-col gap-3 pt-4">
-      <p className="sr-only" role="status">
-        {t.inspector.loading}
-      </p>
       <div aria-hidden="true" className="flex flex-col gap-3">
         <Skeleton className="h-3 w-28 rounded-sm" />
         <Skeleton className="h-3 w-full rounded-sm" />
@@ -66,12 +63,18 @@ export function DescribeFailure({
   );
 }
 
+export function SummarySkeleton() {
+  return (
+    <Skeleton
+      aria-hidden="true"
+      className="my-[3px] h-2.5 w-[220px] max-w-full shrink-0 rounded-sm"
+    />
+  );
+}
+
 export function LoadingFirstPage() {
   return (
     <div aria-busy="true" className="border-t">
-      <p className="sr-only" role="status">
-        {t.inspector.dependencies.loading}
-      </p>
       <div aria-hidden="true">
         {SKELETON_ROWS.map((row) => (
           <div className="flex flex-col gap-2 border-b py-3" key={row}>
@@ -94,10 +97,7 @@ export function DependenciesFailure({
   readonly error: Error | null;
   readonly onRetry: () => void;
 }) {
-  const message =
-    error === null || error instanceof DependencyPageContractError
-      ? null
-      : formatProtocolError(protocolErrorOf(error));
+  const message = error === null ? null : dependencyFailureOf(error);
   return (
     <div className="flex flex-col items-start gap-2.5 border-t pt-3">
       <div className="flex flex-col gap-0.5" role="alert">

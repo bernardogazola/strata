@@ -1,7 +1,9 @@
 import {
+  type Dispatch,
   type FocusEvent,
   type MouseEvent,
   type RefObject,
+  type SetStateAction,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -82,6 +84,8 @@ export interface RowHighlight {
   readonly onFocus: (event: FocusEvent<Element>) => void;
   readonly onMouseOut: (event: MouseEvent<Element>) => void;
   readonly onMouseOver: (event: MouseEvent<Element>) => void;
+
+  readonly setActiveKey: Dispatch<SetStateAction<string | null>>;
 }
 
 export const useRowHighlightHandlers = (
@@ -169,5 +173,13 @@ export const useRowHighlightHandlers = (
     [containerRef, idOf, release, write]
   );
 
-  return { activeKey, containsFocus, onBlur, onFocus, onMouseOut, onMouseOver };
+  return {
+    activeKey,
+    containsFocus,
+    onBlur,
+    onFocus,
+    onMouseOut,
+    onMouseOver,
+    setActiveKey,
+  };
 };

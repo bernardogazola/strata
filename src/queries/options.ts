@@ -171,6 +171,20 @@ const fetchDependencyPage =
       limit: DEPENDENCY_PAGE_LIMIT,
     });
 
+interface DependencyPages {
+  readonly pages: readonly DependencyPage[];
+}
+
+const SELECT_DEPENDENCY_ROWS = {
+  IN: (data: DependencyPages): DependencyRows =>
+    flattenDependencyPages(data.pages, "IN"),
+  OUT: (data: DependencyPages): DependencyRows =>
+    flattenDependencyPages(data.pages, "OUT"),
+} as const satisfies Record<
+  DependencyDirection,
+  (data: DependencyPages) => DependencyRows
+>;
+
 export const dependencyPagesQueryOptions = (
   analysisId: string,
   elementId: string,
@@ -186,7 +200,5 @@ export const dependencyPagesQueryOptions = (
       direction,
       DEPENDENCY_PAGE_LIMIT
     ),
-    select: (data: {
-      readonly pages: readonly DependencyPage[];
-    }): DependencyRows => flattenDependencyPages(data.pages, direction),
+    select: SELECT_DEPENDENCY_ROWS[direction],
   });

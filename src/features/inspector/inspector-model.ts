@@ -1,3 +1,5 @@
+import { protocolErrorOf } from "@/bridge/analyzer";
+import { type ErrorMessage, formatProtocolError } from "@/i18n/errors";
 import {
   dependencyTypeLabels,
   dependencyTypePassiveLabels,
@@ -38,6 +40,7 @@ export interface DependencyRows {
 
 export class DependencyPageContractError extends Error {
   readonly violation:
+    | "DUPLICATE_ROW"
     | "EMPTY_PAGE_WITH_CURSOR"
     | "INTERNAL_AFTER_EXTERNAL"
     | "TOTALS_CHANGED";
@@ -48,6 +51,11 @@ export class DependencyPageContractError extends Error {
     this.violation = violation;
   }
 }
+
+export const dependencyFailureOf = (error: Error): ErrorMessage | null =>
+  error instanceof DependencyPageContractError
+    ? null
+    : formatProtocolError(protocolErrorOf(error));
 
 const NO_TOTALS: DependencyPage["totals"] = {
   in: 0,
@@ -95,10 +103,15 @@ export const flattenDependencyPages = (
   const { totals } = first;
   const externalCount = totals.outExternal ?? 0;
   const items: DependencyListItem[] = [];
+  const seenIds = new Set<string>();
   let seenExternal = false;
   for (const page of pages) {
     assertPage(page, totals);
     for (const entry of page.items) {
+      if (seenIds.has(entry.elementId)) {
+        throw new DependencyPageContractError("DUPLICATE_ROW");
+      }
+      seenIds.add(entry.elementId);
       if (entry.isExternal && !seenExternal) {
         seenExternal = true;
         items.push({

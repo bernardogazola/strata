@@ -4,25 +4,29 @@ import type { DependencyDirection } from "@/protocol/enums";
 import { dependencyPagesQueryOptions } from "@/queries/options";
 import {
   type DependencyListItem,
-  DependencyPageContractError,
   type DependencyRows,
+  dependencyFailureOf,
 } from "./inspector-model";
 
 export interface LoadingTailModel {
   readonly index: number;
-  readonly type: "tail-loading";
+  readonly state: "loading";
+  readonly type: "tail";
 }
 
-export interface ErrorTailModel {
+export interface FailedTailModel {
   readonly index: number;
   readonly retryable: boolean;
-  readonly type: "tail-error";
+  readonly state: "failed";
+  readonly title: string | null;
+  readonly type: "tail";
 }
 
-export type DependencyTableRow =
-  | DependencyListItem
-  | ErrorTailModel
-  | LoadingTailModel;
+export type TailModel = FailedTailModel | LoadingTailModel;
+
+export type DependencyTableRow = DependencyListItem | TailModel;
+
+export const TAIL_ROW_KEY = "tail";
 
 export const rowKeyOf = (row: DependencyTableRow): string => {
   switch (row.type) {
@@ -30,10 +34,8 @@ export const rowKeyOf = (row: DependencyTableRow): string => {
       return row.entry.elementId;
     case "externals-heading":
       return "externals:heading";
-    case "tail-loading":
-      return "tail:loading";
-    case "tail-error":
-      return "tail:error";
+    case "tail":
+      return TAIL_ROW_KEY;
     default:
       return row satisfies never;
   }
@@ -53,6 +55,8 @@ export interface Dependencies {
   readonly list: DependencyRows | undefined;
 
   readonly loaded: number;
+
+  readonly refreshError: Error | null;
 
   readonly retryFirst: () => void;
 
@@ -100,25 +104,34 @@ export const useDependencies = (
     fetchNextPage(NO_CANCEL);
   }, [fetchNextPage, isRefetchError, refetch]);
 
-  const contractBroken = error instanceof DependencyPageContractError;
+  const refreshFailed = isRefetchError && !hasNextPage;
   const rows = useMemo((): readonly DependencyTableRow[] | undefined => {
     if (data === undefined) {
       return;
     }
-    const index = data.items.length;
+    const loading: LoadingTailModel = {
+      index: data.items.length,
+      state: "loading",
+      type: "tail",
+    };
     if (isFetchingNextPage) {
-      return [...data.items, { index, type: "tail-loading" }];
+      return [...data.items, loading];
     }
-    if (isError) {
+    if (isError && error !== null && !refreshFailed) {
+      const message = dependencyFailureOf(error);
       return [
         ...data.items,
-        { index, retryable: !contractBroken, type: "tail-error" },
+        {
+          index: data.items.length,
+          retryable: message?.retryable ?? false,
+          state: "failed",
+          title: message?.title ?? null,
+          type: "tail",
+        },
       ];
     }
-    return hasNextPage
-      ? [...data.items, { index, type: "tail-loading" }]
-      : data.items;
-  }, [contractBroken, data, hasNextPage, isError, isFetchingNextPage]);
+    return hasNextPage ? [...data.items, loading] : data.items;
+  }, [data, error, hasNextPage, isError, isFetchingNextPage, refreshFailed]);
 
   return {
     busy: isFetching,
@@ -127,6 +140,7 @@ export const useDependencies = (
     fetchMore,
     list: data,
     loaded: data?.items.length ?? 0,
+    refreshError: data !== undefined && refreshFailed ? error : null,
     retryFirst,
     retryMore,
     rows,

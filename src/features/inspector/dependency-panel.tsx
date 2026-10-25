@@ -1,7 +1,7 @@
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { countPhrase } from "@/features/repository/count-phrase";
 import type { RevealTarget } from "@/features/shell/repository-search";
 import { interpolate } from "@/i18n/format";
@@ -13,6 +13,7 @@ import {
 import type { DependencyPage, ElementDetail } from "@/protocol/graph";
 import { dependencyPagesQueryOptions } from "@/queries/options";
 import { DependencyTable, type InspectedElement } from "./dependency-table";
+import { SummarySkeleton } from "./inspector-states";
 
 const DIRECTIONS = [
   { label: t.inspector.dependsOn, value: "OUT" },
@@ -26,22 +27,38 @@ const totalsOf = (data: {
   readonly pages: readonly DependencyPage[];
 }): DependencyPage["totals"] | null => data.pages[0]?.totals ?? null;
 
-const useExternalCount = (
+interface DirectionPage {
+  readonly external: number | undefined;
+
+  readonly pending: boolean;
+}
+
+const useDirectionPage = (
   analysisId: string,
   element: InspectedElement,
   direction: DependencyDirection
-): number | undefined => {
+): DirectionPage => {
   const counted = direction === "OUT" && element.kind === "TYPE";
-  const { data } = useInfiniteQuery({
+  const { data, isPending } = useInfiniteQuery({
     ...dependencyPagesQueryOptions(analysisId, element.elementId, direction),
     select: totalsOf,
   });
   if (!counted) {
-    return 0;
+    return { external: 0, pending: isPending };
   }
-  return data === undefined || data === null
-    ? undefined
-    : (data.outExternal ?? 0);
+  return {
+    external:
+      data === undefined || data === null ? undefined : (data.outExternal ?? 0),
+    pending: isPending,
+  };
+};
+
+const useLoadingAnnouncement = (pending: boolean): string => {
+  const [announcement, setAnnouncement] = useState("");
+  useEffect(() => {
+    setAnnouncement(pending ? t.inspector.dependencies.loading : "");
+  }, [pending]);
+  return announcement;
 };
 
 const summaryOf = (
@@ -80,7 +97,12 @@ export function DependencyPanel({
   onReveal,
   onSelectDirection,
 }: DependencyPanelProps) {
-  const external = useExternalCount(analysisId, element, direction);
+  const { external, pending } = useDirectionPage(
+    analysisId,
+    element,
+    direction
+  );
+  const announcement = useLoadingAnnouncement(pending);
   const summary = summaryOf(
     direction === "OUT" ? graph.fanOut : graph.fanIn,
     external,
@@ -115,9 +137,13 @@ export function DependencyPanel({
           </Radio.Root>
         ))}
       </RadioGroup>
+      <p className="sr-only" role="status">
+        {announcement}
+      </p>
       {summary === null ? null : (
         <p className="text-muted-foreground text-xs">{summary}</p>
       )}
+      {pending && external === undefined ? <SummarySkeleton /> : null}
       <DependencyTable
         analysisId={analysisId}
         direction={direction}
