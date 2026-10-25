@@ -1,6 +1,5 @@
 import { elementDisplayLabel } from "@/features/graph/adapter";
 import { LOCALE } from "@/i18n/format";
-import { pinIndexes as pinVirtualIndexes } from "@/lib/virtual-range";
 import type { OutlineNodeRow, OutlineRow } from "./use-outline";
 
 export type FocusTarget =
@@ -220,5 +219,3 @@ export const followTarget = (
     ? { after: target.after, waitingOn: next.key }
     : target;
 };
-
-export const pinIndexes = pinVirtualIndexes;

@@ -4,7 +4,6 @@ import {
   useVirtualizer,
 } from "@tanstack/react-virtual";
 import {
-  type FocusEvent,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
@@ -24,7 +23,7 @@ import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
 import { type ErrorMessage, formatProtocolError } from "@/i18n/errors";
 import { t } from "@/i18n/messages";
-import { useCrossHighlight } from "@/lib/cross-highlight";
+import { useRowHighlightHandlers } from "@/lib/cross-highlight";
 import { cn } from "@/lib/utils";
 import { pinIndexes } from "@/lib/virtual-range";
 import type { ElementKind } from "@/protocol/enums";
@@ -141,12 +140,31 @@ function OutlineTree({
   treeRef,
   view,
 }: OutlineTreeProps) {
-  const { release, write } = useCrossHighlight(treeRef, elementIdOf);
-
-  const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [containsFocus, setContainsFocus] = useState(false);
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
   const typeahead = useRef(EMPTY_TYPEAHEAD);
+
+  const keyOf = useCallback(
+    (target: Element) => {
+      const index = rowIndexOf(target);
+      return index === null ? null : (rows[index]?.key ?? null);
+    },
+    [rows]
+  );
+
+  const cancelPendingTarget = useCallback(
+    (relatedTarget: EventTarget | null) => {
+      if (relatedTarget !== null) {
+        setFocusTarget(null);
+      }
+    },
+    []
+  );
+
+  const { activeKey, containsFocus, ...highlightHandlers } =
+    useRowHighlightHandlers(treeRef, elementIdOf, {
+      keyOf,
+      onFocusLeave: cancelPendingTarget,
+    });
 
   const viewKey = `${view.level}:${view.parentId ?? ""}`;
   const refocusFrom = useRef<string | null>(null);
@@ -219,13 +237,6 @@ function OutlineTree({
       ?.querySelector<HTMLElement>(`[data-index="${tabbableIndex}"]`)
       ?.focus({ preventScroll: true });
   }, [tabbableIndex, treeRef, viewKey]);
-
-  useLayoutEffect(() => {
-    if (containsFocus && !treeRef.current?.contains(document.activeElement)) {
-      setContainsFocus(false);
-      release();
-    }
-  });
 
   useEffect(() => {
     if (!containsFocus && tabbableIndex !== null) {
@@ -347,84 +358,18 @@ function OutlineTree({
     [activate, expandedId, rows, run]
   );
 
-  const handleFocus = useCallback(
-    (event: FocusEvent<HTMLDivElement>) => {
-      const index = rowIndexOf(event.target);
-      const row = index === null ? undefined : rows[index];
-      if (row === undefined) {
-        return;
-      }
-      setContainsFocus(true);
-      setActiveKey(row.key);
-      if (row.type === "node") {
-        write(row.node.id);
-      } else {
-        release();
-      }
-    },
-    [release, rows, write]
-  );
-
-  const handleBlur = useCallback(
-    (event: FocusEvent<HTMLDivElement>) => {
-      const { relatedTarget } = event;
-      if (event.currentTarget.contains(relatedTarget)) {
-        return;
-      }
-      setContainsFocus(false);
-      release();
-      if (relatedTarget !== null) {
-        setFocusTarget(null);
-      }
-    },
-    [release]
-  );
-
-  const handleMouseOver = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
-      const elementId = elementIdOf(event.target);
-      if (elementId !== null) {
-        write(elementId);
-      }
-    },
-    [write]
-  );
-
-  const handleMouseOut = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
-      const tree = event.currentTarget;
-      const { relatedTarget } = event;
-      if (
-        relatedTarget instanceof Node &&
-        tree.contains(relatedTarget) &&
-        elementIdOf(relatedTarget) !== null
-      ) {
-        return;
-      }
-      const focused = tree.contains(document.activeElement)
-        ? elementIdOf(document.activeElement)
-        : null;
-      if (focused === null) {
-        release();
-      } else {
-        write(focused);
-      }
-    },
-    [release, write]
-  );
-
   return (
     <div
       aria-busy={busy}
       aria-describedby={hintId}
       aria-labelledby={headingId}
       className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1"
-      onBlur={handleBlur}
+      onBlur={highlightHandlers.onBlur}
       onClick={handleClick}
-      onFocus={handleFocus}
+      onFocus={highlightHandlers.onFocus}
       onKeyDown={handleKeyDown}
-      onMouseOut={handleMouseOut}
-      onMouseOver={handleMouseOver}
+      onMouseOut={highlightHandlers.onMouseOut}
+      onMouseOver={highlightHandlers.onMouseOver}
       ref={treeRef}
       role="tree"
     >
