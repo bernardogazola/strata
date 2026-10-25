@@ -24,10 +24,11 @@ import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
 import { type ErrorMessage, formatProtocolError } from "@/i18n/errors";
 import { t } from "@/i18n/messages";
+import { useCrossHighlight } from "@/lib/cross-highlight";
 import { cn } from "@/lib/utils";
+import { pinIndexes } from "@/lib/virtual-range";
 import type { ElementKind } from "@/protocol/enums";
 import type { GraphViewParams } from "@/queries/options";
-import { useAppStore } from "@/state/app-store";
 import {
   EMPTY_TYPEAHEAD,
   extendTypeahead,
@@ -36,7 +37,6 @@ import {
   intentOf,
   isTypeaheadKey,
   type KeyIntent,
-  pinIndexes,
   resolveTabbable,
   resolveTarget,
   toggleIntent,
@@ -105,41 +105,6 @@ const refusalOf = (error: Error | null): ErrorMessage | null => {
     : null;
 };
 
-const useCrossHighlight = (treeRef: RefObject<HTMLDivElement | null>) => {
-  const written = useRef<string | null>(null);
-  const write = useCallback((elementId: string) => {
-    written.current = elementId;
-    useAppStore.getState().setActiveElementId(elementId);
-  }, []);
-  const release = useCallback(() => {
-    const elementId = written.current;
-    written.current = null;
-    if (elementId !== null) {
-      useAppStore.getState().releaseActiveElementId(elementId);
-    }
-  }, []);
-  useEffect(() => release, [release]);
-  useEffect(
-    () =>
-      useAppStore.subscribe((state, previous) => {
-        if (
-          state.activeElementId !== null ||
-          previous.activeElementId === null
-        ) {
-          return;
-        }
-        const focused = treeRef.current?.contains(document.activeElement)
-          ? elementIdOf(document.activeElement)
-          : null;
-        if (focused !== null) {
-          write(focused);
-        }
-      }),
-    [treeRef, write]
-  );
-  return { release, write };
-};
-
 interface OutlineTreeProps {
   readonly busy: boolean;
 
@@ -176,7 +141,7 @@ function OutlineTree({
   treeRef,
   view,
 }: OutlineTreeProps) {
-  const { release, write } = useCrossHighlight(treeRef);
+  const { release, write } = useCrossHighlight(treeRef, elementIdOf);
 
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [containsFocus, setContainsFocus] = useState(false);

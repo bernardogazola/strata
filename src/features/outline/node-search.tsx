@@ -24,12 +24,12 @@ import { formatProtocolError } from "@/i18n/errors";
 import { interpolate, plural } from "@/i18n/format";
 import { elementKindLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
+import { useCrossHighlight } from "@/lib/cross-highlight";
 import { clampText, sanitizeUntrusted } from "@/lib/untrusted";
 import { cn } from "@/lib/utils";
 import type { SearchHit } from "@/protocol/graph";
 import { SEARCH_QUERY_MAX_CHARS } from "@/protocol/primitives";
 import { graphSearchQueryOptions } from "@/queries/options";
-import { useAppStore } from "@/state/app-store";
 
 export const SEARCH_DEBOUNCE_MS = 250;
 
@@ -69,6 +69,9 @@ const optionOf = (target: EventTarget | null): HTMLElement | null =>
   target instanceof Element
     ? target.closest<HTMLElement>('[role="option"]')
     : null;
+
+const optionIdOf = (element: Element): string | null =>
+  optionOf(element)?.dataset.elementId ?? null;
 
 const crossedOptionId = (
   event: MouseEvent<HTMLElement>
@@ -241,55 +244,17 @@ function SearchResults({
     ? rovingId
     : (hits[0]?.elementId ?? null);
 
-  const writtenRef = useRef<string | null>(null);
-
-  const write = useCallback((elementId: string) => {
-    writtenRef.current = elementId;
-    useAppStore.getState().setActiveElementId(elementId);
-  }, []);
-
-  const release = useCallback((elementId: string) => {
-    useAppStore.getState().releaseActiveElementId(elementId);
-    if (writtenRef.current === elementId) {
-      writtenRef.current = null;
-    }
-  }, []);
+  const { release, write, written } = useCrossHighlight(listRef, optionIdOf);
 
   useEffect(() => {
-    const written = writtenRef.current;
-    if (written !== null && !hits.some((hit) => hit.elementId === written)) {
-      release(written);
+    const elementId = written();
+    if (
+      elementId !== null &&
+      !hits.some((hit) => hit.elementId === elementId)
+    ) {
+      release(elementId);
     }
-  }, [hits, release]);
-
-  useEffect(
-    () => () => {
-      const written = writtenRef.current;
-      if (written !== null) {
-        useAppStore.getState().releaseActiveElementId(written);
-      }
-    },
-    []
-  );
-
-  useEffect(
-    () =>
-      useAppStore.subscribe((state, previous) => {
-        if (
-          state.activeElementId !== null ||
-          previous.activeElementId === null
-        ) {
-          return;
-        }
-        const focused = listRef.current?.contains(document.activeElement)
-          ? optionOf(document.activeElement)?.dataset.elementId
-          : undefined;
-        if (focused !== undefined) {
-          write(focused);
-        }
-      }),
-    [listRef, write]
-  );
+  }, [hits, release, written]);
 
   const activate = useCallback(
     (option: HTMLElement) => {

@@ -1,5 +1,6 @@
 import { elementDisplayLabel } from "@/features/graph/adapter";
 import { LOCALE } from "@/i18n/format";
+import { pinIndexes as pinVirtualIndexes } from "@/lib/virtual-range";
 import type { OutlineNodeRow, OutlineRow } from "./use-outline";
 
 export type FocusTarget =
@@ -220,15 +221,4 @@ export const followTarget = (
     : target;
 };
 
-export const pinIndexes = (
-  indexes: readonly number[],
-  pinned: readonly (number | null)[]
-): number[] => {
-  const extra = pinned.filter(
-    (index): index is number => index !== null && !indexes.includes(index)
-  );
-  if (extra.length === 0) {
-    return [...indexes];
-  }
-  return [...new Set([...indexes, ...extra])].sort((a, b) => a - b);
-};
+export const pinIndexes = pinVirtualIndexes;
