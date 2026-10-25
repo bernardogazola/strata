@@ -5,7 +5,6 @@ import {
 } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import {
-  type ReactNode,
   type RefObject,
   useCallback,
   useEffect,
@@ -18,10 +17,7 @@ import { ErrorSurface } from "@/features/errors/error-surface";
 import { elementDisplayLabel } from "@/features/graph/adapter";
 import { ElementLabel } from "@/features/graph/element-label";
 import { GraphPanel } from "@/features/graph/graph-panel";
-import {
-  NodeSummary,
-  type NotOnMapReason,
-} from "@/features/graph/node-summary";
+import { ElementInspector } from "@/features/inspector/element-inspector";
 import {
   ArchitectureOutline,
   type OutlineHandle,
@@ -35,14 +31,9 @@ import { CompletenessCaveat } from "@/features/progress/completeness-caveat";
 import { PrepareScreen } from "@/features/repository/prepare-screen";
 import { t } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
-import type { ElementKind } from "@/protocol/enums";
+import type { DependencyDirection, ElementKind } from "@/protocol/enums";
 import type { ProtocolError } from "@/protocol/errors";
-import type {
-  GraphNode,
-  GraphSlice,
-  OutlinePage,
-  SearchHit,
-} from "@/protocol/graph";
+import type { GraphSlice, OutlinePage, SearchHit } from "@/protocol/graph";
 import {
   type GraphViewParams,
   graphSliceQueryOptions,
@@ -55,39 +46,21 @@ import {
   backToLevelOne,
   changesView,
   expandPackage,
+  type InspectorTab,
+  type RevealTarget,
   resolveGraphView,
+  revealElement,
   revealSearchHit,
   type SearchTransition,
+  selectDirection,
   selectElement,
+  selectTab,
   selectWhereDrawn,
 } from "./repository-search";
 import { SkipToOutline } from "./skip-to-outline";
 
 const ROUTE_ID = "/repository/$handle";
 const routeApi = getRouteApi(ROUTE_ID);
-
-interface FocusedNode {
-  readonly node: GraphNode | null;
-
-  readonly notOnMap: NotOnMapReason | undefined;
-}
-
-const describeFocus = (
-  slice: GraphSlice,
-  elementId: string | null
-): FocusedNode => {
-  if (elementId === null) {
-    return { node: null, notOnMap: undefined };
-  }
-  const node = slice.nodes.find((candidate) => candidate.id === elementId);
-  if (node !== undefined) {
-    return { node, notOnMap: undefined };
-  }
-  if (slice.aggregated) {
-    return { node: null, notOnMap: "aggregated" };
-  }
-  return { node: null, notOnMap: slice.truncated ? "truncated" : undefined };
-};
 
 const LEVEL_ONE: GraphViewParams = { level: "PACKAGE" };
 
@@ -223,39 +196,6 @@ function MapBreadcrumb({
   );
 }
 
-function FocusedNodeSummary({
-  analysisId,
-  caveat,
-  focus,
-  onExpand,
-  view,
-}: {
-  readonly analysisId: string;
-  readonly caveat: ReactNode;
-  readonly focus: string | null;
-  readonly onExpand: (elementId: string) => void;
-  readonly view: GraphViewParams;
-}) {
-  const selectFocus = useCallback(
-    (slice: GraphSlice) => describeFocus(slice, focus),
-    [focus]
-  );
-  const { data } = useQuery({
-    ...graphSliceQueryOptions(analysisId, view),
-    select: selectFocus,
-  });
-  return (
-    <NodeSummary
-      caveat={caveat}
-      focus={focus}
-      level={view.level}
-      node={data?.node ?? null}
-      notOnMap={data?.notOnMap}
-      onExpand={onExpand}
-    />
-  );
-}
-
 function RepositoryWorkspace({ header, report }: AnalysisWorkspaceProps) {
   const search = routeApi.useSearch();
   const navigate = routeApi.useNavigate();
@@ -292,6 +232,18 @@ function RepositoryWorkspace({ header, report }: AnalysisWorkspaceProps) {
     (hit: SearchHit) => go(revealSearchHit(hit)),
     [go]
   );
+  const onRevealRow = useCallback(
+    (target: RevealTarget) => go(revealElement(target)),
+    [go]
+  );
+  const onSelectTab = useCallback(
+    (tab: InspectorTab) => go(selectTab(tab)),
+    [go]
+  );
+  const onSelectDirection = useCallback(
+    (direction: DependencyDirection) => go(selectDirection(direction)),
+    [go]
+  );
   const onSkip = useCallback(() => outlineRef.current?.focus(), []);
 
   return (
@@ -303,11 +255,16 @@ function RepositoryWorkspace({ header, report }: AnalysisWorkspaceProps) {
         />
       }
       inspector={
-        <FocusedNodeSummary
+        <ElementInspector
           analysisId={analysisId}
           caveat={<CompletenessCaveat compact report={report} />}
+          direction={search.direction}
           focus={focus}
           onExpand={onExpand}
+          onReveal={onRevealRow}
+          onSelectDirection={onSelectDirection}
+          onSelectTab={onSelectTab}
+          tab={search.tab}
           view={view}
         />
       }

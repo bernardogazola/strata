@@ -82,7 +82,7 @@ function Metric({
   );
 }
 
-function ExpandButton({
+export function ExpandButton({
   elementId,
   onExpand,
 }: {
