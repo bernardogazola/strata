@@ -319,19 +319,149 @@ const ptBR = {
   },
 
   inspector: {
+    dependencies: {
+      ambiguous: "ambígua entre tipos do repositório",
+      direction: "Direção das dependências",
+      empty: {
+        IN: {
+          PACKAGE: "Nenhum pacote depende deste.",
+          TYPE: "Nenhum tipo do repositório depende deste.",
+        },
+        OUT: {
+          PACKAGE: "Este pacote não depende de nenhum outro pacote.",
+          TYPE: "Este tipo não depende de nenhum outro tipo do repositório.",
+        },
+      },
+      externalCount: {
+        one: "{count} dependência externa",
+        other: "{count} dependências externas",
+        zero: "nenhuma dependência externa",
+      },
+      externalDescription: "Fora do repositório: não aparece no mapa.",
+      externalHeading: "Fora do repositório",
+      failed: "Não foi possível carregar as dependências.",
+      failedMore: "Não foi possível carregar mais dependências.",
+      keyboardHint: "As setas percorrem e Enter mostra o elemento no mapa.",
+      loading: "Carregando as dependências…",
+      loadingMore: "Carregando mais dependências…",
+      packageOf: "no pacote {name}",
+      summary: {
+        internal: {
+          PACKAGE: {
+            one: "{count} pacote",
+            other: "{count} pacotes",
+            zero: "Nenhum pacote",
+          },
+          TYPE: {
+            one: "{count} tipo do repositório",
+            other: "{count} tipos do repositório",
+            zero: "Nenhum tipo do repositório",
+          },
+        },
+        withExternal: "{internal} e {external}",
+      },
+    },
     dependsOn: "Depende de",
     empty: "Selecione um elemento no mapa para ver os detalhes.",
     expand: "Ver os tipos deste pacote",
+    graphFacts: {
+      cycle: "Ciclo de dependência",
+      cycleNone: "nenhum",
+      cycleSize: {
+        PACKAGE: {
+          one: "{count} pacote, incluindo este",
+          other: "{count} pacotes, incluindo este",
+        },
+        TYPE: {
+          one: "{count} tipo, incluindo este",
+          other: "{count} tipos, incluindo este",
+        },
+      },
+      dependsOnValue: {
+        PACKAGE: {
+          one: "{count} pacote",
+          other: "{count} pacotes",
+          zero: "nenhum pacote",
+        },
+        TYPE: {
+          one: "{count} tipo do repositório",
+          other: "{count} tipos do repositório",
+          zero: "nenhum tipo do repositório",
+        },
+      },
+      openDependencies: "Abre a lista na aba Dependências.",
+      title: "No grafo de dependências",
+      usedByValue: {
+        PACKAGE: {
+          one: "{count} pacote",
+          other: "{count} pacotes",
+          zero: "nenhum pacote",
+        },
+        TYPE: {
+          one: "{count} tipo",
+          other: "{count} tipos",
+          zero: "nenhum tipo",
+        },
+      },
+    },
     group: {
       loc: "linhas de código",
       typeCount: "tipos neste grupo",
     },
+    header: {
+      file: "Arquivo",
+      line: "linha {line}",
+      lines: "linhas {start} a {end}",
+      modifiers: "Modificadores",
+      noLines: "sem linhas no código-fonte",
+      qualifiedName: "Nome completo",
+      test: "Código de teste",
+    },
     kind: "Elemento",
+    loading: "Carregando os detalhes do elemento…",
+    methods: {
+      ccHeader: "complexidade ciclomática",
+      ccNotApplicable: "não se aplica",
+      ccNote:
+        "Não se aplica quando o método não tem corpo escrito: abstrato, de interface, nativo ou gerado pelo compilador.",
+      cut: "Mostrando {shown} de {total} métodos.",
+      none: "Este tipo não declara métodos.",
+      title: "Métodos ({count})",
+    },
+    metrics: {
+      ccMax: "Complexidade ciclomática máxima",
+      ccMean: "Complexidade ciclomática média",
+      ccSum: "Complexidade ciclomática total",
+      loc: "Linhas de código",
+      title: "Tamanho e complexidade",
+    },
     notOnMap: {
       aggregated:
         "Este pacote não aparece sozinho no mapa: o primeiro nível agrupa os pacotes por prefixo. A estrutura da arquitetura e a busca alcançam cada pacote.",
       truncated:
         "Este elemento não aparece no mapa: o limite de exibição do nível o deixou de fora.",
+    },
+    resolution: {
+      caption: {
+        PACKAGE: {
+          one: "Da única referência que o código deste pacote faz",
+          other: "Das {count} referências que o código deste pacote faz",
+          zero: "O código deste pacote não faz referência a nenhum tipo",
+        },
+        TYPE: {
+          one: "Da única referência que o código deste tipo faz",
+          other: "Das {count} referências que o código deste tipo faz",
+          zero: "O código deste tipo não faz referência a nenhum tipo",
+        },
+      },
+      none: "nenhuma",
+      title: "Qualidade de resolução",
+    },
+    tabs: {
+      dependencies: "Dependências",
+      history: "Histórico",
+      label: "Seções do elemento",
+      overview: "Visão geral",
     },
     typeCount: "tipos neste pacote",
     usedBy: "Usado por",

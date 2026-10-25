@@ -80,7 +80,19 @@ export const dependencyTypeLabels = {
   IMPORTS: "importa",
   MODULE_DEPENDENCY: "depende do módulo",
   PARAMETER_TYPE: "recebe como parâmetro",
-  RETURN_TYPE: "devolve",
+  RETURN_TYPE: "retorna",
+} as const satisfies Record<DependencyType, string>;
+
+export const dependencyTypePassiveLabels = {
+  ANNOTATION_REFERENCE: "referenciado como anotação",
+  CALLS: "chamado",
+  EXTENDS: "estendido",
+  FIELD_TYPE: "usado como tipo de campo",
+  IMPLEMENTS: "implementado",
+  IMPORTS: "importado",
+  MODULE_DEPENDENCY: "requerido como módulo",
+  PARAMETER_TYPE: "recebido como parâmetro",
+  RETURN_TYPE: "retornado",
 } as const satisfies Record<DependencyType, string>;
 
 export const resolutionQualityLabels = {

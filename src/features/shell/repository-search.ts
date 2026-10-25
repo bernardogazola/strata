@@ -1,6 +1,8 @@
 import { notFound } from "@tanstack/react-router";
 import { z } from "zod";
 import {
+  type DependencyDirection,
+  dependencyDirectionSchema,
   type ElementKind,
   graphLevelSchema,
   resolutionQualitySchema,
@@ -26,6 +28,7 @@ const PERCENTILE_MIN = 50;
 const PERCENTILE_MAX = 99;
 
 export const REPOSITORY_SEARCH_DEFAULTS = {
+  direction: "OUT",
   minQuality: "INFERRED",
   percentile: 75,
   tab: "overview",
@@ -33,6 +36,10 @@ export const REPOSITORY_SEARCH_DEFAULTS = {
 
 export const repositorySearchSchema = z.object({
   analysis: analysisIdSchema.optional().catch(undefined),
+
+  direction: dependencyDirectionSchema
+    .default(REPOSITORY_SEARCH_DEFAULTS.direction)
+    .catch(REPOSITORY_SEARCH_DEFAULTS.direction),
 
   focus: graphNodeIdSchema.optional().catch(undefined),
 
@@ -118,25 +125,39 @@ export const selectWhereDrawn =
       ? { ...prev, focus: elementId, level: "PACKAGE", parent: undefined }
       : { ...prev, focus: elementId };
 
-export const revealSearchHit =
-  (hit: SearchHit): SearchTransition =>
+export type RevealTarget = Pick<SearchHit, "elementId" | "kind" | "packageId">;
+
+export const revealElement =
+  (target: RevealTarget): SearchTransition =>
   (prev) => {
-    if (hit.kind === "PACKAGE") {
-      return selectWhereDrawn(hit.elementId, hit.kind)(prev);
+    if (target.kind === "PACKAGE") {
+      return selectWhereDrawn(target.elementId, target.kind)(prev);
     }
-    if (hit.kind !== "TYPE" || hit.packageId === null) {
+    if (target.kind !== "TYPE" || target.packageId === null) {
       return prev;
     }
     return {
       ...prev,
-      focus: hit.elementId,
+      focus: target.elementId,
       level: "TYPE",
-      parent: hit.packageId,
+      parent: target.packageId,
     };
   };
 
-export const isRevealable = (hit: SearchHit): boolean =>
-  hit.kind === "PACKAGE" || (hit.kind === "TYPE" && hit.packageId !== null);
+export const revealSearchHit = (hit: SearchHit): SearchTransition =>
+  revealElement(hit);
+
+export const selectTab =
+  (tab: InspectorTab): SearchTransition =>
+  (prev) => ({ ...prev, tab });
+
+export const selectDirection =
+  (direction: DependencyDirection): SearchTransition =>
+  (prev) => ({ ...prev, direction });
+
+export const isRevealable = (target: RevealTarget): boolean =>
+  target.kind === "PACKAGE" ||
+  (target.kind === "TYPE" && target.packageId !== null);
 
 export const parseRepositoryParams = ({
   handle,

@@ -26,7 +26,11 @@ import {
   selectWhereDrawn,
   startAnalysis,
 } from "@/features/shell/repository-search";
-import type { GraphLevel, ResolutionQuality } from "@/protocol/enums";
+import type {
+  DependencyDirection,
+  GraphLevel,
+  ResolutionQuality,
+} from "@/protocol/enums";
 import type { SearchHit } from "@/protocol/graph";
 import { Route as RepositoryRoute } from "@/routes/repository.$handle";
 
@@ -48,6 +52,7 @@ describe("repositorySearchSchema", () => {
   test("params válidos passam como vieram", () => {
     const search = {
       analysis: ANALYSIS_ID,
+      direction: "IN",
       focus: TYPE_ID,
       level: "TYPE",
       minQuality: "RESOLVED",
@@ -100,6 +105,7 @@ describe("repositorySearchSchema", () => {
   test("um link pode omitir todos os campos, level inclusive", () => {
     expectTypeOf<z.input<typeof repositorySearchSchema>>().toEqualTypeOf<{
       analysis?: string | undefined;
+      direction?: DependencyDirection | undefined;
       focus?: string | undefined;
       level?: GraphLevel | undefined;
       minQuality?: ResolutionQuality | undefined;

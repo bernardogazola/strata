@@ -116,6 +116,17 @@ const createGraphHandle = (
     cy.fit(undefined, FIT_PADDING_PX);
     settleViewport(cy);
   },
+  fitElements: (ids) => {
+    const present = ids.reduce(
+      (collection, id) => collection.union(cy.getElementById(id)),
+      cy.collection()
+    );
+    if (present.empty()) {
+      return;
+    }
+    cy.fit(present, FIT_PADDING_PX);
+    settleViewport(cy);
+  },
   nodeIds: () =>
     cy
       .nodes()
