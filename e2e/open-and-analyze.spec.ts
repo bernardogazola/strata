@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { formatProtocolError } from "@/i18n/errors";
 import { t } from "@/i18n/messages";
+import { openFakeRepository } from "./support/fake-run";
 import { expectGraph, fixtureNodeIds } from "./support/graph-page";
 
 const HANDLE = "repo_AAAAAAAAAAAAAAAAAAAAAQ";
@@ -16,16 +17,6 @@ const factValue = (page: Page, label: string) =>
     .getByRole("term")
     .filter({ hasText: label })
     .locator("xpath=following-sibling::dd");
-
-const openFakeRepository = async (page: Page): Promise<void> => {
-  await page.goto("/");
-  const open = mainNamed(page, t.shell.regions.start).getByRole("button", {
-    name: t.repository.open,
-  });
-  await expect(open).not.toHaveAttribute("aria-disabled", "true");
-  await open.click();
-  await expect(mainNamed(page, t.shell.regions.prepare)).toBeVisible();
-};
 
 test("do início ao mapa: a preparação com core e api, Analisar, e o mapa com os pacotes", async ({
   page,

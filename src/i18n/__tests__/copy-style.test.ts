@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { graphNodeKindLabels, stageStatusLabels } from "../labels";
+import {
+  dependencyTypeLabels,
+  dependencyTypePassiveLabels,
+  graphNodeKindLabels,
+  stageStatusLabels,
+} from "../labels";
 import { t } from "../messages";
 
 const MIDDLE_DOT = String.fromCodePoint(0xb7);
@@ -71,7 +76,28 @@ const GROUP_COPY: readonly CatalogueString[] = [
   ...collectStrings(graphNodeKindLabels, "graphNodeKindLabels"),
 ];
 
-const SCOPED_COPY: readonly CatalogueString[] = [...BASE_COPY, ...GROUP_COPY];
+const INSPECTOR_SCOPE_COPY: readonly CatalogueString[] = [
+  ...collectStrings(t.inspector, "inspector"),
+  ...collectStrings(dependencyTypePassiveLabels, "dependencyTypePassiveLabels"),
+  ...collectStrings(
+    dependencyTypeLabels.RETURN_TYPE,
+    "dependencyTypeLabels.RETURN_TYPE"
+  ),
+];
+
+const SCOPED_COPY: readonly CatalogueString[] = [
+  ...BASE_COPY,
+  ...GROUP_COPY,
+  ...INSPECTOR_SCOPE_COPY,
+];
+
+const RESOLUTION_BANNED = [
+  "inferid",
+  "inferênc",
+  "confiáv",
+  "confian",
+  "o quanto",
+];
 
 const contractionsIn = (text: string): string[] =>
   text
@@ -97,6 +123,16 @@ describe("a redação do catálogo", () => {
     expect(paths).toContain("graph.legend.kindNames.PACKAGE_PREFIX");
     expect(paths).toContain("inspector.notOnMap.aggregated");
     expect(paths).toContain("graphNodeKindLabels.PACKAGE_PREFIX");
+  });
+
+  test("o escopo alcança a copy do inspetor", () => {
+    const paths = SCOPED_COPY.map(({ path }) => path);
+
+    expect(paths).toContain("inspector.dependencies.externalHeading");
+    expect(paths).toContain("inspector.graphFacts.cycleSize.TYPE.other");
+    expect(paths).toContain("inspector.methods.ccNote");
+    expect(paths).toContain("dependencyTypePassiveLabels.RETURN_TYPE");
+    expect(paths).toContain("dependencyTypeLabels.RETURN_TYPE");
   });
 
   test("nenhuma frase tem ponto médio", () => {
@@ -127,5 +163,33 @@ describe("a redação do catálogo", () => {
     ]);
     expect(contractionsIn("Numa janela do sistema")).toStrictEqual(["numa"]);
     expect(contractionsIn("Um valor numérico, em um pacote")).toStrictEqual([]);
+  });
+});
+
+describe("a resolução no inspetor", () => {
+  const INSPECTOR_COPY = collectStrings(t.inspector, "inspector");
+
+  test("nenhuma frase do inspetor fala em inferência, confiança ou grau", () => {
+    const offending = INSPECTOR_COPY.filter(({ text }) =>
+      RESOLUTION_BANNED.some((fragment) =>
+        text.toLocaleLowerCase("pt-BR").includes(fragment)
+      )
+    );
+
+    expect(offending).toStrictEqual([]);
+  });
+
+  test("a regra pega as palavras proibidas em qualquer caixa", () => {
+    const banned = (text: string) =>
+      RESOLUTION_BANNED.some((fragment) =>
+        text.toLocaleLowerCase("pt-BR").includes(fragment)
+      );
+
+    expect(banned("Referência Inferida")).toBe(true);
+    expect(banned("Inferência fraca")).toBe(true);
+    expect(banned("Confiável")).toBe(true);
+    expect(banned("com Confiança")).toBe(true);
+    expect(banned("O quanto foi resolvida")).toBe(true);
+    expect(banned("deduzida do código")).toBe(false);
   });
 });

@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
+import { gunzipSync } from "node:zlib";
 import {
+  type Browser,
   type BrowserContextOptions,
   expect,
   type Page,
@@ -19,6 +22,9 @@ import { repositoryDescriptionSchema } from "@/protocol/repository";
 import { DRILLED_PACKAGE_ID } from "@/test/fixture-graph";
 import {
   BENCHMARK_OUT_ENV,
+  type BenchmarkEnvironment,
+  type BenchmarkRecord,
+  benchmarkOutputPath,
   benchmarkTypeBudget,
   captureEnvironment,
   createBenchmarkRecord,
@@ -569,15 +575,15 @@ const emptyPointNearCentre = async (page: Page) =>
     EMPTY_POINT_SEARCH
   );
 
-const measurePanZoomPage = async (
+interface GestureRun {
+  readonly fitZoom: number;
+  readonly sessions: Readonly<Record<GestureName, GestureSession>>;
+}
+
+const runGestures = async (
   page: Page,
-  pageNumber: number
-): Promise<PanZoomPage> => {
-  const loadAverage = os.loadavg();
-  await serveTypeSlice(page);
-  await page.goto(TYPE_URL);
-  await waitForFreshReady(page, TYPE_SLICE.nodes);
-  const baselineMs = await measureIdleBaseline(page);
+  baselineMs: number
+): Promise<GestureRun> => {
   const drag = (start: Point) => dragPan(page, start, GESTURE_MS);
   const wheel = (at: Point) => trackpadWheel(page, at, GESTURE_MS);
 
@@ -609,12 +615,26 @@ const measurePanZoomPage = async (
     await emptyPointNearCentre(page)
   );
 
+  return { fitZoom, sessions: { G1: g1, G2: g2, G3: g3 } };
+};
+
+const measurePanZoomPage = async (
+  page: Page,
+  pageNumber: number
+): Promise<PanZoomPage> => {
+  const loadAverage = os.loadavg();
+  await serveTypeSlice(page);
+  await page.goto(TYPE_URL);
+  await waitForFreshReady(page, TYPE_SLICE.nodes);
+  const baselineMs = await measureIdleBaseline(page);
+  const { fitZoom, sessions } = await runGestures(page, baselineMs);
+
   return {
     baselineMs,
     fitZoom,
     loadAverage,
     page: pageNumber,
-    sessions: { G1: g1, G2: g2, G3: g3 },
+    sessions,
     slice: TYPE_SLICE,
   };
 };
@@ -734,6 +754,30 @@ const buildVerdict = (
   } as const;
 };
 
+const measureEnvironment = (
+  browser: Browser,
+  testInfo: TestInfo
+): Promise<BenchmarkEnvironment> =>
+  withFreshPage(browser, contextOptionsOf(testInfo), async (page) => {
+    await serveMap(page);
+    await page.goto(LEVEL_ONE_URL);
+    await expectGraph(page, PACKAGE_IDS);
+    return captureEnvironment({
+      baselineMs: await measureIdleBaseline(page),
+      browser,
+      page,
+      project: testInfo.project,
+    });
+  });
+
+const expectGatingSetup = (environment: BenchmarkEnvironment): void => {
+  expect(environment.browser.channel).toBe("chromium");
+  expect(environment.browser.executablePath).not.toBeNull();
+  expect(environment.browser.webglRenderer).not.toMatch(SOFTWARE_RENDERER);
+  expect(environment.viewport).toStrictEqual({ height: 800, width: 1280 });
+  expect(environment.devicePixelRatio).toBe(1);
+};
+
 test.describe("Benchmark do grafo sobre fatias sintéticas", () => {
   test.describe.configure({ mode: "serial", timeout: BENCHMARK_TIMEOUT_MS });
 
@@ -819,21 +863,7 @@ test.describe("Benchmark do grafo sobre fatias sintéticas", () => {
     if (clicks === null || levelOne === null || panZoom === null) {
       throw new Error("uma medição @benchmark não rodou neste worker");
     }
-    const environment = await withFreshPage(
-      browser,
-      contextOptionsOf(testInfo),
-      async (page) => {
-        await serveMap(page);
-        await page.goto(LEVEL_ONE_URL);
-        await expectGraph(page, PACKAGE_IDS);
-        return captureEnvironment({
-          baselineMs: await measureIdleBaseline(page),
-          browser,
-          page,
-          project: testInfo.project,
-        });
-      }
-    );
+    const environment = await measureEnvironment(browser, testInfo);
     const verdict = buildVerdict(
       levelOne,
       panZoom,
@@ -868,11 +898,236 @@ test.describe("Benchmark do grafo sobre fatias sintéticas", () => {
     if (testInfo.project.name !== GATING_PROJECT) {
       return;
     }
-    expect(environment.browser.channel).toBe("chromium");
-    expect(environment.browser.executablePath).not.toBeNull();
-    expect(environment.browser.webglRenderer).not.toMatch(SOFTWARE_RENDERER);
-    expect(environment.viewport).toStrictEqual({ height: 800, width: 1280 });
-    expect(environment.devicePixelRatio).toBe(1);
+    expectGatingSetup(environment);
+    expect(verdict.outcome).toBe("PASS");
+  });
+});
+
+const RECORDED_DIR = new URL("recorded/", import.meta.url);
+
+const RECORDED_LEVEL_ONE = [
+  {
+    file: "elasticsearch.default.graph-slice-package.jsonl.gz",
+    selection: "DEFAULT",
+  },
+  { file: "elasticsearch.all.graph-slice-package.jsonl.gz", selection: "ALL" },
+] as const;
+
+type RecordedSelection = (typeof RECORDED_LEVEL_ONE)[number]["selection"];
+
+interface RecordedLevelOne {
+  readonly edges: number;
+  readonly file: string;
+  readonly nodes: number;
+
+  readonly nonSolidEdges: number;
+
+  readonly responseSha256: string;
+  readonly selection: RecordedSelection;
+  readonly slice: GraphSlice;
+}
+
+const readRecordedLevelOne = ({
+  file,
+  selection,
+}: (typeof RECORDED_LEVEL_ONE)[number]): RecordedLevelOne => {
+  const [, responseLine] = gunzipSync(readFileSync(new URL(file, RECORDED_DIR)))
+    .toString("utf8")
+    .split("\n");
+  if (responseLine === undefined || responseLine === "") {
+    throw new Error(`${file} não tem linha de resposta`);
+  }
+  const frame = JSON.parse(responseLine) as { readonly payload: unknown };
+  const slice = graphSliceSchema.parse(frame.payload);
+  if (slice.level !== "PACKAGE") {
+    throw new Error(`${file} não é uma fatia de nível 1`);
+  }
+  return {
+    edges: slice.edges.length,
+    file,
+    nodes: slice.nodes.length,
+    nonSolidEdges: slice.edges.filter((edge) => edge.resolution !== "RESOLVED")
+      .length,
+    responseSha256: sha256(responseLine),
+    selection,
+    slice,
+  };
+};
+
+interface RecordedPanZoomPage extends GestureRun {
+  readonly baselineMs: number;
+  readonly loadAverage: readonly number[];
+  readonly page: number;
+  readonly selection: RecordedSelection;
+}
+
+const recordedMeasured: Partial<
+  Record<RecordedSelection, readonly RecordedPanZoomPage[]>
+> = {};
+
+const measureRecordedPage = async (
+  page: Page,
+  pageNumber: number,
+  recording: RecordedLevelOne
+): Promise<RecordedPanZoomPage> => {
+  const loadAverage = os.loadavg();
+  await serveSlices(page, [
+    {
+      method: "graph.slice",
+      request: { level: "PACKAGE" },
+      result: recording.slice,
+    },
+  ]);
+  await page.goto(LEVEL_ONE_URL);
+  await waitForFreshReady(page, recording.nodes);
+  const baselineMs = await measureIdleBaseline(page);
+  return {
+    ...(await runGestures(page, baselineMs)),
+    baselineMs,
+    loadAverage,
+    page: pageNumber,
+    selection: recording.selection,
+  };
+};
+
+const RECORDED_KEY_ORDER = [
+  "schema",
+  "measuredAt",
+  "baseCommit",
+  "measure",
+  "rule",
+  "verdict",
+  "environment",
+  "generator",
+  "results",
+] as const satisfies readonly (keyof BenchmarkRecord<unknown>)[];
+
+const RECORDED_BLOCK = "recorded";
+
+const writeRecordedBlock = <Results>(
+  record: BenchmarkRecord<Results>,
+  projectName: string
+): string | null => {
+  const target = benchmarkOutputPath(projectName);
+  if (target === null) {
+    return null;
+  }
+  const existing: Record<string, unknown> = existsSync(target)
+    ? (JSON.parse(readFileSync(target, "utf8")) as Record<string, unknown>)
+    : {};
+  const block = Object.fromEntries(
+    RECORDED_KEY_ORDER.map((key) => [key, record[key]])
+  );
+  writeFileSync(
+    target,
+    `${JSON.stringify({ ...existing, [RECORDED_BLOCK]: block }, null, 2)}\n`
+  );
+  return target;
+};
+
+const buildRecordedRule = (recordings: readonly RecordedLevelOne[]) => ({
+  criterion:
+    "frameRatio = frames / (span / b); PASS iff frameRatio >= minFrameRatio in every session of every recording",
+  freshPagesPerRecording: PAN_ZOOM_PAGES,
+  gestureMs: GESTURE_MS,
+  gestures: buildRule().typeBudgetPanZoom.gestures,
+  minFrameRatio: MIN_FRAME_RATIO,
+  recordings: recordings.map(({ slice: _slice, ...identity }) => identity),
+  settleBeforeEachGestureMs: SETTLE_MS,
+});
+
+const buildRecordedVerdict = (
+  pages: readonly RecordedPanZoomPage[],
+  projectName: string
+) => {
+  const sessions = pages.flatMap((page) =>
+    GESTURES.map((gesture) => ({
+      frameRatio: page.sessions[gesture].frameRatio,
+      gesture,
+      page: page.page,
+      selection: page.selection,
+    }))
+  );
+  const frameRatios = sessions.map((session) => session.frameRatio);
+  const pass =
+    sessions.length ===
+      RECORDED_LEVEL_ONE.length * PAN_ZOOM_PAGES * GESTURES.length &&
+    frameRatios.every((ratio) => ratio >= MIN_FRAME_RATIO);
+  return {
+    decides: projectName === GATING_PROJECT,
+    minFrameRatio: MIN_FRAME_RATIO,
+    observedMinFrameRatio: Math.min(...frameRatios),
+    outcome: pass ? "PASS" : "FAIL",
+    project: projectName,
+    sessions,
+  } as const;
+};
+
+test.describe("Benchmark do grafo sobre fatias reais: o nível 1 gravado do Elasticsearch", () => {
+  test.describe.configure({ mode: "serial", timeout: BENCHMARK_TIMEOUT_MS });
+
+  for (const entry of RECORDED_LEVEL_ONE) {
+    test(`@benchmark recorded pan-zoom: Elasticsearch ${entry.selection} nível 1, G1 G2 G3 em 3 páginas novas`, async ({
+      browser,
+    }, testInfo) => {
+      const recording = readRecordedLevelOne(entry);
+      const pages: RecordedPanZoomPage[] = [];
+
+      for (let pageNumber = 1; pageNumber <= PAN_ZOOM_PAGES; pageNumber += 1) {
+        pages.push(
+          // biome-ignore lint/performance/noAwaitInLoops: uma medição por vez, para não dividir a GPU
+          await withFreshPage(browser, contextOptionsOf(testInfo), (page) =>
+            measureRecordedPage(page, pageNumber, recording)
+          )
+        );
+      }
+
+      recordedMeasured[entry.selection] = pages;
+      const inputs = pages.flatMap((page) =>
+        GESTURES.map((gesture) => page.sessions[gesture].inputEvents)
+      );
+      expect(inputs).toHaveLength(PAN_ZOOM_PAGES * GESTURES.length);
+      expect(Math.min(...inputs)).toBeGreaterThan(0);
+    });
+  }
+
+  test("@benchmark recorded veredito: o mesmo limiar nas fatias gravadas, em um bloco próprio do registro", async ({
+    browser,
+  }, testInfo) => {
+    const pages = RECORDED_LEVEL_ONE.flatMap(
+      ({ selection }) => recordedMeasured[selection] ?? []
+    );
+    if (pages.length !== RECORDED_LEVEL_ONE.length * PAN_ZOOM_PAGES) {
+      throw new Error("uma medição @benchmark gravada não rodou neste worker");
+    }
+    const recordings = RECORDED_LEVEL_ONE.map(readRecordedLevelOne);
+    const environment = await measureEnvironment(browser, testInfo);
+    const verdict = buildRecordedVerdict(pages, testInfo.project.name);
+    const written = writeRecordedBlock(
+      createBenchmarkRecord({
+        environment,
+        generator: {
+          recordedBy: "the real analyzer, stored under e2e/recorded/",
+          recordings: recordings.map(
+            ({ slice: _slice, ...identity }) => identity
+          ),
+        },
+        measure: MEASURE_COMMAND,
+        results: { recordedPanZoom: pages },
+        rule: buildRecordedRule(recordings),
+        verdict,
+      }),
+      testInfo.project.name
+    );
+    testInfo.annotations.push({
+      description: JSON.stringify({ verdict, written }),
+      type: "verdict",
+    });
+
+    if (testInfo.project.name !== GATING_PROJECT) {
+      return;
+    }
+    expectGatingSetup(environment);
     expect(verdict.outcome).toBe("PASS");
   });
 });

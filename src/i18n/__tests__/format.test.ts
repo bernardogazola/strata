@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  formatDecimal,
   formatDuration,
   formatInteger,
   formatPercent,
@@ -112,6 +113,33 @@ describe("formatação numérica em pt-BR", () => {
 
   test("recebe razão e não porcentagem já multiplicada", () => {
     expect(formatPercent(0.82)).toBe("82%");
+  });
+});
+
+describe("formatDecimal", () => {
+  test("escreve a casa decimal com vírgula, como o pt-BR", () => {
+    expect(formatDecimal(2.3)).toBe("2,3");
+  });
+
+  test("um inteiro sai sem a casa decimal: 2 e não 2,0", () => {
+    expect(formatDecimal(2)).toBe("2");
+    expect(formatDecimal(0)).toBe("0");
+  });
+
+  test("mostra no máximo uma casa, e não trunca", () => {
+    expect(formatDecimal(2.26)).toBe("2,3");
+    expect(formatDecimal(2.24)).toBe("2,2");
+  });
+
+  test("usa ponto como separador de milhar, como formatInteger", () => {
+    expect(formatDecimal(1234.5)).toBe("1.234,5");
+  });
+
+  test("é a forma que o interpolate precisa receber: um número lá vira inteiro", () => {
+    expect(interpolate("média {mean}", { mean: 2.3 })).toBe("média 2");
+    expect(interpolate("média {mean}", { mean: formatDecimal(2.3) })).toBe(
+      "média 2,3"
+    );
   });
 });
 

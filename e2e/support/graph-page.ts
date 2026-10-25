@@ -7,7 +7,14 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
-import type { GraphSlice, OutlinePage } from "@/protocol/graph";
+import type { DependencyDirection } from "@/protocol/enums";
+import type {
+  DependencyEvidenceResult,
+  DependencyPage,
+  ElementDetail,
+  GraphSlice,
+  OutlinePage,
+} from "@/protocol/graph";
 import {
   type AnalysisStatusReport,
   analysisStatusReportSchema,
@@ -172,8 +179,32 @@ export interface DescribeOverride {
   readonly result: RepositoryDescription;
 }
 
+export interface ElementDescribeOverride {
+  readonly method: "element.describe";
+  readonly request: { readonly elementId: string };
+  readonly result: ElementDetail;
+}
+
+export interface DependenciesOverride {
+  readonly method: "element.dependencies";
+  readonly request: {
+    readonly direction: DependencyDirection;
+    readonly elementId: string;
+  };
+  readonly result: DependencyPage;
+}
+
+export interface EvidenceOverride {
+  readonly method: "element.dependencyEvidence";
+  readonly request: { readonly source: string; readonly target: string };
+  readonly result: DependencyEvidenceResult;
+}
+
 export type TranscriptOverride =
+  | DependenciesOverride
   | DescribeOverride
+  | ElementDescribeOverride
+  | EvidenceOverride
   | SliceOverride
   | OutlineOverride
   | StatusOverride;

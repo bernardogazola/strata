@@ -7,8 +7,12 @@ import {
 } from "@/bridge/events";
 import { type RawFrame, transport } from "@/bridge/transport";
 import { type AnalysisStage, analysisStageSchema } from "@/protocol/analysis";
+import { EVENTS } from "@/protocol/registry";
 import { queryKeys } from "@/queries/keys";
+import { DEPENDENCY_PAGE_LIMIT } from "@/queries/options";
 import { useAppStore } from "@/state/app-store";
+import { TYPE_IDS } from "@/test/fixture-graph";
+import stageCompletedSource from "../../../protocol/fixtures/analysis.stage.completed.ok.jsonl?raw";
 
 const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 const OTHER = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1X";
@@ -265,6 +269,109 @@ describe("invalidação", () => {
       .find({ queryKey: ["analysis", AN, "structure"] });
     expect(entry?.state.isInvalidated).toBe(true);
   });
+});
+
+describe("a tabela de invalidação, estágio por estágio", () => {
+  const fixtureStageCompleted = (stage: AnalysisStage): unknown => {
+    const [line = ""] = stageCompletedSource.trim().split("\n");
+    const frame = JSON.parse(line) as { payload: Record<string, unknown> };
+    return EVENTS["analysis.stage.completed"].parse({
+      ...frame.payload,
+      analysisId: AN,
+      stage,
+    });
+  };
+
+  const [ELEMENT = ""] = TYPE_IDS;
+
+  const analysisSeeds = (analysisId: string) =>
+    ({
+      evolution: queryKeys.evolution.all(analysisId),
+      hotspots: queryKeys.hotspots.all(analysisId),
+      status: queryKeys.analysisStatus(analysisId),
+      "structure.dependencies": queryKeys.structure.dependencies(
+        analysisId,
+        ELEMENT,
+        "OUT",
+        DEPENDENCY_PAGE_LIMIT
+      ),
+      "structure.element": queryKeys.structure.element(analysisId, ELEMENT),
+      "structure.outline": queryKeys.structure.outline(analysisId, null),
+      "structure.slice": queryKeys.structure.slice(analysisId, {
+        level: "PACKAGE",
+      }),
+      tour: queryKeys.tour(analysisId),
+    }) as const;
+
+  const REPOSITORY_SEEDS = {
+    "repository.currentAnalysis": queryKeys.repository.currentAnalysis(HANDLE),
+    "repository.describe": queryKeys.repository.describe(HANDLE),
+  } as const;
+
+  type Seed =
+    | keyof ReturnType<typeof analysisSeeds>
+    | keyof typeof REPOSITORY_SEEDS;
+
+  const SEEDS: readonly (readonly [string, readonly unknown[]])[] = [
+    ...Object.entries(analysisSeeds(AN)),
+    ...Object.entries(analysisSeeds(OTHER)).map(
+      ([name, key]) => [`outra análise: ${name}`, key] as const
+    ),
+    ...Object.entries(REPOSITORY_SEEDS),
+  ];
+
+  const STRUCTURE: readonly Seed[] = [
+    "structure.dependencies",
+    "structure.element",
+    "structure.outline",
+    "structure.slice",
+  ];
+
+  const STAGE_PREFIXES = {
+    EVOLUTIONARY_COUPLING: ["evolution"],
+    GIT_HISTORY_CHEAP: ["evolution"],
+    GIT_HISTORY_DETAILED: ["evolution"],
+    GUIDED_TOUR: ["tour"],
+    HOTSPOT_PROFILES: ["hotspots"],
+    LAYOUT_DISCOVERY: [],
+    PERSISTENCE: ["repository.currentAnalysis"],
+    REPOSITORY_VALIDATION: [],
+    SOURCE_ANALYSIS: [],
+    STRUCTURAL_GRAPH: STRUCTURE,
+  } as const satisfies Record<AnalysisStage, readonly Seed[]>;
+
+  const invalidatedSeeds = (): string[] =>
+    SEEDS.filter(
+      ([, key]) => queryClient.getQueryState(key)?.isInvalidated === true
+    )
+      .map(([name]) => name)
+      .sort();
+
+  test("a tabela tem uma linha por estágio do protocolo, e só elas", () => {
+    expect(Object.keys(STAGE_PREFIXES).sort()).toStrictEqual(
+      [...analysisStageSchema.options].sort()
+    );
+  });
+
+  test.each(analysisStageSchema.options)(
+    "%s invalida exatamente o status e a linha dele, e nada mais",
+    (stage) => {
+      for (const [, key] of SEEDS) {
+        seed(key);
+      }
+
+      expect(
+        handleFrame(
+          forwarded("analysis.stage.completed", fixtureStageCompleted(stage)),
+          queryClient
+        )
+      ).toBe(true);
+
+      expect(invalidatedSeeds()).toStrictEqual(
+        ["status", ...STAGE_PREFIXES[stage]].sort()
+      );
+    }
+  );
 });
 
 describe("o status da análise", () => {

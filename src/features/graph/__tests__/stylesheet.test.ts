@@ -340,6 +340,61 @@ describe("cor nunca é o único canal", () => {
   });
 });
 
+describe("o par recíproco vira dois arcos", () => {
+  const controlPointsOf = (edge: EdgeSingular): readonly unknown[] =>
+    (edge.controlPoints() as readonly unknown[] | undefined) ?? [];
+
+  const reciprocalIds = (slice: GraphSlice): ReadonlySet<string> => {
+    const pairs = new Set(
+      slice.edges.map((edge) => `${edge.source}\0${edge.target}`)
+    );
+    return new Set(
+      slice.edges
+        .filter((edge) => pairs.has(`${edge.target}\0${edge.source}`))
+        .map((edge) => edge.id)
+    );
+  };
+
+  test("a folha declara curve-style bezier no seletor das arestas, e toda aresta o lê", () => {
+    const block = buildStylesheet(palettes.light).find(
+      (candidate) => candidate.selector === "edge"
+    ) as StylesheetStyle;
+    const cy = createGraph(palettes.light, PACKAGE_SLICE);
+
+    expect((block.style as Record<string, unknown>)["curve-style"]).toBe(
+      "bezier"
+    );
+    expect(cy.edges().map((edge) => edge.style("curve-style"))).toStrictEqual(
+      PACKAGE_SLICE.edges.map(() => "bezier")
+    );
+  });
+
+  test("as duas direções do par saem em arcos distintos, e a aresta sozinha continua reta", () => {
+    const reciprocal = reciprocalIds(PACKAGE_SLICE);
+    const cy = createGraph(palettes.light, PACKAGE_SLICE);
+    cy.nodes().positions((_, index) => ({
+      x: 120 * index,
+      y: 60 * (index % 2),
+    }));
+
+    const edges = cy.edges().toArray();
+    const pair = edges.filter((edge) => reciprocal.has(edge.id()));
+    const lone = edges.filter((edge) => !reciprocal.has(edge.id()));
+
+    expect([pair.length, lone.length]).toStrictEqual([
+      2,
+      PACKAGE_SLICE.edges.length - 2,
+    ]);
+    expect(
+      pair.map(controlPointsOf).map((points) => points.length)
+    ).toStrictEqual([1, 1]);
+    expect(
+      new Set(pair.map((edge) => JSON.stringify(controlPointsOf(edge)))).size
+    ).toBe(2);
+    expect(lone.map(controlPointsOf)).toStrictEqual(lone.map(() => []));
+  });
+});
+
 describe("o estado de execução no scratch reestiliza a instância", () => {
   test("dashScale escala o traço: INFERRED [6, 3] vira [60, 30]", () => {
     const cy = createGraph(palettes.light, sliceWithEveryQuality());
