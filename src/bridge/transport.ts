@@ -9,7 +9,6 @@ import {
   FORWARDED_CHANNELS,
 } from "./contracts";
 import { isTauri } from "./environment";
-import { fakeRequest, fakeSubscribe } from "./fake";
 
 export type RawFrame =
   | { readonly kind: "state"; readonly value: unknown }
@@ -68,6 +67,8 @@ const BROWSER_READY: BackendState = {
   protocolVersion: PROTOCOL_VERSION,
 };
 
+const loadFakeBridge = () => import("./fake");
+
 const browserTransport: BridgeTransport = {
   analyzerCancel: () => Promise.resolve({ cancelled: true }),
   analyzerRestart: () => Promise.resolve(BROWSER_READY),
@@ -80,16 +81,19 @@ const browserTransport: BridgeTransport = {
       displayName: `orders${String.fromCodePoint(0x20_2e)}ecivres`,
       handle: BROWSER_HANDLE,
     }),
-  request: (method, payload) => fakeRequest(method, payload),
-  subscribe: (listener) =>
-    Promise.resolve(
-      fakeSubscribe((event) =>
-        listener({
-          kind: "forwarded",
-          value: { event: event.event, payload: event.payload },
-        })
-      )
-    ),
+  request: async (method, payload) => {
+    const { fakeRequest } = await loadFakeBridge();
+    return fakeRequest(method, payload);
+  },
+  subscribe: async (listener) => {
+    const { fakeSubscribe } = await loadFakeBridge();
+    return fakeSubscribe((event) =>
+      listener({
+        kind: "forwarded",
+        value: { event: event.event, payload: event.payload },
+      })
+    );
+  },
 };
 
 export const transport: BridgeTransport = isTauri()

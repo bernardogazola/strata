@@ -7,6 +7,10 @@ import {
 } from "@/protocol/envelope";
 import type { ProtocolError } from "@/protocol/errors";
 import { EVENTS, METHODS, PROTOCOL_METHODS } from "@/protocol/registry";
+import { FakeBridgeError } from "./error";
+
+// biome-ignore lint/performance/noBarrelFile: reexporta só a classe de erro que este módulo lança
+export { FakeBridgeError } from "./error";
 
 const JSONL_SUFFIX = /\.jsonl$/;
 const PATH_STEM = /([^/]+)\.jsonl$/;
@@ -37,16 +41,6 @@ export interface Transcript {
 interface EventTranscript {
   readonly caseName: string;
   readonly payload: unknown;
-}
-
-export class FakeBridgeError extends Error {
-  readonly protocolError: ProtocolError;
-
-  constructor(protocolError: ProtocolError) {
-    super(protocolError.detail ?? protocolError.code);
-    this.name = "FakeBridgeError";
-    this.protocolError = protocolError;
-  }
 }
 
 const parseFrames = (text: string): Record<string, unknown>[] =>
@@ -182,11 +176,23 @@ const findOverride = (
   );
 };
 
+const recordRequest = (method: string, payload: unknown): void => {
+  if (import.meta.env.DEV && window.__STRATA_FAKE_LOG__ !== undefined) {
+    window.__STRATA_FAKE_LOG__ = [
+      ...window.__STRATA_FAKE_LOG__,
+      { method, payload },
+    ];
+  }
+};
+
 const reject = (protocolError: ProtocolError): Promise<never> =>
   Promise.reject(new FakeBridgeError(protocolError));
 
 const isProtocolMethod = (method: string): method is ProtocolMethod =>
   Object.hasOwn(METHODS, method);
+
+const isProtocolEventName = (event: string): event is ProtocolEventName =>
+  Object.hasOwn(EVENTS, event);
 
 export const fakeBridgeRoutes = (): Record<string, string[]> =>
   Object.fromEntries(
@@ -209,6 +215,7 @@ export const fakeRequest = (
   method: string,
   payload: unknown
 ): Promise<unknown> => {
+  recordRequest(method, payload);
   if (!isProtocolMethod(method)) {
     return reject({
       code: "PROTO_UNKNOWN_METHOD",
@@ -270,3 +277,16 @@ export const fakeEmit = (
   }
   return true;
 };
+
+if (import.meta.env.DEV) {
+  window.__STRATA_FAKE_EMIT__ = (event, payload) => {
+    if (!isProtocolEventName(event)) {
+      throw new Error(`o bridge falso não tem evento chamado ${event}`);
+    }
+    EVENTS[event].parse(payload);
+    for (const listener of listeners) {
+      listener({ event, payload });
+    }
+    return listeners.size;
+  };
+}
