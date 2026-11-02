@@ -17,11 +17,12 @@ public final class ElementDao {
   private static final String INSERT_HEAD =
       """
       INSERT INTO code_element (id, analysis_pk, element_id, kind, parent_pk, simple_name,
-                                qualified_name, sort_key, type_kind, modifiers, is_external,
-                                is_test, source_root_pk, file_pk, start_line, end_line)
+                                qualified_name, sort_key, search_name, type_kind, modifiers,
+                                is_external, is_test, source_root_pk, file_pk, start_line,
+                                end_line)
       VALUES""";
 
-  private static final int COLUMNS = 16;
+  private static final int COLUMNS = 17;
 
   private static final String NEXT_ID = "SELECT coalesce(max(id), 0) + 1 FROM code_element";
 
@@ -74,14 +75,15 @@ public final class ElementDao {
           statement.setString(first + 5, row.simpleName());
           statement.setString(first + 6, row.qualifiedName());
           statement.setString(first + 7, row.sortKey());
-          statement.setString(first + 8, row.typeKind() == null ? null : row.typeKind().name());
-          statement.setString(first + 9, row.modifiers());
-          statement.setInt(first + 10, row.isExternal() ? 1 : 0);
-          statement.setInt(first + 11, row.isTest() ? 1 : 0);
-          statement.setObject(first + 12, row.sourceRootPk());
-          statement.setObject(first + 13, row.filePk());
-          statement.setObject(first + 14, row.startLine());
-          statement.setObject(first + 15, row.endLine());
+          statement.setString(first + 8, row.searchName());
+          statement.setString(first + 9, row.typeKind() == null ? null : row.typeKind().name());
+          statement.setString(first + 10, row.modifiers());
+          statement.setInt(first + 11, row.isExternal() ? 1 : 0);
+          statement.setInt(first + 12, row.isTest() ? 1 : 0);
+          statement.setObject(first + 13, row.sourceRootPk());
+          statement.setObject(first + 14, row.filePk());
+          statement.setObject(first + 15, row.startLine());
+          statement.setObject(first + 16, row.endLine());
         },
         cancelled);
   }
@@ -135,17 +137,12 @@ public final class ElementDao {
         rows.getInt("is_test") == 1,
         nullableLong(rows, "source_root_pk"),
         nullableLong(rows, "file_pk"),
-        nullableInt(rows, "start_line"),
-        nullableInt(rows, "end_line"));
+        Columns.nullableInt(rows, "start_line"),
+        Columns.nullableInt(rows, "end_line"));
   }
 
   private static Long nullableLong(ResultSet rows, String column) throws SQLException {
     final long value = rows.getLong(column);
-    return rows.wasNull() ? null : value;
-  }
-
-  private static Integer nullableInt(ResultSet rows, String column) throws SQLException {
-    final int value = rows.getInt(column);
     return rows.wasNull() ? null : value;
   }
 

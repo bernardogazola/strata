@@ -56,6 +56,26 @@ export const elementIdSchema = z
   .regex(/^(?:pkg:|type:|method:|file:)/);
 export type ElementId = z.infer<typeof elementIdSchema>;
 
+export const packageIdSchema = elementIdSchema.regex(/^pkg:/);
+export const typeIdSchema = elementIdSchema.regex(/^type:/);
+
+export const packageOrTypeIdSchema = elementIdSchema.regex(/^(?:pkg:|type:)/);
+
+export const methodIdSchema = z
+  .string()
+  .max(4096)
+  .regex(/^method:/);
+export type MethodId = z.infer<typeof methodIdSchema>;
+
+export const prefixIdSchema = z
+  .string()
+  .max(4096)
+  .regex(/^pfx:[^.]+(?:\.[^.]+)*$/);
+export type PrefixId = z.infer<typeof prefixIdSchema>;
+
+export const graphNodeIdSchema = z.union([elementIdSchema, prefixIdSchema]);
+export type GraphNodeId = z.infer<typeof graphNodeIdSchema>;
+
 export const cursorSchema = z.base64url().min(1).max(256);
 export type Cursor = z.infer<typeof cursorSchema>;
 
@@ -63,6 +83,8 @@ export const timestampSchema = z.iso.datetime({ precision: 0 }).max(32);
 export type Timestamp = z.infer<typeof timestampSchema>;
 
 export const filePathSchema = z.string().max(1024);
+
+export const rootRelativePathSchema = filePathSchema.regex(/^(?!\/)/);
 export const qualifiedNameSchema = z.string().max(4096);
 export const elementLabelSchema = z.string().max(512);
 export const commitSubjectSchema = z.string().max(512);

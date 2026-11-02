@@ -9,7 +9,7 @@ import { interpolate, plural } from "@/i18n/format";
 import { graphLevelLabels } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
-import type { GraphSlice } from "@/protocol/graph";
+import type { GraphNode, GraphSlice } from "@/protocol/graph";
 import {
   type GraphViewParams,
   graphSliceQueryOptions,
@@ -44,34 +44,56 @@ const countPhrase = (count: number, forms: CountForms): string =>
 const totalPhrase = (count: number, { one, other }: CountForms): string =>
   countPhrase(count, { one, other });
 
-const canvasLabel = ({ edges, level, nodes }: GraphSlice): string =>
-  interpolate(t.graph.canvas.label, {
-    edges: countPhrase(edges.length, t.graph.canvas.edges),
-    level: graphLevelLabels[level],
-    nodes: countPhrase(nodes.length, t.graph.canvas.nodes[level]),
-  });
+const isGroup = (node: GraphNode): boolean => node.kind === "PACKAGE_PREFIX";
 
-const sliceNotices = ({
+const canvasLabel = ({
+  aggregated,
+  edges,
+  level,
+  nodes,
+}: GraphSlice): string => {
+  const edgesPhrase = countPhrase(edges.length, t.graph.canvas.edges);
+  const levelName = graphLevelLabels[level];
+  if (!aggregated) {
+    return interpolate(t.graph.canvas.label, {
+      edges: edgesPhrase,
+      level: levelName,
+      nodes: countPhrase(nodes.length, t.graph.canvas.nodes[level]),
+    });
+  }
+  const groups = nodes.filter(isGroup).length;
+  return interpolate(t.graph.canvas.labelAggregated, {
+    edges: edgesPhrase,
+    groups: countPhrase(groups, t.graph.canvas.groups),
+    level: levelName,
+    nodes: countPhrase(nodes.length - groups, t.graph.canvas.nodes[level]),
+  });
+};
+
+const truncationNotice = ({
   aggregated,
   edges,
   level,
   nodes,
   totals,
-  truncated,
-}: GraphSlice): readonly string[] => [
-  ...(aggregated
-    ? [interpolate(t.graph.notice.aggregated, { total: totals.nodes })]
+}: GraphSlice): string => {
+  if (aggregated) {
+    const { shown, template } = t.graph.notice.truncatedAggregated;
+    return interpolate(template, { shown: countPhrase(edges.length, shown) });
+  }
+  return interpolate(t.graph.notice.truncated, {
+    edges: totalPhrase(totals.edges, t.graph.canvas.edges),
+    edgesShown: edges.length,
+    nodes: totalPhrase(totals.nodes, t.graph.canvas.nodes[level]),
+    nodesShown: nodes.length,
+  });
+};
+
+const sliceNotices = (slice: GraphSlice): readonly string[] => [
+  ...(slice.aggregated
+    ? [interpolate(t.graph.notice.aggregated, { total: slice.totals.nodes })]
     : []),
-  ...(truncated
-    ? [
-        interpolate(t.graph.notice.truncated, {
-          edges: totalPhrase(totals.edges, t.graph.canvas.edges),
-          edgesShown: edges.length,
-          nodes: totalPhrase(totals.nodes, t.graph.canvas.nodes[level]),
-          nodesShown: nodes.length,
-        }),
-      ]
-    : []),
+  ...(slice.truncated ? [truncationNotice(slice)] : []),
 ];
 
 function FailureState({
@@ -204,7 +226,7 @@ export function GraphPanel({
         )}
         {emptyText === null ? null : <CenteredStatus text={emptyText} />}
       </div>
-      <GraphLegend />
+      <GraphLegend drawsGroups={drawable?.slice.nodes.some(isGroup) ?? false} />
     </div>
   );
 }

@@ -1,0 +1,2 @@
+{"id":"req_01JQ8ZJ2B2C3D4E5F6G7H8J9KD","kind":"request","method":"element.dependencies","payload":{"analysisId":"an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W","cursor":"AQAAAAAAAAAq","direction":"IN","elementId":"type:br.pucpr.legacy.core.CatalogEntry"},"protocol":1}
+{"error":{"code":"PROTO_INVALID_PAYLOAD","detail":"o cursor está malformado","origin":"analyzer","params":{"method":"element.dependencies"}},"id":"req_01JQ8ZJ2B2C3D4E5F6G7H8J9KD","kind":"response","ok":false,"protocol":1}

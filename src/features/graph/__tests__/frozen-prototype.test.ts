@@ -23,8 +23,8 @@ const cy = cytoscape({
   ],
 });
 cy.add([
-  { data: { id: "a", label: "orders" } },
-  { data: { id: "b", label: "billing" } },
+  { data: { id: "a", label: "core" } },
+  { data: { id: "b", label: "api" } },
   { data: { id: "e", source: "a", target: "b" } },
 ]);
 cy.layout({ name: "concentric", animate: false, avoidOverlap: true }).run();

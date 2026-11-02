@@ -1,21 +1,17 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import cytoscape, { type Core, type NodeSingular } from "cytoscape";
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  test,
-} from "vitest";
-import {
-  GRAPH_SLICE_BUDGETS,
-  type GraphSlice,
-  graphSliceSchema,
-} from "@/protocol/graph";
+import cytoscape, {
+  type ConcentricLayoutOptions,
+  type Core,
+  type NodeSingular,
+} from "cytoscape";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { GRAPH_SLICE_BUDGETS, type GraphSlice } from "@/protocol/graph";
 import { installCanvasStub } from "@/test/canvas";
+import {
+  PACKAGE_SLICE,
+  packageIdByLabel,
+  typeSliceOf,
+} from "@/test/fixture-graph";
+import { syntheticSlice } from "../../../../e2e/support/synthetic-slice";
 import { toGraphElements } from "../adapter";
 import {
   CONCENTRIC_RINGS,
@@ -33,23 +29,18 @@ import {
   setGraphRuntime,
 } from "../stylesheet";
 
-const FIXTURES = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../../../protocol/fixtures"
-);
-
-const readSliceFixture = async (stem: string): Promise<GraphSlice> => {
-  const text = await readFile(path.join(FIXTURES, `${stem}.jsonl`), "utf8");
-  const response = text
-    .split("\n")
-    .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as { kind: string; payload: unknown })
-    .find((frame) => frame.kind === "response");
-  return graphSliceSchema.parse(response?.payload);
-};
-
 const CONTAINER_WIDTH = 1280;
 const CONTAINER_HEIGHT = 800;
+
+interface ContainerSize {
+  readonly height: number;
+  readonly width: number;
+}
+
+const BENCHMARK_CONTAINER: ContainerSize = {
+  height: CONTAINER_HEIGHT,
+  width: CONTAINER_WIDTH,
+};
 
 const PALETTE = Object.fromEntries(
   GRAPH_TOKENS.map((token) => [token, "#808080"])
@@ -81,43 +72,156 @@ const skewedSlice = (count: number): GraphSlice => {
   };
 };
 
-const createContainer = (): HTMLDivElement => {
+const sliceWithPageranks = (pageranks: readonly number[]): GraphSlice => {
+  const base = skewedSlice(pageranks.length);
+  return {
+    ...base,
+    nodes: base.nodes.map((node, index) => ({
+      ...node,
+      pagerank: pageranks[index] ?? 0,
+    })),
+  };
+};
+
+const createContainer = (size: ContainerSize): HTMLDivElement => {
   const container = document.createElement("div");
   container.style.padding = "0";
   Object.defineProperty(container, "clientWidth", {
     configurable: true,
-    value: CONTAINER_WIDTH,
+    value: size.width,
   });
   Object.defineProperty(container, "clientHeight", {
     configurable: true,
-    value: CONTAINER_HEIGHT,
+    value: size.height,
   });
   document.body.append(container);
   return container;
 };
 
-type Positions = ReadonlyArray<readonly [string, { x: number; y: number }]>;
+interface Point {
+  readonly x: number;
+  readonly y: number;
+}
 
-const runLayout = (slice: GraphSlice): Core => {
+type Positions = ReadonlyArray<readonly [string, Point]>;
+
+const runLayout = (
+  slice: GraphSlice,
+  options: ConcentricLayoutOptions = concentricLayout(slice),
+  size: ContainerSize = BENCHMARK_CONTAINER
+): Core => {
   const cy = cytoscape({
-    container: createContainer(),
+    container: createContainer(size),
     layout: { name: "preset" },
     pixelRatio: 1,
     style: buildStylesheet(PALETTE),
   });
   cy.add(toGraphElements(slice));
   setGraphRuntime(cy, graphRuntimeForSlice(slice));
-  cy.layout(concentricLayout(slice)).run();
+  cy.layout(options).run();
   return cy;
 };
 
-const layoutPositions = (slice: GraphSlice): Positions => {
-  const cy = runLayout(slice);
+const layoutPositions = (
+  slice: GraphSlice,
+  options: ConcentricLayoutOptions = concentricLayout(slice),
+  size: ContainerSize = BENCHMARK_CONTAINER
+): Positions => {
+  const cy = runLayout(slice, options, size);
   const positions = cy
     .nodes()
     .map((node) => [node.id(), { ...node.position() }] as const);
   cy.destroy();
   return positions;
+};
+
+const withoutTransform = (slice: GraphSlice): ConcentricLayoutOptions => ({
+  ...concentricLayout(slice),
+  transform: undefined,
+});
+
+const levelsOf = (slice: GraphSlice): readonly (readonly string[])[] => {
+  const max = Math.max(...slice.nodes.map((node) => node.pagerank));
+  const ringOf = (pagerank: number): number => pagerankRing(pagerank, max);
+  const rings = [...new Set(slice.nodes.map((node) => ringOf(node.pagerank)))];
+  return rings
+    .sort((left, right) => left - right)
+    .map((ring) =>
+      slice.nodes
+        .filter((node) => ringOf(node.pagerank) === ring)
+        .map((node) => node.id)
+    );
+};
+
+const levelLabelsOf = (slice: GraphSlice): readonly (readonly string[])[] => {
+  const labels = new Map(slice.nodes.map((node) => [node.id, node.label]));
+  return levelsOf(slice).map((level) =>
+    level.map((id) => labels.get(id) ?? id)
+  );
+};
+
+const offsetsByLabel = (
+  slice: GraphSlice
+): Record<string, readonly [number, number]> => {
+  const cy = runLayout(slice);
+  const centre = { x: cy.width() / 2, y: cy.height() / 2 };
+  const offsets = Object.fromEntries(
+    slice.nodes.map((node) => {
+      const { x, y } = cy.getElementById(node.id).position();
+      return [node.label, [x - centre.x, y - centre.y] as const];
+    })
+  );
+  cy.destroy();
+  return offsets;
+};
+
+const SMALL_LEVEL_MAX_NODES = 2;
+
+const QUARTERS_PER_TURN = 4;
+
+const quarterTurns = (offset: Point, turns: number): Point => {
+  let turned = offset;
+  for (let turn = 0; turn < turns % QUARTERS_PER_TURN; turn += 1) {
+    turned = { x: -turned.y, y: turned.x };
+  }
+  return turned;
+};
+
+const segmentMeetsBox = (
+  from: Point,
+  to: Point,
+  box: {
+    readonly x1: number;
+    readonly x2: number;
+    readonly y1: number;
+    readonly y2: number;
+  }
+): boolean => {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const clips = [
+    [-dx, from.x - box.x1],
+    [dx, box.x2 - from.x],
+    [-dy, from.y - box.y1],
+    [dy, box.y2 - from.y],
+  ] as const;
+  let enter = 0;
+  let leave = 1;
+  for (const [direction, distance] of clips) {
+    if (direction === 0) {
+      if (distance < 0) {
+        return false;
+      }
+      continue;
+    }
+    const t = distance / direction;
+    if (direction < 0) {
+      enter = Math.max(enter, t);
+    } else {
+      leave = Math.min(leave, t);
+    }
+  }
+  return enter <= leave;
 };
 
 const distinctRadii = (positions: Positions): number =>
@@ -133,12 +237,15 @@ const distinctRings = (slice: GraphSlice): number => {
     .size;
 };
 
-let packageSlice: GraphSlice;
-let restoreCanvas: () => void;
+const FIXTURE_SLICES: [string, GraphSlice][] = [
+  ["o nível 1", PACKAGE_SLICE],
+  ...PACKAGE_SLICE.nodes.map((node): [string, GraphSlice] => [
+    `os tipos de ${node.label}`,
+    typeSliceOf(node.id),
+  ]),
+];
 
-beforeAll(async () => {
-  packageSlice = await readSliceFixture("graph.slice.package");
-});
+let restoreCanvas: () => void;
 
 beforeEach(() => {
   restoreCanvas = installCanvasStub();
@@ -177,7 +284,7 @@ describe("pagerankRing", () => {
 
 describe("concentricLayout", () => {
   test("fixa as opções que o determinismo e o enquadramento pedem", () => {
-    const options = concentricLayout(packageSlice);
+    const options = concentricLayout(PACKAGE_SLICE);
 
     expect(options).toMatchObject({
       animate: false,
@@ -191,15 +298,8 @@ describe("concentricLayout", () => {
     expect(options.levelWidth?.(cytoscape().collection())).toBe(1);
   });
 
-  test("um nó por anel sai em coluna, e o vão entre dois vizinhos cabe o rótulo e um trecho da aresta", () => {
-    const base = skewedSlice(3);
-    const column: GraphSlice = {
-      ...base,
-      nodes: base.nodes.map((node, index) => ({
-        ...node,
-        pagerank: [0.7, 0.2, 0.1][index] ?? 0,
-      })),
-    };
+  test("um nó por anel não sai mais em coluna, e o vão entre dois vizinhos ainda cabe o rótulo e um trecho da aresta", () => {
+    const column = sliceWithPageranks([0.7, 0.2, 0.1]);
     const { labelFontSize, labelHaloWidth, labelMarginY } = GRAPH_STYLE.node;
     const labelHeight = labelMarginY + labelFontSize + 2 * labelHaloWidth;
 
@@ -213,8 +313,21 @@ describe("concentricLayout", () => {
       );
       return distance - (node.outerWidth() + previous.outerWidth()) / 2;
     });
+    const inBetween = nodes.filter((node) => {
+      const [from, to] = nodes.filter((other) => other !== node);
+      const half = node.outerWidth() / 2;
+      const { x, y } = node.position();
+      return segmentMeetsBox(from.position(), to.position(), {
+        x1: x - half,
+        x2: x + half,
+        y1: y - half,
+        y2: y + half,
+      });
+    });
+    const labels = inBetween.map((node) => node.data("label") as string);
     cy.destroy();
 
+    expect(labels).toStrictEqual([]);
     expect(gaps).toHaveLength(2);
     for (const gap of gaps) {
       expect(gap).toBeGreaterThanOrEqual(labelHeight + VISIBLE_EDGE_PX);
@@ -222,17 +335,24 @@ describe("concentricLayout", () => {
   });
 
   test("o valor concêntrico é o anel invertido: o mais exposto vale mais", () => {
-    const options = concentricLayout(packageSlice);
+    const options = concentricLayout(PACKAGE_SLICE);
     const ringValueOf = (id: string): number | undefined =>
       options.concentric?.({ id: () => id } as unknown as NodeSingular);
 
-    expect(ringValueOf("pkg:br.pucpr.shared")).toBe(CONCENTRIC_RINGS);
-    expect(ringValueOf("pkg:br.pucpr.billing")).toBe(CONCENTRIC_RINGS);
-    expect(ringValueOf("pkg:br.pucpr.orders")).toBe(CONCENTRIC_RINGS - 1);
+    expect(
+      Object.fromEntries(
+        PACKAGE_SLICE.nodes.map((node) => [node.label, ringValueOf(node.id)])
+      )
+    ).toStrictEqual({
+      api: CONCENTRIC_RINGS - 3,
+      core: CONCENTRIC_RINGS,
+      "core.gen": CONCENTRIC_RINGS - 3,
+      "core.spi": CONCENTRIC_RINGS,
+    });
   });
 
   test("um nó fora da fatia vai para o anel externo, e não para o centro", () => {
-    const options = concentricLayout(packageSlice);
+    const options = concentricLayout(PACKAGE_SLICE);
 
     expect(
       options.concentric?.({ id: () => "pkg:fora" } as unknown as NodeSingular)
@@ -260,7 +380,7 @@ describe("concentricLayout no Cytoscape", () => {
   });
 
   test("a fatia de pacotes do fixture já sai em dois anéis", () => {
-    expect(distinctRadii(layoutPositions(packageSlice))).toBe(2);
+    expect(distinctRadii(layoutPositions(PACKAGE_SLICE))).toBe(2);
   });
 
   test("dentro de um anel a ordem da fatia decide a posição, por isso o adaptador não reordena", () => {
@@ -282,4 +402,110 @@ describe("concentricLayout no Cytoscape", () => {
     expect(reordered.get(lastNode.id)).toEqual(original.get(secondToLast.id));
     expect(reordered.get(secondToLast.id)).toEqual(original.get(lastNode.id));
   });
+});
+
+describe("as voltas de um quarto dos níveis pequenos", () => {
+  test("o nível 1 do fixture: core e core.spi no eixo vertical, api às 3 horas e core.gen às 9", () => {
+    expect(levelLabelsOf(PACKAGE_SLICE)).toStrictEqual([
+      ["core", "core.spi"],
+      ["api", "core.gen"],
+    ]);
+
+    expect(offsetsByLabel(PACKAGE_SLICE)).toStrictEqual({
+      api: [153, 0],
+      core: [0, -51],
+      "core.gen": [-153, 0],
+      "core.spi": [0, 51],
+    });
+  });
+
+  test("os tipos de core: CatalogEntry e Kind no eixo vertical, Audited às 3 horas e Catalog às 9", () => {
+    const core = typeSliceOf(packageIdByLabel("core"));
+
+    expect(levelLabelsOf(core)).toStrictEqual([
+      ["CatalogEntry", "Kind"],
+      ["Audited", "Catalog"],
+    ]);
+
+    expect(offsetsByLabel(core)).toStrictEqual({
+      Audited: [153, 0],
+      Catalog: [-153, 0],
+      CatalogEntry: [0, -51],
+      Kind: [0, 51],
+    });
+  });
+
+  const MIXED_LEVELS = sliceWithPageranks([0.4, 0.2, 0.2, 0.2, 0.1, 0.1, 0.02]);
+
+  const NEAR_ORIGIN: ContainerSize = { height: 2, width: 2 };
+
+  test.each<[string, GraphSlice]>([
+    ...FIXTURE_SLICES,
+    ["uma fatia com níveis de 1, 3, 2 e 1 nós", MIXED_LEVELS],
+  ])(
+    "%s: cada nível de até 2 nós gira k quartos de volta exatos, os outros ficam onde o concêntrico os pôs",
+    (_, slice) => {
+      const centre = { x: NEAR_ORIGIN.width / 2, y: NEAR_ORIGIN.height / 2 };
+      const before = new Map(
+        layoutPositions(slice, withoutTransform(slice), NEAR_ORIGIN)
+      );
+      const expected = levelsOf(slice).flatMap((level, turns) =>
+        level.map((id) => {
+          const position = before.get(id) ?? { x: Number.NaN, y: Number.NaN };
+          if (level.length > SMALL_LEVEL_MAX_NODES) {
+            return [id, position] as const;
+          }
+          const turned = quarterTurns(
+            { x: position.x - centre.x, y: position.y - centre.y },
+            turns
+          );
+          return [
+            id,
+            { x: centre.x + turned.x, y: centre.y + turned.y },
+          ] as const;
+        })
+      );
+
+      const after = layoutPositions(
+        slice,
+        concentricLayout(slice),
+        NEAR_ORIGIN
+      );
+
+      expect(Object.fromEntries(after)).toStrictEqual(
+        Object.fromEntries(expected)
+      );
+    }
+  );
+
+  const BENCHMARK_SEED = 20;
+
+  test.each(["PACKAGE", "TYPE"] as const)(
+    "a fatia sintética %s do benchmark sai byte a byte como no concêntrico de antes",
+    (level) => {
+      const slice = syntheticSlice({
+        ...GRAPH_SLICE_BUDGETS[level],
+        level,
+        seed: BENCHMARK_SEED,
+      });
+      const smallPastTheCentre = levelsOf(slice)
+        .slice(1)
+        .filter((nodes) => nodes.length <= SMALL_LEVEL_MAX_NODES);
+
+      expect(smallPastTheCentre).toStrictEqual([]);
+      expect(layoutPositions(slice)).toStrictEqual(
+        layoutPositions(slice, withoutTransform(slice))
+      );
+    }
+  );
+
+  test.each(FIXTURE_SLICES)(
+    "%s do fixture duas vezes dá posições idênticas, byte a byte",
+    (_, slice) => {
+      const first = JSON.stringify(layoutPositions(slice));
+      const second = JSON.stringify(layoutPositions(slice));
+
+      expect(first).toBe(second);
+    }
+  );
 });

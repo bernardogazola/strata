@@ -5,6 +5,12 @@ import br.pucpr.tcc.strata.analyzer.protocol.MethodHandler;
 import br.pucpr.tcc.strata.analyzer.protocol.method.AnalysisCancel;
 import br.pucpr.tcc.strata.analyzer.protocol.method.AnalysisStart;
 import br.pucpr.tcc.strata.analyzer.protocol.method.AnalysisStatusQuery;
+import br.pucpr.tcc.strata.analyzer.protocol.method.ElementDependencies;
+import br.pucpr.tcc.strata.analyzer.protocol.method.ElementDependencyEvidence;
+import br.pucpr.tcc.strata.analyzer.protocol.method.ElementDescribe;
+import br.pucpr.tcc.strata.analyzer.protocol.method.GraphSearch;
+import br.pucpr.tcc.strata.analyzer.protocol.method.GraphSlice;
+import br.pucpr.tcc.strata.analyzer.protocol.method.OutlineChildren;
 import br.pucpr.tcc.strata.analyzer.protocol.method.RepositoryDescribe;
 import br.pucpr.tcc.strata.analyzer.protocol.method.SystemPing;
 import br.pucpr.tcc.strata.analyzer.protocol.method.SystemShutdown;
@@ -28,6 +34,12 @@ public final class Handlers {
         new RepositoryDescribe(new RepositoryValidator()),
         new AnalysisStart(analyses),
         new AnalysisCancel(analyses),
-        new AnalysisStatusQuery(analyses));
+        new AnalysisStatusQuery(analyses),
+        new GraphSlice(analyses),
+        new OutlineChildren(analyses),
+        new GraphSearch(analyses),
+        new ElementDescribe(analyses),
+        new ElementDependencies(analyses),
+        new ElementDependencyEvidence(analyses));
   }
 }

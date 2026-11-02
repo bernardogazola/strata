@@ -25,7 +25,10 @@ const HOME_DIRECTORY = /\/(Users|home)\//;
 
 const RESERVED_TOPIC = "protocol";
 
-const PAYLOAD_MUST_FAIL = new Set(["protocol.invalid-payload.jsonl"]);
+const PAYLOAD_MUST_FAIL = new Set([
+  "element.describe.method.jsonl",
+  "protocol.invalid-payload.jsonl",
+]);
 
 const ENVELOPE_MUST_FAIL = new Set(["protocol.discarded-frame.jsonl"]);
 
@@ -242,12 +245,11 @@ const OPEN_MAP_PATHS = new Set([
   "payload.stages.[].counters",
 ]);
 
+const normalizedPath = (at: readonly (number | string)[]): string =>
+  at.map((segment) => (typeof segment === "number" ? "[]" : segment)).join(".");
+
 const isOpenMap = (at: readonly (number | string)[]): boolean =>
-  OPEN_MAP_PATHS.has(
-    at
-      .map((segment) => (typeof segment === "number" ? "[]" : segment))
-      .join(".")
-  );
+  OPEN_MAP_PATHS.has(normalizedPath(at));
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -529,6 +531,90 @@ const unknownKeyMutation = (
   };
 };
 
+const OPTIONAL_OUTPUT_KEYS = new Set([
+  "payload.error.detail",
+  "payload.error.origin",
+  "payload.error.params",
+]);
+
+const PARTIAL_MAP_PATHS = new Set([
+  "payload.edges.[].types",
+  "payload.items.[].types",
+]);
+
+interface MissingKeyMutation {
+  readonly accepted: readonly string[];
+  readonly mutants: number;
+
+  readonly reached: readonly string[];
+}
+
+const objectAt = (
+  value: unknown,
+  at: readonly (number | string)[]
+): Record<string, unknown> =>
+  at.reduce<unknown>(
+    (node, segment) => (node as Record<number | string, unknown>)[segment],
+    value
+  ) as Record<string, unknown>;
+
+const deleteAt = (
+  value: unknown,
+  at: readonly (number | string)[],
+  key: string
+): unknown => {
+  if (at.length === 0) {
+    const { [key]: _dropped, ...rest } = value as Record<string, unknown>;
+    return rest;
+  }
+  const [head, ...rest] = at;
+  if (Array.isArray(value)) {
+    return value.map((item, index) =>
+      index === head ? deleteAt(item, rest, key) : item
+    );
+  }
+  const clone = { ...(value as Record<string, unknown>) };
+  clone[head as string] = deleteAt(clone[head as string], rest, key);
+  return clone;
+};
+
+const missingKeyMutation = (
+  fixture: Fixture,
+  frame: Frame
+): MissingKeyMutation => {
+  const composed = composedFrameSchema(fixture, frame);
+  if (composed === null || frame.value.kind === "request") {
+    return { accepted: [], mutants: 0, reached: [] };
+  }
+  const removals = objectPaths(frame.value, [], [])
+    .filter(
+      (at) =>
+        at[0] === "payload" &&
+        !(isOpenMap(at) || PARTIAL_MAP_PATHS.has(normalizedPath(at)))
+    )
+    .flatMap((at) =>
+      Object.keys(objectAt(frame.value, at)).map((key) => ({
+        at,
+        key,
+        keyPath: normalizedPath([...at, key]),
+      }))
+    )
+    .filter(({ keyPath }) => !OPTIONAL_OUTPUT_KEYS.has(keyPath));
+  return {
+    accepted: removals
+      .filter(
+        ({ at, key }) =>
+          composed.safeParse(deleteAt(frame.value, at, key)).success
+      )
+      .map(
+        ({ keyPath }) =>
+          `${fixture.name}:${frame.index + 1} aceitou a falta de "${keyPath}"`
+      ),
+    mutants: removals.length,
+    reached: removals.map(({ keyPath }) => keyPath),
+  };
+};
+
 interface OpenMapMutation {
   readonly checked: number;
   readonly refused: readonly string[];
@@ -563,9 +649,6 @@ const coverageGap = coverageTopics.filter((topic) => !coveredTopics.has(topic));
 const EXPECTED_COVERAGE_GAP = [
   "archaeology.timeline",
   "diagnostics.report",
-  "element.dependencies",
-  "element.dependencyEvidence",
-  "element.describe",
   "evolution.changeMetrics",
   "evolution.cochange",
   "hotspot.profile",
@@ -863,6 +946,72 @@ describe("chave desconhecida", () => {
     });
   });
 
+  test("uma chave a menos em qualquer objeto da saída do analisador reprova: nulo, nunca ausente", () => {
+    const mutations = allFrames
+      .filter(({ fixture }) => !ENVELOPE_MUST_FAIL.has(fixture.name))
+      .map(({ fixture, frame }) => missingKeyMutation(fixture, frame));
+
+    expect(mutations.flatMap((mutation) => mutation.accepted)).toStrictEqual(
+      []
+    );
+    expect(
+      mutations.reduce((sum, mutation) => sum + mutation.mutants, 0)
+    ).toBeGreaterThan(0);
+  });
+
+  test("a varredura de chave ausente desce até os objetos aninhados dos payloads do inspetor", () => {
+    const reached = new Set(
+      allFrames.flatMap(
+        ({ fixture, frame }) => missingKeyMutation(fixture, frame).reached
+      )
+    );
+
+    for (const keyPath of [
+      "payload.evidence.[].filePath",
+      "payload.evidence.[].fromMethod",
+      "payload.evidence.[].line",
+      "payload.evidence.[].toMethod",
+      "payload.evidence.[].toMethod.ownerId",
+      "payload.graph.cycle",
+      "payload.items.[].packageId",
+      "payload.methods.[].cc",
+      "payload.methods.[].lines",
+      "payload.metrics.ccP90",
+      "payload.totals.outExternal",
+    ]) {
+      expect(reached.has(keyPath), keyPath).toBe(true);
+    }
+  });
+
+  test("a chave opcional do erro de um evento continua opcional", () => {
+    const optionalSeen = allFrames.flatMap(({ fixture, frame }) => {
+      const composed = composedFrameSchema(fixture, frame);
+      const error = isRecord(frame.value.payload)
+        ? frame.value.payload.error
+        : undefined;
+      if (
+        composed === null ||
+        frame.value.kind !== "event" ||
+        !isRecord(error)
+      ) {
+        return [];
+      }
+      return Object.keys(error)
+        .filter((key) => OPTIONAL_OUTPUT_KEYS.has(`payload.error.${key}`))
+        .map((key) => ({
+          accepted: composed.safeParse(
+            deleteAt(frame.value, ["payload", "error"], key)
+          ).success,
+          at: `${fixture.name}:${frame.index + 1} payload.error.${key}`,
+        }));
+    });
+
+    expect(
+      optionalSeen.filter(({ accepted }) => !accepted).map(({ at }) => at)
+    ).toStrictEqual([]);
+    expect(optionalSeen.length).toBeGreaterThan(0);
+  });
+
   test("todo objeto alcançável a partir do registro é estrito", () => {
     const permissive = reachableSchemas()
       .filter((node) => !isStrictObject(node.schema))
@@ -986,8 +1135,8 @@ describe("varreduras", () => {
       expect(isAbsolutePathLike(bad), bad).toBe(true);
     }
     for (const good of [
-      "src/main/java/br/pucpr/orders/PaymentService.java",
-      "pkg:br.pucpr.orders",
+      "core/src/main/java/br/pucpr/legacy/core/Catalog.java",
+      "pkg:br.pucpr.legacy.core",
       "req_home123",
       "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W",
     ]) {
@@ -1059,6 +1208,6 @@ describe("estritude fora do fio", () => {
     expect(
       sample.safeParse({ method: "graph.slice", sobrando: 1 }).success
     ).toBe(true);
-    expect(ERROR_CODES).toHaveLength(33);
+    expect(ERROR_CODES).toHaveLength(34);
   });
 });

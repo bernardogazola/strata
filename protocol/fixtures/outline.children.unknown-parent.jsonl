@@ -1,0 +1,2 @@
+{"id":"req_01JQ8ZB1B2C3D4E5F6G7H8J9PB","kind":"request","method":"outline.children","payload":{"analysisId":"an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W","limit":500,"parentId":"pkg:br.pucpr.legacy.nowhere"},"protocol":1}
+{"error":{"code":"ELEMENT_NOT_FOUND","detail":"o elemento não é um elemento interno desta análise","origin":"analyzer","params":{}},"id":"req_01JQ8ZB1B2C3D4E5F6G7H8J9PB","kind":"response","ok":false,"protocol":1}

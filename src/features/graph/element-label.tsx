@@ -1,10 +1,10 @@
 import { t } from "@/i18n/messages";
-import type { ElementKind } from "@/protocol/enums";
+import type { ElementKind, GraphNodeKind } from "@/protocol/enums";
 import { elementDisplayLabel } from "./adapter";
 
 export interface ElementLabelProps {
   readonly className?: string;
-  readonly kind: ElementKind;
+  readonly kind: ElementKind | GraphNodeKind;
 
   readonly label: string;
 

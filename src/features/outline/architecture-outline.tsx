@@ -4,7 +4,6 @@ import {
   useVirtualizer,
 } from "@tanstack/react-virtual";
 import {
-  type FocusEvent,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
@@ -22,12 +21,13 @@ import {
 import { protocolErrorOf } from "@/bridge/analyzer";
 import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { Button } from "@/components/ui/button";
-import { formatProtocolError } from "@/i18n/errors";
+import { type ErrorMessage, formatProtocolError } from "@/i18n/errors";
 import { t } from "@/i18n/messages";
+import { useRowHighlightHandlers } from "@/lib/cross-highlight";
 import { cn } from "@/lib/utils";
+import { pinIndexes } from "@/lib/virtual-range";
 import type { ElementKind } from "@/protocol/enums";
 import type { GraphViewParams } from "@/queries/options";
-import { useAppStore } from "@/state/app-store";
 import {
   EMPTY_TYPEAHEAD,
   extendTypeahead,
@@ -36,7 +36,6 @@ import {
   intentOf,
   isTypeaheadKey,
   type KeyIntent,
-  pinIndexes,
   resolveTabbable,
   resolveTarget,
   toggleIntent,
@@ -68,6 +67,16 @@ const OVERSCAN = 8;
 
 const estimateRowSize = (): number => ROW_HEIGHT;
 
+const measureRow = (
+  element: Element,
+  entry: ResizeObserverEntry | undefined
+): number => {
+  const height =
+    entry?.borderBoxSize[0]?.blockSize ??
+    element.getBoundingClientRect().height;
+  return height > 0 ? Math.round(height) : ROW_HEIGHT;
+};
+
 const rowIndexOf = (target: EventTarget | null): number | null => {
   if (!(target instanceof Element)) {
     return null;
@@ -85,43 +94,20 @@ const elementIdOf = (target: EventTarget | null): string | null => {
   );
 };
 
-const useCrossHighlight = (treeRef: RefObject<HTMLDivElement | null>) => {
-  const written = useRef<string | null>(null);
-  const write = useCallback((elementId: string) => {
-    written.current = elementId;
-    useAppStore.getState().setActiveElementId(elementId);
-  }, []);
-  const release = useCallback(() => {
-    const elementId = written.current;
-    written.current = null;
-    if (elementId !== null) {
-      useAppStore.getState().releaseActiveElementId(elementId);
-    }
-  }, []);
-  useEffect(() => release, [release]);
-  useEffect(
-    () =>
-      useAppStore.subscribe((state, previous) => {
-        if (
-          state.activeElementId !== null ||
-          previous.activeElementId === null
-        ) {
-          return;
-        }
-        const focused = treeRef.current?.contains(document.activeElement)
-          ? elementIdOf(document.activeElement)
-          : null;
-        if (focused !== null) {
-          write(focused);
-        }
-      }),
-    [treeRef, write]
-  );
-  return { release, write };
+const refusalOf = (error: Error | null): ErrorMessage | null => {
+  if (error === null) {
+    return null;
+  }
+  const protocolError = protocolErrorOf(error);
+  return protocolError.code === "ELEMENT_NOT_FOUND"
+    ? formatProtocolError(protocolError)
+    : null;
 };
 
 interface OutlineTreeProps {
   readonly busy: boolean;
+
+  readonly childrenRefusal: ErrorMessage | null;
   readonly expandedId: string | null;
   readonly focus: string | null;
   readonly headingId: string;
@@ -140,6 +126,7 @@ interface OutlineTreeProps {
 
 function OutlineTree({
   busy,
+  childrenRefusal,
   expandedId,
   focus,
   headingId,
@@ -153,12 +140,31 @@ function OutlineTree({
   treeRef,
   view,
 }: OutlineTreeProps) {
-  const { release, write } = useCrossHighlight(treeRef);
-
-  const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [containsFocus, setContainsFocus] = useState(false);
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
   const typeahead = useRef(EMPTY_TYPEAHEAD);
+
+  const keyOf = useCallback(
+    (target: Element) => {
+      const index = rowIndexOf(target);
+      return index === null ? null : (rows[index]?.key ?? null);
+    },
+    [rows]
+  );
+
+  const cancelPendingTarget = useCallback(
+    (relatedTarget: EventTarget | null) => {
+      if (relatedTarget !== null) {
+        setFocusTarget(null);
+      }
+    },
+    []
+  );
+
+  const { activeKey, containsFocus, ...highlightHandlers } =
+    useRowHighlightHandlers(treeRef, elementIdOf, {
+      keyOf,
+      onFocusLeave: cancelPendingTarget,
+    });
 
   const viewKey = `${view.level}:${view.parentId ?? ""}`;
   const refocusFrom = useRef<string | null>(null);
@@ -189,6 +195,7 @@ function OutlineTree({
     estimateSize: estimateRowSize,
     getItemKey,
     getScrollElement: () => treeRef.current,
+    measureElement: measureRow,
     overscan: OVERSCAN,
     rangeExtractor,
   });
@@ -231,13 +238,6 @@ function OutlineTree({
       ?.focus({ preventScroll: true });
   }, [tabbableIndex, treeRef, viewKey]);
 
-  useLayoutEffect(() => {
-    if (containsFocus && !treeRef.current?.contains(document.activeElement)) {
-      setContainsFocus(false);
-      release();
-    }
-  });
-
   useEffect(() => {
     if (!containsFocus && tabbableIndex !== null) {
       virtualizer.scrollToIndex(tabbableIndex, { align: "auto" });
@@ -263,6 +263,9 @@ function OutlineTree({
         }
         onLoadMore(row.parentId);
       } else if (row?.type === "error") {
+        if (row.parentId !== null && childrenRefusal !== null) {
+          return;
+        }
         const previous = rows[index - 1];
         if (previous !== undefined) {
           setFocusTarget({ after: previous.key, waitingOn: row.key });
@@ -270,7 +273,15 @@ function OutlineTree({
         onRetry(row.parentId);
       }
     },
-    [armRefocus, onLoadMore, onRetry, onSelect, rows, view.level]
+    [
+      armRefocus,
+      childrenRefusal,
+      onLoadMore,
+      onRetry,
+      onSelect,
+      rows,
+      view.level,
+    ]
   );
 
   const run = useCallback(
@@ -347,84 +358,18 @@ function OutlineTree({
     [activate, expandedId, rows, run]
   );
 
-  const handleFocus = useCallback(
-    (event: FocusEvent<HTMLDivElement>) => {
-      const index = rowIndexOf(event.target);
-      const row = index === null ? undefined : rows[index];
-      if (row === undefined) {
-        return;
-      }
-      setContainsFocus(true);
-      setActiveKey(row.key);
-      if (row.type === "node") {
-        write(row.node.id);
-      } else {
-        release();
-      }
-    },
-    [release, rows, write]
-  );
-
-  const handleBlur = useCallback(
-    (event: FocusEvent<HTMLDivElement>) => {
-      const { relatedTarget } = event;
-      if (event.currentTarget.contains(relatedTarget)) {
-        return;
-      }
-      setContainsFocus(false);
-      release();
-      if (relatedTarget !== null) {
-        setFocusTarget(null);
-      }
-    },
-    [release]
-  );
-
-  const handleMouseOver = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
-      const elementId = elementIdOf(event.target);
-      if (elementId !== null) {
-        write(elementId);
-      }
-    },
-    [write]
-  );
-
-  const handleMouseOut = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
-      const tree = event.currentTarget;
-      const { relatedTarget } = event;
-      if (
-        relatedTarget instanceof Node &&
-        tree.contains(relatedTarget) &&
-        elementIdOf(relatedTarget) !== null
-      ) {
-        return;
-      }
-      const focused = tree.contains(document.activeElement)
-        ? elementIdOf(document.activeElement)
-        : null;
-      if (focused === null) {
-        release();
-      } else {
-        write(focused);
-      }
-    },
-    [release, write]
-  );
-
   return (
     <div
       aria-busy={busy}
       aria-describedby={hintId}
       aria-labelledby={headingId}
       className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1"
-      onBlur={handleBlur}
+      onBlur={highlightHandlers.onBlur}
       onClick={handleClick}
-      onFocus={handleFocus}
+      onFocus={highlightHandlers.onFocus}
       onKeyDown={handleKeyDown}
-      onMouseOut={handleMouseOut}
-      onMouseOver={handleMouseOver}
+      onMouseOut={highlightHandlers.onMouseOut}
+      onMouseOver={highlightHandlers.onMouseOver}
       ref={treeRef}
       role="tree"
     >
@@ -440,6 +385,12 @@ function OutlineTree({
               focus={focus}
               index={index}
               key={row.key}
+              measureRef={virtualizer.measureElement}
+              refusal={
+                row.type === "error" && row.parentId !== null
+                  ? childrenRefusal
+                  : null
+              }
               row={row}
               start={start}
               tabbable={index === tabbableIndex}
@@ -503,7 +454,11 @@ export function ArchitectureOutline({
   const headingRef = useRef<HTMLHeadingElement>(null);
   const treeRef = useRef<HTMLDivElement>(null);
   const outline = useOutline(analysisId, view, focus);
-  const { retry, rootError, rootStatus, rows } = outline;
+  const { childrenError, retry, rootError, rootStatus, rows } = outline;
+  const childrenRefusal = useMemo(
+    () => refusalOf(childrenError),
+    [childrenError]
+  );
 
   useImperativeHandle(
     ref,
@@ -529,6 +484,7 @@ export function ArchitectureOutline({
         </p>
         <OutlineTree
           busy={outline.busy}
+          childrenRefusal={childrenRefusal}
           expandedId={outline.expandedId}
           focus={focus}
           headingId={headingId}

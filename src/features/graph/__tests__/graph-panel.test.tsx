@@ -29,10 +29,16 @@ import {
   resolutionQualityLabels,
 } from "@/i18n/labels";
 import { t } from "@/i18n/messages";
-import { graphLevelSchema, resolutionQualitySchema } from "@/protocol/enums";
+import { graphLevelSchema, type ResolutionQuality } from "@/protocol/enums";
 import type { GraphNode, GraphSlice } from "@/protocol/graph";
 import { createQueryClient } from "@/queries/client";
 import type { GraphViewParams } from "@/queries/options";
+import {
+  DRILLED_PACKAGE_ID,
+  PACKAGE_SLICE,
+  packageIdByLabel,
+  TYPE_SLICE,
+} from "@/test/fixture-graph";
 
 vi.mock("@/features/graph/architecture-graph", async (importOriginal) => {
   const actual =
@@ -98,7 +104,13 @@ vi.mock("@/features/graph/architecture-graph", async (importOriginal) => {
 });
 
 const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
-const ORDERS = "pkg:br.pucpr.orders";
+const DRILLED = DRILLED_PACKAGE_ID;
+const PACKAGES = PACKAGE_SLICE.nodes.length;
+const PACKAGE_EDGES = PACKAGE_SLICE.edges.length;
+const TYPES = TYPE_SLICE.nodes.length;
+const TYPE_EDGES = TYPE_SLICE.edges.length;
+
+const EDGE_LEGEND: readonly ResolutionQuality[] = ["RESOLVED", "INFERRED"];
 const BIDI_OVERRIDE = String.fromCodePoint(0x20_2e);
 const ANY_TEXT = /./u;
 
@@ -159,7 +171,7 @@ describe("GraphPanel: carregando e pronto", () => {
       "true"
     );
 
-    await waitForNodes(3);
+    await waitForNodes(PACKAGES);
 
     expect(screen.queryByText(t.graph.loading)).toBeNull();
     expect(canvas().closest("[aria-busy]")?.getAttribute("aria-busy")).toBe(
@@ -172,17 +184,17 @@ describe("GraphPanel: carregando e pronto", () => {
     renderPanel();
     const whileLoading = canvas();
 
-    await waitForNodes(3);
+    await waitForNodes(PACKAGES);
 
     expect(canvas()).toBe(whileLoading);
   });
 
   test("o nome acessível do canvas diz o nível e as contagens, com plural", async () => {
     renderPanel();
-    await waitForNodes(3);
+    await waitForNodes(PACKAGES);
 
     expect(canvas().getAttribute("aria-label")).toBe(
-      "Mapa da arquitetura, pacotes: 3 pacotes e 3 dependências."
+      `Mapa da arquitetura, pacotes: ${PACKAGES} pacotes e ${PACKAGE_EDGES} dependências.`
     );
   });
 
@@ -233,11 +245,11 @@ describe("GraphPanel: carregando e pronto", () => {
   });
 
   test("o nível TYPE pede os tipos do pacote", async () => {
-    renderPanel({ view: { level: "TYPE", parentId: ORDERS } });
-    await waitForNodes(3);
+    renderPanel({ view: { level: "TYPE", parentId: DRILLED } });
+    await waitForNodes(TYPES);
 
     expect(canvas().getAttribute("aria-label")).toBe(
-      "Mapa da arquitetura, tipos: 3 tipos e 2 dependências."
+      `Mapa da arquitetura, tipos: ${TYPES} tipos e ${TYPE_EDGES} dependências.`
     );
   });
 
@@ -247,36 +259,36 @@ describe("GraphPanel: carregando e pronto", () => {
     expect(liveRegion()?.textContent).toBe("");
     expect(liveRegion()?.className).toContain("sr-only");
 
-    await waitForNodes(3);
+    await waitForNodes(PACKAGES);
 
     expect(liveRegion()?.textContent).toBe(canvas().getAttribute("aria-label"));
     expect(liveRegion()?.textContent).toBe(
-      "Mapa da arquitetura, pacotes: 3 pacotes e 3 dependências."
+      `Mapa da arquitetura, pacotes: ${PACKAGES} pacotes e ${PACKAGE_EDGES} dependências.`
     );
   });
 
   test("o foco da URL chega ao canvas como a seleção", async () => {
-    renderPanel({ focus: ORDERS });
-    await waitForNodes(3);
+    renderPanel({ focus: DRILLED });
+    await waitForNodes(PACKAGES);
 
-    expect(canvas().getAttribute("data-selected")).toBe(ORDERS);
+    expect(canvas().getAttribute("data-selected")).toBe(DRILLED);
   });
 
   test("seleção e expansão do canvas sobem pelos callbacks", async () => {
     const { onExpand, onSelect } = renderPanel();
-    await waitForNodes(3);
+    await waitForNodes(PACKAGES);
 
-    fireEvent.click(screen.getByRole("button", { name: `select:${ORDERS}` }));
+    fireEvent.click(screen.getByRole("button", { name: `select:${DRILLED}` }));
     fireEvent.click(screen.getByRole("button", { name: "select:none" }));
-    fireEvent.click(screen.getByRole("button", { name: `expand:${ORDERS}` }));
+    fireEvent.click(screen.getByRole("button", { name: `expand:${DRILLED}` }));
 
-    expect(onSelect.mock.calls).toStrictEqual([[ORDERS], [null]]);
-    expect(onExpand).toHaveBeenCalledWith(ORDERS);
+    expect(onSelect.mock.calls).toStrictEqual([[DRILLED], [null]]);
+    expect(onExpand).toHaveBeenCalledWith(DRILLED);
   });
 
   test("uma fatia completa não mostra aviso nenhum", async () => {
     renderPanel();
-    await waitForNodes(3);
+    await waitForNodes(PACKAGES);
 
     expect(screen.queryByRole("status")).toBeNull();
   });
@@ -327,7 +339,7 @@ describe("GraphPanel: erro", () => {
 
     fireEvent.click(screen.getByRole("button", { name: t.graph.retry }));
 
-    await waitForNodes(3);
+    await waitForNodes(PACKAGES);
     expect(request).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -349,7 +361,7 @@ describe("GraphPanel: erro", () => {
 
   test("uma falha de render do canvas vira o mesmo estado de erro, e a nova tentativa desenha", async () => {
     renderPanel();
-    await waitForNodes(3);
+    await waitForNodes(PACKAGES);
 
     fireEvent.click(screen.getByRole("button", { name: "render-error" }));
 
@@ -363,7 +375,7 @@ describe("GraphPanel: erro", () => {
     expect(canvas().getAttribute("data-node-count")).toBe("none");
 
     fireEvent.click(screen.getByRole("button", { name: t.graph.retry }));
-    await waitForNodes(3);
+    await waitForNodes(PACKAGES);
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
@@ -374,7 +386,7 @@ describe("GraphPanel: falha de render sem fatia", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "render-error" }));
 
-    await waitForNodes(3);
+    await waitForNodes(PACKAGES);
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
@@ -393,23 +405,23 @@ describe("GraphPanel: vazio e avisos", () => {
   });
 
   test("uma fatia truncada diz quanto o mapa mostra, de nós e de arestas", async () => {
-    const fixture = await fixtureSlice({ level: "TYPE", parentId: ORDERS });
+    const fixture = await fixtureSlice({ level: "TYPE", parentId: DRILLED });
     overrideSlice(
-      { level: "TYPE", parentId: ORDERS },
+      { level: "TYPE", parentId: DRILLED },
       { ...fixture, totals: { edges: 9120, nodes: 1842 }, truncated: true }
     );
-    renderPanel({ view: { level: "TYPE", parentId: ORDERS } });
-    await waitForNodes(3);
+    renderPanel({ view: { level: "TYPE", parentId: DRILLED } });
+    await waitForNodes(TYPES);
 
     expect(screen.getByRole("status").textContent).toBe(
-      "Este nível tem mais elementos do que o mapa mostra: 3 de 1.842 tipos e 2 de 9.120 dependências. O limite de exibição do nível deixou o restante de fora."
+      `Este nível tem mais elementos do que o mapa mostra: ${TYPES} de 1.842 tipos e ${TYPE_EDGES} de 9.120 dependências. O limite de exibição do nível deixou o restante de fora.`
     );
   });
 
   test('o aviso compara números: um total zero de arestas não vira "de nenhuma"', async () => {
-    const fixture = await fixtureSlice({ level: "TYPE", parentId: ORDERS });
+    const fixture = await fixtureSlice({ level: "TYPE", parentId: DRILLED });
     overrideSlice(
-      { level: "TYPE", parentId: ORDERS },
+      { level: "TYPE", parentId: DRILLED },
       {
         ...fixture,
         edges: [],
@@ -417,11 +429,11 @@ describe("GraphPanel: vazio e avisos", () => {
         truncated: true,
       }
     );
-    renderPanel({ view: { level: "TYPE", parentId: ORDERS } });
-    await waitForNodes(3);
+    renderPanel({ view: { level: "TYPE", parentId: DRILLED } });
+    await waitForNodes(TYPES);
 
     const notice = screen.getByRole("status").textContent ?? "";
-    expect(notice).toContain("3 de 1.842 tipos e 0 de 0 dependência.");
+    expect(notice).toContain(`${TYPES} de 1.842 tipos e 0 de 0 dependência.`);
     expect(notice).not.toContain("nenhuma");
   });
 
@@ -432,10 +444,10 @@ describe("GraphPanel: vazio e avisos", () => {
       { ...fixture, aggregated: true, totals: { edges: 7000, nodes: 1842 } }
     );
     renderPanel();
-    await waitForNodes(3);
+    await waitForNodes(PACKAGES);
 
     expect(screen.getByRole("status").textContent).toBe(
-      "Este repositório tem 1.842 pacotes, mais do que o primeiro nível comporta. Eles aparecem agrupados pelos prefixos de pacote de topo."
+      "Este repositório tem 1.842 pacotes, mais do que o primeiro nível comporta. Eles aparecem agrupados por prefixo de pacote. Use a estrutura da arquitetura ou a busca para abrir um pacote."
     );
   });
 
@@ -451,7 +463,7 @@ describe("GraphPanel: vazio e avisos", () => {
       }
     );
     renderPanel();
-    await waitForNodes(3);
+    await waitForNodes(PACKAGES);
 
     expect(
       within(screen.getByRole("status")).getAllByText(ANY_TEXT)
@@ -460,10 +472,12 @@ describe("GraphPanel: vazio e avisos", () => {
 });
 
 describe("NodeSummary", () => {
+  const INSPECTED = packageIdByLabel("api");
+
   const packageNode = async (): Promise<GraphNode> => {
     const elements = toGraphElements(await fixtureSlice({ level: "PACKAGE" }));
-    const orders = elements.nodes.find((node) => node.data.id === ORDERS);
-    return orders?.data as GraphNode;
+    const inspected = elements.nodes.find((node) => node.data.id === INSPECTED);
+    return inspected?.data as GraphNode;
   };
 
   const metricRows = () =>
@@ -487,6 +501,13 @@ describe("NodeSummary", () => {
     const hint = screen.getByText(t.graph.legend.expandHint);
     expect(empty.nextElementSibling).toBe(hint);
     expect(hint.className).toContain("text-muted-foreground");
+  });
+
+  test("no nível TYPE, o vazio não manda clicar duas vezes em um pacote", () => {
+    render(<NodeSummary level="TYPE" node={null} onExpand={vi.fn()} />);
+
+    expect(screen.getByText(t.inspector.empty)).toBeDefined();
+    expect(screen.queryByText(t.graph.legend.expandHint)).toBeNull();
   });
 
   test("com uma seleção, dentro ou fora do mapa, a dica do duplo clique sai", async () => {
@@ -523,19 +544,19 @@ describe("NodeSummary", () => {
 
     const heading = screen.getByRole("heading", { level: 2 });
     const label = heading.querySelector("bdi");
-    expect(label?.textContent).toBe("orders");
+    expect(label?.textContent).toBe("api");
     expect(label?.getAttribute("lang")).toBe("");
     expect(label?.getAttribute("translate")).toBe("no");
 
     expect(screen.getByText(elementKindLabels.PACKAGE)).toBeDefined();
     expect(metricRows()).toStrictEqual([
-      [t.inspector.typeCount, "3"],
+      [t.inspector.typeCount, "2"],
       [t.inspector.dependsOn, "2 pacotes"],
       [t.inspector.usedBy, "nenhum pacote"],
     ]);
 
     fireEvent.click(screen.getByRole("button", { name: t.inspector.expand }));
-    expect(onExpand).toHaveBeenCalledWith(ORDERS);
+    expect(onExpand).toHaveBeenCalledWith(INSPECTED);
   });
 
   test("sem jargão inglês: nem LOC, nem fan-in, nem fan-out, nem dica de ponteiro", async () => {
@@ -643,14 +664,14 @@ describe("NodeSummary", () => {
 });
 
 describe("GraphLegend", () => {
-  test("as três qualidades de resolução, na ordem do protocolo, cada uma com o traço do canvas", () => {
+  test("as duas qualidades que uma aresta do fio tem, na ordem do protocolo, cada uma com o traço do canvas", () => {
     const { container } = render(<GraphLegend />);
 
     const items = screen
       .getByText(t.graph.legend.resolution)
       .parentElement?.querySelectorAll("li");
     expect([...(items ?? [])].map((item) => item.textContent)).toStrictEqual(
-      resolutionQualitySchema.options.map((quality) =>
+      EDGE_LEGEND.map((quality) =>
         sentenceCase(resolutionQualityLabels[quality])
       )
     );
@@ -662,7 +683,7 @@ describe("GraphLegend", () => {
         line.getAttribute("stroke-linecap"),
       ])
     ).toStrictEqual(
-      resolutionQualitySchema.options.map((quality) => [
+      EDGE_LEGEND.map((quality) => [
         EDGE_LINES[quality].dashPattern?.join(" ") ?? null,
         EDGE_LINES[quality].cap,
       ])
@@ -691,7 +712,7 @@ describe("GraphLegend", () => {
     }
 
     const svgs = [...container.querySelectorAll("svg")];
-    expect(svgs).toHaveLength(6);
+    expect(svgs).toHaveLength(5);
     for (const svg of svgs) {
       expect(svg.getAttribute("aria-hidden")).toBe("true");
     }
@@ -715,7 +736,7 @@ describe("GraphLegend", () => {
       t.graph.legend.selectionName,
     ]);
     expect(resolutions).toStrictEqual(
-      resolutionQualitySchema.options.map((quality) =>
+      EDGE_LEGEND.map((quality) =>
         sentenceCase(resolutionQualityLabels[quality])
       )
     );
@@ -733,7 +754,7 @@ describe("GraphLegend", () => {
     const { container } = render(<GraphLegend />);
 
     const items = [...container.querySelectorAll("li")];
-    expect(items).toHaveLength(6);
+    expect(items).toHaveLength(5);
     for (const item of items) {
       expect(item.firstElementChild?.tagName).toBe("svg");
     }
@@ -779,7 +800,7 @@ describe("GraphPanel: a legenda", () => {
 
   test("é um rodapé do painel: irmã do invólucro do canvas, logo depois dele, e nunca dentro", async () => {
     renderPanel();
-    await waitForNodes(3);
+    await waitForNodes(PACKAGES);
 
     const wrapper = canvas().parentElement;
     expect(wrapper?.nextElementSibling).toBe(legend());

@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 export interface AppHeaderRepository {
   readonly displayName: string | undefined;
+  readonly onAnalyzeAgain?: () => void;
   readonly onClose: () => void;
 }
 
@@ -108,11 +109,19 @@ function PathSeparator() {
   );
 }
 
+const SHORT_NAME_CODE_POINTS = 8;
+
+const LONG_NAME_SHRINK_CLASS = "min-w-16 shrink-[100]";
+
 function RepositoryName({ displayName }: { readonly displayName: string }) {
   const name = clampText(sanitizeUntrusted(displayName));
+  const short = [...name].length <= SHORT_NAME_CODE_POINTS;
   return (
     <bdi
-      className="min-w-0 max-w-70 truncate font-medium text-foreground group-data-inactive/titlebar:text-muted-foreground"
+      className={cn(
+        "max-w-70 truncate font-medium text-foreground group-data-inactive/titlebar:text-muted-foreground",
+        short ? "shrink-0" : LONG_NAME_SHRINK_CLASS
+      )}
       lang=""
       title={name}
       translate="no"
@@ -121,6 +130,9 @@ function RepositoryName({ displayName }: { readonly displayName: string }) {
     </bdi>
   );
 }
+
+const HEADER_ACTION_CLASS =
+  "h-7 px-2.5 text-muted-foreground text-xs hover:text-foreground";
 
 const TRAILING_INSET = {
   browser: "pr-4",
@@ -173,9 +185,19 @@ export function AppHeader({ repository, status, trail }: AppHeaderProps) {
       <div className="flex shrink-0 items-center gap-1 self-stretch">
         {status}
         <AnalyzerStatus offersRestart={repository !== undefined} />
+        {repository?.onAnalyzeAgain === undefined ? null : (
+          <Button
+            className={HEADER_ACTION_CLASS}
+            onClick={repository.onAnalyzeAgain}
+            size="sm"
+            variant="ghost"
+          >
+            {t.analysis.again}
+          </Button>
+        )}
         {repository === undefined ? null : (
           <Button
-            className="h-7 px-2.5 text-muted-foreground text-xs hover:text-foreground"
+            className={HEADER_ACTION_CLASS}
             onClick={repository.onClose}
             size="sm"
             variant="ghost"

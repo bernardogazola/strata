@@ -4,18 +4,42 @@ import static com.tngtech.archunit.base.DescribedPredicate.describe;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyEdge;
+import com.tngtech.archunit.base.DescribedPredicate;
+import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaCodeUnitAccess;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.EvaluationResult;
+import java.util.Set;
+import java.util.function.ToIntFunction;
 import org.junit.jupiter.api.Test;
 
 @AnalyzeClasses(packages = "br.pucpr.tcc.strata.analyzer")
 final class ArchitectureRulesTest {
 
   private static final String PACOTE_DO_PIPELINE = "br.pucpr.tcc.strata.analyzer.analysis..";
+
+  private static final String PACOTE_DO_GRAFO = "br.pucpr.tcc.strata.analyzer.graph..";
+
+  private static final String PACOTE_DA_ESTRUTURA = "br.pucpr.tcc.strata.analyzer.structure..";
+
+  private static final Set<String> PESOS =
+      Set.of(
+          "br.pucpr.tcc.strata.analyzer.sourceanalysis.DependencyAggregator#weightOf",
+          "br.pucpr.tcc.strata.analyzer.sourceanalysis.DependencyAggregator#rowWeight",
+          "br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyEdge#weight");
+
+  private static final DescribedPredicate<JavaAccess<?>> UM_PESO =
+      describe(
+          "DependencyAggregator.weightOf, DependencyAggregator.rowWeight or DependencyEdge.weight()",
+          acesso ->
+              acesso instanceof JavaCodeUnitAccess<?>
+                  && PESOS.contains(
+                      acesso.getTargetOwner().getFullName() + "#" + acesso.getName()));
 
   @ArchTest
   static final ArchRule nenhumaClasseUsaProcessBuilderOuRuntimeExec =
@@ -80,6 +104,43 @@ final class ArchitectureRulesTest {
               "o pipeline compõe a análise de fonte e o repositório por tipos do JDK; o contrário"
                   + " acoplaria a varredura e o Spoon ao registro de análises");
 
+  @ArchTest
+  static final ArchRule oGrafoNaoDependeDaPersistencia =
+      semDependencia(PACOTE_DO_GRAFO, "..persistence..")
+          .because(
+              "o estágio lê pelos DAOs, chama o graph/ e grava pelos DAOs; o graph/ só recebe e"
+                  + " devolve valores");
+
+  @ArchTest
+  static final ArchRule oGrafoNaoDependeDoPipeline =
+      semDependencia(PACOTE_DO_GRAFO, PACOTE_DO_PIPELINE)
+          .because(
+              "o pipeline compõe o graph/ por tipos do JDK; o contrário traria o registro de"
+                  + " análises para dentro do teste de cada algoritmo");
+
+  @ArchTest
+  static final ArchRule oGrafoNaoAlcancaPesoNenhum =
+      semPeso(PACOTE_DO_GRAFO)
+          .because(
+              "o grafo é simples e sem peso: um peso no PageRank premiaria o laço mais tagarela, e"
+                  + " a intermediação o leria como distância");
+
+  @ArchTest
+  static final ArchRule aEstruturaNaoDependeDoProtocoloNemDoPipeline =
+      noClasses()
+          .that()
+          .resideInAPackage(PACOTE_DA_ESTRUTURA)
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage("..protocol..", PACOTE_DO_PIPELINE)
+          .because(
+              "a consulta é uma função da conexão e devolve valores; o handler abre a unidade e"
+                  + " fala o fio");
+
+  private static ArchRule semPeso(String pacote) {
+    return noClasses().that().resideInAPackage(pacote).should().accessTargetWhere(UM_PESO);
+  }
+
   private static ArchRule semDependencia(String origem, String destino) {
     return noClasses()
         .that()
@@ -98,7 +159,7 @@ final class ArchitectureRulesTest {
     final JavaClasses importadas = importar();
 
     assertThat(importadas)
-        .as("um pacote errado devolve conjunto vazio e deixa as cinco regras verdes para sempre")
+        .as("um pacote errado devolve conjunto vazio e deixa as regras verdes para sempre")
         .isNotEmpty();
     assertThat(importadas.stream().map(c -> c.getFullName()))
         .as(
@@ -115,7 +176,17 @@ final class ArchitectureRulesTest {
         .as("os três pacotes da sexta regra")
         .contains("br.pucpr.tcc.strata.analyzer.sourceanalysis.SpoonModelBuilder")
         .contains("br.pucpr.tcc.strata.analyzer.repository.RepositoryWalker")
-        .contains("br.pucpr.tcc.strata.analyzer.analysis.CancellationToken");
+        .contains("br.pucpr.tcc.strata.analyzer.analysis.CancellationToken")
+        .as("o graph/ das três regras do grafo, e os dois lados da regra do peso")
+        .contains("br.pucpr.tcc.strata.analyzer.graph.GraphAlgorithms")
+        .contains("br.pucpr.tcc.strata.analyzer.graph.StructuralGraphAnalysis")
+        .contains("br.pucpr.tcc.strata.analyzer.sourceanalysis.DependencyAggregator")
+        .contains("br.pucpr.tcc.strata.analyzer.sourceanalysis.model.DependencyEdge")
+        .contains("br.pucpr.tcc.strata.analyzer.persistence.DependencyFlush")
+        .as("os dois lados da décima regra, a do structure/")
+        .contains("br.pucpr.tcc.strata.analyzer.structure.GraphSliceQuery")
+        .contains("br.pucpr.tcc.strata.analyzer.structure.GraphLevel")
+        .contains("br.pucpr.tcc.strata.analyzer.protocol.method.GraphSlice");
   }
 
   @Test
@@ -164,5 +235,69 @@ final class ArchitectureRulesTest {
                 assertThat(detalhe)
                     .contains("br.pucpr.tcc.strata.analyzer.analysis.RunInputs")
                     .contains("br.pucpr.tcc.strata.analyzer.repository.ValidatedRepository"));
+  }
+
+  @Test
+  void aFronteiraInvertidaDaEstruturaReprovaNoGraphSlice() {
+    final EvaluationResult invertida =
+        semDependencia("..protocol..", PACOTE_DA_ESTRUTURA).evaluate(importar());
+
+    assertThat(invertida.hasViolation()).isTrue();
+    assertThat(invertida.getFailureReport().getDetails())
+        .anySatisfy(
+            detalhe ->
+                assertThat(detalhe)
+                    .contains("br.pucpr.tcc.strata.analyzer.protocol.method.GraphSlice")
+                    .contains("br.pucpr.tcc.strata.analyzer.structure.GraphLevel"));
+  }
+
+  @Test
+  void aRegraDoPesoInvertidaReprovaNoDependencyFlush() {
+    final EvaluationResult invertida = semPeso("..persistence..").evaluate(importar());
+
+    assertThat(invertida.hasViolation()).isTrue();
+    assertThat(invertida.getFailureReport().getDetails())
+        .anySatisfy(
+            detalhe ->
+                assertThat(detalhe)
+                    .contains("br.pucpr.tcc.strata.analyzer.persistence.DependencyFlush")
+                    .contains("DependencyAggregator.rowWeight"));
+  }
+
+  @Test
+  void aRegraDoPesoPegaUmaReferenciaDeMetodo() {
+    final EvaluationResult naFixture =
+        noClasses()
+            .that()
+            .haveFullyQualifiedName(ReferenciaAoPeso.class.getName())
+            .should()
+            .accessTargetWhere(UM_PESO)
+            .evaluate(importar());
+
+    assertThat(ReferenciaAoPeso.PESO).isNotNull();
+    assertThat(naFixture.hasViolation()).isTrue();
+    assertThat(naFixture.getFailureReport().getDetails())
+        .anySatisfy(detalhe -> assertThat(detalhe).contains("DependencyEdge.weight()"));
+  }
+
+  @Test
+  void oImportadorEnxergaAsArestasQueSaemDoGrafo() {
+    final EvaluationResult saindo =
+        semDependencia(PACOTE_DO_GRAFO, "..sourceanalysis..").evaluate(importar());
+
+    assertThat(saindo.hasViolation()).isTrue();
+    assertThat(saindo.getFailureReport().getDetails())
+        .anySatisfy(
+            detalhe ->
+                assertThat(detalhe)
+                    .contains("br.pucpr.tcc.strata.analyzer.graph.")
+                    .contains("br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId"));
+  }
+
+  private static final class ReferenciaAoPeso {
+
+    static final ToIntFunction<DependencyEdge> PESO = DependencyEdge::weight;
+
+    private ReferenciaAoPeso() {}
   }
 }

@@ -16,8 +16,14 @@ import {
   test,
   vi,
 } from "vitest";
-import { type GraphSlice, graphSliceSchema } from "@/protocol/graph";
+import type { ResolutionQuality } from "@/protocol/enums";
+import type { GraphSlice } from "@/protocol/graph";
 import { installCanvasStub } from "@/test/canvas";
+import {
+  PACKAGE_SLICE,
+  packageIdByLabel,
+  TYPE_SLICE,
+} from "@/test/fixture-graph";
 import { toGraphElements } from "../adapter";
 import { GRAPH_TOKENS, type GraphPalette, readGraphPalette } from "../palette";
 import {
@@ -38,20 +44,9 @@ import {
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const GLOBAL_CSS = path.resolve(ROOT, "../../global.css");
-const FIXTURES = path.resolve(ROOT, "../../../protocol/fixtures");
 
 const PARSER_WARNING = /is invalid|may not return/;
 const WHEEL_SENSITIVITY_WARNING = /wheel sensitivity/;
-
-const readSliceFixture = async (stem: string): Promise<GraphSlice> => {
-  const text = await readFile(path.join(FIXTURES, `${stem}.jsonl`), "utf8");
-  const response = text
-    .split("\n")
-    .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as { kind: string; payload: unknown })
-    .find((frame) => frame.kind === "response");
-  return graphSliceSchema.parse(response?.payload);
-};
 
 const tokenBlock = (css: string, selector: string): string => {
   const start = css.indexOf(`\n${selector} {`);
@@ -68,17 +63,12 @@ const parsedColor = (hex: string): string => {
 const nextFrames = (): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, 50));
 
-let packageSlice: GraphSlice;
-let typeSlice: GraphSlice;
 let palettes: Record<"dark" | "light", GraphPalette>;
 let restoreCanvas: () => void;
 let warn: MockInstance<typeof console.warn>;
 let instances: Core[] = [];
 
 beforeAll(async () => {
-  packageSlice = await readSliceFixture("graph.slice.package");
-  typeSlice = await readSliceFixture("graph.slice.type");
-
   const css = await readFile(GLOBAL_CSS, "utf8");
   const style = document.createElement("style");
   style.textContent = `${tokenBlock(css, ":root")}\n${tokenBlock(css, ".dark")}`;
@@ -106,11 +96,18 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
+const EVERY_QUALITY: readonly ResolutionQuality[] = [
+  "RESOLVED",
+  "INFERRED",
+  "UNRESOLVED_EXTERNAL",
+];
+
 const sliceWithEveryQuality = (): GraphSlice => ({
-  ...packageSlice,
-  edges: packageSlice.edges.map((edge, index) =>
-    index === 2 ? { ...edge, resolution: "UNRESOLVED_EXTERNAL" } : edge
-  ),
+  ...PACKAGE_SLICE,
+  edges: PACKAGE_SLICE.edges.map((edge, index) => ({
+    ...edge,
+    resolution: EVERY_QUALITY[index] ?? edge.resolution,
+  })),
 });
 
 const createGraph = (palette: GraphPalette, slice: GraphSlice): Core => {
@@ -137,7 +134,7 @@ const parserWarnings = (): string[] =>
     .filter((message) => !WHEEL_SENSITIVITY_WARNING.test(message));
 
 const edgeOf = (cy: Core, index: number): EdgeSingular =>
-  cy.getElementById(packageSlice.edges[index].id) as EdgeSingular;
+  cy.getElementById(PACKAGE_SLICE.edges[index].id) as EdgeSingular;
 
 describe("buildStylesheet pelo parser do Cytoscape", () => {
   test.each(["light", "dark"] as const)(
@@ -145,8 +142,8 @@ describe("buildStylesheet pelo parser do Cytoscape", () => {
     async (theme) => {
       const palette = palettes[theme];
       const packages = createGraph(palette, sliceWithEveryQuality());
-      const types = createGraph(palette, typeSlice);
-      const [first] = packageSlice.nodes;
+      const types = createGraph(palette, TYPE_SLICE);
+      const [first] = PACKAGE_SLICE.nodes;
 
       packages
         .getElementById(first.id)
@@ -163,13 +160,13 @@ describe("buildStylesheet pelo parser do Cytoscape", () => {
         parserWarnings().filter((message) => PARSER_WARNING.test(message))
       ).toEqual([]);
       expect(parserWarnings()).toEqual([]);
-      expect(packages.nodes()).toHaveLength(packageSlice.nodes.length);
-      expect(types.nodes()).toHaveLength(typeSlice.nodes.length);
+      expect(packages.nodes()).toHaveLength(PACKAGE_SLICE.nodes.length);
+      expect(types.nodes()).toHaveLength(TYPE_SLICE.nodes.length);
     }
   );
 
   test("o contrato de wheelSensitivity avisa uma vez por instância, e só ele", () => {
-    createGraph(palettes.light, packageSlice);
+    createGraph(palettes.light, PACKAGE_SLICE);
 
     const wheel = warn.mock.calls.filter((call) =>
       WHEEL_SENSITIVITY_WARNING.test(String(call[0]))
@@ -181,8 +178,8 @@ describe("buildStylesheet pelo parser do Cytoscape", () => {
   test("as cores lidas de volta são as da paleta do tema", () => {
     for (const theme of ["light", "dark"] as const) {
       const palette = palettes[theme];
-      const cy = createGraph(palette, packageSlice);
-      const node = cy.getElementById(packageSlice.nodes[0].id);
+      const cy = createGraph(palette, PACKAGE_SLICE);
+      const node = cy.getElementById(PACKAGE_SLICE.nodes[0].id);
 
       expect(node.style("background-color")).toBe(
         parsedColor(palette["--graph-node-package"])
@@ -197,8 +194,8 @@ describe("buildStylesheet pelo parser do Cytoscape", () => {
   });
 
   test("o rótulo do nó é a Inter da interface, em 500, no tamanho da constante", () => {
-    const cy = createGraph(palettes.light, packageSlice);
-    const node = cy.getElementById(packageSlice.nodes[0].id);
+    const cy = createGraph(palettes.light, PACKAGE_SLICE);
+    const node = cy.getElementById(PACKAGE_SLICE.nodes[0].id);
 
     expect(node.style("font-family")).toBe(LABEL_FONT_FAMILY);
     expect(node.style("font-weight")).toBe(
@@ -210,8 +207,8 @@ describe("buildStylesheet pelo parser do Cytoscape", () => {
   test("o rótulo tem um halo da cor do canvas, e a aresta que passa por baixo não risca o texto", () => {
     for (const theme of ["light", "dark"] as const) {
       const palette = palettes[theme];
-      const cy = createGraph(palette, packageSlice);
-      const node = cy.getElementById(packageSlice.nodes[0].id);
+      const cy = createGraph(palette, PACKAGE_SLICE);
+      const node = cy.getElementById(PACKAGE_SLICE.nodes[0].id);
 
       expect(node.style("text-outline-color")).toBe(
         parsedColor(palette["--graph-canvas"])
@@ -285,23 +282,23 @@ describe("cor nunca é o único canal", () => {
   });
 
   test("o tipo do elemento vira forma: pacote retângulo arredondado, tipo elipse", () => {
-    const packages = createGraph(palettes.light, packageSlice);
-    const types = createGraph(palettes.light, typeSlice);
+    const packages = createGraph(palettes.light, PACKAGE_SLICE);
+    const types = createGraph(palettes.light, TYPE_SLICE);
 
     expect(
-      packages.getElementById(packageSlice.nodes[0].id).style("shape")
+      packages.getElementById(PACKAGE_SLICE.nodes[0].id).style("shape")
     ).toBe("round-rectangle");
-    expect(types.getElementById(typeSlice.nodes[0].id).style("shape")).toBe(
+    expect(types.getElementById(TYPE_SLICE.nodes[0].id).style("shape")).toBe(
       "ellipse"
     );
     expect(
-      types.getElementById(typeSlice.nodes[0].id).style("background-color")
+      types.getElementById(TYPE_SLICE.nodes[0].id).style("background-color")
     ).toBe(parsedColor(palettes.light["--graph-node"]));
   });
 
   test("a seleção alarga a borda de 1 para 4 e usa a cor de seleção", () => {
-    const cy = createGraph(palettes.light, packageSlice);
-    const node = cy.getElementById(packageSlice.nodes[0].id);
+    const cy = createGraph(palettes.light, PACKAGE_SLICE);
+    const node = cy.getElementById(PACKAGE_SLICE.nodes[0].id);
     const before = node.style("border-width");
 
     node.addClass(SELECTED_CLASS);
@@ -314,8 +311,8 @@ describe("cor nunca é o único canal", () => {
   });
 
   test("o destaque cruzado engrossa o nó e as arestas dele, e a seleção prevalece", () => {
-    const cy = createGraph(palettes.light, packageSlice);
-    const node = cy.getElementById(packageSlice.nodes[0].id);
+    const cy = createGraph(palettes.light, PACKAGE_SLICE);
+    const node = cy.getElementById(PACKAGE_SLICE.nodes[0].id);
     const edge = edgeOf(cy, 0);
     const width = edge.numericStyle("width") as number;
 
@@ -337,9 +334,64 @@ describe("cor nunca é o único canal", () => {
   });
 
   test("a largura da aresta é 1 + ln(1 + peso)", () => {
-    const cy = createGraph(palettes.light, packageSlice);
+    const cy = createGraph(palettes.light, PACKAGE_SLICE);
 
-    expect(edgeOf(cy, 0).numericStyle("width")).toBeCloseTo(1 + Math.log(57));
+    expect(edgeOf(cy, 0).numericStyle("width")).toBeCloseTo(1 + Math.log(5));
+  });
+});
+
+describe("o par recíproco vira dois arcos", () => {
+  const controlPointsOf = (edge: EdgeSingular): readonly unknown[] =>
+    (edge.controlPoints() as readonly unknown[] | undefined) ?? [];
+
+  const reciprocalIds = (slice: GraphSlice): ReadonlySet<string> => {
+    const pairs = new Set(
+      slice.edges.map((edge) => `${edge.source}\0${edge.target}`)
+    );
+    return new Set(
+      slice.edges
+        .filter((edge) => pairs.has(`${edge.target}\0${edge.source}`))
+        .map((edge) => edge.id)
+    );
+  };
+
+  test("a folha declara curve-style bezier no seletor das arestas, e toda aresta o lê", () => {
+    const block = buildStylesheet(palettes.light).find(
+      (candidate) => candidate.selector === "edge"
+    ) as StylesheetStyle;
+    const cy = createGraph(palettes.light, PACKAGE_SLICE);
+
+    expect((block.style as Record<string, unknown>)["curve-style"]).toBe(
+      "bezier"
+    );
+    expect(cy.edges().map((edge) => edge.style("curve-style"))).toStrictEqual(
+      PACKAGE_SLICE.edges.map(() => "bezier")
+    );
+  });
+
+  test("as duas direções do par saem em arcos distintos, e a aresta sozinha continua reta", () => {
+    const reciprocal = reciprocalIds(PACKAGE_SLICE);
+    const cy = createGraph(palettes.light, PACKAGE_SLICE);
+    cy.nodes().positions((_, index) => ({
+      x: 120 * index,
+      y: 60 * (index % 2),
+    }));
+
+    const edges = cy.edges().toArray();
+    const pair = edges.filter((edge) => reciprocal.has(edge.id()));
+    const lone = edges.filter((edge) => !reciprocal.has(edge.id()));
+
+    expect([pair.length, lone.length]).toStrictEqual([
+      2,
+      PACKAGE_SLICE.edges.length - 2,
+    ]);
+    expect(
+      pair.map(controlPointsOf).map((points) => points.length)
+    ).toStrictEqual([1, 1]);
+    expect(
+      new Set(pair.map((edge) => JSON.stringify(controlPointsOf(edge)))).size
+    ).toBe(2);
+    expect(lone.map(controlPointsOf)).toStrictEqual(lone.map(() => []));
   });
 });
 
@@ -355,8 +407,8 @@ describe("o estado de execução no scratch reestiliza a instância", () => {
   });
 
   test("um hotspot cresce 1,5 vez e ganha a cor de hotspot", () => {
-    const cy = createGraph(palettes.light, packageSlice);
-    const node = cy.getElementById(packageSlice.nodes[0].id);
+    const cy = createGraph(palettes.light, PACKAGE_SLICE);
+    const node = cy.getElementById(PACKAGE_SLICE.nodes[0].id);
     const width = node.width();
 
     setGraphRuntime(cy, { hotspotIds: new Set([node.id()]) });
@@ -369,12 +421,12 @@ describe("o estado de execução no scratch reestiliza a instância", () => {
   });
 
   test("maxLoc redimensiona os nós: o maior da fatia vai ao diâmetro máximo", () => {
-    const cy = createGraph(palettes.light, packageSlice);
-    const largest = cy.getElementById("pkg:br.pucpr.orders");
-    const smaller = cy.getElementById("pkg:br.pucpr.shared");
+    const cy = createGraph(palettes.light, PACKAGE_SLICE);
+    const largest = cy.getElementById(packageIdByLabel("api"));
+    const smaller = cy.getElementById(packageIdByLabel("core.gen"));
 
     expect(largest.width()).toBeCloseTo(GRAPH_STYLE.node.maxDiameter);
-    expect(smaller.width()).toBeCloseTo(nodeDiameter(620, 4210));
+    expect(smaller.width()).toBeCloseTo(nodeDiameter(6, 24));
 
     setGraphRuntime(cy, { maxLoc: 0 });
 
@@ -406,8 +458,8 @@ describe("estado de execução", () => {
   });
 
   test("graphRuntimeForSlice leva o maior loc da fatia, e zero em uma fatia vazia", () => {
-    expect(graphRuntimeForSlice(packageSlice)).toEqual({ maxLoc: 4210 });
-    expect(graphRuntimeForSlice({ ...packageSlice, nodes: [] })).toEqual({
+    expect(graphRuntimeForSlice(PACKAGE_SLICE)).toEqual({ maxLoc: 24 });
+    expect(graphRuntimeForSlice({ ...PACKAGE_SLICE, nodes: [] })).toEqual({
       maxLoc: 0,
     });
   });

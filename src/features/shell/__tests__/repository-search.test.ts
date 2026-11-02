@@ -26,15 +26,19 @@ import {
   selectWhereDrawn,
   startAnalysis,
 } from "@/features/shell/repository-search";
-import type { GraphLevel, ResolutionQuality } from "@/protocol/enums";
+import type {
+  DependencyDirection,
+  GraphLevel,
+  ResolutionQuality,
+} from "@/protocol/enums";
 import type { SearchHit } from "@/protocol/graph";
 import { Route as RepositoryRoute } from "@/routes/repository.$handle";
 
 const ANALYSIS_ID = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 const NEXT_ANALYSIS_ID = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1X";
-const PACKAGE_ID = "pkg:br.pucpr.orders";
-const TYPE_ID = "type:br.pucpr.orders.Order";
-const OTHER_PACKAGE_ID = "pkg:br.pucpr.billing";
+const PACKAGE_ID = "pkg:br.pucpr.legacy.core";
+const TYPE_ID = "type:br.pucpr.legacy.core.Catalog";
+const OTHER_PACKAGE_ID = "pkg:br.pucpr.legacy.api";
 const HANDLE = "repo_AAAAAAAAAAAAAAAAAAAAAQ";
 
 describe("repositorySearchSchema", () => {
@@ -48,6 +52,7 @@ describe("repositorySearchSchema", () => {
   test("params válidos passam como vieram", () => {
     const search = {
       analysis: ANALYSIS_ID,
+      direction: "IN",
       focus: TYPE_ID,
       level: "TYPE",
       minQuality: "RESOLVED",
@@ -74,7 +79,7 @@ describe("repositorySearchSchema", () => {
   test("cada campo inválido vira o seu padrão sozinho", () => {
     const parsed = repositorySearchSchema.parse({
       analysis: "an_minúsculo",
-      focus: "OrderService",
+      focus: "CatalogEntry",
       level: 3,
       minQuality: "CONFIANÇA",
       parent: "/etc/passwd",
@@ -100,6 +105,7 @@ describe("repositorySearchSchema", () => {
   test("um link pode omitir todos os campos, level inclusive", () => {
     expectTypeOf<z.input<typeof repositorySearchSchema>>().toEqualTypeOf<{
       analysis?: string | undefined;
+      direction?: DependencyDirection | undefined;
       focus?: string | undefined;
       level?: GraphLevel | undefined;
       minQuality?: ResolutionQuality | undefined;
@@ -242,14 +248,14 @@ describe("as transições de vista", () => {
   const at = (patch: Partial<RepositorySearch>): RepositorySearch =>
     repositorySearchSchema.parse({ analysis: ANALYSIS_ID, ...patch });
   const levelOne = at({ level: "PACKAGE" });
-  const ordersTypes = at({ level: "TYPE", parent: PACKAGE_ID });
+  const coreTypes = at({ level: "TYPE", parent: PACKAGE_ID });
 
   const hit = (patch: Partial<SearchHit>): SearchHit => ({
     elementId: TYPE_ID,
     kind: "TYPE",
-    label: "Order",
+    label: "Catalog",
     packageId: PACKAGE_ID,
-    qualifiedName: "br.pucpr.orders.Order",
+    qualifiedName: "br.pucpr.legacy.core.Catalog",
     ...patch,
   });
 
@@ -269,22 +275,22 @@ describe("as transições de vista", () => {
 
   test("trocar o pacote aberto também empilha", () => {
     expect(
-      changesView(ordersTypes, expandPackage(OTHER_PACKAGE_ID)(ordersTypes))
+      changesView(coreTypes, expandPackage(OTHER_PACKAGE_ID)(coreTypes))
     ).toBe(true);
   });
 
   test("voltar ao nível 1 seleciona o pacote de onde a pessoa saiu", () => {
-    const next = backToLevelOne(ordersTypes);
+    const next = backToLevelOne(coreTypes);
     expect(next).toMatchObject({ focus: PACKAGE_ID, level: "PACKAGE" });
     expect(next.parent).toBeUndefined();
-    expect(changesView(ordersTypes, next)).toBe(true);
+    expect(changesView(coreTypes, next)).toBe(true);
   });
 
   test("um pacote selecionado enquanto o mapa mostra tipos vai para o nível 1", () => {
-    const next = selectWhereDrawn(OTHER_PACKAGE_ID, "PACKAGE")(ordersTypes);
+    const next = selectWhereDrawn(OTHER_PACKAGE_ID, "PACKAGE")(coreTypes);
     expect(next).toMatchObject({ focus: OTHER_PACKAGE_ID, level: "PACKAGE" });
     expect(next.parent).toBeUndefined();
-    expect(changesView(ordersTypes, next)).toBe(true);
+    expect(changesView(coreTypes, next)).toBe(true);
   });
 
   test("um pacote no nível 1 e um tipo no pacote aberto só mudam o focus", () => {
@@ -292,8 +298,8 @@ describe("as transições de vista", () => {
       ...levelOne,
       focus: PACKAGE_ID,
     });
-    expect(selectWhereDrawn(TYPE_ID, "TYPE")(ordersTypes)).toStrictEqual({
-      ...ordersTypes,
+    expect(selectWhereDrawn(TYPE_ID, "TYPE")(coreTypes)).toStrictEqual({
+      ...coreTypes,
       focus: TYPE_ID,
     });
   });
@@ -306,15 +312,15 @@ describe("as transições de vista", () => {
       parent: PACKAGE_ID,
     });
     expect(changesView(levelOne, next)).toBe(true);
-    expect(
-      changesView(ordersTypes, revealSearchHit(hit({}))(ordersTypes))
-    ).toBe(false);
+    expect(changesView(coreTypes, revealSearchHit(hit({}))(coreTypes))).toBe(
+      false
+    );
   });
 
   test("um pacote achado na busca é selecionado no nível 1", () => {
     const next = revealSearchHit(
       hit({ elementId: PACKAGE_ID, kind: "PACKAGE", packageId: null })
-    )(ordersTypes);
+    )(coreTypes);
     expect(next).toMatchObject({ focus: PACKAGE_ID, level: "PACKAGE" });
     expect(next.parent).toBeUndefined();
   });
@@ -322,12 +328,12 @@ describe("as transições de vista", () => {
   test("um resultado que o mapa não mostra deixa a vista como está", () => {
     const orphan = hit({ packageId: null });
     const method = hit({
-      elementId: "method:br.pucpr.orders.Order#total()",
+      elementId: "method:br.pucpr.legacy.core.Catalog#total()",
       kind: "METHOD",
     });
 
-    expect(revealSearchHit(orphan)(ordersTypes)).toBe(ordersTypes);
-    expect(revealSearchHit(method)(ordersTypes)).toBe(ordersTypes);
+    expect(revealSearchHit(orphan)(coreTypes)).toBe(coreTypes);
+    expect(revealSearchHit(method)(coreTypes)).toBe(coreTypes);
     expect(isRevealable(orphan)).toBe(false);
     expect(isRevealable(method)).toBe(false);
     expect(isRevealable(hit({}))).toBe(true);

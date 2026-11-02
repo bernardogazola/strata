@@ -31,30 +31,34 @@ import { SEARCH_QUERY_MAX_CHARS } from "@/protocol/primitives";
 import { createQueryClient } from "@/queries/client";
 import { graphSearchQueryOptions } from "@/queries/options";
 import { useAppStore } from "@/state/app-store";
+import {
+  DRILLED_PACKAGE_ID,
+  packageIdByLabel,
+  SEARCH_HITS,
+  SEARCH_QUERY,
+} from "@/test/fixture-graph";
 
 const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
-const ORDERS = "pkg:br.pucpr.orders";
-const ORDER = "type:br.pucpr.orders.Order";
-const ORDER_SERVICE = "type:br.pucpr.orders.OrderService";
-const FIXTURE_IDS = [ORDER, ORDER_SERVICE, ORDERS];
 const RESULTS_CAP = 50;
 const BIDI_OVERRIDE = String.fromCodePoint(0x20_2e);
 
-const ORDER_SERVICE_HIT: SearchHit = {
-  elementId: ORDER_SERVICE,
-  kind: "TYPE",
-  label: "OrderService",
-  packageId: ORDERS,
-  qualifiedName: "br.pucpr.orders.OrderService",
+const requireHit = (hit: SearchHit | undefined): SearchHit => {
+  if (hit === undefined) {
+    throw new Error("graph.search.hit tem menos resultados do que o teste lê");
+  }
+  return hit;
 };
 
-const ORDERS_HIT: SearchHit = {
-  elementId: ORDERS,
-  kind: "PACKAGE",
-  label: "orders",
-  packageId: null,
-  qualifiedName: "br.pucpr.orders",
-};
+const FIXTURE_IDS = SEARCH_HITS.map((hit) => hit.elementId);
+const FIRST_HIT = requireHit(SEARCH_HITS[0]);
+const SECOND_HIT = requireHit(SEARCH_HITS[1]);
+const LAST_HIT = requireHit(SEARCH_HITS.at(-1));
+const FIRST = FIRST_HIT.elementId;
+const SECOND = SECOND_HIT.elementId;
+const LAST = LAST_HIT.elementId;
+
+const qualifiedOf = (packageId: string): string =>
+  packageId.slice("pkg:".length);
 
 const DEBOUNCED_WAIT_MS = 4000;
 const TESTING_LIBRARY_DEFAULT_WAIT_MS = 1000;
@@ -77,11 +81,11 @@ afterEach(() => {
 });
 
 const typeHit = (name: string, packageId: string | null): SearchHit => ({
-  elementId: `type:br.pucpr.orders.${name}`,
+  elementId: `type:${qualifiedOf(DRILLED_PACKAGE_ID)}.${name}`,
   kind: "TYPE",
   label: name,
   packageId,
-  qualifiedName: `br.pucpr.orders.${name}`,
+  qualifiedName: `${qualifiedOf(DRILLED_PACKAGE_ID)}.${name}`,
 });
 
 const overrideResults = (results: readonly SearchHit[]): void => {
@@ -163,10 +167,12 @@ const advance = async (ms: number): Promise<void> => {
 
 const renderWithHits = async (props?: { readonly focus?: string | null }) => {
   const rendered = renderSearch(props);
-  typeQuery("Ord");
+  typeQuery(SEARCH_QUERY);
   const list = await listbox();
   await waitFor(() => {
-    expect(within(list).getAllByRole("option")).toHaveLength(3);
+    expect(within(list).getAllByRole("option")).toHaveLength(
+      SEARCH_HITS.length
+    );
   });
   return { ...rendered, list };
 };
@@ -199,33 +205,33 @@ describe("a caixa de busca", () => {
 });
 
 describe("o pedido", () => {
-  test("digitar O, Or, Ord depressa faz um só pedido, com Ord, pacotes e tipos", async () => {
+  test("digitar C, Ca, Cat depressa faz um só pedido, com Cat, pacotes e tipos", async () => {
     const request = vi.spyOn(transport, "request");
     renderSearch();
 
-    typeQuery("O");
-    typeQuery("Or");
-    typeQuery("Ord");
+    typeQuery("C");
+    typeQuery("Ca");
+    typeQuery("Cat");
     await listbox();
 
     expect(searchCalls(request)).toHaveLength(1);
     expect(request).toHaveBeenCalledWith("graph.search", {
       analysisId: AN,
       kinds: ["PACKAGE", "TYPE"],
-      query: "Ord",
+      query: "Cat",
     });
   });
 
-  test('"Ord   " é a mesma chave aparada e não pede de novo', async () => {
+  test("a consulta com espaços no fim é a mesma chave aparada e não pede de novo", async () => {
     const request = vi.spyOn(transport, "request");
     await renderWithHits();
     expect(searchCalls(request)).toHaveLength(1);
 
-    typeQuery("Ord   ");
+    typeQuery(`${SEARCH_QUERY}   `);
     await outlastDebounce();
 
     expect(searchCalls(request)).toHaveLength(1);
-    expect(options()).toHaveLength(3);
+    expect(options()).toHaveLength(SEARCH_HITS.length);
   });
 
   test("só espaços não pede nada", async () => {
@@ -244,7 +250,7 @@ describe("o pedido", () => {
     const request = vi.spyOn(transport, "request");
     renderSearch();
 
-    typeQuery("Ord");
+    typeQuery("Cat");
     await advance(SPEC_DEBOUNCE_MS - 1);
     expect(searchCalls(request)).toHaveLength(0);
 
@@ -258,9 +264,9 @@ describe("o pedido", () => {
     const request = vi.spyOn(transport, "request");
     renderSearch();
 
-    typeQuery("O");
+    typeQuery("C");
     await advance(SPEC_DEBOUNCE_MS - 50);
-    typeQuery("Or");
+    typeQuery("Ca");
     await advance(SPEC_DEBOUNCE_MS - 50);
     expect(searchCalls(request)).toHaveLength(0);
 
@@ -268,19 +274,19 @@ describe("o pedido", () => {
     expect(searchCalls(request)).toHaveLength(1);
     expect(request).toHaveBeenCalledWith(
       "graph.search",
-      expect.objectContaining({ query: "Or" })
+      expect.objectContaining({ query: "Ca" })
     );
   });
 });
 
 describe("apagar a caixa e digitar outra busca", () => {
-  const BILLING = "pkg:br.pucpr.billing";
-  const BILLING_HIT: SearchHit = {
-    elementId: BILLING,
+  const SPI = packageIdByLabel("core.spi");
+  const SPI_HIT: SearchHit = {
+    elementId: SPI,
     kind: "PACKAGE",
-    label: "billing",
+    label: "core.spi",
     packageId: null,
-    qualifiedName: "br.pucpr.billing",
+    qualifiedName: qualifiedOf(SPI),
   };
   const answerByQuery = () =>
     vi
@@ -288,9 +294,9 @@ describe("apagar a caixa e digitar outra busca", () => {
       .mockImplementation((_method: string, payload: unknown) =>
         Promise.resolve({
           results: [
-            (payload as { readonly query: string }).query === "Ord"
-              ? typeHit("Order", ORDERS)
-              : BILLING_HIT,
+            (payload as { readonly query: string }).query === "Cat"
+              ? FIRST_HIT
+              : SPI_HIT,
           ],
         } satisfies SearchResult)
       );
@@ -304,16 +310,16 @@ describe("apagar a caixa e digitar outra busca", () => {
     vi.useFakeTimers();
     const request = answerByQuery();
     const { onReveal } = renderSearch();
-    typeQuery("Ord");
+    typeQuery("Cat");
     await advance(SEARCH_DEBOUNCE_MS);
-    expect(elementIdsOf(options())).toStrictEqual([ORDER]);
+    expect(elementIdsOf(options())).toStrictEqual([FIRST]);
 
     typeQuery("");
     await advance(100);
-    typeQuery("bil");
+    typeQuery("spi");
     await advance(10);
 
-    expect(searchbox().value).toBe("bil");
+    expect(searchbox().value).toBe("spi");
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(screen.getByRole("status").textContent).toBe("");
     fireEvent.keyDown(searchbox(), { key: "ArrowDown" });
@@ -323,18 +329,18 @@ describe("apagar a caixa e digitar outra busca", () => {
     expect(onReveal).not.toHaveBeenCalled();
 
     await advance(SEARCH_DEBOUNCE_MS);
-    expect(elementIdsOf(options())).toStrictEqual([BILLING]);
+    expect(elementIdsOf(options())).toStrictEqual([SPI]);
     expect(screen.getByRole("status").textContent).toBe(countPhrase(1));
-    expect(queriesOf(request)).toStrictEqual(["Ord", "bil"]);
+    expect(queriesOf(request)).toStrictEqual(["Cat", "spi"]);
   });
 
   test("enquanto a nova busca chega, a lista apagada não volta como substituta", async () => {
     vi.useFakeTimers();
     const request = answerByQuery();
     const { onReveal } = renderSearch();
-    typeQuery("Ord");
+    typeQuery("Cat");
     await advance(SEARCH_DEBOUNCE_MS);
-    expect(elementIdsOf(options())).toStrictEqual([ORDER]);
+    expect(elementIdsOf(options())).toStrictEqual([FIRST]);
     let answer: (value: SearchResult) => void = () => undefined;
     request.mockImplementationOnce(
       () =>
@@ -344,10 +350,10 @@ describe("apagar a caixa e digitar outra busca", () => {
     );
 
     typeQuery("");
-    typeQuery("bil");
+    typeQuery("spi");
     await advance(SEARCH_DEBOUNCE_MS);
 
-    expect(queriesOf(request)).toStrictEqual(["Ord", "bil"]);
+    expect(queriesOf(request)).toStrictEqual(["Cat", "spi"]);
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(screen.getByRole("status").textContent).toBe("");
     fireEvent.keyDown(searchbox(), { key: "ArrowDown" });
@@ -357,11 +363,11 @@ describe("apagar a caixa e digitar outra busca", () => {
     expect(onReveal).not.toHaveBeenCalled();
 
     await act(async () => {
-      answer({ results: [BILLING_HIT] });
+      answer({ results: [SPI_HIT] });
       await Promise.resolve();
     });
     await advance(0);
-    expect(elementIdsOf(options())).toStrictEqual([BILLING]);
+    expect(elementIdsOf(options())).toStrictEqual([SPI]);
     expect(screen.getByRole("status").textContent).toBe(countPhrase(1));
   });
 });
@@ -376,11 +382,11 @@ describe("a lista", () => {
   test("cada opção traz o rótulo, o tipo de elemento e o nome qualificado", async () => {
     await renderWithHits();
 
-    const service = optionFor(ORDER_SERVICE);
-    expect(service.textContent).toContain("OrderService");
+    const service = optionFor(SECOND);
+    expect(service.textContent).toContain(SECOND_HIT.label);
     expect(service.textContent).toContain(elementKindLabels.TYPE);
-    expect(service.textContent).toContain("br.pucpr.orders.OrderService");
-    expect(optionFor(ORDERS).textContent).toContain(elementKindLabels.PACKAGE);
+    expect(service.textContent).toContain(SECOND_HIT.qualifiedName);
+    expect(optionFor(LAST).textContent).toContain(elementKindLabels.PACKAGE);
     for (const bdi of service.querySelectorAll("bdi")) {
       expect(bdi.getAttribute("translate")).toBe("no");
       expect(bdi.getAttribute("lang")).toBe("");
@@ -397,7 +403,9 @@ describe("a lista", () => {
       expect(screen.queryByRole("listbox")).toBeNull();
     });
     expect(
-      queryClient.getQueryData(graphSearchQueryOptions(AN, "Ord").queryKey)
+      queryClient.getQueryData(
+        graphSearchQueryOptions(AN, SEARCH_QUERY).queryKey
+      )
     ).toBeDefined();
     expect(screen.getByRole("status").textContent).toBe("");
   });
@@ -405,41 +413,42 @@ describe("a lista", () => {
   test("uma tabulação só: a primeira opção é a parada, as outras ficam fora", async () => {
     await renderWithHits();
 
-    expect(options().map((option) => option.tabIndex)).toStrictEqual([
-      0, -1, -1,
-    ]);
+    expect(options().map((option) => option.tabIndex)).toStrictEqual(
+      FIXTURE_IDS.map((id) => (id === FIRST ? 0 : -1))
+    );
   });
 
   test("aria-selected segue o focus da URL", async () => {
-    const { rerenderWith } = await renderWithHits({ focus: ORDERS });
+    const { rerenderWith } = await renderWithHits({ focus: LAST });
 
     expect(
       options().map((option) => option.getAttribute("aria-selected"))
-    ).toStrictEqual(["false", "false", "true"]);
+    ).toStrictEqual(FIXTURE_IDS.map((id) => String(id === LAST)));
 
-    rerenderWith(ORDER);
+    rerenderWith(FIRST);
 
     expect(
       options().map((option) => option.getAttribute("aria-selected"))
-    ).toStrictEqual(["true", "false", "false"]);
+    ).toStrictEqual(FIXTURE_IDS.map((id) => String(id === FIRST)));
   });
 
   test("um caractere de controle bidi no rótulo e no nome qualificado é removido", async () => {
+    const evil = typeHit("Catalog", DRILLED_PACKAGE_ID);
     overrideResults([
       {
-        ...typeHit("Order", ORDERS),
-        label: `Order${BIDI_OVERRIDE}Evil`,
-        qualifiedName: `br.pucpr.orders.Order${BIDI_OVERRIDE}Evil`,
+        ...evil,
+        label: `Catalog${BIDI_OVERRIDE}Evil`,
+        qualifiedName: `${evil.qualifiedName}${BIDI_OVERRIDE}Evil`,
       },
     ]);
     renderSearch();
-    typeQuery("Ord");
+    typeQuery("Cat");
     await listbox();
 
     const [option] = options();
     expect(option?.textContent).not.toContain(BIDI_OVERRIDE);
-    expect(option?.textContent).toContain("OrderEvil");
-    expect(option?.textContent).toContain("br.pucpr.orders.OrderEvil");
+    expect(option?.textContent).toContain("CatalogEvil");
+    expect(option?.textContent).toContain(`${evil.qualifiedName}Evil`);
   });
 
   test("enquanto a próxima consulta chega, a lista anterior fica, ocupada e calada", async () => {
@@ -452,23 +461,23 @@ describe("a lista", () => {
         })
     );
 
-    typeQuery("Orde");
+    typeQuery("core");
 
     await waitFor(() => {
       expect(screen.getByRole("listbox").getAttribute("aria-busy")).toBe(
         "true"
       );
     });
-    expect(options()).toHaveLength(3);
+    expect(options()).toHaveLength(SEARCH_HITS.length);
     expect(screen.getByRole("status").textContent).toBe("");
 
     await act(async () => {
-      resolve({ results: [ORDERS_HIT] });
+      resolve({ results: [LAST_HIT] });
       await Promise.resolve();
     });
 
     await waitFor(() => {
-      expect(elementIdsOf(options())).toStrictEqual([ORDERS]);
+      expect(elementIdsOf(options())).toStrictEqual([LAST]);
     });
     expect(screen.getByRole("listbox").getAttribute("aria-busy")).toBe("false");
     expect(screen.getByRole("status").textContent).toBe(countPhrase(1));
@@ -481,41 +490,42 @@ describe("o teclado", () => {
 
     fireEvent.keyDown(searchbox(), { key: "ArrowDown" });
 
-    expect(document.activeElement).toBe(optionFor(ORDER));
-    expect(useAppStore.getState().activeElementId).toBe(ORDER);
-    expect(optionFor(ORDER).tabIndex).toBe(0);
+    expect(document.activeElement).toBe(optionFor(FIRST));
+    expect(useAppStore.getState().activeElementId).toBe(FIRST);
+    expect(optionFor(FIRST).tabIndex).toBe(0);
   });
 
   test("↓, ↑, Home e End movem o foco e a parada de tabulação", async () => {
     await renderWithHits();
     fireEvent.keyDown(searchbox(), { key: "ArrowDown" });
 
-    fireEvent.keyDown(optionFor(ORDER), { key: "ArrowDown" });
-    expect(document.activeElement).toBe(optionFor(ORDER_SERVICE));
-    expect(useAppStore.getState().activeElementId).toBe(ORDER_SERVICE);
-    expect(options().map((option) => option.tabIndex)).toStrictEqual([
-      -1, 0, -1,
-    ]);
+    fireEvent.keyDown(optionFor(FIRST), { key: "ArrowDown" });
+    expect(document.activeElement).toBe(optionFor(SECOND));
+    expect(useAppStore.getState().activeElementId).toBe(SECOND);
+    expect(options().map((option) => option.tabIndex)).toStrictEqual(
+      FIXTURE_IDS.map((id) => (id === SECOND ? 0 : -1))
+    );
 
-    fireEvent.keyDown(optionFor(ORDER_SERVICE), { key: "End" });
-    expect(document.activeElement).toBe(optionFor(ORDERS));
+    fireEvent.keyDown(optionFor(SECOND), { key: "End" });
+    expect(document.activeElement).toBe(optionFor(LAST));
 
-    fireEvent.keyDown(optionFor(ORDERS), { key: "ArrowDown" });
-    expect(document.activeElement).toBe(optionFor(ORDERS));
+    fireEvent.keyDown(optionFor(LAST), { key: "ArrowDown" });
+    expect(document.activeElement).toBe(optionFor(LAST));
 
-    fireEvent.keyDown(optionFor(ORDERS), { key: "ArrowUp" });
-    expect(document.activeElement).toBe(optionFor(ORDER_SERVICE));
+    const penultimate = FIXTURE_IDS.at(-2) ?? "";
+    fireEvent.keyDown(optionFor(LAST), { key: "ArrowUp" });
+    expect(document.activeElement).toBe(optionFor(penultimate));
 
-    fireEvent.keyDown(optionFor(ORDER_SERVICE), { key: "Home" });
-    expect(document.activeElement).toBe(optionFor(ORDER));
-    expect(useAppStore.getState().activeElementId).toBe(ORDER);
+    fireEvent.keyDown(optionFor(penultimate), { key: "Home" });
+    expect(document.activeElement).toBe(optionFor(FIRST));
+    expect(useAppStore.getState().activeElementId).toBe(FIRST);
   });
 
   test("↑ na primeira opção volta para a caixa", async () => {
     await renderWithHits();
     fireEvent.keyDown(searchbox(), { key: "ArrowDown" });
 
-    fireEvent.keyDown(optionFor(ORDER), { key: "ArrowUp" });
+    fireEvent.keyDown(optionFor(FIRST), { key: "ArrowUp" });
 
     expect(document.activeElement).toBe(searchbox());
   });
@@ -523,9 +533,9 @@ describe("o teclado", () => {
   test("Escape na lista volta para a caixa", async () => {
     await renderWithHits();
     fireEvent.keyDown(searchbox(), { key: "ArrowDown" });
-    fireEvent.keyDown(optionFor(ORDER), { key: "ArrowDown" });
+    fireEvent.keyDown(optionFor(FIRST), { key: "ArrowDown" });
 
-    fireEvent.keyDown(optionFor(ORDER_SERVICE), { key: "Escape" });
+    fireEvent.keyDown(optionFor(SECOND), { key: "Escape" });
 
     expect(document.activeElement).toBe(searchbox());
   });
@@ -533,40 +543,40 @@ describe("o teclado", () => {
   test("Enter revela o resultado e o foco fica nele", async () => {
     const { onReveal } = await renderWithHits();
     fireEvent.keyDown(searchbox(), { key: "ArrowDown" });
-    fireEvent.keyDown(optionFor(ORDER), { key: "ArrowDown" });
+    fireEvent.keyDown(optionFor(FIRST), { key: "ArrowDown" });
 
-    fireEvent.keyDown(optionFor(ORDER_SERVICE), { key: "Enter" });
+    fireEvent.keyDown(optionFor(SECOND), { key: "Enter" });
 
     expect(onReveal).toHaveBeenCalledTimes(1);
-    expect(onReveal).toHaveBeenCalledWith(ORDER_SERVICE_HIT);
-    expect(document.activeElement).toBe(optionFor(ORDER_SERVICE));
+    expect(onReveal).toHaveBeenCalledWith(SECOND_HIT);
+    expect(document.activeElement).toBe(optionFor(SECOND));
   });
 
   test("Espaço revela o resultado", async () => {
     const { onReveal } = await renderWithHits();
     fireEvent.keyDown(searchbox(), { key: "ArrowDown" });
-    fireEvent.keyDown(optionFor(ORDER), { key: "End" });
+    fireEvent.keyDown(optionFor(FIRST), { key: "End" });
 
-    fireEvent.keyDown(optionFor(ORDERS), { key: " " });
+    fireEvent.keyDown(optionFor(LAST), { key: " " });
 
-    expect(onReveal).toHaveBeenCalledWith(ORDERS_HIT);
+    expect(onReveal).toHaveBeenCalledWith(LAST_HIT);
   });
 
   test("o clique revela o resultado e leva o foco a ele", async () => {
     const { onReveal } = await renderWithHits();
 
-    fireEvent.click(optionFor(ORDERS));
+    fireEvent.click(optionFor(LAST));
 
     expect(onReveal).toHaveBeenCalledTimes(1);
-    expect(onReveal).toHaveBeenCalledWith(ORDERS_HIT);
-    expect(document.activeElement).toBe(optionFor(ORDERS));
+    expect(onReveal).toHaveBeenCalledWith(LAST_HIT);
+    expect(document.activeElement).toBe(optionFor(LAST));
   });
 
   test("um tipo sem pacote fica desabilitado: focável, mas não revela", async () => {
     const orphan = typeHit("Orphan", null);
-    overrideResults([orphan, typeHit("Order", ORDERS)]);
+    overrideResults([orphan, typeHit("Catalog", DRILLED_PACKAGE_ID)]);
     const { onReveal } = renderSearch();
-    typeQuery("Or");
+    typeQuery("Ca");
     await listbox();
     await waitFor(() => {
       expect(options()).toHaveLength(2);
@@ -592,9 +602,9 @@ describe("o foco em uma opção que a nova consulta tira", () => {
     await renderWithHits();
     vi.spyOn(transport, "request").mockResolvedValueOnce({ results: [] });
 
-    typeQuery("Ordzz");
+    typeQuery(`${SEARCH_QUERY}zz`);
     fireEvent.keyDown(searchbox(), { key: "ArrowDown" });
-    expect(document.activeElement).toBe(optionFor(ORDER));
+    expect(document.activeElement).toBe(optionFor(FIRST));
 
     await waitFor(() => {
       expect(screen.queryByRole("listbox")).toBeNull();
@@ -606,15 +616,15 @@ describe("o foco em uma opção que a nova consulta tira", () => {
   test("a opção focada que some da nova lista devolve o foco à caixa", async () => {
     await renderWithHits();
     vi.spyOn(transport, "request").mockResolvedValueOnce({
-      results: [ORDERS_HIT],
+      results: [LAST_HIT],
     });
 
-    typeQuery("Orders");
+    typeQuery("core");
     fireEvent.keyDown(searchbox(), { key: "ArrowDown" });
-    expect(document.activeElement).toBe(optionFor(ORDER));
+    expect(document.activeElement).toBe(optionFor(FIRST));
 
     await waitFor(() => {
-      expect(elementIdsOf(options())).toStrictEqual([ORDERS]);
+      expect(elementIdsOf(options())).toStrictEqual([LAST]);
     });
     expect(document.activeElement).toBe(searchbox());
     expect(useAppStore.getState().activeElementId).toBeNull();
@@ -623,19 +633,19 @@ describe("o foco em uma opção que a nova consulta tira", () => {
   test("a opção focada que continua na nova lista fica com o foco", async () => {
     await renderWithHits();
     vi.spyOn(transport, "request").mockResolvedValueOnce({
-      results: [ORDERS_HIT],
+      results: [LAST_HIT],
     });
 
-    typeQuery("Orders");
+    typeQuery("core");
     fireEvent.keyDown(searchbox(), { key: "ArrowDown" });
-    fireEvent.keyDown(optionFor(ORDER), { key: "End" });
-    expect(document.activeElement).toBe(optionFor(ORDERS));
+    fireEvent.keyDown(optionFor(FIRST), { key: "End" });
+    expect(document.activeElement).toBe(optionFor(LAST));
 
     await waitFor(() => {
-      expect(elementIdsOf(options())).toStrictEqual([ORDERS]);
+      expect(elementIdsOf(options())).toStrictEqual([LAST]);
     });
-    expect(document.activeElement).toBe(optionFor(ORDERS));
-    expect(useAppStore.getState().activeElementId).toBe(ORDERS);
+    expect(document.activeElement).toBe(optionFor(LAST));
+    expect(useAppStore.getState().activeElementId).toBe(LAST);
   });
 });
 
@@ -643,70 +653,70 @@ describe("o destaque cruzado", () => {
   test("o ponteiro escreve ao entrar e solta ao sair", async () => {
     await renderWithHits();
 
-    fireEvent.mouseOver(optionFor(ORDER_SERVICE));
-    expect(useAppStore.getState().activeElementId).toBe(ORDER_SERVICE);
+    fireEvent.mouseOver(optionFor(SECOND));
+    expect(useAppStore.getState().activeElementId).toBe(SECOND);
 
-    fireEvent.mouseOut(optionFor(ORDER_SERVICE));
+    fireEvent.mouseOut(optionFor(SECOND));
     expect(useAppStore.getState().activeElementId).toBeNull();
   });
 
   test("o ponteiro andando dentro da mesma opção não solta o destaque", async () => {
     await renderWithHits();
-    const option = optionFor(ORDER_SERVICE);
+    const option = optionFor(SECOND);
     const [label, qualifiedName] = option.querySelectorAll("bdi");
     fireEvent.mouseOver(option);
 
     fireEvent.mouseOut(label ?? option, { relatedTarget: qualifiedName });
 
-    expect(useAppStore.getState().activeElementId).toBe(ORDER_SERVICE);
+    expect(useAppStore.getState().activeElementId).toBe(SECOND);
   });
 
   test("o ponteiro saindo não apaga o destaque de outro escritor", async () => {
     await renderWithHits();
-    fireEvent.mouseOver(optionFor(ORDER_SERVICE));
+    fireEvent.mouseOver(optionFor(SECOND));
 
     act(() => {
-      useAppStore.getState().setActiveElementId(ORDERS);
+      useAppStore.getState().setActiveElementId(LAST);
     });
-    fireEvent.mouseOut(optionFor(ORDER_SERVICE));
+    fireEvent.mouseOut(optionFor(SECOND));
 
-    expect(useAppStore.getState().activeElementId).toBe(ORDERS);
+    expect(useAppStore.getState().activeElementId).toBe(LAST);
   });
 
   test("o ponteiro cruzando um nó do canvas não apaga o destaque da opção com foco", async () => {
     await renderWithHits();
     fireEvent.keyDown(searchbox(), { key: "ArrowDown" });
-    expect(useAppStore.getState().activeElementId).toBe(ORDER);
+    expect(useAppStore.getState().activeElementId).toBe(FIRST);
 
     act(() => {
-      useAppStore.getState().setActiveElementId(ORDERS);
+      useAppStore.getState().setActiveElementId(LAST);
     });
-    expect(useAppStore.getState().activeElementId).toBe(ORDERS);
+    expect(useAppStore.getState().activeElementId).toBe(LAST);
     act(() => {
-      useAppStore.getState().releaseActiveElementId(ORDERS);
+      useAppStore.getState().releaseActiveElementId(LAST);
     });
 
-    expect(document.activeElement).toBe(optionFor(ORDER));
-    expect(useAppStore.getState().activeElementId).toBe(ORDER);
+    expect(document.activeElement).toBe(optionFor(FIRST));
+    expect(useAppStore.getState().activeElementId).toBe(FIRST);
   });
 
   test("o ponteiro saindo de outra opção devolve o destaque à opção com foco", async () => {
     await renderWithHits();
     fireEvent.keyDown(searchbox(), { key: "ArrowDown" });
-    fireEvent.mouseOver(optionFor(ORDER_SERVICE));
-    expect(useAppStore.getState().activeElementId).toBe(ORDER_SERVICE);
+    fireEvent.mouseOver(optionFor(SECOND));
+    expect(useAppStore.getState().activeElementId).toBe(SECOND);
 
-    fireEvent.mouseOut(optionFor(ORDER_SERVICE));
+    fireEvent.mouseOut(optionFor(SECOND));
 
-    expect(useAppStore.getState().activeElementId).toBe(ORDER);
+    expect(useAppStore.getState().activeElementId).toBe(FIRST);
   });
 
   test("o foco saindo da lista solta o destaque que ele escreveu", async () => {
     await renderWithHits();
     fireEvent.keyDown(searchbox(), { key: "ArrowDown" });
-    expect(useAppStore.getState().activeElementId).toBe(ORDER);
+    expect(useAppStore.getState().activeElementId).toBe(FIRST);
 
-    fireEvent.keyDown(optionFor(ORDER), { key: "ArrowUp" });
+    fireEvent.keyDown(optionFor(FIRST), { key: "ArrowUp" });
 
     expect(document.activeElement).toBe(searchbox());
     expect(useAppStore.getState().activeElementId).toBeNull();
@@ -714,7 +724,7 @@ describe("o destaque cruzado", () => {
 
   test("um resultado que sai da tela leva o destaque que escreveu junto", async () => {
     await renderWithHits();
-    fireEvent.mouseOver(optionFor(ORDER_SERVICE));
+    fireEvent.mouseOver(optionFor(SECOND));
 
     typeQuery("");
 
@@ -730,8 +740,8 @@ describe("o anúncio", () => {
     await renderWithHits();
 
     const status = screen.getByRole("status");
-    expect(status.textContent).toBe(countPhrase(3));
-    expect(status.textContent).not.toContain("Ord");
+    expect(status.textContent).toBe(countPhrase(SEARCH_HITS.length));
+    expect(status.textContent).not.toContain(SEARCH_QUERY);
   });
 
   test("zero resultados: a forma zero, no lugar da lista", async () => {
@@ -748,7 +758,7 @@ describe("o anúncio", () => {
 
   test("50 resultados: o teto é dito, porque o fio não traz o total", async () => {
     const capped = Array.from({ length: RESULTS_CAP }, (_, index) =>
-      typeHit(`Type${index}`, ORDERS)
+      typeHit(`Type${index}`, DRILLED_PACKAGE_ID)
     );
     overrideResults(capped);
     renderSearch();
@@ -773,7 +783,7 @@ describe("o anúncio", () => {
   test("49 resultados não falam em teto", async () => {
     overrideResults(
       Array.from({ length: RESULTS_CAP - 1 }, (_, index) =>
-        typeHit(`Type${index}`, ORDERS)
+        typeHit(`Type${index}`, DRILLED_PACKAGE_ID)
       )
     );
     renderSearch();
@@ -798,7 +808,7 @@ describe("a falha", () => {
       })
     );
     renderSearch();
-    typeQuery("Ord");
+    typeQuery(SEARCH_QUERY);
 
     const alert = await screen.findByRole("alert");
     const expected = formatProtocolError({
@@ -815,7 +825,7 @@ describe("a falha", () => {
 
     await listbox();
     await waitFor(() => {
-      expect(options()).toHaveLength(3);
+      expect(options()).toHaveLength(SEARCH_HITS.length);
     });
     expect(searchCalls(request)).toHaveLength(2);
     expect(screen.queryByRole("alert")).toBeNull();

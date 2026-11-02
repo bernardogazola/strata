@@ -14,8 +14,20 @@ import {
 } from "@/bridge/analyzer";
 import { toGraphView } from "@/features/graph/adapter";
 import { GRAPH_PERF } from "@/features/graph/perf";
-import type { ElementKind, GraphLevel } from "@/protocol/enums";
-import type { OutlineNode, OutlinePage } from "@/protocol/graph";
+import {
+  type DependencyRows,
+  flattenDependencyPages,
+} from "@/features/inspector/inspector-model";
+import type {
+  DependencyDirection,
+  ElementKind,
+  GraphLevel,
+} from "@/protocol/enums";
+import type {
+  DependencyPage,
+  OutlineNode,
+  OutlinePage,
+} from "@/protocol/graph";
 import { queryKeys } from "./keys";
 
 export const analyzerQueryOptions = <M extends PlainMethod>(
@@ -130,4 +142,63 @@ export const graphSearchQueryOptions = (analysisId: string, query: string) =>
         query,
       }),
     queryKey: queryKeys.structure.search(analysisId, query),
+  });
+
+export const DEPENDENCY_PAGE_LIMIT = 500;
+
+export const elementDetailQueryOptions = (
+  analysisId: string,
+  elementId: string
+) =>
+  analyzerQueryOptions(
+    queryKeys.structure.element(analysisId, elementId),
+    "element.describe",
+    { analysisId, elementId }
+  );
+
+interface DependencyPageParam {
+  readonly pageParam: string | null;
+}
+
+const fetchDependencyPage =
+  (analysisId: string, elementId: string, direction: DependencyDirection) =>
+  ({ pageParam }: DependencyPageParam): Promise<DependencyPage> =>
+    analyzerRequest("element.dependencies", {
+      analysisId,
+      cursor: pageParam ?? undefined,
+      direction,
+      elementId,
+      limit: DEPENDENCY_PAGE_LIMIT,
+    });
+
+interface DependencyPages {
+  readonly pages: readonly DependencyPage[];
+}
+
+const SELECT_DEPENDENCY_ROWS = {
+  IN: (data: DependencyPages): DependencyRows =>
+    flattenDependencyPages(data.pages, "IN"),
+  OUT: (data: DependencyPages): DependencyRows =>
+    flattenDependencyPages(data.pages, "OUT"),
+} as const satisfies Record<
+  DependencyDirection,
+  (data: DependencyPages) => DependencyRows
+>;
+
+export const dependencyPagesQueryOptions = (
+  analysisId: string,
+  elementId: string,
+  direction: DependencyDirection
+) =>
+  infiniteQueryOptions({
+    getNextPageParam: (last: DependencyPage) => last.nextCursor,
+    initialPageParam: null as string | null,
+    queryFn: fetchDependencyPage(analysisId, elementId, direction),
+    queryKey: queryKeys.structure.dependencies(
+      analysisId,
+      elementId,
+      direction,
+      DEPENDENCY_PAGE_LIMIT
+    ),
+    select: SELECT_DEPENDENCY_ROWS[direction],
   });

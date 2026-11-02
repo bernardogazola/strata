@@ -1,0 +1,22 @@
+{
+  "vertices": [
+    "type:com.acme.App",
+    "type:com.acme.Clock",
+    "type:com.acme.Controller",
+    "type:com.acme.Money",
+    "type:com.acme.Repository",
+    "type:com.acme.Service"
+  ],
+  "edges": [
+    ["type:com.acme.App", "type:com.acme.Clock"],
+    ["type:com.acme.App", "type:com.acme.Controller"],
+    ["type:com.acme.App", "type:com.acme.Repository"],
+    ["type:com.acme.App", "type:com.acme.Service"],
+    ["type:com.acme.Controller", "type:com.acme.Money"],
+    ["type:com.acme.Controller", "type:com.acme.Service"],
+    ["type:com.acme.Repository", "type:com.acme.Money"],
+    ["type:com.acme.Service", "type:com.acme.Clock"],
+    ["type:com.acme.Service", "type:com.acme.Money"],
+    ["type:com.acme.Service", "type:com.acme.Repository"]
+  ]
+}

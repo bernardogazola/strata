@@ -35,17 +35,28 @@ import { createQueryClient } from "@/queries/client";
 import type { GraphViewParams } from "@/queries/options";
 import { useAppStore } from "@/state/app-store";
 import { installCanvasStub } from "@/test/canvas";
+import {
+  DRILLED_CHILDREN,
+  DRILLED_PACKAGE_ID,
+  PACKAGE_IDS,
+  ROOT_ITEMS,
+} from "@/test/fixture-graph";
 
 const AN = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
-const BILLING = "pkg:br.pucpr.billing";
-const ORDERS = "pkg:br.pucpr.orders";
-const SHARED = "pkg:br.pucpr.shared";
-const ORDER = "type:br.pucpr.orders.Order";
-const ORDER_SERVICE = "type:br.pucpr.orders.OrderService";
-const PAYMENT_GATEWAY = "type:br.pucpr.orders.PaymentGateway";
+
+const ROOT_IDS = ROOT_ITEMS.map((item) => item.id);
+const TYPE_IDS = DRILLED_CHILDREN.map((item) => item.id);
+const FIRST_PACKAGE = ROOT_IDS[0] ?? "";
+const DRILLED = DRILLED_PACKAGE_ID;
+const LAST_PACKAGE = ROOT_IDS.at(-1) ?? "";
+const FIRST_TYPE = TYPE_IDS[0] ?? "";
+const SECOND_TYPE = TYPE_IDS[1] ?? "";
+const LAST_TYPE = TYPE_IDS.at(-1) ?? "";
+const ROOT_ROWS = ROOT_IDS.length;
+const DRILLED_ROWS = ROOT_IDS.length + TYPE_IDS.length;
 
 const LEVEL_ONE: GraphViewParams = { level: "PACKAGE" };
-const ordersTypes: GraphViewParams = { level: "TYPE", parentId: ORDERS };
+const drilledTypes: GraphViewParams = { level: "TYPE", parentId: DRILLED };
 
 const instances = vi.hoisted(() => [] as Core[]);
 vi.mock("cytoscape", async (importOriginal) => {
@@ -202,6 +213,16 @@ const focusRow = (id: string): HTMLElement => {
   return row;
 };
 
+const failChildrenOf = (packageId: string): void => {
+  vi.stubGlobal("__STRATA_FAKE_TRANSCRIPTS__", [
+    {
+      method: "outline.children",
+      request: { parentId: packageId },
+      result: { notAPage: true },
+    },
+  ] satisfies readonly FakeTranscriptOverride[]);
+};
+
 const press = (key: string): void => {
   fireEvent.keyDown(document.activeElement ?? document.body, { key });
 };
@@ -242,17 +263,26 @@ const renderWithCanvas = async (): Promise<void> => {
       />
     </QueryClientProvider>
   );
-  await waitForRows(3);
+  await waitForRows(ROOT_ROWS);
   await waitFor(() => expect(window.__STRATA_GRAPH__).toBeDefined());
 };
+
+describe("o mundo que as sequências de teclado percorrem", () => {
+  test("a raiz é o nível 1, e o pacote aberto é a segunda linha dela, e não a última", () => {
+    expect(ROOT_IDS).toStrictEqual(PACKAGE_IDS);
+    expect(ROOT_IDS.indexOf(DRILLED)).toBe(1);
+    expect(LAST_PACKAGE).not.toBe(DRILLED);
+    expect(TYPE_IDS.length).toBeGreaterThanOrEqual(3);
+  });
+});
 
 describe("ArchitectureOutline: uma parada de Tab", () => {
   test("exatamente uma linha tabulável, e a árvore em si sem tabIndex", async () => {
     setup();
 
-    await waitForRows(3);
+    await waitForRows(ROOT_ROWS);
 
-    expect(tabbableRows()).toStrictEqual([rowById(BILLING)]);
+    expect(tabbableRows()).toStrictEqual([rowById(FIRST_PACKAGE)]);
     expect(screen.getByRole("tree").hasAttribute("tabindex")).toBe(false);
     expect(
       treeItems().every((row) => row.getAttribute("tabindex") !== null)
@@ -260,138 +290,138 @@ describe("ArchitectureOutline: uma parada de Tab", () => {
   });
 
   test("a linha tabulável é a selecionada quando há uma; senão o pacote aberto", async () => {
-    const { rerender } = setup({ focus: SHARED });
+    const { rerender } = setup({ focus: LAST_PACKAGE });
 
-    await waitForRows(3);
-    expect(tabbableRows()).toStrictEqual([rowById(SHARED)]);
+    await waitForRows(ROOT_ROWS);
+    expect(tabbableRows()).toStrictEqual([rowById(LAST_PACKAGE)]);
 
-    rerender({ view: ordersTypes });
-    await waitForRows(6);
-    expect(tabbableRows()).toStrictEqual([rowById(ORDERS)]);
+    rerender({ view: drilledTypes });
+    await waitForRows(DRILLED_ROWS);
+    expect(tabbableRows()).toStrictEqual([rowById(DRILLED)]);
   });
 
   test("focar a linha escreve activeElementId", async () => {
     setup();
-    await waitForRows(3);
+    await waitForRows(ROOT_ROWS);
 
-    focusRow(BILLING);
+    focusRow(FIRST_PACKAGE);
 
-    expect(activeElementId()).toBe(BILLING);
+    expect(activeElementId()).toBe(FIRST_PACKAGE);
   });
 
   test("ArrowDown move o foco do DOM e o activeElementId, e o canvas destaca o nó", async () => {
     await renderWithCanvas();
 
-    focusRow(BILLING);
-    expect(window.__STRATA_GRAPH__?.style(BILLING, "border-width")).toBe(
+    focusRow(FIRST_PACKAGE);
+    expect(window.__STRATA_GRAPH__?.style(FIRST_PACKAGE, "border-width")).toBe(
       activeBorder
     );
 
     press("ArrowDown");
 
-    expect(document.activeElement).toBe(rowById(ORDERS));
-    expect(activeElementId()).toBe(ORDERS);
-    expect(window.__STRATA_GRAPH__?.style(ORDERS, "border-width")).toBe(
+    expect(document.activeElement).toBe(rowById(DRILLED));
+    expect(activeElementId()).toBe(DRILLED);
+    expect(window.__STRATA_GRAPH__?.style(DRILLED, "border-width")).toBe(
       activeBorder
     );
-    expect(window.__STRATA_GRAPH__?.style(BILLING, "border-width")).not.toBe(
-      activeBorder
-    );
-    expect(tabbableRows()).toStrictEqual([rowById(ORDERS)]);
+    expect(
+      window.__STRATA_GRAPH__?.style(FIRST_PACKAGE, "border-width")
+    ).not.toBe(activeBorder);
+    expect(tabbableRows()).toStrictEqual([rowById(DRILLED)]);
   });
 });
 
 describe("ArchitectureOutline: abrir e fechar pelo teclado", () => {
   test("→ em um pacote fechado chama onExpand e, na vista TYPE, a mesma linha mantém o foco", async () => {
     const { onExpand, onSelect, rerender } = setup();
-    await waitForRows(3);
-    const orders = focusRow(ORDERS);
+    await waitForRows(ROOT_ROWS);
+    const drilled = focusRow(DRILLED);
 
     press("ArrowRight");
 
-    expect(onExpand).toHaveBeenCalledExactlyOnceWith(ORDERS);
+    expect(onExpand).toHaveBeenCalledExactlyOnceWith(DRILLED);
     expect(onSelect).not.toHaveBeenCalled();
-    expect(document.activeElement).toBe(orders);
+    expect(document.activeElement).toBe(drilled);
 
-    rerender({ view: ordersTypes });
-    await waitForRows(6);
+    rerender({ view: drilledTypes });
+    await waitForRows(DRILLED_ROWS);
 
-    expect(rowById(ORDERS)).toBe(orders);
-    expect(document.activeElement).toBe(orders);
-    expect(activeElementId()).toBe(ORDERS);
+    expect(rowById(DRILLED)).toBe(drilled);
+    expect(document.activeElement).toBe(drilled);
+    expect(activeElementId()).toBe(DRILLED);
   });
 
   test("a rede de segurança: se o foco caiu no <body> durante a troca que a estrutura pediu, volta à linha", async () => {
     const { rerender } = setup();
-    await waitForRows(3);
-    focusRow(ORDERS);
+    await waitForRows(ROOT_ROWS);
+    focusRow(DRILLED);
 
     press("ArrowRight");
     act(() => (document.activeElement as HTMLElement | null)?.blur());
     expect(document.activeElement).toBe(document.body);
-    rerender({ view: ordersTypes });
+    rerender({ view: drilledTypes });
 
-    expect(document.activeElement).toBe(rowById(ORDERS));
+    expect(document.activeElement).toBe(rowById(DRILLED));
   });
 
   test("uma troca de vista que a estrutura não pediu não puxa o foco para ela", async () => {
     const { rerender } = setup();
-    await waitForRows(3);
+    await waitForRows(ROOT_ROWS);
 
-    rerender({ view: ordersTypes });
-    await waitForRows(6);
+    rerender({ view: drilledTypes });
+    await waitForRows(DRILLED_ROWS);
 
     expect(document.activeElement).toBe(document.body);
   });
 
   test("→ no pacote aberto entra no primeiro filho; ← no filho volta ao pacote", async () => {
-    const { onCollapse, onExpand } = setup({ view: ordersTypes });
-    await waitForRows(6);
-    focusRow(ORDERS);
+    const { onCollapse, onExpand } = setup({ view: drilledTypes });
+    await waitForRows(DRILLED_ROWS);
+    focusRow(DRILLED);
 
     press("ArrowRight");
-    expect(document.activeElement).toBe(rowById(ORDER));
-    expect(activeElementId()).toBe(ORDER);
+    expect(document.activeElement).toBe(rowById(FIRST_TYPE));
+    expect(activeElementId()).toBe(FIRST_TYPE);
 
     press("ArrowRight");
-    expect(document.activeElement).toBe(rowById(ORDER));
+    expect(document.activeElement).toBe(rowById(FIRST_TYPE));
 
     press("ArrowLeft");
-    expect(document.activeElement).toBe(rowById(ORDERS));
+    expect(document.activeElement).toBe(rowById(DRILLED));
     expect(onExpand).not.toHaveBeenCalled();
     expect(onCollapse).not.toHaveBeenCalled();
   });
 
   test("← no pacote aberto chama onCollapse e o foco fica nele", async () => {
-    const { onCollapse, rerender } = setup({ view: ordersTypes });
-    await waitForRows(6);
-    const orders = focusRow(ORDERS);
+    const { onCollapse, rerender } = setup({ view: drilledTypes });
+    await waitForRows(DRILLED_ROWS);
+    const drilled = focusRow(DRILLED);
 
     press("ArrowLeft");
 
     expect(onCollapse).toHaveBeenCalledOnce();
-    rerender({ focus: ORDERS, view: LEVEL_ONE });
-    await waitForRows(3);
-    expect(document.activeElement).toBe(orders);
+    rerender({ focus: DRILLED, view: LEVEL_ONE });
+    await waitForRows(ROOT_ROWS);
+    expect(document.activeElement).toBe(drilled);
   });
 
   test("← em um pacote fechado e → em um tipo não fazem nada", async () => {
-    const { onCollapse, onExpand } = setup({ view: ordersTypes });
-    await waitForRows(6);
+    const { onCollapse, onExpand } = setup({ view: drilledTypes });
+    await waitForRows(DRILLED_ROWS);
 
-    focusRow(BILLING);
+    focusRow(FIRST_PACKAGE);
     press("ArrowLeft");
-    focusRow(PAYMENT_GATEWAY);
+    focusRow(LAST_TYPE);
     press("ArrowRight");
 
-    expect(document.activeElement).toBe(rowById(PAYMENT_GATEWAY));
+    expect(document.activeElement).toBe(rowById(LAST_TYPE));
     expect(onCollapse).not.toHaveBeenCalled();
     expect(onExpand).not.toHaveBeenCalled();
   });
 
   test("clicar na seta de um pacote abre ou fecha sem selecionar", async () => {
-    const { onCollapse, onExpand, onSelect } = setup({ view: ordersTypes });
-    await waitForRows(6);
+    const { onCollapse, onExpand, onSelect } = setup({ view: drilledTypes });
+    await waitForRows(DRILLED_ROWS);
 
     const chevronOf = (id: string): Element => {
       const chevron = rowById(id).querySelector("[data-chevron]");
@@ -400,10 +430,10 @@ describe("ArchitectureOutline: abrir e fechar pelo teclado", () => {
       }
       return chevron;
     };
-    fireEvent.click(chevronOf(SHARED));
-    fireEvent.click(chevronOf(ORDERS));
+    fireEvent.click(chevronOf(LAST_PACKAGE));
+    fireEvent.click(chevronOf(DRILLED));
 
-    expect(onExpand).toHaveBeenCalledExactlyOnceWith(SHARED);
+    expect(onExpand).toHaveBeenCalledExactlyOnceWith(LAST_PACKAGE);
     expect(onCollapse).toHaveBeenCalledOnce();
     expect(onSelect).not.toHaveBeenCalled();
   });
@@ -411,9 +441,9 @@ describe("ArchitectureOutline: abrir e fechar pelo teclado", () => {
 
 describe("ArchitectureOutline: selecionar não segue o foco", () => {
   test("Enter, Espaço e clique selecionam com (id, kind); as setas nunca", async () => {
-    const { onSelect } = setup({ view: ordersTypes });
-    await waitForRows(6);
-    focusRow(BILLING);
+    const { onSelect } = setup({ view: drilledTypes });
+    await waitForRows(DRILLED_ROWS);
+    focusRow(FIRST_PACKAGE);
 
     press("ArrowDown");
     press("ArrowDown");
@@ -421,27 +451,27 @@ describe("ArchitectureOutline: selecionar não segue o foco", () => {
     expect(onSelect).not.toHaveBeenCalled();
 
     press("Enter");
-    focusRow(ORDER_SERVICE);
+    focusRow(SECOND_TYPE);
     press(" ");
-    fireEvent.click(rowById(SHARED));
+    fireEvent.click(rowById(LAST_PACKAGE));
 
     expect(onSelect.mock.calls).toStrictEqual([
-      [ORDERS, "PACKAGE"],
-      [ORDER_SERVICE, "TYPE"],
-      [SHARED, "PACKAGE"],
+      [DRILLED, "PACKAGE"],
+      [SECOND_TYPE, "TYPE"],
+      [LAST_PACKAGE, "PACKAGE"],
     ]);
   });
 
   test("Home e End vão à primeira e à última linha", async () => {
-    setup({ view: ordersTypes });
-    await waitForRows(6);
-    focusRow(ORDER);
+    setup({ view: drilledTypes });
+    await waitForRows(DRILLED_ROWS);
+    focusRow(FIRST_TYPE);
 
     press("End");
-    expect(document.activeElement).toBe(rowById(SHARED));
+    expect(document.activeElement).toBe(rowById(LAST_PACKAGE));
 
     press("Home");
-    expect(document.activeElement).toBe(rowById(BILLING));
+    expect(document.activeElement).toBe(rowById(FIRST_PACKAGE));
   });
 
   test("type-ahead: a próxima linha cujo rótulo começa com o que se digitou, e o buffer zera", async () => {
@@ -479,107 +509,108 @@ describe("ArchitectureOutline: selecionar não segue o foco", () => {
 
   test("* não faz nada: há um pacote aberto por vez", async () => {
     const { onExpand } = setup();
-    await waitForRows(3);
-    focusRow(BILLING);
+    await waitForRows(ROOT_ROWS);
+    focusRow(FIRST_PACKAGE);
 
     press("*");
 
     expect(onExpand).not.toHaveBeenCalled();
-    expect(document.activeElement).toBe(rowById(BILLING));
+    expect(document.activeElement).toBe(rowById(FIRST_PACKAGE));
   });
 });
 
 describe("ArchitectureOutline: o destaque cruzado", () => {
   test("o foco que sai da árvore solta o destaque, só se ele ainda é o dela", async () => {
     setup();
-    await waitForRows(3);
+    await waitForRows(ROOT_ROWS);
     const outside = screen.getByRole("button", { name: "fora" });
 
-    focusRow(BILLING);
+    focusRow(FIRST_PACKAGE);
     act(() => outside.focus());
     expect(activeElementId()).toBeNull();
 
-    focusRow(ORDERS);
-    act(() => useAppStore.getState().setActiveElementId(SHARED));
+    focusRow(DRILLED);
+    act(() => useAppStore.getState().setActiveElementId(LAST_PACKAGE));
     act(() => outside.focus());
-    expect(activeElementId()).toBe(SHARED);
+    expect(activeElementId()).toBe(LAST_PACKAGE);
   });
 
   test("o ponteiro sobre uma linha escreve; ao sair, volta à linha focada ou solta", async () => {
     setup();
-    await waitForRows(3);
+    await waitForRows(ROOT_ROWS);
     const outside = screen.getByRole("button", { name: "fora" });
 
-    fireEvent.mouseOver(rowById(ORDERS));
-    expect(activeElementId()).toBe(ORDERS);
-    fireEvent.mouseOut(rowById(ORDERS), { relatedTarget: outside });
+    fireEvent.mouseOver(rowById(DRILLED));
+    expect(activeElementId()).toBe(DRILLED);
+    fireEvent.mouseOut(rowById(DRILLED), { relatedTarget: outside });
     expect(activeElementId()).toBeNull();
 
-    focusRow(BILLING);
-    fireEvent.mouseOver(rowById(SHARED));
-    expect(activeElementId()).toBe(SHARED);
-    fireEvent.mouseOut(rowById(SHARED), { relatedTarget: outside });
-    expect(activeElementId()).toBe(BILLING);
+    focusRow(FIRST_PACKAGE);
+    fireEvent.mouseOver(rowById(LAST_PACKAGE));
+    expect(activeElementId()).toBe(LAST_PACKAGE);
+    fireEvent.mouseOut(rowById(LAST_PACKAGE), { relatedTarget: outside });
+    expect(activeElementId()).toBe(FIRST_PACKAGE);
   });
 
   test("o ponteiro cruzando outro nó do canvas não apaga o destaque que o foco de teclado segura", async () => {
     await renderWithCanvas();
-    focusRow(BILLING);
-    const shared = liveInstance().getElementById(SHARED);
+    focusRow(FIRST_PACKAGE);
+    const last = liveInstance().getElementById(LAST_PACKAGE);
 
     act(() => {
-      shared.emit("mouseover");
+      last.emit("mouseover");
     });
-    expect(window.__STRATA_GRAPH__?.style(SHARED, "border-width")).toBe(
+    expect(window.__STRATA_GRAPH__?.style(LAST_PACKAGE, "border-width")).toBe(
       activeBorder
     );
     act(() => {
-      shared.emit("mouseout");
+      last.emit("mouseout");
     });
 
-    expect(document.activeElement).toBe(rowById(BILLING));
-    expect(activeElementId()).toBe(BILLING);
-    expect(rowById(BILLING).hasAttribute("data-active")).toBe(true);
-    expect(window.__STRATA_GRAPH__?.style(BILLING, "border-width")).toBe(
+    expect(document.activeElement).toBe(rowById(FIRST_PACKAGE));
+    expect(activeElementId()).toBe(FIRST_PACKAGE);
+    expect(rowById(FIRST_PACKAGE).hasAttribute("data-active")).toBe(true);
+    expect(window.__STRATA_GRAPH__?.style(FIRST_PACKAGE, "border-width")).toBe(
       activeBorder
     );
-    expect(window.__STRATA_GRAPH__?.style(SHARED, "border-width")).not.toBe(
-      activeBorder
-    );
+    expect(
+      window.__STRATA_GRAPH__?.style(LAST_PACKAGE, "border-width")
+    ).not.toBe(activeBorder);
   });
 
   test("a linha focada que uma troca de vista de fora tira do DOM solta o destaque que a árvore escreveu", async () => {
-    const { rerender } = setup({ view: ordersTypes });
-    await waitForRows(6);
-    focusRow(ORDER);
-    expect(activeElementId()).toBe(ORDER);
+    const { rerender } = setup({ view: drilledTypes });
+    await waitForRows(DRILLED_ROWS);
+    focusRow(FIRST_TYPE);
+    expect(activeElementId()).toBe(FIRST_TYPE);
 
     rerender({ view: LEVEL_ONE });
-    await waitForRows(3);
+    await waitForRows(ROOT_ROWS);
 
     expect(document.activeElement).toBe(document.body);
     expect(activeElementId()).toBeNull();
   });
 
   test("depois dessa troca a árvore não se diz mais focada: no Avançar, a tabulável é o pacote aberto", async () => {
-    const { rerender } = setup({ view: ordersTypes });
-    await waitForRows(6);
-    focusRow(ORDER);
+    const { rerender } = setup({ view: drilledTypes });
+    await waitForRows(DRILLED_ROWS);
+    focusRow(FIRST_TYPE);
 
     rerender({ view: LEVEL_ONE });
-    await waitForRows(3);
-    rerender({ view: ordersTypes });
-    await waitForRows(6);
+    await waitForRows(ROOT_ROWS);
+    rerender({ view: drilledTypes });
+    await waitForRows(DRILLED_ROWS);
 
     expect(document.activeElement).toBe(document.body);
-    expect(tabbableRows()).toStrictEqual([rowById(ORDERS)]);
-    expect(rowById(ORDER).hasAttribute("data-active")).toBe(false);
+    expect(tabbableRows()).toStrictEqual([rowById(DRILLED)]);
+    expect(rowById(FIRST_TYPE).hasAttribute("data-active")).toBe(false);
   });
 
   test("focar uma pseudo-linha solta o id que a árvore escreveu", async () => {
-    setup({ view: { level: "TYPE", parentId: BILLING } });
-    const rows = await waitForRows(4);
-    focusRow(BILLING);
+    failChildrenOf(FIRST_PACKAGE);
+    setup({ view: { level: "TYPE", parentId: FIRST_PACKAGE } });
+    const rows = await waitForRows(ROOT_ROWS + 1);
+    focusRow(FIRST_PACKAGE);
 
     press("ArrowDown");
 
@@ -588,13 +619,13 @@ describe("ArchitectureOutline: o destaque cruzado", () => {
     expect(activeElementId()).toBeNull();
 
     press("ArrowLeft");
-    expect(document.activeElement).toBe(rowById(BILLING));
+    expect(document.activeElement).toBe(rowById(FIRST_PACKAGE));
   });
 
   test("desmontar solta o destaque", async () => {
     const { unmount } = setup();
-    await waitForRows(3);
-    focusRow(SHARED);
+    await waitForRows(ROOT_ROWS);
+    focusRow(LAST_PACKAGE);
 
     unmount();
 
@@ -603,12 +634,12 @@ describe("ArchitectureOutline: o destaque cruzado", () => {
 
   test("uma linha marca data-active quando o destaque é dela, sem rolar", async () => {
     setup();
-    await waitForRows(3);
+    await waitForRows(ROOT_ROWS);
 
-    act(() => useAppStore.getState().setActiveElementId(SHARED));
+    act(() => useAppStore.getState().setActiveElementId(LAST_PACKAGE));
 
-    expect(rowById(SHARED).hasAttribute("data-active")).toBe(true);
-    expect(rowById(BILLING).hasAttribute("data-active")).toBe(false);
+    expect(rowById(LAST_PACKAGE).hasAttribute("data-active")).toBe(true);
+    expect(rowById(FIRST_PACKAGE).hasAttribute("data-active")).toBe(false);
     expect(document.activeElement).toBe(document.body);
   });
 });
@@ -616,12 +647,12 @@ describe("ArchitectureOutline: o destaque cruzado", () => {
 describe("ArchitectureOutline: o foco de fora", () => {
   test("ref.focus() foca a linha tabulável; sem linhas, o título", async () => {
     const outlineRef = createRef<OutlineHandle>();
-    setup({ focus: ORDERS, outlineRef });
-    await waitForRows(3);
+    setup({ focus: DRILLED, outlineRef });
+    await waitForRows(ROOT_ROWS);
 
     act(() => outlineRef.current?.focus());
 
-    expect(document.activeElement).toBe(rowById(ORDERS));
+    expect(document.activeElement).toBe(rowById(DRILLED));
   });
 
   test("ref.focus() sem linhas foca o título da estrutura", async () => {
@@ -645,22 +676,22 @@ describe("ArchitectureOutline: o foco de fora", () => {
 
   test("um focus de fora (canvas, busca) leva a linha tabulável sem mover o foco do DOM", async () => {
     const { rerender } = setup();
-    await waitForRows(3);
+    await waitForRows(ROOT_ROWS);
 
-    rerender({ focus: SHARED });
+    rerender({ focus: LAST_PACKAGE });
 
-    expect(tabbableRows()).toStrictEqual([rowById(SHARED)]);
+    expect(tabbableRows()).toStrictEqual([rowById(LAST_PACKAGE)]);
     expect(document.activeElement).toBe(document.body);
   });
 
   test("com o foco do DOM na árvore, um focus de fora não rouba a linha tabulável", async () => {
     const { rerender } = setup();
-    await waitForRows(3);
-    focusRow(BILLING);
+    await waitForRows(ROOT_ROWS);
+    focusRow(FIRST_PACKAGE);
 
-    rerender({ focus: SHARED });
+    rerender({ focus: LAST_PACKAGE });
 
-    expect(tabbableRows()).toStrictEqual([rowById(BILLING)]);
-    expect(document.activeElement).toBe(rowById(BILLING));
+    expect(tabbableRows()).toStrictEqual([rowById(FIRST_PACKAGE)]);
+    expect(document.activeElement).toBe(rowById(FIRST_PACKAGE));
   });
 });

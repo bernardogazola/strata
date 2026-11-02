@@ -1,0 +1,2 @@
+{"id":"req_01JQ8ZJ4B2C3D4E5F6G7H8J9K3","kind":"request","method":"element.dependencyEvidence","payload":{"analysisId":"an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W","source":"type:br.pucpr.legacy.core.Audited","target":"type:br.pucpr.legacy.core.Kind"},"protocol":1}
+{"error":{"code":"PROTO_INVALID_PAYLOAD","detail":"o par não tem dependência","origin":"analyzer","params":{"method":"element.dependencyEvidence"}},"id":"req_01JQ8ZJ4B2C3D4E5F6G7H8J9K3","kind":"response","ok":false,"protocol":1}

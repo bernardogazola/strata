@@ -102,18 +102,13 @@ public final class CodeMetricDao {
     return List.copyOf(metrics);
   }
 
-  private static CodeMetricRow read(ResultSet rows) throws SQLException {
+  static CodeMetricRow read(ResultSet rows) throws SQLException {
     return new CodeMetricRow(
         rows.getLong("element_pk"),
         rows.getInt("loc"),
-        nullableInt(rows, "unit_count"),
-        nullableInt(rows, "cc_sum"),
-        nullableInt(rows, "cc_max"),
-        nullableInt(rows, "cc_p90"));
-  }
-
-  private static Integer nullableInt(ResultSet rows, String column) throws SQLException {
-    final int value = rows.getInt(column);
-    return rows.wasNull() ? null : value;
+        Columns.nullableInt(rows, "unit_count"),
+        Columns.nullableInt(rows, "cc_sum"),
+        Columns.nullableInt(rows, "cc_max"),
+        Columns.nullableInt(rows, "cc_p90"));
   }
 }

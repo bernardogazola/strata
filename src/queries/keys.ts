@@ -54,7 +54,8 @@ export const queryKeys = {
     dependencies: (
       analysisId: string,
       elementId: string,
-      direction: DependencyDirection
+      direction: DependencyDirection,
+      limit: number
     ) =>
       [
         "analysis",
@@ -64,15 +65,23 @@ export const queryKeys = {
         elementId,
         "deps",
         direction,
+        limit,
       ] as const,
-    dependencyEvidence: (analysisId: string, edgeId: string) =>
+    dependencyEvidence: (
+      analysisId: string,
+      source: string,
+      target: string,
+      limit: number
+    ) =>
       [
         "analysis",
         analysisId,
         "structure",
         "edge",
-        edgeId,
+        source,
+        target,
         "evidence",
+        limit,
       ] as const,
     element: (analysisId: string, elementId: string) =>
       ["analysis", analysisId, "structure", "element", elementId] as const,

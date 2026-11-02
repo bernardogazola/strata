@@ -27,11 +27,11 @@ describe("elementDisplayLabel", () => {
 describe("ElementLabel", () => {
   test("o texto do repositório vai em um bdi isolado e fora do tradutor", () => {
     const { container } = render(
-      <ElementLabel kind="TYPE" label="OrderService" />
+      <ElementLabel kind="TYPE" label="CatalogEntry" />
     );
     const bdi = container.querySelector("bdi");
 
-    expect(bdi?.textContent).toBe("OrderService");
+    expect(bdi?.textContent).toBe("CatalogEntry");
     expect(bdi?.getAttribute("lang")).toBe("");
     expect(bdi?.getAttribute("translate")).toBe("no");
   });

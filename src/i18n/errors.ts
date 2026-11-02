@@ -141,6 +141,15 @@ const errorRegistry: ErrorRegistry = {
     retryable: (p) => CACHE_UNAVAILABLE_RETRYABLE[p.cause],
     severity: "error",
   },
+  ELEMENT_NOT_FOUND: {
+    format: () => ({
+      body: [t("Este elemento não faz parte desta análise.")],
+      hint: "Volte a Todos os pacotes e escolha outro pela estrutura ou pela busca.",
+      title: "Elemento não encontrado",
+    }),
+    retryable: false,
+    severity: "error",
+  },
   INTERNAL_UNEXPECTED: {
     format: () => ({
       body: [t("O Strata encontrou um erro inesperado.")],

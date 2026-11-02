@@ -6,7 +6,11 @@ import type {
   StylesheetJson,
   StylesheetStyle,
 } from "cytoscape";
-import type { ElementKind, ResolutionQuality } from "@/protocol/enums";
+import type {
+  ElementKind,
+  GraphNodeKind,
+  ResolutionQuality,
+} from "@/protocol/enums";
 import type { GraphEdge, GraphNode, GraphSlice } from "@/protocol/graph";
 import type { GraphPalette, GraphToken } from "./palette";
 
@@ -72,15 +76,17 @@ export const NODE_SHAPES = {
   FILE: "ellipse",
   METHOD: "ellipse",
   PACKAGE: "round-rectangle",
+  PACKAGE_PREFIX: "round-hexagon",
   TYPE: "ellipse",
-} as const satisfies Record<ElementKind, Css.NodeShape>;
+} as const satisfies Record<ElementKind | GraphNodeKind, Css.NodeShape>;
 
 const NODE_FILLS = {
   FILE: "--graph-node",
   METHOD: "--graph-node",
   PACKAGE: "--graph-node-package",
+  PACKAGE_PREFIX: "--graph-node-package",
   TYPE: "--graph-node",
-} as const satisfies Record<ElementKind, GraphToken>;
+} as const satisfies Record<ElementKind | GraphNodeKind, GraphToken>;
 
 export const readGraphRuntime = (cy: Core): GraphRuntime =>
   (cy.scratch(GRAPH_SCRATCH) as GraphRuntime | undefined) ??
@@ -180,7 +186,7 @@ const edgeRules = (palette: GraphPalette): StylesheetStyle[] => [
     selector: "edge",
     style: {
       "arrow-scale": GRAPH_STYLE.edge.arrowScale,
-      "curve-style": "straight",
+      "curve-style": "bezier",
       "line-color": palette["--graph-edge-structural"],
       "target-arrow-color": palette["--graph-edge-structural"],
       "target-arrow-shape": "triangle",

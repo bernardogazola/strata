@@ -1,6 +1,7 @@
 package br.pucpr.tcc.strata.analyzer.protocol;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import br.pucpr.tcc.strata.analyzer.analysis.AnalysisConfiguration;
 import br.pucpr.tcc.strata.analyzer.analysis.AnalysisId;
@@ -35,15 +36,23 @@ import java.time.InstantSource;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 final class ProtocolFixtureTest {
 
@@ -57,7 +66,56 @@ final class ProtocolFixtureTest {
 
   private static final String VERSAO_DA_FIXTURE = "0.0.0-fixture";
 
-  private static final Set<String> DIRIGIDOS =
+  private static final Set<String> DIRIGIDOS_DA_FASE_32 =
+      Set.of(
+          "element.dependencies.api-in.jsonl",
+          "element.dependencies.api-out.jsonl",
+          "element.dependencies.audited-in.jsonl",
+          "element.dependencies.audited-out.jsonl",
+          "element.dependencies.catalog-endpoint-in.jsonl",
+          "element.dependencies.catalog-endpoint-out.jsonl",
+          "element.dependencies.catalog-entry-in.jsonl",
+          "element.dependencies.catalog-entry-out.jsonl",
+          "element.dependencies.catalog-in.jsonl",
+          "element.dependencies.catalog-metadata-in.jsonl",
+          "element.dependencies.catalog-metadata-out.jsonl",
+          "element.dependencies.catalog-out.jsonl",
+          "element.dependencies.core-gen-in.jsonl",
+          "element.dependencies.core-gen-out.jsonl",
+          "element.dependencies.core-in.jsonl",
+          "element.dependencies.core-out.jsonl",
+          "element.dependencies.core-spi-in.jsonl",
+          "element.dependencies.core-spi-out.jsonl",
+          "element.dependencies.foreign-cursor.jsonl",
+          "element.dependencies.kind-in.jsonl",
+          "element.dependencies.kind-out.jsonl",
+          "element.dependencies.main-in.jsonl",
+          "element.dependencies.main-out.jsonl",
+          "element.dependencies.memory-store-in.jsonl",
+          "element.dependencies.memory-store-out.jsonl",
+          "element.dependencies.store-in.jsonl",
+          "element.dependencies.store-out.jsonl",
+          "element.dependencyEvidence.catalog-endpoint-catalog.jsonl",
+          "element.dependencyEvidence.catalog-store.jsonl",
+          "element.dependencyEvidence.main-string.jsonl",
+          "element.dependencyEvidence.no-pair.jsonl",
+          "element.describe.api.jsonl",
+          "element.describe.audited.jsonl",
+          "element.describe.catalog-endpoint.jsonl",
+          "element.describe.catalog-entry.jsonl",
+          "element.describe.catalog-metadata.jsonl",
+          "element.describe.catalog.jsonl",
+          "element.describe.core-gen.jsonl",
+          "element.describe.core-spi.jsonl",
+          "element.describe.core.jsonl",
+          "element.describe.kind.jsonl",
+          "element.describe.main.jsonl",
+          "element.describe.memory-store.jsonl",
+          "element.describe.method.jsonl",
+          "element.describe.store.jsonl",
+          "element.describe.unknown.jsonl");
+
+  private static final Set<String> DIRIGIDOS_ATE_A_FASE_31 =
       Set.of(
           "analysis.start.ok.jsonl",
           "analysis.cancel.unknown.jsonl",
@@ -82,19 +140,30 @@ final class ProtocolFixtureTest {
           "system.shutdown.ok.jsonl",
           "repository.describe.ok.jsonl",
           "repository.describe.bare.jsonl",
-          "repository.describe.no-java.jsonl");
+          "repository.describe.no-java.jsonl",
+          "graph.slice.package.jsonl",
+          "graph.slice.type.jsonl",
+          "graph.slice.type-api.jsonl",
+          "graph.slice.type-core-gen.jsonl",
+          "graph.slice.type-core-spi.jsonl",
+          "graph.slice.package-aggregated.jsonl",
+          "outline.children.root.jsonl",
+          "outline.children.core.jsonl",
+          "outline.children.api.jsonl",
+          "outline.children.core-gen.jsonl",
+          "outline.children.core-spi.jsonl",
+          "outline.children.unknown-parent.jsonl",
+          "graph.search.hit.jsonl");
 
-  private static final Map<String, String> EXPECTADOS_NAO_DIRIGIVEIS = criarBaseline();
+  private static final Set<String> DIRIGIDOS = comAsDaFase32();
 
-  private static Map<String, String> criarBaseline() {
-    final Map<String, String> m = new LinkedHashMap<>();
-    m.put("graph.search.hit.jsonl", "ainda não implementado");
-    m.put("graph.slice.package.jsonl", "ainda não implementado");
-    m.put("graph.slice.type.jsonl", "ainda não implementado");
-    m.put("outline.children.orders.jsonl", "ainda não implementado");
-    m.put("outline.children.root.jsonl", "ainda não implementado");
-    return Map.copyOf(m);
+  private static Set<String> comAsDaFase32() {
+    final Set<String> todos = new TreeSet<>(DIRIGIDOS_ATE_A_FASE_31);
+    todos.addAll(DIRIGIDOS_DA_FASE_32);
+    return Set.copyOf(todos);
   }
+
+  private static final Map<String, String> EXPECTADOS_NAO_DIRIGIVEIS = Map.of();
 
   private static List<String> linhas(String arquivo) throws IOException {
     final String texto = Files.readString(FIXTURES.resolve(arquivo), StandardCharsets.UTF_8);
@@ -169,7 +238,13 @@ final class ProtocolFixtureTest {
   @Test
   void aPastaDeFixturesExisteEFoiLida() throws IOException {
     assertThat(FIXTURES).isDirectory();
-    assertThat(arquivos()).contains("protocol.ready.mvp.jsonl").hasSize(29);
+    assertThat(arquivos()).contains("protocol.ready.mvp.jsonl").hasSize(83);
+  }
+
+  @Test
+  void nenhumaFixtureFicaSemDirigirDesdeAFase31() throws IOException {
+    assertThat(EXPECTADOS_NAO_DIRIGIVEIS).isEmpty();
+    assertThat(DIRIGIDOS).isEqualTo(arquivos());
   }
 
   @Test
@@ -499,33 +574,481 @@ final class ProtocolFixtureTest {
   }
 
   @Test
-  void analysisStatusCompletedBateByteAByte(@TempDir Path temp) throws Exception {
-    final Path repositorio = temp.toRealPath().resolve("multi-module");
-    final var commit = TestRepositories.reproduceCorpusFixture("multi-module", repositorio);
-    assertThat(commit.name()).isEqualTo(TestRepositories.corpusCommitId("multi-module"));
-    final EventosDaAnalise eventos = new EventosDaAnalise();
-    final AnalysisRegistry registro = registroQueRoda(eventos);
-    final Dispatcher despachante =
-        Dispatcher.of(inbound, Handlers.all(() -> 0L, encerrar, registro));
-
-    final StartResult partida =
-        registro.start(
-            repositorio.toString(),
-            repositorio,
-            new AnalysisConfiguration(false, HistoryScope.ALL, null, null, false));
-    assertThat(partida).isInstanceOf(StartResult.Started.class);
-    ((StartResult.Started) partida).launch().run();
-    final JsonNode terminal = eventos.terminal();
-    assertThat(terminal.path("event").asText())
-        .as(terminal.toString())
-        .isEqualTo("analysis.completed");
-
+  void analysisStatusCompletedBateByteAByte() throws Exception {
     final List<String> l = linhas("analysis.status.completed.jsonl");
     assertThat(l).hasSize(2);
+
+    assertThat(despacharNoMundo(MULTI_MODULO.get(), l.get(0))).isEqualTo(l.get(1));
+  }
+
+  @TempDir static Path dadosDaClasse;
+
+  private static final AnalysisId ID_DO_AGREGADO = new AnalysisId("an_01JQ8Z9K3M4N5P6Q7R8S9T0V2A");
+
+  private record Mundo(AnalysisRegistry registro, Dispatcher despachante) {}
+
+  private static final class UmaVezPorClasse {
+    private final String nome;
+    private final Callable<Mundo> construcao;
+    private Mundo mundo;
+    private Throwable falha;
+
+    UmaVezPorClasse(String nome, Callable<Mundo> construcao) {
+      this.nome = nome;
+      this.construcao = construcao;
+    }
+
+    synchronized Mundo get() {
+      if (mundo == null && falha == null) {
+        try {
+          mundo = construcao.call();
+        } catch (Exception | AssertionError naoFicouPronto) {
+          falha = naoFicouPronto;
+        }
+      }
+      if (falha != null) {
+        throw new AssertionError("o mundo " + nome + " não ficou pronto", falha);
+      }
+      return mundo;
+    }
+
+    synchronized void fechar() {
+      if (mundo != null) {
+        mundo.registro().close();
+      }
+    }
+  }
+
+  private static final UmaVezPorClasse MULTI_MODULO =
+      new UmaVezPorClasse(
+          "multi-module",
+          () ->
+              analisar(
+                  "multi-module",
+                  ID_DA_FIXTURE,
+                  repositorio -> {
+                    final var commit =
+                        TestRepositories.reproduceCorpusFixture("multi-module", repositorio);
+                    assertThat(commit.name())
+                        .as("a reprodução tem de dar o commit que o make-fixtures.sh gravou")
+                        .isEqualTo(TestRepositories.corpusCommitId("multi-module"));
+                  }));
+
+  private static final UmaVezPorClasse AGREGADO =
+      new UmaVezPorClasse(
+          "agregado",
+          () ->
+              analisar("aggregated", ID_DO_AGREGADO, ProtocolFixtureTest::escreverOMundoAgregado));
+
+  @AfterAll
+  static void fecharOsMundos() {
+    MULTI_MODULO.fechar();
+    AGREGADO.fechar();
+  }
+
+  @FunctionalInterface
+  private interface Escritor {
+    void escrever(Path repositorio) throws Exception;
+  }
+
+  private static Mundo analisar(String nome, AnalysisId id, Escritor escritor) throws Exception {
+    final Path base = Files.createDirectories(dadosDaClasse.toRealPath().resolve(nome));
+    final Path repositorio = base.resolve("repositorio");
+    escritor.escrever(repositorio);
+    final EventosDaAnalise eventos = new EventosDaAnalise();
+    final AnalysisRegistry registro =
+        new AnalysisRegistry(
+            RegistrySettings.production(
+                    PersistenceRoot.prepare(Files.createDirectories(base.resolve("dados"))),
+                    eventos,
+                    VERSAO_DA_FIXTURE)
+                .withClock(InstantSource.fixed(INSTANTE_DA_FIXTURE))
+                .withNanoClock(() -> 0L)
+                .withIds(() -> id));
+    try {
+      final StartResult partida =
+          registro.start(
+              repositorio.toString(),
+              repositorio,
+              new AnalysisConfiguration(false, HistoryScope.ALL, null, null, false));
+      assertThat(partida).isInstanceOf(StartResult.Started.class);
+      ((StartResult.Started) partida).launch().run();
+      final JsonNode terminal = eventos.terminal();
+      assertThat(terminal.path("event").asText())
+          .as(terminal.toString())
+          .isEqualTo("analysis.completed");
+      return new Mundo(
+          registro,
+          Dispatcher.of(
+              JsonLines.strictInboundMapper(),
+              Handlers.all(() -> 0L, new AtomicBoolean(false), registro)));
+    } catch (Exception | AssertionError falha) {
+      registro.close();
+      throw falha;
+    }
+  }
+
+  private String despacharNoMundo(Mundo mundo, String requisicao) throws IOException {
+    final Dispatcher despachante = mundo.despachante();
     final Dispatcher.Outcome fora =
-        despachante.dispatch(despachante.parse(l.get(0).getBytes(StandardCharsets.UTF_8)));
+        despachante.dispatch(despachante.parse(requisicao.getBytes(StandardCharsets.UTF_8)));
     assertThat(fora).isInstanceOf(Dispatcher.Outcome.Respond.class);
-    assertThat(emitido(((Dispatcher.Outcome.Respond) fora).envelope())).isEqualTo(l.get(1));
+    return emitido(((Dispatcher.Outcome.Respond) fora).envelope());
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(
+      strings = {
+        "outline.children.root.jsonl",
+        "outline.children.core.jsonl",
+        "outline.children.api.jsonl",
+        "outline.children.core-gen.jsonl",
+        "outline.children.core-spi.jsonl",
+        "outline.children.unknown-parent.jsonl",
+        "graph.search.hit.jsonl"
+      })
+  void asLeiturasDaEstruturaEDaBuscaBatemByteAByte(String arquivo) throws Exception {
+    final List<String> l = linhas(arquivo);
+    assertThat(l).as(arquivo + ": requisição e resposta").hasSize(2);
+
+    assertThat(despacharNoMundo(MULTI_MODULO.get(), l.get(0))).isEqualTo(l.get(1));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @CsvSource({
+    "graph.slice.package.jsonl, 4",
+    "graph.slice.type.jsonl, 9",
+    "graph.slice.type-api.jsonl, 9",
+    "graph.slice.type-core-gen.jsonl, 9",
+    "graph.slice.type-core-spi.jsonl, 9"
+  })
+  void asFatiasDoMultiModuloBatemComOPageRankDentroDoLimite(String arquivo, int vertices)
+      throws Exception {
+    final List<String> l = linhas(arquivo);
+    assertThat(l).as(arquivo + ": requisição e resposta").hasSize(2);
+
+    compararFatia(l.get(1), despacharNoMundo(MULTI_MODULO.get(), l.get(0)), vertices, Map.of());
+  }
+
+  @Test
+  void osEmpatesExatosDoGoldenSaoEmpatesBitABitNoEmitido() throws Exception {
+    final Mundo mundo = MULTI_MODULO.get();
+    final Map<String, double[]> tipos = new LinkedHashMap<>();
+    for (final String arquivo :
+        List.of(
+            "graph.slice.type.jsonl",
+            "graph.slice.type-api.jsonl",
+            "graph.slice.type-core-gen.jsonl",
+            "graph.slice.type-core-spi.jsonl")) {
+      tipos.putAll(pageranksLadoALado(arquivo, mundo));
+    }
+    final Map<String, double[]> pacotes = pageranksLadoALado("graph.slice.package.jsonl", mundo);
+
+    for (final String[] empate :
+        List.of(
+            new String[] {
+              "type:br.pucpr.legacy.api.Main", "type:br.pucpr.legacy.core.gen.CatalogMetadata"
+            },
+            new String[] {
+              "type:br.pucpr.legacy.api.CatalogEndpoint",
+              "type:br.pucpr.legacy.core.spi.MemoryStore"
+            })) {
+      assertThat(bits(tipos.get(empate[0])[0]))
+          .as("anti-vacuidade: o golden empata " + empate[0] + " e " + empate[1])
+          .isEqualTo(bits(tipos.get(empate[1])[0]));
+    }
+    assertThat(bits(pacotes.get("pkg:br.pucpr.legacy.api")[0]))
+        .isEqualTo(bits(pacotes.get("pkg:br.pucpr.legacy.core.gen")[0]));
+    assertThat(bits(pacotes.get("pkg:br.pucpr.legacy.core")[0]))
+        .isEqualTo(bits(pacotes.get("pkg:br.pucpr.legacy.core.spi")[0]));
+
+    verificarEmpates(tipos);
+    verificarEmpates(pacotes);
+  }
+
+  private static void verificarEmpates(Map<String, double[]> ladoALado) {
+    final List<Map.Entry<String, double[]>> nos = List.copyOf(ladoALado.entrySet());
+    for (int i = 0; i < nos.size(); i++) {
+      for (int j = i + 1; j < nos.size(); j++) {
+        final double[] um = nos.get(i).getValue();
+        final double[] outro = nos.get(j).getValue();
+        if (bits(um[0]) == bits(outro[0])) {
+          assertThat(bits(um[1]))
+              .as(nos.get(i).getKey() + " e " + nos.get(j).getKey() + " empatam no golden")
+              .isEqualTo(bits(outro[1]));
+        }
+      }
+    }
+  }
+
+  private static long bits(double valor) {
+    return Double.doubleToRawLongBits(valor);
+  }
+
+  private Map<String, double[]> pageranksLadoALado(String arquivo, Mundo mundo) throws Exception {
+    final List<String> l = linhas(arquivo);
+    final JsonNode golden = inbound.readTree(l.get(1)).path("payload").path("nodes");
+    final String saida = despacharNoMundo(mundo, l.get(0));
+    final JsonNode emitido = inbound.readTree(saida).path("payload").path("nodes");
+    assertThat(emitido.size())
+        .as(arquivo + ": os nós emitidos; a resposta foi " + saida)
+        .isEqualTo(golden.size());
+    final Map<String, double[]> ladoALado = new LinkedHashMap<>();
+    for (int i = 0; i < golden.size(); i++) {
+      final String id = golden.get(i).path("id").asText();
+      assertThat(emitido.get(i).path("id").asText()).as(arquivo + ": o nó " + i).isEqualTo(id);
+      ladoALado.put(
+          id,
+          new double[] {
+            golden.get(i).path("pagerank").doubleValue(),
+            emitido.get(i).path("pagerank").doubleValue()
+          });
+    }
+    return ladoALado;
+  }
+
+  private static final Pattern PAGERANK = Pattern.compile("\"pagerank\":([-+.0-9eE]+)");
+
+  private void compararFatia(
+      String golden, String emitido, int vertices, Map<String, Integer> membros)
+      throws IOException {
+    final JsonNode nosGolden = inbound.readTree(golden).path("payload").path("nodes");
+    final JsonNode nosEmitidos = inbound.readTree(emitido).path("payload").path("nodes");
+    final double porNo =
+        AnalysisConstants.PAGERANK_DAMPING
+            / (1 - AnalysisConstants.PAGERANK_DAMPING)
+            * vertices
+            * AnalysisConstants.PAGERANK_TOLERANCE;
+    final boolean mesmaForma =
+        nosEmitidos.isArray()
+            && nosEmitidos.size() == nosGolden.size()
+            && tokens(emitido).size() == tokens(golden).size();
+    if (mesmaForma) {
+      final Map<String, double[]> ladoALado = new LinkedHashMap<>();
+      for (int i = 0; i < nosGolden.size(); i++) {
+        final String id = nosGolden.get(i).path("id").asText();
+        final double esperado = nosGolden.get(i).path("pagerank").doubleValue();
+        final double obtido = nosEmitidos.get(i).path("pagerank").doubleValue();
+        assertThat(obtido)
+            .as(id + ": dentro de d/(1−d)·N·TOL do oráculo, vezes os membros de um grupo")
+            .isCloseTo(esperado, within(porNo * membros.getOrDefault(id, 1)));
+        ladoALado.put(id, new double[] {esperado, obtido});
+      }
+      verificarEmpates(ladoALado);
+    }
+    assertThat(emitido)
+        .as("os bytes, com o pagerank emitido no lugar do golden")
+        .isEqualTo(mesmaForma ? substituirPageRank(golden, tokens(emitido)) : golden);
+  }
+
+  private static List<String> tokens(String linha) {
+    final List<String> encontrados = new ArrayList<>();
+    final Matcher m = PAGERANK.matcher(linha);
+    while (m.find()) {
+      encontrados.add(m.group(1));
+    }
+    return encontrados;
+  }
+
+  private static String substituirPageRank(String golden, List<String> emitidos) {
+    final Matcher m = PAGERANK.matcher(golden);
+    final StringBuilder saida = new StringBuilder();
+    int k = 0;
+    while (m.find()) {
+      m.appendReplacement(saida, Matcher.quoteReplacement("\"pagerank\":" + emitidos.get(k++)));
+    }
+    m.appendTail(saida);
+    return saida.toString();
+  }
+
+  @Test
+  void asQuarentaESeisDaFase32SaoAsElementDoDiretorio() throws IOException {
+    assertThat(DIRIGIDOS_DA_FASE_32)
+        .hasSize(46)
+        .isEqualTo(
+            new TreeSet<>(arquivos().stream().filter(a -> a.startsWith("element.")).toList()));
+    for (final String arquivo : DIRIGIDOS_DA_FASE_32) {
+      final List<String> l = linhas(arquivo);
+      assertThat(l).as(arquivo + ": requisição e resposta").hasSize(2);
+      assertThat(inbound.readTree(l.get(0)).path("payload").path("analysisId").asText())
+          .as(arquivo)
+          .isEqualTo(ID_DA_FIXTURE.value());
+    }
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(
+      strings = {
+        "element.dependencies.api-in.jsonl",
+        "element.dependencies.api-out.jsonl",
+        "element.dependencies.audited-in.jsonl",
+        "element.dependencies.audited-out.jsonl",
+        "element.dependencies.catalog-endpoint-in.jsonl",
+        "element.dependencies.catalog-endpoint-out.jsonl",
+        "element.dependencies.catalog-entry-in.jsonl",
+        "element.dependencies.catalog-entry-out.jsonl",
+        "element.dependencies.catalog-in.jsonl",
+        "element.dependencies.catalog-metadata-in.jsonl",
+        "element.dependencies.catalog-metadata-out.jsonl",
+        "element.dependencies.catalog-out.jsonl",
+        "element.dependencies.core-gen-in.jsonl",
+        "element.dependencies.core-gen-out.jsonl",
+        "element.dependencies.core-in.jsonl",
+        "element.dependencies.core-out.jsonl",
+        "element.dependencies.core-spi-in.jsonl",
+        "element.dependencies.core-spi-out.jsonl",
+        "element.dependencies.kind-in.jsonl",
+        "element.dependencies.kind-out.jsonl",
+        "element.dependencies.main-in.jsonl",
+        "element.dependencies.main-out.jsonl",
+        "element.dependencies.memory-store-in.jsonl",
+        "element.dependencies.memory-store-out.jsonl",
+        "element.dependencies.store-in.jsonl",
+        "element.dependencies.store-out.jsonl",
+        "element.dependencies.foreign-cursor.jsonl",
+        "element.dependencyEvidence.catalog-endpoint-catalog.jsonl",
+        "element.dependencyEvidence.catalog-store.jsonl",
+        "element.dependencyEvidence.main-string.jsonl",
+        "element.dependencyEvidence.no-pair.jsonl",
+        "element.describe.method.jsonl",
+        "element.describe.unknown.jsonl"
+      })
+  void asPaginasAsEvidenciasEAsRecusasDoInspetorBatemByteAByte(String arquivo) throws Exception {
+    final List<String> l = linhas(arquivo);
+    assertThat(l).as(arquivo + ": requisição e resposta").hasSize(2);
+
+    assertThat(despacharNoMundo(MULTI_MODULO.get(), l.get(0))).isEqualTo(l.get(1));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @CsvSource({
+    "element.describe.api.jsonl, 4",
+    "element.describe.core.jsonl, 4",
+    "element.describe.core-gen.jsonl, 4",
+    "element.describe.core-spi.jsonl, 4",
+    "element.describe.audited.jsonl, 9",
+    "element.describe.catalog.jsonl, 9",
+    "element.describe.catalog-endpoint.jsonl, 9",
+    "element.describe.catalog-entry.jsonl, 9",
+    "element.describe.catalog-metadata.jsonl, 9",
+    "element.describe.kind.jsonl, 9",
+    "element.describe.main.jsonl, 9",
+    "element.describe.memory-store.jsonl, 9",
+    "element.describe.store.jsonl, 9"
+  })
+  void osDetalhesDoMultiModuloBatemComOPageRankDentroDoLimite(String arquivo, int vertices)
+      throws Exception {
+    final List<String> l = linhas(arquivo);
+    assertThat(l).as(arquivo + ": requisição e resposta").hasSize(2);
+
+    compararDetalhe(l.get(1), despacharNoMundo(MULTI_MODULO.get(), l.get(0)), vertices);
+  }
+
+  @Test
+  void oPageRankDoDetalheEODaFatiaNoGoldenENoEmitido() throws Exception {
+    final Mundo mundo = MULTI_MODULO.get();
+    final Map<String, double[]> daFatia = new LinkedHashMap<>();
+    for (final String arquivo :
+        List.of(
+            "graph.slice.package.jsonl",
+            "graph.slice.type.jsonl",
+            "graph.slice.type-api.jsonl",
+            "graph.slice.type-core-gen.jsonl",
+            "graph.slice.type-core-spi.jsonl")) {
+      daFatia.putAll(pageranksLadoALado(arquivo, mundo));
+    }
+    final Map<String, double[]> doDetalhe = new LinkedHashMap<>();
+    for (final String arquivo : DIRIGIDOS_DA_FASE_32) {
+      final boolean detalheOk =
+          arquivo.startsWith("element.describe.")
+              && !arquivo.endsWith(".method.jsonl")
+              && !arquivo.endsWith(".unknown.jsonl");
+      if (!detalheOk) {
+        continue;
+      }
+      final List<String> l = linhas(arquivo);
+      final JsonNode golden = inbound.readTree(l.get(1)).path("payload");
+      final String saida = despacharNoMundo(mundo, l.get(0));
+      final JsonNode emitido = inbound.readTree(saida).path("payload");
+      assertThat(emitido.path("graph").path("pagerank").isNumber())
+          .as(arquivo + ": a resposta foi " + saida)
+          .isTrue();
+      doDetalhe.put(
+          golden.path("elementId").asText(),
+          new double[] {
+            golden.path("graph").path("pagerank").doubleValue(),
+            emitido.path("graph").path("pagerank").doubleValue()
+          });
+    }
+
+    assertThat(doDetalhe).as("os treze detalhes").hasSize(13);
+    for (final Map.Entry<String, double[]> detalhe : doDetalhe.entrySet()) {
+      final double[] fatia = daFatia.get(detalhe.getKey());
+      assertThat(fatia).as(detalhe.getKey() + ": a fatia desenha o nó").isNotNull();
+      assertThat(bits(detalhe.getValue()[0]))
+          .as(detalhe.getKey() + ": o golden do detalhe é o da fatia")
+          .isEqualTo(bits(fatia[0]));
+      assertThat(bits(detalhe.getValue()[1]))
+          .as(detalhe.getKey() + ": o detalhe emitido é o nó emitido, bit a bit")
+          .isEqualTo(bits(fatia[1]));
+    }
+    verificarEmpates(doDetalhe);
+  }
+
+  private void compararDetalhe(String golden, String emitido, int vertices) throws IOException {
+    final JsonNode doGolden = inbound.readTree(golden).path("payload").path("graph");
+    final JsonNode doEmitido = inbound.readTree(emitido).path("payload").path("graph");
+    final boolean mesmaForma =
+        doEmitido.path("pagerank").isNumber()
+            && tokens(emitido).size() == 1
+            && tokens(golden).size() == 1;
+    if (mesmaForma) {
+      final double porNo =
+          AnalysisConstants.PAGERANK_DAMPING
+              / (1 - AnalysisConstants.PAGERANK_DAMPING)
+              * vertices
+              * AnalysisConstants.PAGERANK_TOLERANCE;
+      assertThat(doEmitido.path("pagerank").doubleValue())
+          .as("dentro de d/(1−d)·N·TOL do oráculo")
+          .isCloseTo(doGolden.path("pagerank").doubleValue(), within(porNo));
+    }
+    assertThat(emitido)
+        .as("os bytes, com o pagerank emitido no lugar do golden")
+        .isEqualTo(mesmaForma ? substituirPageRank(golden, tokens(emitido)) : golden);
+  }
+
+  private static void escreverOMundoAgregado(Path repositorio) throws Exception {
+    try (var git = TestRepositories.init(repositorio)) {
+      for (final String prefixo : List.of("a", "b")) {
+        for (int i = 0; i <= 300; i++) {
+          final String pacote = prefixo + ".p" + String.format(Locale.ROOT, "%03d", i);
+          final String campo = "a.p000".equals(pacote) ? "  private b.p000.T next;\n\n" : "";
+          TestRepositories.write(
+              repositorio,
+              "src/main/java/" + pacote.replace('.', '/') + "/T.java",
+              "package " + pacote + ";\n\npublic class T {\n" + campo + "  public T() {}\n}\n");
+        }
+      }
+      TestRepositories.write(
+          repositorio,
+          "src/main/java/c/T.java",
+          "package c;\n\npublic class T {\n  private a.p000.T next;\n\n  public T() {}\n}\n");
+      TestRepositories.commitAll(git, "o mundo agregado\n");
+    }
+  }
+
+  @Test
+  void graphSlicePackageAggregatedBateComOPageRankDentroDoLimite() throws Exception {
+    final List<String> l = linhas("graph.slice.package-aggregated.jsonl");
+    assertThat(l).as("requisição e resposta").hasSize(2);
+    assertThat(inbound.readTree(l.get(0)).path("payload").path("analysisId").asText())
+        .isEqualTo(ID_DO_AGREGADO.value());
+
+    compararFatia(
+        l.get(1),
+        despacharNoMundo(AGREGADO.get(), l.get(0)),
+        603,
+        Map.of("pfx:a", 301, "pfx:b", 301));
   }
 
   @Test
@@ -578,7 +1101,7 @@ final class ProtocolFixtureTest {
   }
 
   @Test
-  void oDespachanteRegistraExatamenteOsSeisMetodosJaImplementados() {
+  void oDespachanteRegistraExatamenteOsDozeMetodosJaImplementados() {
     assertThat(dispatcher.registeredMethods())
         .containsExactlyInAnyOrder(
             "system.ping",
@@ -586,7 +1109,13 @@ final class ProtocolFixtureTest {
             "repository.describe",
             "analysis.start",
             "analysis.cancel",
-            "analysis.status");
+            "analysis.status",
+            "graph.slice",
+            "outline.children",
+            "graph.search",
+            "element.describe",
+            "element.dependencies",
+            "element.dependencyEvidence");
   }
 
   @Test

@@ -14,7 +14,7 @@ import {
   type StderrTail,
   stderrTailSchema,
 } from "./contracts";
-import { FakeBridgeError } from "./fake";
+import { FakeBridgeError } from "./fake/error";
 import { transport } from "./transport";
 
 type Contracts = typeof METHODS;

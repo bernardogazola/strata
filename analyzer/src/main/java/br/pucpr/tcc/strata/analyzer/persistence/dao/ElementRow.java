@@ -2,6 +2,7 @@ package br.pucpr.tcc.strata.analyzer.persistence.dao;
 
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.CodeElementId;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.ElementKind;
+import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.NameFold;
 import br.pucpr.tcc.strata.analyzer.sourceanalysis.model.TypeKind;
 import java.util.Objects;
 
@@ -38,5 +39,10 @@ public record ElementRow(
     if ((startLine == null) != (endLine == null)) {
       throw new IllegalArgumentException("start_line e end_line são null juntos: " + elementId);
     }
+  }
+
+  public String searchName() {
+    final boolean searchable = kind == ElementKind.PACKAGE || kind == ElementKind.TYPE;
+    return searchable && !isExternal ? NameFold.fold(simpleName) : null;
   }
 }

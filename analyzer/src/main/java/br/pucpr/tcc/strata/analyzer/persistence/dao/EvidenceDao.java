@@ -64,7 +64,7 @@ public final class EvidenceDao {
                   nullableLong(rows, "from_method_pk"),
                   nullableLong(rows, "to_method_pk"),
                   nullableLong(rows, "file_pk"),
-                  nullableInt(rows, "line"),
+                  Columns.nullableInt(rows, "line"),
                   ResolutionQuality.valueOf(rows.getString("resolution"))));
         }
       }
@@ -74,11 +74,6 @@ public final class EvidenceDao {
 
   private static Long nullableLong(ResultSet rows, String column) throws SQLException {
     final long value = rows.getLong(column);
-    return rows.wasNull() ? null : value;
-  }
-
-  private static Integer nullableInt(ResultSet rows, String column) throws SQLException {
-    final int value = rows.getInt(column);
     return rows.wasNull() ? null : value;
   }
 }

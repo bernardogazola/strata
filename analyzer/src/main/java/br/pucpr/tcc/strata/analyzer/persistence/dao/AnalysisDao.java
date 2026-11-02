@@ -148,24 +148,19 @@ public final class AnalysisDao {
         rows.getString("source_fingerprint"),
         rows.getInt("include_tests") == 1,
         HistoryScope.valueOf(rows.getString("history_scope")),
-        nullableInt(rows, "history_scope_commits"),
+        Columns.nullableInt(rows, "history_scope_commits"),
         new AnalysisCounters(
             rows.getInt("total_files"),
             rows.getInt("skipped_files"),
             rows.getInt("parse_failures"),
             rows.getInt("shallow_clone") == 1,
-            nullableInt(rows, "history_truncated_at")),
+            Columns.nullableInt(rows, "history_truncated_at")),
         rows.getString("failure_code"),
         rows.getString("failure_detail"));
   }
 
   private static Long nullableLong(ResultSet rows, String column) throws SQLException {
     final long value = rows.getLong(column);
-    return rows.wasNull() ? null : value;
-  }
-
-  private static Integer nullableInt(ResultSet rows, String column) throws SQLException {
-    final int value = rows.getInt(column);
     return rows.wasNull() ? null : value;
   }
 }

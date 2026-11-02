@@ -56,6 +56,7 @@ final class SchemaTest {
           "hotspot_metric",
           "hotspot_profile",
           "module_dependency",
+          "package_edge",
           "path_lineage",
           "path_rename",
           "provider_metadata",
@@ -66,7 +67,7 @@ final class SchemaTest {
           "tour_step",
           "tour_step_reason");
 
-  private static final int FOREIGN_KEYS = 48;
+  private static final int FOREIGN_KEYS = 51;
 
   private static final String FOREIGN_KEY_CHILDREN =
       """
@@ -141,14 +142,15 @@ final class SchemaTest {
             "kind",
             names(ElementKind.values()),
             "INSERT INTO code_element (analysis_pk, element_id, kind, simple_name, qualified_name,"
-                + " sort_key) VALUES (1, 'probe', ?, 'p', 'p', 'p')"),
+                + " sort_key, search_name) SELECT 1, 'probe', k, 'p', 'p', 'p',"
+                + " CASE WHEN k IN ('PACKAGE', 'TYPE') THEN 'p' END FROM (SELECT ? AS k)"),
         new EnumColumn(
             "code_element",
             "type_kind",
             names(TypeKind.values()),
             "INSERT INTO code_element (analysis_pk, element_id, kind, simple_name, qualified_name,"
-                + " sort_key, type_kind) VALUES (1, 'type:Probe', 'TYPE', 'Probe', 'Probe', 'Probe',"
-                + " ?)"),
+                + " sort_key, search_name, type_kind) VALUES (1, 'type:Probe', 'TYPE', 'Probe',"
+                + " 'Probe', 'Probe', 'probe', ?)"),
         new EnumColumn(
             "dependency",
             "type",
@@ -189,9 +191,11 @@ final class SchemaTest {
             + " 0, 'ALL')");
     final String tipo =
         "INSERT INTO code_element (id, analysis_pk, element_id, kind, simple_name, qualified_name,"
-            + " sort_key) VALUES (?, 1, ?, 'TYPE', ?, ?, ?)";
-    DaoTestDatabase.execute(banco, tipo, 1, "type:a.Source", "Source", "a.Source", "a.Source");
-    DaoTestDatabase.execute(banco, tipo, 2, "type:a.Target", "Target", "a.Target", "a.Target");
+            + " sort_key, search_name) VALUES (?, 1, ?, 'TYPE', ?, ?, ?, ?)";
+    DaoTestDatabase.execute(
+        banco, tipo, 1, "type:a.Source", "Source", "a.Source", "a.Source", "source");
+    DaoTestDatabase.execute(
+        banco, tipo, 2, "type:a.Target", "Target", "a.Target", "a.Target", "target");
     DaoTestDatabase.execute(
         banco,
         "INSERT INTO dependency (id, analysis_pk, source_pk, target_pk, type, resolution)"
@@ -210,7 +214,7 @@ final class SchemaTest {
   }
 
   @Test
-  void temExatamenteAs29TabelasDoMvp() throws Exception {
+  void temExatamenteAs30TabelasDoMvp() throws Exception {
     try (Connection banco = DaoTestDatabase.create(temp)) {
       assertThat(TestCaches.userTables(banco)).isEqualTo(TABLES);
     }

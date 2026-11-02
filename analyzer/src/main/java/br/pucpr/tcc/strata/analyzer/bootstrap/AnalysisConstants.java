@@ -110,6 +110,46 @@ public final class AnalysisConstants {
 
   public static final long MAX_COMMIT_GRAPH_BYTES = 268_435_456L;
 
+  public static final double PAGERANK_DAMPING = 0.85d;
+
+  public static final double PAGERANK_TOLERANCE = 1e-10d;
+
+  public static final int PAGERANK_MAX_ITER = 200;
+
+  public static final int BETWEENNESS_MAX_NODES = 1_000;
+
+  public static final int BETWEENNESS_MAX_EDGES = 20_000;
+
+  public static final int GRAPH_READ_CHECK_STRIDE_ROWS = 8_192;
+
+  public static final int GRAPH_SLICE_PACKAGE_MAX_NODES = 300;
+
+  public static final int GRAPH_SLICE_PACKAGE_MAX_EDGES = 1_200;
+
+  public static final int GRAPH_SLICE_TYPE_MAX_NODES = 1_000;
+
+  public static final int GRAPH_SLICE_TYPE_MAX_EDGES = 5_000;
+
+  public static final int OUTLINE_PAGE_DEFAULT = 200;
+
+  public static final int OUTLINE_PAGE_MAX = 500;
+
+  public static final int SEARCH_RESULTS_MAX = 50;
+
+  public static final int MAX_CURSOR_CHARS = 256;
+
+  public static final int MAX_SEARCH_QUERY_CODE_POINTS = 128;
+
+  public static final int DEPENDENCY_PAGE_DEFAULT = 500;
+
+  public static final int DEPENDENCY_PAGE_MAX = 2_000;
+
+  public static final int DEPENDENCY_PAGE_MAX_BYTES = 4_194_304;
+
+  public static final int DEPENDENCY_EVIDENCE_RESULTS_MAX = 50;
+
+  public static final int ELEMENT_METHODS_MAX = 1_000;
+
   private AnalysisConstants() {}
 
   public static Map<String, Object> asMetadata() {

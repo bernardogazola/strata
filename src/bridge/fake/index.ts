@@ -7,6 +7,10 @@ import {
 } from "@/protocol/envelope";
 import type { ProtocolError } from "@/protocol/errors";
 import { EVENTS, METHODS, PROTOCOL_METHODS } from "@/protocol/registry";
+import { FakeBridgeError } from "./error";
+
+// biome-ignore lint/performance/noBarrelFile: reexporta só a classe de erro que este módulo lança
+export { FakeBridgeError } from "./error";
 
 const JSONL_SUFFIX = /\.jsonl$/;
 const PATH_STEM = /([^/]+)\.jsonl$/;
@@ -17,11 +21,18 @@ const FIXTURE_SOURCES: Record<string, string> = import.meta.glob(
 );
 
 const DISCRIMINANTS: Partial<Record<ProtocolMethod, readonly string[]>> = {
+  "element.dependencies": ["elementId", "direction"],
+  "element.dependencyEvidence": ["source", "target"],
+  "element.describe": ["elementId"],
   "graph.slice": ["level", "parentId"],
   "outline.children": ["parentId"],
 };
 
-interface Transcript {
+const UNSERVED: ReadonlySet<string> = new Set([
+  "graph.slice.package-aggregated",
+]);
+
+export interface Transcript {
   readonly caseName: string;
   readonly request: Record<string, unknown>;
   readonly result: unknown;
@@ -30,16 +41,6 @@ interface Transcript {
 interface EventTranscript {
   readonly caseName: string;
   readonly payload: unknown;
-}
-
-export class FakeBridgeError extends Error {
-  readonly protocolError: ProtocolError;
-
-  constructor(protocolError: ProtocolError) {
-    super(protocolError.detail ?? protocolError.code);
-    this.name = "FakeBridgeError";
-    this.protocolError = protocolError;
-  }
 }
 
 const parseFrames = (text: string): Record<string, unknown>[] =>
@@ -70,9 +71,13 @@ const caseNameOf = (stem: string, topic: string): string =>
 
 const EVENT_NAMES = Object.keys(EVENTS) as ProtocolEventName[];
 
-const readMethodTranscripts = (): Map<ProtocolMethod, Transcript[]> => {
+export const readMethodTranscripts = (
+  sources: Readonly<Record<string, string>>,
+  unserved: ReadonlySet<string>
+): Map<ProtocolMethod, Transcript[]> => {
   const routes = new Map<ProtocolMethod, Transcript[]>();
-  for (const [filePath, text] of Object.entries(FIXTURE_SOURCES)) {
+  const unservedSeen = new Set<string>();
+  for (const [filePath, text] of Object.entries(sources)) {
     const stem = stemOf(filePath);
     const topic = resolveTopic(stem, PROTOCOL_METHODS);
     if (topic === undefined) {
@@ -90,20 +95,29 @@ const readMethodTranscripts = (): Map<ProtocolMethod, Transcript[]> => {
     const parsedRequest = requestEnvelopeSchema.parse(request);
     const parsedResponse = okResponseEnvelopeSchema.parse(response);
     const contract = METHODS[method];
+    const parsedParams = contract.params.parse(parsedRequest.payload);
+    const parsedResult =
+      contract.result === null
+        ? parsedResponse.payload
+        : contract.result.parse(parsedResponse.payload);
+    if (unserved.has(stem)) {
+      unservedSeen.add(stem);
+      continue;
+    }
     routes.set(method, [
       ...(routes.get(method) ?? []),
       {
         caseName: caseNameOf(stem, topic),
-        request: contract.params.parse(parsedRequest.payload) as Record<
-          string,
-          unknown
-        >,
-        result:
-          contract.result === null
-            ? parsedResponse.payload
-            : contract.result.parse(parsedResponse.payload),
+        request: parsedParams as Record<string, unknown>,
+        result: parsedResult,
       },
     ]);
+  }
+  const stale = [...unserved].filter((stem) => !unservedSeen.has(stem));
+  if (stale.length > 0) {
+    throw new Error(
+      `UNSERVED cita fixtures que não existem: ${stale.join(", ")}`
+    );
   }
   return routes;
 };
@@ -133,7 +147,7 @@ const readEventTranscripts = (): Map<ProtocolEventName, EventTranscript[]> => {
   return routes;
 };
 
-const METHOD_ROUTES = readMethodTranscripts();
+const METHOD_ROUTES = readMethodTranscripts(FIXTURE_SOURCES, UNSERVED);
 const EVENT_ROUTES = readEventTranscripts();
 
 const matchesDiscriminants = (
@@ -162,11 +176,23 @@ const findOverride = (
   );
 };
 
+const recordRequest = (method: string, payload: unknown): void => {
+  if (import.meta.env.DEV && window.__STRATA_FAKE_LOG__ !== undefined) {
+    window.__STRATA_FAKE_LOG__ = [
+      ...window.__STRATA_FAKE_LOG__,
+      { method, payload },
+    ];
+  }
+};
+
 const reject = (protocolError: ProtocolError): Promise<never> =>
   Promise.reject(new FakeBridgeError(protocolError));
 
 const isProtocolMethod = (method: string): method is ProtocolMethod =>
   Object.hasOwn(METHODS, method);
+
+const isProtocolEventName = (event: string): event is ProtocolEventName =>
+  Object.hasOwn(EVENTS, event);
 
 export const fakeBridgeRoutes = (): Record<string, string[]> =>
   Object.fromEntries(
@@ -189,6 +215,7 @@ export const fakeRequest = (
   method: string,
   payload: unknown
 ): Promise<unknown> => {
+  recordRequest(method, payload);
   if (!isProtocolMethod(method)) {
     return reject({
       code: "PROTO_UNKNOWN_METHOD",
@@ -250,3 +277,16 @@ export const fakeEmit = (
   }
   return true;
 };
+
+if (import.meta.env.DEV) {
+  window.__STRATA_FAKE_EMIT__ = (event, payload) => {
+    if (!isProtocolEventName(event)) {
+      throw new Error(`o bridge falso não tem evento chamado ${event}`);
+    }
+    EVENTS[event].parse(payload);
+    for (const listener of listeners) {
+      listener({ event, payload });
+    }
+    return listeners.size;
+  };
+}

@@ -298,7 +298,8 @@
 
   [role="treeitem"],
   [role="option"],
-  [role^="menuitem"] {
+  [role^="menuitem"],
+  [data-slot="dependency-row"] {
     --focus-ring-offset: -2px;
   }
 

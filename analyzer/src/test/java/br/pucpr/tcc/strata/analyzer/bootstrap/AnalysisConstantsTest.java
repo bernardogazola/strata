@@ -27,6 +27,53 @@ final class AnalysisConstantsTest {
   }
 
   @Test
+  void asConstantesDoGrafoDaFase30SaoEcoadasNosMetadados() {
+    assertThat(AnalysisConstants.asMetadata())
+        .containsAllEntriesOf(
+            Map.ofEntries(
+                Map.entry("PAGERANK_DAMPING", 0.85d),
+                Map.entry("PAGERANK_TOLERANCE", 1e-10d),
+                Map.entry("PAGERANK_MAX_ITER", 200),
+                Map.entry("BETWEENNESS_MAX_NODES", 1_000),
+                Map.entry("BETWEENNESS_MAX_EDGES", 20_000),
+                Map.entry("GRAPH_READ_CHECK_STRIDE_ROWS", 8_192)));
+  }
+
+  @Test
+  void osLimitesDasLeiturasDaFase31SaoEcoadosNosMetadados() {
+    assertThat(AnalysisConstants.asMetadata())
+        .containsAllEntriesOf(
+            Map.ofEntries(
+                Map.entry("GRAPH_SLICE_PACKAGE_MAX_NODES", 300),
+                Map.entry("GRAPH_SLICE_PACKAGE_MAX_EDGES", 1_200),
+                Map.entry("GRAPH_SLICE_TYPE_MAX_NODES", 1_000),
+                Map.entry("GRAPH_SLICE_TYPE_MAX_EDGES", 5_000),
+                Map.entry("OUTLINE_PAGE_DEFAULT", 200),
+                Map.entry("OUTLINE_PAGE_MAX", 500),
+                Map.entry("SEARCH_RESULTS_MAX", 50),
+                Map.entry("MAX_CURSOR_CHARS", 256),
+                Map.entry("MAX_SEARCH_QUERY_CODE_POINTS", 128)))
+        .doesNotContainKeys(
+            "GRAPH_SLICE_EXCEPTIONAL_MAX_NODES",
+            "GRAPH_SLICE_EXCEPTIONAL_MAX_EDGES",
+            "MAX_CURSOR_BYTES",
+            "MAX_SEARCH_QUERY_CHARS");
+  }
+
+  @Test
+  void osLimitesDasLeiturasDaFase32SaoEcoadosNosMetadados() {
+    assertThat(AnalysisConstants.asMetadata())
+        .containsAllEntriesOf(
+            Map.ofEntries(
+                Map.entry("DEPENDENCY_PAGE_DEFAULT", 500),
+                Map.entry("DEPENDENCY_PAGE_MAX", 2_000),
+                Map.entry("DEPENDENCY_PAGE_MAX_BYTES", 4_194_304),
+                Map.entry("DEPENDENCY_EVIDENCE_RESULTS_MAX", 50),
+                Map.entry("ELEMENT_METHODS_MAX", 1_000),
+                Map.entry("DEPENDENCY_EVIDENCE_CAP", 20)));
+  }
+
+  @Test
   void oTetoDeEntradasDoBancoDeObjetosSubstituiODeObjetosSoltos() {
     assertThat(AnalysisConstants.asMetadata()).doesNotContainKey("MAX_LOOSE_OBJECTS");
   }

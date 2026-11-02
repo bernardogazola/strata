@@ -27,6 +27,10 @@ const integerFormatter = new Intl.NumberFormat(LOCALE, {
   maximumFractionDigits: 0,
 });
 
+const decimalFormatter = new Intl.NumberFormat(LOCALE, {
+  maximumFractionDigits: 1,
+});
+
 const percentFormatter = new Intl.NumberFormat(LOCALE, {
   maximumFractionDigits: 0,
   style: "percent",
@@ -48,6 +52,9 @@ export const formatMonthYear = (value: Date): string =>
 
 export const formatInteger = (value: number): string =>
   integerFormatter.format(value);
+
+export const formatDecimal = (value: number): string =>
+  decimalFormatter.format(value);
 
 export const formatPercent = (ratio: number): string =>
   percentFormatter.format(ratio);

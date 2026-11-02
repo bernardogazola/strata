@@ -1,7 +1,11 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  type InfiniteData,
+  useInfiniteQuery,
+  useQuery,
+} from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import {
-  type ReactNode,
+  type RefObject,
   useCallback,
   useEffect,
   useRef,
@@ -10,12 +14,10 @@ import {
 import { SECONDARY_ACTION_CLASS } from "@/components/action-styles";
 import { buttonVariants } from "@/components/ui/button";
 import { ErrorSurface } from "@/features/errors/error-surface";
+import { elementDisplayLabel } from "@/features/graph/adapter";
 import { ElementLabel } from "@/features/graph/element-label";
 import { GraphPanel } from "@/features/graph/graph-panel";
-import {
-  NodeSummary,
-  type NotOnMapReason,
-} from "@/features/graph/node-summary";
+import { ElementInspector } from "@/features/inspector/element-inspector";
 import {
   ArchitectureOutline,
   type OutlineHandle,
@@ -25,16 +27,20 @@ import {
   AnalysisScreen,
   type AnalysisWorkspaceProps,
 } from "@/features/progress/analysis-screen";
-import { CompletenessCaveat } from "@/features/progress/completeness-caveat";
+import {
+  CompletenessCaveat,
+  hasCompletenessCaveat,
+} from "@/features/progress/completeness-caveat";
 import { PrepareScreen } from "@/features/repository/prepare-screen";
 import { t } from "@/i18n/messages";
 import { cn } from "@/lib/utils";
-import type { ElementKind } from "@/protocol/enums";
+import type { DependencyDirection, ElementKind } from "@/protocol/enums";
 import type { ProtocolError } from "@/protocol/errors";
-import type { GraphNode, GraphSlice, SearchHit } from "@/protocol/graph";
+import type { GraphSlice, OutlinePage, SearchHit } from "@/protocol/graph";
 import {
   type GraphViewParams,
   graphSliceQueryOptions,
+  outlineChildrenQueryOptions,
 } from "@/queries/options";
 import { AppHeader } from "./app-header";
 import { AppShell } from "./app-shell";
@@ -43,10 +49,15 @@ import {
   backToLevelOne,
   changesView,
   expandPackage,
+  type InspectorTab,
+  type RevealTarget,
   resolveGraphView,
+  revealElement,
   revealSearchHit,
   type SearchTransition,
+  selectDirection,
   selectElement,
+  selectTab,
   selectWhereDrawn,
 } from "./repository-search";
 import { SkipToOutline } from "./skip-to-outline";
@@ -54,47 +65,36 @@ import { SkipToOutline } from "./skip-to-outline";
 const ROUTE_ID = "/repository/$handle";
 const routeApi = getRouteApi(ROUTE_ID);
 
-interface FocusedNode {
-  readonly node: GraphNode | null;
+const LEVEL_ONE: GraphViewParams = { level: "PACKAGE" };
 
-  readonly notOnMap: NotOnMapReason | undefined;
-}
-
-const describeFocus = (
-  slice: GraphSlice,
-  elementId: string | null
-): FocusedNode => {
-  if (elementId === null) {
-    return { node: null, notOnMap: undefined };
-  }
-  const node = slice.nodes.find((candidate) => candidate.id === elementId);
-  if (node !== undefined) {
-    return { node, notOnMap: undefined };
-  }
-  if (slice.aggregated) {
-    return { node: null, notOnMap: "aggregated" };
-  }
-  return { node: null, notOnMap: slice.truncated ? "truncated" : undefined };
-};
-
-function ParentCrumb({
-  analysisId,
-  parentId,
-}: {
-  readonly analysisId: string;
-  readonly parentId: string | undefined;
-}) {
-  const queryClient = useQueryClient();
-  const levelOne = queryClient.getQueryData(
-    graphSliceQueryOptions(analysisId, { level: "PACKAGE" }).queryKey
+const useParentLabel = (
+  analysisId: string,
+  parentId: string | undefined
+): string | undefined => {
+  const findInSlice = useCallback(
+    (slice: GraphSlice) =>
+      slice.nodes.find((node) => node.id === parentId)?.label ?? null,
+    [parentId]
   );
-  const label = levelOne?.nodes.find((node) => node.id === parentId)?.label;
-
-  if (label === undefined) {
-    return <>{t.shell.breadcrumb.selectedPackage}</>;
-  }
-  return <ElementLabel kind="PACKAGE" label={label} />;
-}
+  const findInOutline = useCallback(
+    (data: InfiniteData<OutlinePage>) =>
+      data.pages
+        .flatMap((page) => page.items)
+        .find((item) => item.id === parentId)?.label ?? null,
+    [parentId]
+  );
+  const { data: sliceLabel } = useQuery({
+    ...graphSliceQueryOptions(analysisId, LEVEL_ONE),
+    enabled: false,
+    select: findInSlice,
+  });
+  const { data: outlineLabel } = useInfiniteQuery({
+    ...outlineChildrenQueryOptions(analysisId, null),
+    enabled: false,
+    select: findInOutline,
+  });
+  return sliceLabel ?? outlineLabel ?? undefined;
+};
 
 const useFocusOnViewChange = (viewKey: string) => {
   const targetRef = useRef<HTMLSpanElement>(null);
@@ -115,6 +115,37 @@ const useFocusOnViewChange = (viewKey: string) => {
 
 const CURRENT_CRUMB_CLASS = "rounded-sm text-muted-foreground";
 
+function ParentCrumb({
+  analysisId,
+  currentRef,
+  parentId,
+}: {
+  readonly analysisId: string;
+  readonly currentRef: RefObject<HTMLSpanElement | null>;
+  readonly parentId: string | undefined;
+}) {
+  const label = useParentLabel(analysisId, parentId);
+  return (
+    <span
+      aria-current="page"
+      className={cn(CURRENT_CRUMB_CLASS, "min-w-0 truncate")}
+      ref={currentRef}
+      tabIndex={-1}
+      title={
+        label === undefined
+          ? t.shell.breadcrumb.selectedPackage
+          : elementDisplayLabel("PACKAGE", label)
+      }
+    >
+      {label === undefined ? (
+        t.shell.breadcrumb.selectedPackage
+      ) : (
+        <ElementLabel kind="PACKAGE" label={label} />
+      )}
+    </span>
+  );
+}
+
 function MapBreadcrumb({
   analysisId,
   view,
@@ -128,9 +159,9 @@ function MapBreadcrumb({
   );
 
   return (
-    <nav aria-label={t.shell.breadcrumb.label}>
-      <ol className="flex items-center gap-2 text-sm">
-        <li>
+    <nav aria-label={t.shell.breadcrumb.label} className="min-w-0">
+      <ol className="flex min-w-0 items-center gap-2 whitespace-nowrap text-sm">
+        <li className="shrink-0">
           {atRoot ? (
             <span
               aria-current="page"
@@ -152,53 +183,19 @@ function MapBreadcrumb({
           )}
         </li>
         {atRoot ? null : (
-          <li className="flex items-center gap-2">
-            <span aria-hidden="true" className="text-muted-foreground">
+          <li className="flex min-w-0 items-center gap-2">
+            <span aria-hidden="true" className="shrink-0 text-muted-foreground">
               /
             </span>
-            <span
-              aria-current="page"
-              className={CURRENT_CRUMB_CLASS}
-              ref={currentRef}
-              tabIndex={-1}
-            >
-              <ParentCrumb analysisId={analysisId} parentId={view.parentId} />
-            </span>
+            <ParentCrumb
+              analysisId={analysisId}
+              currentRef={currentRef}
+              parentId={view.parentId}
+            />
           </li>
         )}
       </ol>
     </nav>
-  );
-}
-
-function FocusedNodeSummary({
-  analysisId,
-  caveat,
-  focus,
-  onExpand,
-  view,
-}: {
-  readonly analysisId: string;
-  readonly caveat: ReactNode;
-  readonly focus: string | null;
-  readonly onExpand: (elementId: string) => void;
-  readonly view: GraphViewParams;
-}) {
-  const selectFocus = useCallback(
-    (slice: GraphSlice) => describeFocus(slice, focus),
-    [focus]
-  );
-  const { data } = useQuery({
-    ...graphSliceQueryOptions(analysisId, view),
-    select: selectFocus,
-  });
-  return (
-    <NodeSummary
-      caveat={caveat}
-      node={data?.node ?? null}
-      notOnMap={data?.notOnMap}
-      onExpand={onExpand}
-    />
   );
 }
 
@@ -238,6 +235,18 @@ function RepositoryWorkspace({ header, report }: AnalysisWorkspaceProps) {
     (hit: SearchHit) => go(revealSearchHit(hit)),
     [go]
   );
+  const onRevealRow = useCallback(
+    (target: RevealTarget) => go(revealElement(target)),
+    [go]
+  );
+  const onSelectTab = useCallback(
+    (tab: InspectorTab) => go(selectTab(tab)),
+    [go]
+  );
+  const onSelectDirection = useCallback(
+    (direction: DependencyDirection) => go(selectDirection(direction)),
+    [go]
+  );
   const onSkip = useCallback(() => outlineRef.current?.focus(), []);
 
   return (
@@ -249,11 +258,20 @@ function RepositoryWorkspace({ header, report }: AnalysisWorkspaceProps) {
         />
       }
       inspector={
-        <FocusedNodeSummary
+        <ElementInspector
           analysisId={analysisId}
-          caveat={<CompletenessCaveat compact report={report} />}
+          caveat={
+            hasCompletenessCaveat(report) ? (
+              <CompletenessCaveat compact report={report} />
+            ) : undefined
+          }
+          direction={search.direction}
           focus={focus}
           onExpand={onExpand}
+          onReveal={onRevealRow}
+          onSelectDirection={onSelectDirection}
+          onSelectTab={onSelectTab}
+          tab={search.tab}
           view={view}
         />
       }

@@ -8,10 +8,8 @@ import {
   type CacheInvalidationReason,
   cacheInvalidationReasonSchema,
   dependencyDirectionSchema,
-  dependencyTypeSchema,
   elementKindSchema,
   graphLevelSchema,
-  resolutionQualitySchema,
   stageStatusSchema,
 } from "./enums";
 import {
@@ -22,6 +20,8 @@ import {
 } from "./envelope";
 import { type ErrorCode, protocolErrorSchema } from "./errors";
 import {
+  DEPENDENCY_EVIDENCE_RESULTS_MAX,
+  DEPENDENCY_PAGE_MAX,
   dependencyEvidenceResultSchema,
   dependencyPageSchema,
   elementDetailSchema,
@@ -37,10 +37,11 @@ import {
 import {
   analysisIdSchema,
   cursorSchema,
-  edgeIdSchema,
   elementIdSchema,
+  packageOrTypeIdSchema,
   percentileSchema,
   searchQuerySchema,
+  typeIdSchema,
 } from "./primitives";
 import {
   analysisConfigurationSchema,
@@ -106,23 +107,37 @@ export const METHODS = {
       analysisId: analysisIdSchema,
       cursor: cursorSchema.optional(),
       direction: dependencyDirectionSchema,
-      elementId: elementIdSchema,
-      limit: z.number().int().positive().max(2000).optional(),
+      elementId: packageOrTypeIdSchema,
+      limit: z.number().int().positive().max(DEPENDENCY_PAGE_MAX).optional(),
     }),
     requiresRepository: false,
     result: dependencyPageSchema,
   },
   "element.dependencyEvidence": {
-    params: z.strictObject({
-      analysisId: analysisIdSchema,
-      edgeId: edgeIdSchema,
-      limit: z.number().int().positive().max(50).optional(),
-    }),
+    params: z
+      .strictObject({
+        analysisId: analysisIdSchema,
+        limit: z
+          .number()
+          .int()
+          .positive()
+          .max(DEPENDENCY_EVIDENCE_RESULTS_MAX)
+          .optional(),
+        source: typeIdSchema,
+        target: typeIdSchema,
+      })
+      .refine(({ source, target }) => source !== target, {
+        error: "source e target precisam ser diferentes",
+        path: ["target"],
+      }),
     requiresRepository: false,
     result: dependencyEvidenceResultSchema,
   },
   "element.describe": {
-    params: elementRefSchema,
+    params: z.strictObject({
+      analysisId: analysisIdSchema,
+      elementId: packageOrTypeIdSchema,
+    }),
     requiresRepository: false,
     result: elementDetailSchema,
   },
@@ -155,10 +170,8 @@ export const METHODS = {
   "graph.slice": {
     params: z.strictObject({
       analysisId: analysisIdSchema,
-      edgeTypes: z.array(dependencyTypeSchema).optional(),
       level: graphLevelSchema,
-      limit: z.number().int().positive().max(5000).optional(),
-      minResolution: resolutionQualitySchema.optional(),
+      limit: z.number().int().positive().max(1000).optional(),
       parentId: elementIdSchema.optional(),
     }),
     requiresRepository: false,

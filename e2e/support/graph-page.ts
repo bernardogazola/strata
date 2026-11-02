@@ -7,10 +7,18 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
-import type { GraphSlice, OutlinePage } from "@/protocol/graph";
+import type { DependencyDirection } from "@/protocol/enums";
+import type {
+  DependencyEvidenceResult,
+  DependencyPage,
+  ElementDetail,
+  GraphSlice,
+  OutlinePage,
+} from "@/protocol/graph";
 import {
   type AnalysisStatusReport,
   analysisStatusReportSchema,
+  type RepositoryDescription,
 } from "@/protocol/repository";
 import { recordGesture } from "./frames";
 import { mulberry32 } from "./synthetic-slice";
@@ -165,7 +173,38 @@ export interface StatusOverride {
   readonly result: AnalysisStatusReport;
 }
 
+export interface DescribeOverride {
+  readonly method: "repository.describe";
+  readonly request: Record<string, never>;
+  readonly result: RepositoryDescription;
+}
+
+export interface ElementDescribeOverride {
+  readonly method: "element.describe";
+  readonly request: { readonly elementId: string };
+  readonly result: ElementDetail;
+}
+
+export interface DependenciesOverride {
+  readonly method: "element.dependencies";
+  readonly request: {
+    readonly direction: DependencyDirection;
+    readonly elementId: string;
+  };
+  readonly result: DependencyPage;
+}
+
+export interface EvidenceOverride {
+  readonly method: "element.dependencyEvidence";
+  readonly request: { readonly source: string; readonly target: string };
+  readonly result: DependencyEvidenceResult;
+}
+
 export type TranscriptOverride =
+  | DependenciesOverride
+  | DescribeOverride
+  | ElementDescribeOverride
+  | EvidenceOverride
   | SliceOverride
   | OutlineOverride
   | StatusOverride;
@@ -174,18 +213,15 @@ const mapReadyStatus = (): StatusOverride => {
   const report = analysisStatusReportSchema.parse(
     fixtureResponse("analysis.status.completed.jsonl")
   );
-  return {
-    method: "analysis.status",
-    request: {},
-    result: {
-      ...report,
-      stages: report.stages.map((stage) =>
-        stage.stage === "STRUCTURAL_GRAPH"
-          ? { ...stage, status: "COMPLETED" }
-          : stage
-      ),
-    },
-  };
+  const graph = report.stages.find(
+    (stage) => stage.stage === "STRUCTURAL_GRAPH"
+  );
+  if (report.status !== "COMPLETED" || graph?.status !== "COMPLETED") {
+    throw new Error(
+      `analysis.status.completed.jsonl não abre o mapa: execução ${report.status}, STRUCTURAL_GRAPH ${graph?.status}`
+    );
+  }
+  return { method: "analysis.status", request: {}, result: report };
 };
 
 export const MAP_READY_STATUS = mapReadyStatus();

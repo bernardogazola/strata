@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
+import { gunzipSync } from "node:zlib";
 import {
+  type Browser,
   type BrowserContextOptions,
   expect,
   type Page,
@@ -13,9 +16,15 @@ import {
   GRAPH_SLICE_BUDGETS,
   type GraphSlice,
   graphSliceSchema,
+  outlinePageSchema,
 } from "@/protocol/graph";
+import { repositoryDescriptionSchema } from "@/protocol/repository";
+import { DRILLED_PACKAGE_ID } from "@/test/fixture-graph";
 import {
   BENCHMARK_OUT_ENV,
+  type BenchmarkEnvironment,
+  type BenchmarkRecord,
+  benchmarkOutputPath,
   benchmarkTypeBudget,
   captureEnvironment,
   createBenchmarkRecord,
@@ -40,6 +49,7 @@ import {
   findEmptyPoint,
   fitGraph,
   fixtureNodeIds,
+  fixtureResponse,
   GESTURE_INPUT,
   GRAPH_CONTAINER,
   listClickableNodes,
@@ -54,6 +64,7 @@ import {
   searchOf,
   serveMap,
   serveSlices,
+  serveTranscripts,
   settle,
   setZoom,
   styleOf,
@@ -72,8 +83,7 @@ import {
 
 const ANALYSIS_ID = "an_01JQ8Z9K3M4N5P6Q7R8S9T0V1W";
 const LEVEL_ONE_URL = `/repository/repo_AAAAAAAAAAAAAAAAAAAAAQ?analysis=${ANALYSIS_ID}`;
-const ORDERS_ID = "pkg:br.pucpr.orders";
-const BILLING_ID = "pkg:br.pucpr.billing";
+const DRILLED_ID = DRILLED_PACKAGE_ID;
 
 const CYTOSCAPE_STYLESHEET_ID = "__________cytoscape_stylesheet";
 const SELECTED_BORDER_WIDTH = `${GRAPH_STYLE.node.selectedBorderWidth}px`;
@@ -86,6 +96,7 @@ const SOFTWARE_RENDERER = /swiftshader/i;
 
 const PACKAGE_IDS = fixtureNodeIds("graph.slice.package.jsonl");
 const TYPE_IDS = fixtureNodeIds("graph.slice.type.jsonl");
+const OTHER_ID = PACKAGE_IDS.find((id) => id !== DRILLED_ID) ?? "";
 
 const sha256 = (text: string): string =>
   createHash("sha256").update(text).digest("hex");
@@ -95,20 +106,22 @@ const contextOptionsOf = (testInfo: TestInfo): BrowserContextOptions => {
   return { baseURL, deviceScaleFactor, viewport };
 };
 
-const expandOrders = async (page: Page): Promise<void> => {
-  const orders = await renderedPosition(page, ORDERS_ID);
-  await page.mouse.dblclick(orders.x, orders.y);
+const expandDrilled = async (page: Page): Promise<void> => {
+  const drilled = await renderedPosition(page, DRILLED_ID);
+  await page.mouse.dblclick(drilled.x, drilled.y);
   await expect
     .poll(() => searchOf(page))
-    .toMatchObject({ level: "TYPE", parent: ORDERS_ID });
+    .toMatchObject({ level: "TYPE", parent: DRILLED_ID });
   await expectGraph(page, TYPE_IDS);
 };
 
-test("o nível 1 da fixture desenha os três pacotes", async ({ page }) => {
+test("o nível 1 da fixture desenha os quatro pacotes do multi-module", async ({
+  page,
+}) => {
   await page.goto(LEVEL_ONE_URL);
 
   await expectGraph(page, PACKAGE_IDS);
-  expect(PACKAGE_IDS).toHaveLength(3);
+  expect(PACKAGE_IDS).toHaveLength(4);
 });
 
 test("o duplo clique em um pacote navega para os tipos dele e os desenha", async ({
@@ -117,12 +130,12 @@ test("o duplo clique em um pacote navega para os tipos dele e os desenha", async
   await page.goto(LEVEL_ONE_URL);
   await expectGraph(page, PACKAGE_IDS);
 
-  await expandOrders(page);
+  await expandDrilled(page);
 
   expect(searchOf(page)).toMatchObject({
     analysis: ANALYSIS_ID,
     level: "TYPE",
-    parent: ORDERS_ID,
+    parent: DRILLED_ID,
   });
 });
 
@@ -131,7 +144,7 @@ test("voltar restaura o nível 1 do cache, sem pedir a fatia de novo", async ({
 }) => {
   await page.goto(LEVEL_ONE_URL);
   await expectGraph(page, PACKAGE_IDS);
-  await expandOrders(page);
+  await expandDrilled(page);
   const requestsBeforeBack = await countMarks(page, GRAPH_PERF.request);
 
   await page.goBack();
@@ -147,23 +160,23 @@ test("um clique seleciona o nó: focus na URL e a borda de 4 px", async ({
 }) => {
   await page.goto(LEVEL_ONE_URL);
   await expectGraph(page, PACKAGE_IDS);
-  expect(await styleOf(page, BILLING_ID, "border-width")).not.toBe(
+  expect(await styleOf(page, OTHER_ID, "border-width")).not.toBe(
     SELECTED_BORDER_WIDTH
   );
-  const billing = await renderedPosition(page, BILLING_ID);
+  const other = await renderedPosition(page, OTHER_ID);
 
-  await page.mouse.click(billing.x, billing.y);
+  await page.mouse.click(other.x, other.y);
 
-  await expect.poll(() => searchOf(page)).toMatchObject({ focus: BILLING_ID });
+  await expect.poll(() => searchOf(page)).toMatchObject({ focus: OTHER_ID });
   await expect
-    .poll(() => styleOf(page, BILLING_ID, "border-width"))
+    .poll(() => styleOf(page, OTHER_ID, "border-width"))
     .toBe(SELECTED_BORDER_WIDTH);
 });
 
 test("Enter no botão do inspetor expande, e o foco vai para a trilha e não para o <body>", async ({
   page,
 }) => {
-  await page.goto(`${LEVEL_ONE_URL}&focus=${ORDERS_ID}`);
+  await page.goto(`${LEVEL_ONE_URL}&focus=${DRILLED_ID}`);
   await expectGraph(page, PACKAGE_IDS);
   await page.getByRole("button", { name: t.inspector.expand }).focus();
 
@@ -200,7 +213,7 @@ test("o seletor de tema reestiliza o canvas com o token escuro", async ({
   await page.goto(LEVEL_ONE_URL);
   await expectGraph(page, PACKAGE_IDS);
   const lightLabel = await tokenAsCytoscapeRgb(page, LABEL_TOKEN);
-  expect(await styleOf(page, ORDERS_ID, "color")).toBe(lightLabel);
+  expect(await styleOf(page, DRILLED_ID, "color")).toBe(lightLabel);
 
   await page.getByRole("button", { name: "Alternar tema" }).click();
   await page.getByRole("menuitemradio", { name: "Escuro" }).click();
@@ -208,7 +221,7 @@ test("o seletor de tema reestiliza o canvas com o token escuro", async ({
   await expect(page.locator("html")).toHaveClass(DARK_CLASS);
   const darkLabel = await tokenAsCytoscapeRgb(page, LABEL_TOKEN);
   expect(darkLabel).not.toBe(lightLabel);
-  await expect.poll(() => styleOf(page, ORDERS_ID, "color")).toBe(darkLabel);
+  await expect.poll(() => styleOf(page, DRILLED_ID, "color")).toBe(darkLabel);
 });
 
 test("duas páginas novas da mesma vista dão as mesmas posições, byte a byte", async ({
@@ -227,6 +240,132 @@ test("duas páginas novas da mesma vista dão as mesmas posições, byte a byte"
 
   expect(Object.keys(JSON.parse(first))).toStrictEqual(PACKAGE_IDS);
   expect(second).toBe(first);
+});
+
+const CORPUS_LABEL = "xpack.security.authc.support.mapper.expressiondsl";
+const CORPUS_REPOSITORY = "elasticsearch";
+const MIN_WINDOW = { height: 600, width: 960 } as const;
+const HEADER_HEIGHT_PX = 48;
+const REPOSITORY_NAME_FLOOR_PX = 64;
+
+test("a 960 px, com nomes do corpus, a trilha corta com reticências e nada quebra linha nem vaza da barra", async ({
+  browser,
+}, testInfo) => {
+  const relabel = <T extends { readonly id: string; readonly label: string }>(
+    item: T
+  ): T => (item.id === DRILLED_ID ? { ...item, label: CORPUS_LABEL } : item);
+  const levelOne = graphSliceSchema.parse(
+    fixtureResponse("graph.slice.package.jsonl")
+  );
+  const root = outlinePageSchema.parse(
+    fixtureResponse("outline.children.root.jsonl")
+  );
+  const describe = repositoryDescriptionSchema.parse(
+    fixtureResponse("repository.describe.ok.jsonl")
+  );
+
+  const layout = await withFreshPage(
+    browser,
+    {
+      ...contextOptionsOf(testInfo),
+      deviceScaleFactor: 1,
+      viewport: MIN_WINDOW,
+    },
+    async (page) => {
+      await serveTranscripts(page, [
+        {
+          method: "graph.slice",
+          request: { level: "PACKAGE" },
+          result: { ...levelOne, nodes: levelOne.nodes.map(relabel) },
+        },
+        {
+          method: "outline.children",
+          request: { parentId: null },
+          result: { ...root, items: root.items.map(relabel) },
+        },
+        {
+          method: "repository.describe",
+          request: {},
+          result: { ...describe, displayName: CORPUS_REPOSITORY },
+        },
+      ]);
+      await page.goto(`${LEVEL_ONE_URL}&level=TYPE&parent=${DRILLED_ID}`);
+      await expectGraph(page, TYPE_IDS);
+      const current = page
+        .getByRole("navigation", { name: t.shell.breadcrumb.label })
+        .locator('[aria-current="page"]');
+      await expect(current).toHaveText(CORPUS_LABEL);
+      await page.evaluate(() => document.fonts.ready);
+      return page.evaluate(
+        ({
+          again,
+          close,
+        }: {
+          readonly again: string;
+          readonly close: string;
+        }) => {
+          const lines = (element: Element): number => {
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            return new Set(
+              [...range.getClientRects()].map((rect) => Math.round(rect.top))
+            ).size;
+          };
+          const header = document.querySelector("header");
+          const nav = header?.querySelector("nav");
+          const repository = header?.querySelector("bdi[title]");
+          const rootCrumb = nav?.querySelector("li:first-child > *");
+          const crumb = nav?.querySelector<HTMLElement>(
+            '[aria-current="page"]'
+          );
+          const buttons = [
+            ...(header?.querySelectorAll("button") ?? []),
+          ].filter((button) =>
+            [again, close].includes(button.textContent ?? "")
+          );
+          const right = header?.children[1];
+          if (!(header && nav && repository && rootCrumb && crumb && right)) {
+            throw new Error("o cabeçalho do workspace está incompleto");
+          }
+          const bar = header.getBoundingClientRect();
+          const parts = [repository, rootCrumb, crumb, ...buttons];
+          return {
+            buttonLines: buttons.map(lines),
+            crumbClipped: crumb.scrollWidth > crumb.clientWidth,
+            crumbLines: lines(crumb),
+            crumbTitle: crumb.title,
+            headerHeight: Math.round(bar.height),
+            repositoryClipped: repository.scrollWidth > repository.clientWidth,
+            repositoryTitle: repository.getAttribute("title"),
+            repositoryWidth: repository.getBoundingClientRect().width,
+            rootLines: lines(rootCrumb),
+            spills: parts.some((part) => {
+              const box = part.getBoundingClientRect();
+              return box.top < bar.top || box.bottom > bar.bottom;
+            }),
+            trailOverlapsRight:
+              nav.getBoundingClientRect().right >
+              right.getBoundingClientRect().left,
+          };
+        },
+        { again: t.analysis.again, close: t.header.close }
+      );
+    }
+  );
+
+  expect(layout).toStrictEqual({
+    buttonLines: [1, 1],
+    crumbClipped: true,
+    crumbLines: 1,
+    crumbTitle: CORPUS_LABEL,
+    headerHeight: HEADER_HEIGHT_PX,
+    repositoryClipped: true,
+    repositoryTitle: CORPUS_REPOSITORY,
+    repositoryWidth: REPOSITORY_NAME_FLOOR_PX,
+    rootLines: 1,
+    spills: false,
+    trailOverlapsRight: false,
+  });
 });
 
 const AT_BUDGET_SLICES: readonly SyntheticSliceOptions[] = (
@@ -436,15 +575,15 @@ const emptyPointNearCentre = async (page: Page) =>
     EMPTY_POINT_SEARCH
   );
 
-const measurePanZoomPage = async (
+interface GestureRun {
+  readonly fitZoom: number;
+  readonly sessions: Readonly<Record<GestureName, GestureSession>>;
+}
+
+const runGestures = async (
   page: Page,
-  pageNumber: number
-): Promise<PanZoomPage> => {
-  const loadAverage = os.loadavg();
-  await serveTypeSlice(page);
-  await page.goto(TYPE_URL);
-  await waitForFreshReady(page, TYPE_SLICE.nodes);
-  const baselineMs = await measureIdleBaseline(page);
+  baselineMs: number
+): Promise<GestureRun> => {
   const drag = (start: Point) => dragPan(page, start, GESTURE_MS);
   const wheel = (at: Point) => trackpadWheel(page, at, GESTURE_MS);
 
@@ -476,12 +615,26 @@ const measurePanZoomPage = async (
     await emptyPointNearCentre(page)
   );
 
+  return { fitZoom, sessions: { G1: g1, G2: g2, G3: g3 } };
+};
+
+const measurePanZoomPage = async (
+  page: Page,
+  pageNumber: number
+): Promise<PanZoomPage> => {
+  const loadAverage = os.loadavg();
+  await serveTypeSlice(page);
+  await page.goto(TYPE_URL);
+  await waitForFreshReady(page, TYPE_SLICE.nodes);
+  const baselineMs = await measureIdleBaseline(page);
+  const { fitZoom, sessions } = await runGestures(page, baselineMs);
+
   return {
     baselineMs,
     fitZoom,
     loadAverage,
     page: pageNumber,
-    sessions: { G1: g1, G2: g2, G3: g3 },
+    sessions,
     slice: TYPE_SLICE,
   };
 };
@@ -601,6 +754,30 @@ const buildVerdict = (
   } as const;
 };
 
+const measureEnvironment = (
+  browser: Browser,
+  testInfo: TestInfo
+): Promise<BenchmarkEnvironment> =>
+  withFreshPage(browser, contextOptionsOf(testInfo), async (page) => {
+    await serveMap(page);
+    await page.goto(LEVEL_ONE_URL);
+    await expectGraph(page, PACKAGE_IDS);
+    return captureEnvironment({
+      baselineMs: await measureIdleBaseline(page),
+      browser,
+      page,
+      project: testInfo.project,
+    });
+  });
+
+const expectGatingSetup = (environment: BenchmarkEnvironment): void => {
+  expect(environment.browser.channel).toBe("chromium");
+  expect(environment.browser.executablePath).not.toBeNull();
+  expect(environment.browser.webglRenderer).not.toMatch(SOFTWARE_RENDERER);
+  expect(environment.viewport).toStrictEqual({ height: 800, width: 1280 });
+  expect(environment.devicePixelRatio).toBe(1);
+};
+
 test.describe("Benchmark do grafo sobre fatias sintéticas", () => {
   test.describe.configure({ mode: "serial", timeout: BENCHMARK_TIMEOUT_MS });
 
@@ -686,21 +863,7 @@ test.describe("Benchmark do grafo sobre fatias sintéticas", () => {
     if (clicks === null || levelOne === null || panZoom === null) {
       throw new Error("uma medição @benchmark não rodou neste worker");
     }
-    const environment = await withFreshPage(
-      browser,
-      contextOptionsOf(testInfo),
-      async (page) => {
-        await serveMap(page);
-        await page.goto(LEVEL_ONE_URL);
-        await expectGraph(page, PACKAGE_IDS);
-        return captureEnvironment({
-          baselineMs: await measureIdleBaseline(page),
-          browser,
-          page,
-          project: testInfo.project,
-        });
-      }
-    );
+    const environment = await measureEnvironment(browser, testInfo);
     const verdict = buildVerdict(
       levelOne,
       panZoom,
@@ -735,11 +898,236 @@ test.describe("Benchmark do grafo sobre fatias sintéticas", () => {
     if (testInfo.project.name !== GATING_PROJECT) {
       return;
     }
-    expect(environment.browser.channel).toBe("chromium");
-    expect(environment.browser.executablePath).not.toBeNull();
-    expect(environment.browser.webglRenderer).not.toMatch(SOFTWARE_RENDERER);
-    expect(environment.viewport).toStrictEqual({ height: 800, width: 1280 });
-    expect(environment.devicePixelRatio).toBe(1);
+    expectGatingSetup(environment);
+    expect(verdict.outcome).toBe("PASS");
+  });
+});
+
+const RECORDED_DIR = new URL("recorded/", import.meta.url);
+
+const RECORDED_LEVEL_ONE = [
+  {
+    file: "elasticsearch.default.graph-slice-package.jsonl.gz",
+    selection: "DEFAULT",
+  },
+  { file: "elasticsearch.all.graph-slice-package.jsonl.gz", selection: "ALL" },
+] as const;
+
+type RecordedSelection = (typeof RECORDED_LEVEL_ONE)[number]["selection"];
+
+interface RecordedLevelOne {
+  readonly edges: number;
+  readonly file: string;
+  readonly nodes: number;
+
+  readonly nonSolidEdges: number;
+
+  readonly responseSha256: string;
+  readonly selection: RecordedSelection;
+  readonly slice: GraphSlice;
+}
+
+const readRecordedLevelOne = ({
+  file,
+  selection,
+}: (typeof RECORDED_LEVEL_ONE)[number]): RecordedLevelOne => {
+  const [, responseLine] = gunzipSync(readFileSync(new URL(file, RECORDED_DIR)))
+    .toString("utf8")
+    .split("\n");
+  if (responseLine === undefined || responseLine === "") {
+    throw new Error(`${file} não tem linha de resposta`);
+  }
+  const frame = JSON.parse(responseLine) as { readonly payload: unknown };
+  const slice = graphSliceSchema.parse(frame.payload);
+  if (slice.level !== "PACKAGE") {
+    throw new Error(`${file} não é uma fatia de nível 1`);
+  }
+  return {
+    edges: slice.edges.length,
+    file,
+    nodes: slice.nodes.length,
+    nonSolidEdges: slice.edges.filter((edge) => edge.resolution !== "RESOLVED")
+      .length,
+    responseSha256: sha256(responseLine),
+    selection,
+    slice,
+  };
+};
+
+interface RecordedPanZoomPage extends GestureRun {
+  readonly baselineMs: number;
+  readonly loadAverage: readonly number[];
+  readonly page: number;
+  readonly selection: RecordedSelection;
+}
+
+const recordedMeasured: Partial<
+  Record<RecordedSelection, readonly RecordedPanZoomPage[]>
+> = {};
+
+const measureRecordedPage = async (
+  page: Page,
+  pageNumber: number,
+  recording: RecordedLevelOne
+): Promise<RecordedPanZoomPage> => {
+  const loadAverage = os.loadavg();
+  await serveSlices(page, [
+    {
+      method: "graph.slice",
+      request: { level: "PACKAGE" },
+      result: recording.slice,
+    },
+  ]);
+  await page.goto(LEVEL_ONE_URL);
+  await waitForFreshReady(page, recording.nodes);
+  const baselineMs = await measureIdleBaseline(page);
+  return {
+    ...(await runGestures(page, baselineMs)),
+    baselineMs,
+    loadAverage,
+    page: pageNumber,
+    selection: recording.selection,
+  };
+};
+
+const RECORDED_KEY_ORDER = [
+  "schema",
+  "measuredAt",
+  "baseCommit",
+  "measure",
+  "rule",
+  "verdict",
+  "environment",
+  "generator",
+  "results",
+] as const satisfies readonly (keyof BenchmarkRecord<unknown>)[];
+
+const RECORDED_BLOCK = "recorded";
+
+const writeRecordedBlock = <Results>(
+  record: BenchmarkRecord<Results>,
+  projectName: string
+): string | null => {
+  const target = benchmarkOutputPath(projectName);
+  if (target === null) {
+    return null;
+  }
+  const existing: Record<string, unknown> = existsSync(target)
+    ? (JSON.parse(readFileSync(target, "utf8")) as Record<string, unknown>)
+    : {};
+  const block = Object.fromEntries(
+    RECORDED_KEY_ORDER.map((key) => [key, record[key]])
+  );
+  writeFileSync(
+    target,
+    `${JSON.stringify({ ...existing, [RECORDED_BLOCK]: block }, null, 2)}\n`
+  );
+  return target;
+};
+
+const buildRecordedRule = (recordings: readonly RecordedLevelOne[]) => ({
+  criterion:
+    "frameRatio = frames / (span / b); PASS iff frameRatio >= minFrameRatio in every session of every recording",
+  freshPagesPerRecording: PAN_ZOOM_PAGES,
+  gestureMs: GESTURE_MS,
+  gestures: buildRule().typeBudgetPanZoom.gestures,
+  minFrameRatio: MIN_FRAME_RATIO,
+  recordings: recordings.map(({ slice: _slice, ...identity }) => identity),
+  settleBeforeEachGestureMs: SETTLE_MS,
+});
+
+const buildRecordedVerdict = (
+  pages: readonly RecordedPanZoomPage[],
+  projectName: string
+) => {
+  const sessions = pages.flatMap((page) =>
+    GESTURES.map((gesture) => ({
+      frameRatio: page.sessions[gesture].frameRatio,
+      gesture,
+      page: page.page,
+      selection: page.selection,
+    }))
+  );
+  const frameRatios = sessions.map((session) => session.frameRatio);
+  const pass =
+    sessions.length ===
+      RECORDED_LEVEL_ONE.length * PAN_ZOOM_PAGES * GESTURES.length &&
+    frameRatios.every((ratio) => ratio >= MIN_FRAME_RATIO);
+  return {
+    decides: projectName === GATING_PROJECT,
+    minFrameRatio: MIN_FRAME_RATIO,
+    observedMinFrameRatio: Math.min(...frameRatios),
+    outcome: pass ? "PASS" : "FAIL",
+    project: projectName,
+    sessions,
+  } as const;
+};
+
+test.describe("Benchmark do grafo sobre fatias reais: o nível 1 gravado do Elasticsearch", () => {
+  test.describe.configure({ mode: "serial", timeout: BENCHMARK_TIMEOUT_MS });
+
+  for (const entry of RECORDED_LEVEL_ONE) {
+    test(`@benchmark recorded pan-zoom: Elasticsearch ${entry.selection} nível 1, G1 G2 G3 em 3 páginas novas`, async ({
+      browser,
+    }, testInfo) => {
+      const recording = readRecordedLevelOne(entry);
+      const pages: RecordedPanZoomPage[] = [];
+
+      for (let pageNumber = 1; pageNumber <= PAN_ZOOM_PAGES; pageNumber += 1) {
+        pages.push(
+          // biome-ignore lint/performance/noAwaitInLoops: uma medição por vez, para não dividir a GPU
+          await withFreshPage(browser, contextOptionsOf(testInfo), (page) =>
+            measureRecordedPage(page, pageNumber, recording)
+          )
+        );
+      }
+
+      recordedMeasured[entry.selection] = pages;
+      const inputs = pages.flatMap((page) =>
+        GESTURES.map((gesture) => page.sessions[gesture].inputEvents)
+      );
+      expect(inputs).toHaveLength(PAN_ZOOM_PAGES * GESTURES.length);
+      expect(Math.min(...inputs)).toBeGreaterThan(0);
+    });
+  }
+
+  test("@benchmark recorded veredito: o mesmo limiar nas fatias gravadas, em um bloco próprio do registro", async ({
+    browser,
+  }, testInfo) => {
+    const pages = RECORDED_LEVEL_ONE.flatMap(
+      ({ selection }) => recordedMeasured[selection] ?? []
+    );
+    if (pages.length !== RECORDED_LEVEL_ONE.length * PAN_ZOOM_PAGES) {
+      throw new Error("uma medição @benchmark gravada não rodou neste worker");
+    }
+    const recordings = RECORDED_LEVEL_ONE.map(readRecordedLevelOne);
+    const environment = await measureEnvironment(browser, testInfo);
+    const verdict = buildRecordedVerdict(pages, testInfo.project.name);
+    const written = writeRecordedBlock(
+      createBenchmarkRecord({
+        environment,
+        generator: {
+          recordedBy: "the real analyzer, stored under e2e/recorded/",
+          recordings: recordings.map(
+            ({ slice: _slice, ...identity }) => identity
+          ),
+        },
+        measure: MEASURE_COMMAND,
+        results: { recordedPanZoom: pages },
+        rule: buildRecordedRule(recordings),
+        verdict,
+      }),
+      testInfo.project.name
+    );
+    testInfo.annotations.push({
+      description: JSON.stringify({ verdict, written }),
+      type: "verdict",
+    });
+
+    if (testInfo.project.name !== GATING_PROJECT) {
+      return;
+    }
+    expectGatingSetup(environment);
     expect(verdict.outcome).toBe("PASS");
   });
 });

@@ -67,6 +67,8 @@ const UNKNOWN_SET_SIZE = -1;
 
 const PACKAGE_ID_PREFIX = "pkg:";
 
+const TYPE_ID_PREFIX = "type:";
+
 const levelTail = (
   level: OutlineLevel,
   rowLevel: 1 | 2,
@@ -153,6 +155,30 @@ const childRows = (
   ];
 };
 
+const orphanRows = (
+  root: OutlineLevel,
+  nodes: readonly OutlineNode[],
+  expanded: ExpandedOutlineLevel | null
+): OutlineRow[] => {
+  if (
+    expanded === null ||
+    expanded.failure === null ||
+    root.hasNextPage ||
+    nodes.some((node) => node.id === expanded.parentId)
+  ) {
+    return [];
+  }
+  return [
+    {
+      failure: expanded.failure,
+      key: `error:${expanded.parentId}`,
+      level: 1,
+      parentId: expanded.parentId,
+      type: "error",
+    },
+  ];
+};
+
 export const flattenOutline = (
   root: OutlineLevel,
   expanded: ExpandedOutlineLevel | null
@@ -178,11 +204,17 @@ export const flattenOutline = (
       ? [row, ...childRows(expanded, node.childCount)]
       : [row];
   });
-  return [...rows, ...levelTail(root, 1, null, setSize, null)];
+  return [
+    ...orphanRows(root, nodes, expanded),
+    ...rows,
+    ...levelTail(root, 1, null, setSize, null),
+  ];
 };
 
 export interface OutlineModel {
   readonly busy: boolean;
+
+  readonly childrenError: Error | null;
 
   readonly expandedId: string | null;
 
@@ -288,8 +320,10 @@ export function useOutline(
 
   const rootSought =
     expandedId ?? (focus?.startsWith(PACKAGE_ID_PREFIX) ? focus : null);
+  const childSought =
+    expandedId !== null && focus?.startsWith(TYPE_ID_PREFIX) ? focus : null;
   useFetchUntilFound(root, rootSought);
-  useFetchUntilFound(children, expandedId === null ? null : focus);
+  useFetchUntilFound(children, childSought);
 
   const { loadMore: loadMoreRoot, retry: retryRoot } = useLevelActions(root);
   const { loadMore: loadMoreChildren, retry: retryChildren } =
@@ -335,6 +369,7 @@ export function useOutline(
 
   return {
     busy: root.isFetching || children.isFetching,
+    childrenError: children.error,
     expandedId,
     loadMore,
     retry,
