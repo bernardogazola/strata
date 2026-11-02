@@ -3,6 +3,7 @@ name = "strata"
 version = "0.1.0"
 description = "Ferramenta local-first de arqueologia de código para onboarding em bases legadas Java"
 authors = ["Bernardo Gazola"]
+license = "MIT"
 edition = "2024"
 # Descoberta automática desligada: um tests/*.rs novo só roda depois de ganhar
 # uma entrada [[test]] abaixo.
